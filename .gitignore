@@ -1,0 +1,17 @@
+# Build output
+dist/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Claude Code sessions
+.claude/
+
+# Xcode (if ever used)
+*.xcodeproj/
+*.xcworkspace/
+build/
+DerivedData/
+.build/
