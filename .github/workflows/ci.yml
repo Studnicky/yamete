@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint (strict concurrency)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Type-check with strict concurrency
+        run: |
+          swiftc -typecheck \
+            -module-name Yamete -target arm64-apple-macosx14.0 -parse-as-library \
+            -framework SwiftUI -framework AppKit -framework AVFoundation -framework ServiceManagement \
+            -strict-concurrency=complete \
+            -warnings-as-errors \
+            $(find Sources -name '*.swift' | sort)
+
+  build:
+    name: Build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app bundle
+        run: make build
+      - name: Verify bundle contents
+        run: |
+          test -f dist/Yamete.app/Contents/MacOS/yamete
+          test -f dist/Yamete.app/Contents/Info.plist
+          FACE_COUNT=$(ls dist/Yamete.app/Contents/Resources/face_*.svg | wc -l)
+          SOUND_COUNT=$(ls dist/Yamete.app/Contents/Resources/sound_*.mp3 | wc -l)
+          echo "Faces: $FACE_COUNT, Sounds: $SOUND_COUNT"
+          test "$FACE_COUNT" -ge 10
+          test "$SOUND_COUNT" -ge 10
+
+  test:
+    name: Test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: swift test
