@@ -94,12 +94,11 @@ final class ImpactController: @unchecked Sendable {
         // Opacity: intensity 0 → opacityMin, intensity 1 → opacityMax
         // Debounce: intensity 0 → debounceMin (quick), intensity 1 → debounceMax (long)
 
-        let deviceUID: String? = settings.audioDeviceUID.isEmpty ? nil : settings.audioDeviceUID
         let clipDuration = audioPlayer.play(
             intensity: intensity,
             volumeMin: Float(settings.volumeMin),
             volumeMax: Float(settings.volumeMax),
-            deviceUID: deviceUID
+            deviceUIDs: settings.enabledAudioDevices
         )
 
         let debounce = settings.debounce

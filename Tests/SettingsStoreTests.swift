@@ -19,13 +19,13 @@ final class SettingsStoreTests: XCTestCase {
         struct Case { let name: String; let read: (SettingsStore) -> String; let expected: String }
         let cases: [Case] = [
             .init(name: "sensitivityMin",  read: { "\($0.sensitivityMin)" },  expected: "0.1"),
-            .init(name: "sensitivityMax",  read: { "\($0.sensitivityMax)" },  expected: "0.7"),
+            .init(name: "sensitivityMax",  read: { "\($0.sensitivityMax)" },  expected: "0.9"),
             .init(name: "debounce",     read: { "\($0.debounce)" },     expected: "0.3"),
             .init(name: "screenFlash",     read: { "\($0.screenFlash)" },     expected: "true"),
             .init(name: "flashOpacityMin", read: { "\($0.flashOpacityMin)" }, expected: "0.1"),
-            .init(name: "flashOpacityMax", read: { "\($0.flashOpacityMax)" }, expected: "0.7"),
-            .init(name: "volumeMin",       read: { "\($0.volumeMin)" },       expected: "0.3"),
-            .init(name: "volumeMax",       read: { "\($0.volumeMax)" },       expected: "0.7"),
+            .init(name: "flashOpacityMax", read: { "\($0.flashOpacityMax)" }, expected: "0.9"),
+            .init(name: "volumeMin",       read: { "\($0.volumeMin)" },       expected: "0.1"),
+            .init(name: "volumeMax",       read: { "\($0.volumeMax)" },       expected: "0.9"),
         ]
         let store = freshStore()
         for c in cases {
