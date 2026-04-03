@@ -13,7 +13,7 @@ struct MenuBarLabel: View {
 
 struct FaceIcon: View {
     private static let cachedIcon: NSImage? = {
-        guard let path = Bundle.main.path(forResource: "face_icon", ofType: "png"),
+        guard let path = Bundle.main.path(forResource: "menubar_icon", ofType: "png"),
               let img  = NSImage(contentsOfFile: path) else { return nil }
         let t = img.copy() as! NSImage
         t.size = NSSize(width: 18, height: 18)
