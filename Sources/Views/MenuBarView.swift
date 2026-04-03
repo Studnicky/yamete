@@ -18,9 +18,7 @@ struct MenuBarView: View {
 
         VStack(spacing: 0) {
 
-            // ═══════════════════════════════════════════════════════
-            // HEADER: Enable + Launch at Login
-            // ═══════════════════════════════════════════════════════
+            // ── Header ───────────────────────────────────────────
             VStack(spacing: 6) {
                 HStack {
                     Image(systemName: controller.isEnabled
@@ -34,8 +32,7 @@ struct MenuBarView: View {
                         set: { _ in controller.toggle() }
                     ))
                     .toggleStyle(.switch).tint(Theme.pink)
-                    .labelsHidden()
-                    .controlSize(.small)
+                    .labelsHidden().controlSize(.small)
                 }
                 HStack {
                     Toggle("Launch at Login", isOn: $launchAtLogin)
@@ -54,29 +51,13 @@ struct MenuBarView: View {
 
             Divider()
 
-            // ═══════════════════════════════════════════════════════
-            // DETECTION
-            // ═══════════════════════════════════════════════════════
+            // ── Range sliders ────────────────────────────────────
             section("Sensitivity", help: "Impact force band. Below low: ignored. Above high: full response.") {
                 RangeSlider(low: $settings.sensitivityMin, high: $settings.sensitivityMax,
                             bounds: 0...1, format: { String(format: "%.0f%%", $0 * 100) })
             }
             Divider()
 
-            section("Debounce", help: "Minimum seconds between reactions.") {
-                HStack(spacing: 8) {
-                    Slider(value: $settings.debounce, in: 0...1.5)
-                        .tint(Theme.pink)
-                    Text(String(format: "%.1fs", settings.debounce))
-                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                        .frame(width: 36, alignment: .trailing)
-                }
-            }
-            Divider()
-
-            // ═══════════════════════════════════════════════════════
-            // OUTPUT
-            // ═══════════════════════════════════════════════════════
             section("Volume", help: "Audio level range. Light impact → low, hard impact → high.") {
                 RangeSlider(low: $settings.volumeMin, high: $settings.volumeMax,
                             bounds: 0...1, format: { "\(Int($0 * 100))%" })
@@ -89,26 +70,32 @@ struct MenuBarView: View {
             }
             Divider()
 
-            // ═══════════════════════════════════════════════════════
-            // DEVICES
-            // ═══════════════════════════════════════════════════════
+            // ── Debounce (single slider, after all range sliders) ─
+            section("Debounce", help: "Minimum seconds between reactions.") {
+                HStack(spacing: 8) {
+                    Slider(value: $settings.debounce, in: 0...1.5)
+                        .tint(Theme.pink)
+                    Text(String(format: "%.1fs", settings.debounce))
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        .frame(width: 36, alignment: .trailing)
+                }
+            }
+            Divider()
+
+            // ── Displays ─────────────────────────────────────────
             section("Flash Displays", help: "Which monitors show the flash overlay.") {
                 let screens = NSScreen.screens
                 VStack(spacing: 0) {
                     ForEach(0..<screens.count, id: \.self) { i in
                         let screen = screens[i]
-                        let dispID = displayID(for: screen)
+                        let dispID = self.displayID(for: screen)
                         Toggle(isOn: displayBinding(dispID: dispID, screens: screens)) {
-                            Text(screen.localizedName)
-                                .font(.caption)
+                            Text(screen.localizedName).font(.caption)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .toggleStyle(.checkbox)
-                        .tint(Theme.pink)
+                        .toggleStyle(.checkbox).tint(Theme.pink)
                         .padding(.vertical, 3).padding(.horizontal, 4)
-                        if i < screens.count - 1 {
-                            Divider().padding(.leading, 20)
-                        }
+                        if i < screens.count - 1 { Divider().padding(.leading, 20) }
                     }
                 }
                 .background(Color.secondary.opacity(0.08))
@@ -116,20 +103,17 @@ struct MenuBarView: View {
             }
             Divider()
 
-            section("Audio Output", help: "Which audio devices play impact sounds. None selected = system default.") {
+            // ── Audio output ─────────────────────────────────────
+            section("Audio Output", help: "Which audio devices play impact sounds. None = system default.") {
                 VStack(spacing: 0) {
                     ForEach(Array(audioDevices.enumerated()), id: \.offset) { i, device in
                         Toggle(isOn: audioBinding(uid: device.uid)) {
-                            Text(device.name)
-                                .font(.caption)
+                            Text(device.name).font(.caption)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .toggleStyle(.checkbox)
-                        .tint(Theme.pink)
+                        .toggleStyle(.checkbox).tint(Theme.pink)
                         .padding(.vertical, 3).padding(.horizontal, 4)
-                        if i < audioDevices.count - 1 {
-                            Divider().padding(.leading, 20)
-                        }
+                        if i < audioDevices.count - 1 { Divider().padding(.leading, 20) }
                     }
                     if audioDevices.isEmpty {
                         Text("No output devices found")
@@ -140,41 +124,38 @@ struct MenuBarView: View {
                 .background(Color.secondary.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            Divider()
 
-            // ═══════════════════════════════════════════════════════
-            // ERROR (conditional)
-            // ═══════════════════════════════════════════════════════
+            // ── Error ────────────────────────────────────────────
             if let error = controller.sensorError {
+                Divider()
                 Text(error)
                     .font(.caption).foregroundStyle(.red)
                     .padding(.horizontal, 14).padding(.vertical, 4)
-                Divider()
             }
 
-            // ═══════════════════════════════════════════════════════
-            // FOOTER: Auto-Update | Impacts | Version | Quit
-            // ═══════════════════════════════════════════════════════
-            HStack(spacing: 6) {
+            Divider()
+
+            // ── Footer row 1: auto-update toggle + version ───────
+            HStack {
                 Toggle("Auto-Update", isOn: $settings.autoCheckForUpdates)
-                    .toggleStyle(.checkbox)
-                    .tint(Theme.pink)
-                    .font(.caption).foregroundStyle(.secondary)
+                    .toggleStyle(.switch).tint(Theme.pink)
+                    .controlSize(.mini)
                 Spacer()
+                versionButton
             }
+            .font(.caption)
             .padding(.horizontal, 14).padding(.top, 6).padding(.bottom, 2)
 
+            // ── Footer row 2: counter + quit ─────────────────────
             HStack {
-                versionButton
-                Spacer()
-                Text("\(controller.impactCount)")
-                    .font(.caption.monospacedDigit().bold()).foregroundStyle(Theme.deepRose)
+                Text("\(controller.impactCount) impacts today")
+                    .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button(action: { NSApp.terminate(nil) }) {
                     Text("Quit")
                         .font(.caption.bold())
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .padding(.horizontal, 12).padding(.vertical, 4)
                         .background(Theme.deepRose)
                         .clipShape(RoundedRectangle(cornerRadius: 5))
                 }
@@ -236,11 +217,8 @@ struct MenuBarView: View {
             get: { s.enabledAudioDevices.contains(uid) },
             set: { enabled in
                 var uids = s.enabledAudioDevices
-                if enabled {
-                    if !uids.contains(uid) { uids.append(uid) }
-                } else {
-                    uids.removeAll { $0 == uid }
-                }
+                if enabled { if !uids.contains(uid) { uids.append(uid) } }
+                else { uids.removeAll { $0 == uid } }
                 s.enabledAudioDevices = uids
             }
         )
@@ -252,13 +230,9 @@ struct MenuBarView: View {
             get: { s.enabledDisplays.isEmpty || s.enabledDisplays.contains(dispID) },
             set: { enabled in
                 var ids = s.enabledDisplays.isEmpty
-                    ? screens.map { displayID(for: $0) }
-                    : s.enabledDisplays
-                if enabled {
-                    if !ids.contains(dispID) { ids.append(dispID) }
-                } else {
-                    ids.removeAll { $0 == dispID }
-                }
+                    ? screens.map { displayID(for: $0) } : s.enabledDisplays
+                if enabled { if !ids.contains(dispID) { ids.append(dispID) } }
+                else { ids.removeAll { $0 == dispID } }
                 s.enabledDisplays = ids.count == screens.count ? [] : ids
             }
         )
