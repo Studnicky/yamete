@@ -31,8 +31,9 @@ struct RangeSlider: View {
     private func sliderBody(width w: CGFloat, height h: CGFloat) -> some View {
         let span  = bounds.upperBound - bounds.lowerBound
         let yC    = h / 2
-        let lowX  = CGFloat((low  - bounds.lowerBound) / span) * w
-        let highX = CGFloat((high - bounds.lowerBound) / span) * w
+        let safeW = max(w, 1)
+        let lowX  = CGFloat((low  - bounds.lowerBound) / span) * safeW
+        let highX = CGFloat((high - bounds.lowerBound) / span) * safeW
 
         ZStack {
             RoundedRectangle(cornerRadius: trackH / 2)
@@ -49,7 +50,7 @@ struct RangeSlider: View {
                 .highPriorityGesture(
                     DragGesture(coordinateSpace: .named(Self.coordSpace))
                         .onChanged { v in
-                            low = bounds.lowerBound + Double(min(max(0, v.location.x), highX - 1) / w) * span
+                            low = bounds.lowerBound + Double(min(max(0, v.location.x), highX - 1) / safeW) * span
                         }
                 )
 
@@ -57,7 +58,7 @@ struct RangeSlider: View {
                 .highPriorityGesture(
                     DragGesture(coordinateSpace: .named(Self.coordSpace))
                         .onChanged { v in
-                            high = bounds.lowerBound + Double(min(max(lowX + 1, v.location.x), w) / w) * span
+                            high = bounds.lowerBound + Double(min(max(lowX + 1, v.location.x), safeW) / safeW) * span
                         }
                 )
         }

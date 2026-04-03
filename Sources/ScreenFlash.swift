@@ -21,6 +21,9 @@ final class ScreenFlash {
 
     private lazy var faceImages: [NSImage] = loadFaceImages()
 
+    /// Reusable window pool keyed by screen index. Avoids NSWindow creation per impact.
+    private var windowPool: [Int: NSWindow] = [:]
+
     /// Flashes all screens with a face overlay gated inside `clipDuration`.
     /// - Parameter enabledDisplayIDs: display IDs to flash. Empty = all displays.
     func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, enabledDisplayIDs: [Int] = []) {
@@ -48,20 +51,26 @@ final class ScreenFlash {
         guard !screens.isEmpty else { return }
         let picks = pickFaces(count: screens.count, total: faces.count)
 
-        var created: [NSWindow] = []
+        var activeWindows: [NSWindow] = []
         for (i, screen) in screens.enumerated() {
             let face = picks[i].map { faces[$0] }
-            let win = makeWindow(screen: screen, peak: peak, face: face,
+            let win = windowForScreen(index: i, screen: screen)
+            let hosting = NSHostingView(rootView:
+                FlashOverlayView(peak: peak, face: face,
                                  fadeIn: env.fadeIn, hold: env.hold, fadeOut: env.fadeOut)
+                    .frame(width: screen.frame.width, height: screen.frame.height)
+            )
+            hosting.frame = NSRect(origin: .zero, size: screen.frame.size)
+            hosting.autoresizingMask = [.width, .height]
+            win.contentView = hosting
+            win.setFrame(screen.frame, display: false)
             win.orderFront(nil)
-            created.append(win)
+            activeWindows.append(win)
         }
 
-        let captured = Transferred(created)
-        DispatchQueue.main.asyncAfter(deadline: .now() + clipDuration + 0.05) {
-            MainActor.assumeIsolated {
-                captured.value.forEach { $0.orderOut(nil) }
-            }
+        Task {
+            try? await Task.sleep(for: .seconds(clipDuration + 0.05))
+            activeWindows.forEach { $0.orderOut(nil) }
         }
     }
 
@@ -131,15 +140,8 @@ final class ScreenFlash {
     // MARK: - Resource loading
 
     private func loadFaceImages() -> [NSImage] {
-        guard let resourcePath = Bundle.main.resourcePath else { return [] }
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: resourcePath)) ?? []
-        let images = files
-            .filter { name in
-                name.hasPrefix("face_") && ["svg", "png", "jpg", "jpeg"]
-                    .contains(where: { name.hasSuffix("."+$0) })
-            }
-            .sorted()
-            .compactMap { NSImage(contentsOfFile: resourcePath + "/" + $0) }
+        let urls = BundleResources.urls(prefix: "face_", extensions: ["svg", "png", "jpg", "jpeg"])
+        let images = urls.compactMap { NSImage(contentsOf: $0) }
         if images.isEmpty {
             log.error("entity:FaceLibrary wasInvalidatedBy activity:ResourceLoad — no face images in bundle")
         } else {
@@ -148,31 +150,24 @@ final class ScreenFlash {
         return images
     }
 
-    // MARK: - Window creation
+    // MARK: - Window pool
 
-    private func makeWindow(screen: NSScreen, peak: CGFloat, face: NSImage?,
-                            fadeIn: Double, hold: Double, fadeOut: Double) -> NSWindow {
-        let screenSize = screen.frame.size
+    /// Returns a reusable borderless overlay window for the given screen index.
+    /// Creates a new window only on first use; subsequent calls return the existing one.
+    private func windowForScreen(index: Int, screen: NSScreen) -> NSWindow {
+        if let existing = windowPool[index] { return existing }
         let win = NSWindow(
-            contentRect: NSRect(origin: .zero, size: screenSize),
+            contentRect: NSRect(origin: .zero, size: screen.frame.size),
             styleMask:   [.borderless],
             backing:     .buffered,
             defer:       false
         )
-        win.setFrameOrigin(screen.frame.origin)
         win.level              = NSWindow.Level(rawValue: Int(CGWindowLevelKey.screenSaverWindow.rawValue) + 1)
         win.isOpaque           = false
         win.backgroundColor    = .clear
         win.ignoresMouseEvents = true
         win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-
-        let hosting = NSHostingView(rootView:
-            FlashOverlayView(peak: peak, face: face, fadeIn: fadeIn, hold: hold, fadeOut: fadeOut)
-                .frame(width: screenSize.width, height: screenSize.height)
-        )
-        hosting.frame = NSRect(origin: .zero, size: screenSize)
-        hosting.autoresizingMask = [.width, .height]
-        win.contentView = hosting
+        windowPool[index] = win
         return win
     }
 }
@@ -214,11 +209,10 @@ private struct FlashOverlayView: View {
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .ignoresSafeArea()
-        .onAppear {
+        .task {
             withAnimation(.easeIn(duration: fadeIn)) { opacity = peak }
-            DispatchQueue.main.asyncAfter(deadline: .now() + fadeIn + hold) {
-                withAnimation(.easeOut(duration: fadeOut)) { opacity = 0 }
-            }
+            try? await Task.sleep(for: .seconds(fadeIn + hold))
+            withAnimation(.easeOut(duration: fadeOut)) { opacity = 0 }
         }
     }
 }
