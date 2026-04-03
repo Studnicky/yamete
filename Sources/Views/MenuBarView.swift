@@ -21,29 +21,36 @@ struct MenuBarView: View {
             // ═══════════════════════════════════════════════════════
             // HEADER: Enable + Launch at Login
             // ═══════════════════════════════════════════════════════
-            HStack {
-                Image(systemName: controller.isEnabled
-                      ? "waveform.path.ecg.rectangle.fill" : "waveform.path.ecg.rectangle")
-                    .foregroundStyle(controller.isEnabled ? Theme.pink : .secondary)
-                Toggle("Detection", isOn: Binding(
-                    get: { controller.isEnabled },
-                    set: { _ in controller.toggle() }
-                ))
-                .toggleStyle(.switch).tint(Theme.pink)
-
-                Spacer()
-
-                Toggle("Launch at Login", isOn: $launchAtLogin)
+            VStack(spacing: 6) {
+                HStack {
+                    Image(systemName: controller.isEnabled
+                          ? "waveform.path.ecg.rectangle.fill" : "waveform.path.ecg.rectangle")
+                        .foregroundStyle(controller.isEnabled ? Theme.pink : .secondary)
+                    Text(controller.isEnabled ? "Enabled" : "Disabled")
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { controller.isEnabled },
+                        set: { _ in controller.toggle() }
+                    ))
                     .toggleStyle(.switch).tint(Theme.pink)
-                    .onChange(of: launchAtLogin) { _, on in
-                        do {
-                            if on { try SMAppService.mainApp.register() }
-                            else  { try SMAppService.mainApp.unregister() }
-                        } catch { launchAtLogin = !on }
-                    }
+                    .labelsHidden()
+                    .controlSize(.small)
+                }
+                HStack {
+                    Toggle("Launch at Login", isOn: $launchAtLogin)
+                        .toggleStyle(.checkbox).tint(Theme.pink)
+                        .onChange(of: launchAtLogin) { _, on in
+                            do {
+                                if on { try SMAppService.mainApp.register() }
+                                else  { try SMAppService.mainApp.unregister() }
+                            } catch { launchAtLogin = !on }
+                        }
+                    Spacer()
+                }
             }
             .font(.caption)
-            .padding(.horizontal, 14).padding(.vertical, 10)
+            .padding(.horizontal, 14).padding(.vertical, 8)
 
             Divider()
 
@@ -109,16 +116,29 @@ struct MenuBarView: View {
             }
             Divider()
 
-            section("Audio Output", help: "Which audio device plays impact sounds.") {
-                Picker(selection: $settings.audioDeviceUID) {
-                    Text("System Default").tag("")
-                    ForEach(audioDevices) { d in
-                        Text(d.name).tag(d.uid)
+            section("Audio Output", help: "Which audio devices play impact sounds. None selected = system default.") {
+                VStack(spacing: 0) {
+                    ForEach(Array(audioDevices.enumerated()), id: \.offset) { i, device in
+                        Toggle(isOn: audioBinding(uid: device.uid)) {
+                            Text(device.name)
+                                .font(.caption)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .toggleStyle(.checkbox)
+                        .tint(Theme.pink)
+                        .padding(.vertical, 3).padding(.horizontal, 4)
+                        if i < audioDevices.count - 1 {
+                            Divider().padding(.leading, 20)
+                        }
                     }
-                } label: { EmptyView() }
-                .pickerStyle(.menu)
-                .tint(Theme.pink)
-                .font(.caption)
+                    if audioDevices.isEmpty {
+                        Text("No output devices found")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .padding(.vertical, 3).padding(.horizontal, 4)
+                    }
+                }
+                .background(Color.secondary.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             Divider()
 
@@ -208,6 +228,22 @@ struct MenuBarView: View {
 
     private func displayID(for screen: NSScreen) -> Int {
         (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID).map(Int.init) ?? 0
+    }
+
+    private func audioBinding(uid: String) -> Binding<Bool> {
+        @Bindable var s = settings
+        return Binding<Bool>(
+            get: { s.enabledAudioDevices.contains(uid) },
+            set: { enabled in
+                var uids = s.enabledAudioDevices
+                if enabled {
+                    if !uids.contains(uid) { uids.append(uid) }
+                } else {
+                    uids.removeAll { $0 == uid }
+                }
+                s.enabledAudioDevices = uids
+            }
+        )
     }
 
     private func displayBinding(dispID: Int, screens: [NSScreen]) -> Binding<Bool> {

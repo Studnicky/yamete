@@ -19,9 +19,9 @@ final class AudioPlayer {
 
     /// Plays a sound scaled to intensity on the specified device.
     /// Returns the clip duration (0 if nothing played).
-    /// - Parameter deviceUID: Core Audio device UID, or nil for system default.
+    /// - Parameter deviceUIDs: Core Audio device UIDs. Empty = system default.
     @discardableResult
-    func play(intensity: Float, volumeMin: Float, volumeMax: Float, deviceUID: String? = nil) -> Double {
+    func play(intensity: Float, volumeMin: Float, volumeMax: Float, deviceUIDs: [String] = []) -> Double {
         guard let sound = selectSound(intensity: intensity) else {
             log.warning("activity:Playback wasInvalidatedBy entity:EmptySoundPool")
             return 0
@@ -32,18 +32,24 @@ final class AudioPlayer {
 
         let volume = volumeMin + intensity * (volumeMax - volumeMin)
 
-        guard let nsSound = NSSound(contentsOf: sound.url, byReference: true) else {
-            log.error("entity:AudioPlayer wasInvalidatedBy activity:PlayerCreation file=\(sound.url.lastPathComponent)")
-            return 0
+        if deviceUIDs.isEmpty {
+            guard let s = NSSound(contentsOf: sound.url, byReference: true) else {
+                log.error("entity:AudioPlayer wasInvalidatedBy activity:PlayerCreation file=\(sound.url.lastPathComponent)")
+                return 0
+            }
+            s.volume = volume
+            s.play()
+        } else {
+            for uid in deviceUIDs {
+                if let s = NSSound(contentsOf: sound.url, byReference: true) {
+                    s.playbackDeviceIdentifier = uid
+                    s.volume = volume
+                    s.play()
+                }
+            }
         }
 
-        if let uid = deviceUID {
-            nsSound.playbackDeviceIdentifier = uid
-        }
-        nsSound.volume = volume
-        nsSound.play()
-
-        log.debug("activity:Playback used entity:SoundClip file=\(sound.url.lastPathComponent) volume=\(String(format: "%.2f", volume)) device=\(deviceUID ?? "default")")
+        log.debug("activity:Playback used entity:SoundClip file=\(sound.url.lastPathComponent) volume=\(String(format: "%.2f", volume)) devices=\(deviceUIDs.isEmpty ? "default" : "\(deviceUIDs.count)")")
         return sound.duration
     }
 

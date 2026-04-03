@@ -23,22 +23,22 @@ final class SettingsStore {
         case screenFlash
         case flashOpacityMin, flashOpacityMax
         case volumeMin, volumeMax
-        case enabledDisplays, audioDeviceUID, autoCheckForUpdates, lastUpdateCheck
+        case enabledDisplays, enabledAudioDevices, autoCheckForUpdates, lastUpdateCheck
     }
 
     // MARK: - Defaults
 
     nonisolated(unsafe) static let defaults: [String: Any] = [
         Key.sensitivityMin.rawValue:  0.10,
-        Key.sensitivityMax.rawValue:  0.70,
+        Key.sensitivityMax.rawValue:  0.90,
         Key.debounce.rawValue:        0.3,
         Key.screenFlash.rawValue:     true,
         Key.flashOpacityMin.rawValue: 0.10,
-        Key.flashOpacityMax.rawValue: 0.7,
-        Key.volumeMin.rawValue:       0.3,
-        Key.volumeMax.rawValue:       0.7,
+        Key.flashOpacityMax.rawValue: 0.9,
+        Key.volumeMin.rawValue:       0.1,
+        Key.volumeMax.rawValue:       0.9,
         Key.enabledDisplays.rawValue: [Int](),
-        Key.audioDeviceUID.rawValue:  "",
+        Key.enabledAudioDevices.rawValue: [String](),
         Key.autoCheckForUpdates.rawValue: true,
         Key.lastUpdateCheck.rawValue: 0.0,
     ]
@@ -156,11 +156,11 @@ final class SettingsStore {
         }
     }
 
-    /// Core Audio device UID for audio output. Empty = system default.
-    var audioDeviceUID: String {
+    /// Core Audio device UIDs for audio output. Empty = system default only.
+    var enabledAudioDevices: [String] {
         didSet {
-            guard audioDeviceUID != oldValue else { return }
-            persist(audioDeviceUID, .audioDeviceUID)
+            guard enabledAudioDevices != oldValue else { return }
+            persist(enabledAudioDevices, .enabledAudioDevices)
         }
     }
 
@@ -178,7 +178,7 @@ final class SettingsStore {
         volumeMin       = d.double(forKey: Key.volumeMin.rawValue)
         volumeMax       = d.double(forKey: Key.volumeMax.rawValue)
         enabledDisplays = d.array(forKey: Key.enabledDisplays.rawValue) as? [Int] ?? []
-        audioDeviceUID  = d.string(forKey: Key.audioDeviceUID.rawValue) ?? ""
+        enabledAudioDevices = d.array(forKey: Key.enabledAudioDevices.rawValue) as? [String] ?? []
         autoCheckForUpdates = d.bool(forKey: Key.autoCheckForUpdates.rawValue)
         lastUpdateCheck = d.double(forKey: Key.lastUpdateCheck.rawValue)
     }
