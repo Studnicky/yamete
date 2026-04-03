@@ -135,7 +135,7 @@ final class ScreenFlash {
         let files = (try? FileManager.default.contentsOfDirectory(atPath: resourcePath)) ?? []
         let images = files
             .filter { name in
-                name.hasPrefix("face_") && ["svg", "png", "jpg", "jpeg"]
+                name.hasPrefix("face_") && !name.contains("icon") && ["svg", "png", "jpg", "jpeg"]
                     .contains(where: { name.hasSuffix("."+$0) })
             }
             .sorted()
