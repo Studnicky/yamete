@@ -1,38 +1,40 @@
 import CoreAudio
 import Foundation
 
-/// Enumerates macOS audio output devices via Core Audio.
+/// Represents a macOS audio output device.
 struct AudioOutputDevice: Identifiable, Sendable {
     let id: AudioDeviceID
     let uid: String
     let name: String
+    /// Disambiguated display name (appends " (2)" etc. for duplicates)
+    let displayName: String
 }
 
 enum AudioDeviceManager {
-    /// Returns all audio devices that have output channels.
+
+    /// Returns all audio devices that have at least one output channel.
     static func outputDevices() -> [AudioOutputDevice] {
-        var addr = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDevices,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var size: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(
-            AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size
-        ) == noErr else { return [] }
+        let deviceIDs = allDeviceIDs()
 
-        let count = Int(size) / MemoryLayout<AudioDeviceID>.size
-        var deviceIDs = [AudioDeviceID](repeating: 0, count: count)
-        guard AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &deviceIDs
-        ) == noErr else { return [] }
+        var results: [AudioOutputDevice] = []
+        for deviceID in deviceIDs {
+            guard outputChannelCount(deviceID) > 0 else { continue }
+            guard let uid = stringProperty(deviceID, selector: kAudioDevicePropertyDeviceUID),
+                  let name = stringProperty(deviceID, selector: kAudioObjectPropertyName)
+            else { continue }
+            results.append(AudioOutputDevice(id: deviceID, uid: uid, name: name, displayName: name))
+        }
 
-        return deviceIDs.compactMap { deviceID in
-            guard hasOutputChannels(deviceID) else { return nil }
-            guard let uid = getStringProperty(deviceID, selector: kAudioDevicePropertyDeviceUID),
-                  let name = getStringProperty(deviceID, selector: kAudioObjectPropertyName)
-            else { return nil }
-            return AudioOutputDevice(id: deviceID, uid: uid, name: name)
+        // Disambiguate duplicate names (e.g., two "LG UltraFine Display Audio")
+        var nameCounts: [String: Int] = [:]
+        for d in results { nameCounts[d.name, default: 0] += 1 }
+
+        var nameIndex: [String: Int] = [:]
+        return results.map { d in
+            guard nameCounts[d.name, default: 0] > 1 else { return d }
+            let idx = nameIndex[d.name, default: 0] + 1
+            nameIndex[d.name] = idx
+            return AudioOutputDevice(id: d.id, uid: d.uid, name: d.name, displayName: "\(d.name) (\(idx))")
         }
     }
 
@@ -48,12 +50,32 @@ enum AudioDeviceManager {
         guard AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &deviceID
         ) == noErr else { return nil }
-        return getStringProperty(deviceID, selector: kAudioDevicePropertyDeviceUID)
+        return stringProperty(deviceID, selector: kAudioDevicePropertyDeviceUID)
     }
 
     // MARK: - Private
 
-    private static func hasOutputChannels(_ deviceID: AudioDeviceID) -> Bool {
+    private static func allDeviceIDs() -> [AudioDeviceID] {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size
+        ) == noErr else { return [] }
+
+        let count = Int(size) / MemoryLayout<AudioDeviceID>.size
+        var ids = [AudioDeviceID](repeating: 0, count: count)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &ids
+        ) == noErr else { return [] }
+        return ids
+    }
+
+    /// Returns the number of output channels for a device (0 = input-only).
+    private static func outputChannelCount(_ deviceID: AudioDeviceID) -> Int {
         var addr = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration,
             mScope: kAudioObjectPropertyScopeOutput,
@@ -61,15 +83,28 @@ enum AudioDeviceManager {
         )
         var size: UInt32 = 0
         guard AudioObjectGetPropertyDataSize(deviceID, &addr, 0, nil, &size) == noErr,
-              size > 0 else { return false }
-        let buf = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
+              size > 0 else { return 0 }
+
+        // AudioBufferList is variable-length — allocate the full reported size
+        let buf = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
         defer { buf.deallocate() }
-        guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, buf) == noErr else { return false }
-        let channelCount = buf.pointee.mNumberBuffers > 0 ? Int(buf.pointee.mBuffers.mNumberChannels) : 0
- return channelCount > 0
+        guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, buf) == noErr else { return 0 }
+
+        let list = buf.assumingMemoryBound(to: AudioBufferList.self)
+        let bufferCount = Int(list.pointee.mNumberBuffers)
+        guard bufferCount > 0 else { return 0 }
+
+        // Sum channels across all buffers
+        var totalChannels = 0
+        withUnsafeMutablePointer(to: &list.pointee.mBuffers) { firstBuffer in
+            for i in 0..<bufferCount {
+                totalChannels += Int(firstBuffer.advanced(by: i).pointee.mNumberChannels)
+            }
+        }
+        return totalChannels
     }
 
-    private static func getStringProperty(_ deviceID: AudioDeviceID, selector: AudioObjectPropertySelector) -> String? {
+    private static func stringProperty(_ deviceID: AudioDeviceID, selector: AudioObjectPropertySelector) -> String? {
         var addr = AudioObjectPropertyAddress(
             mSelector: selector,
             mScope: kAudioObjectPropertyScopeGlobal,

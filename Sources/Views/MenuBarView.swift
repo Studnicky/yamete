@@ -108,7 +108,7 @@ struct MenuBarView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(audioDevices.enumerated()), id: \.offset) { i, device in
                         Toggle(isOn: audioBinding(uid: device.uid)) {
-                            Text(device.name).font(.caption)
+                            Text(device.displayName).font(.caption)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .toggleStyle(.checkbox).tint(Theme.pink)
