@@ -181,6 +181,44 @@ final class SettingsStore {
         enabledAudioDevices = d.array(forKey: Key.enabledAudioDevices.rawValue) as? [String] ?? []
         autoCheckForUpdates = d.bool(forKey: Key.autoCheckForUpdates.rawValue)
         lastUpdateCheck = d.double(forKey: Key.lastUpdateCheck.rawValue)
+
+        migrateOldKeys()
+    }
+
+    // MARK: - Migration
+
+    /// One-time migration of orphaned keys from earlier versions.
+    private func migrateOldKeys() {
+        let d = UserDefaults.standard
+
+        // v0: "sensitivity" (single Double) → sensitivityMin/Max
+        if d.object(forKey: "sensitivity") != nil && d.object(forKey: Key.sensitivityMin.rawValue) == nil {
+            let old = d.double(forKey: "sensitivity")
+            sensitivityMin = max(0, old - 0.3)
+            sensitivityMax = min(1, old + 0.3)
+            d.removeObject(forKey: "sensitivity")
+        }
+
+        // v0: "isEnabled" (Bool) → removed (use isEnabled on controller)
+        d.removeObject(forKey: "isEnabled")
+
+        // v0: "audioDeviceUID" (String) → enabledAudioDevices ([String])
+        if let old = d.string(forKey: "audioDeviceUID"), !old.isEmpty {
+            if enabledAudioDevices.isEmpty {
+                enabledAudioDevices = [old]
+            }
+            d.removeObject(forKey: "audioDeviceUID")
+        }
+
+        // v0: "debounceMin"/"debounceMax" → debounce (single)
+        if d.object(forKey: "debounceMin") != nil {
+            let lo = d.double(forKey: "debounceMin")
+            let hi = d.double(forKey: "debounceMax")
+            debounce = (lo + hi) / 2.0
+            d.removeObject(forKey: "debounceMin")
+            d.removeObject(forKey: "debounceMax")
+        d.synchronize() // Force flush removed keys
+        }
     }
 
     // MARK: - Private
