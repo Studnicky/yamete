@@ -23,9 +23,9 @@ final class SettingsStoreTests: XCTestCase {
             .init(name: "debounce",     read: { "\($0.debounce)" },     expected: "0.3"),
             .init(name: "screenFlash",     read: { "\($0.screenFlash)" },     expected: "true"),
             .init(name: "flashOpacityMin", read: { "\($0.flashOpacityMin)" }, expected: "0.1"),
-            .init(name: "flashOpacityMax", read: { "\($0.flashOpacityMax)" }, expected: "0.65"),
-            .init(name: "volumeMin",       read: { "\($0.volumeMin)" },       expected: "0.2"),
-            .init(name: "volumeMax",       read: { "\($0.volumeMax)" },       expected: "1.0"),
+            .init(name: "flashOpacityMax", read: { "\($0.flashOpacityMax)" }, expected: "0.7"),
+            .init(name: "volumeMin",       read: { "\($0.volumeMin)" },       expected: "0.3"),
+            .init(name: "volumeMax",       read: { "\($0.volumeMax)" },       expected: "0.7"),
         ]
         let store = freshStore()
         for c in cases {
