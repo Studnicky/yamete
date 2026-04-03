@@ -114,7 +114,7 @@ final class ScreenFlash {
                 return (faceIdx, -(recency) + globalPenalty + eventPenalty)
             }
 
-            let best = scores.min(by: { $0.score < $1.score })!.index
+            guard let best = scores.min(by: { $0.score < $1.score })?.index else { picks.append(nil); continue }
             picks.append(best)
             usedThisEvent.insert(best)
             history[monitor].append(best)

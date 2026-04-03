@@ -55,8 +55,10 @@ final class STALTADetector: SignalDetector {
         ltaBuffer.push(abs(sample))
         guard ltaBuffer.isFull else { return false }
 
-        let staMean = staBuffer.sumAbs() / Float(staBuffer.currentCount)
-        let ltaMean = ltaBuffer.sumAbs() / Float(ltaBuffer.currentCount)
+        let staCount = Float(max(1, staBuffer.currentCount))
+        let staMean = staBuffer.sumAbs() / staCount
+        let ltaCount = Float(max(1, ltaBuffer.currentCount))
+        let ltaMean = ltaBuffer.sumAbs() / ltaCount
         guard ltaMean > 1e-6 else { return false }
 
         let ratio = staMean / ltaMean
@@ -118,7 +120,7 @@ final class KurtosisDetector: SignalDetector {
         guard buffer.isFull else { return false }
 
         let samples = buffer.asArray()
-        let n = Float(samples.count)
+        let n = Float(max(1, samples.count))
         let mean = samples.reduce(0, +) / n
         let variance = samples.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / n
         guard variance > 1e-10 else { inEvent = false; return false }

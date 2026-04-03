@@ -15,7 +15,7 @@ struct FaceIcon: View {
     private static let cachedIcon: NSImage? = {
         guard let path = Bundle.main.path(forResource: "menubar_icon", ofType: "png"),
               let img  = NSImage(contentsOfFile: path) else { return nil }
-        let t = img.copy() as! NSImage
+        guard let t = img.copy() as? NSImage else { return nil }
         t.size = NSSize(width: 18, height: 18)
         t.isTemplate = true
         return t
