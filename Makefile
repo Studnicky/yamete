@@ -1,81 +1,76 @@
 # Yamete — Build Pipeline
 #
-# Stages:
-#   1. compile    swiftc -O → binary
-#   2. optimize   SVG minification, PNG compression
-#   3. bundle     Assemble .app structure
-#   4. sign       Ad-hoc codesign with entitlements
-#   5. verify     Validate bundle structure + signature
+# Source layout mirrors the final .app bundle:
+#   Bundle/Contents/Info.plist          → Yamete.app/Contents/Info.plist
+#   Bundle/Contents/Resources/*         → Yamete.app/Contents/Resources/*
+#   Sources/**/*.swift                  → compiled into Contents/MacOS/yamete
 #
-# The dist/ folder IS the bundle — it mirrors the final .app structure.
+# Build stages:
+#   1. compile    swiftc -O → binary
+#   2. minify     strip symbols, optimize SVGs (if svgo installed)
+#   3. bundle     copy Bundle/ mirror + binary → dist/Yamete.app
+#   4. sign       codesign with entitlements + hardened runtime
+#   5. verify     validate structure, signature, asset counts
 
 APP       := Yamete
 BUNDLE_ID := com.yamete
 DIST      := dist
-BUNDLE    := $(DIST)/$(APP).app
-BINARY    := $(BUNDLE)/Contents/MacOS/yamete
-RES_DIR   := $(BUNDLE)/Contents/Resources
+BUILD     := .build-stage
+TARGET    := $(DIST)/$(APP).app
+BINARY    := $(TARGET)/Contents/MacOS/yamete
+RES_DIR   := $(TARGET)/Contents/Resources
 
-SOURCES := \
-	Sources/Domain.swift \
-	Sources/Logging.swift \
-	Sources/SignalProcessing.swift \
-	Sources/SignalDetectors.swift \
-	Sources/ImpactDetector.swift \
-	Sources/AccelerometerReader.swift \
-	Sources/AudioDevice.swift \
-	Sources/AudioPlayer.swift \
-	Sources/ScreenFlash.swift \
-	Sources/SettingsStore.swift \
-	Sources/Updater.swift \
-	Sources/ImpactController.swift \
-	Sources/Views/Theme.swift \
-	Sources/Views/MenuBarIcon.swift \
-	Sources/Views/SliderRow.swift \
-	Sources/Views/RangeSlider.swift \
-	Sources/Views/MenuBarView.swift \
-	Sources/YameteApp.swift
+# Source of truth for bundle contents
+BUNDLE_SRC := Bundle/Contents
+
+SOURCES := $(shell find Sources -name '*.swift' | sort)
+BUNDLE_RESOURCES := $(shell find $(BUNDLE_SRC)/Resources -type f 2>/dev/null)
 
 FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio ServiceManagement
 SWIFTFLAGS := -O -module-name $(APP) -target arm64-apple-macosx14.0 -parse-as-library \
               $(addprefix -framework ,$(FRAMEWORKS))
 
-FACES     := $(wildcard Resources/face_*.svg)
-SOUNDS    := $(wildcard Resources/sound_*.mp3)
-ICONS     := Assets/menubar_icon.png Assets/AppIcon.icns
 ENTITLE   := Yamete.entitlements
+SIGNING_ID ?= -
 
-.PHONY: all build test install uninstall clean dmg lint verify
+.PHONY: all build test install uninstall clean dmg lint verify release notarize
 
 all: build
 
 # ── Stage 1: Compile ──────────────────────────────────────────
-build: $(BINARY)
-
-$(BINARY): $(SOURCES) $(FACES) $(SOUNDS) $(ICONS) $(ENTITLE) Info.plist
-	@mkdir -p $(BUNDLE)/Contents/MacOS $(RES_DIR)
+$(BUILD)/yamete: $(SOURCES)
+	@mkdir -p $(BUILD)
 	@printf "  compile   $(APP)\n"
-	@swiftc $(SWIFTFLAGS) $(SOURCES) -o $(BINARY)
-	@# ── Stage 2: Optimize assets ──
-	@printf "  assets    $(words $(FACES)) faces, $(words $(SOUNDS)) sounds\n"
-	@cp $(FACES) $(RES_DIR)/
-	@cp $(SOUNDS) $(RES_DIR)/
-	@cp $(ICONS) $(RES_DIR)/
-	@# SVG minification (if svgo available)
+	@swiftc $(SWIFTFLAGS) $(SOURCES) -o $(BUILD)/yamete
+
+# ── Stage 2: Minify ───────────────────────────────────────────
+$(BUILD)/.minified: $(BUILD)/yamete $(BUNDLE_RESOURCES)
+	@printf "  strip     symbols\n"
+	@strip -x $(BUILD)/yamete -o $(BUILD)/yamete.stripped
+	@mv $(BUILD)/yamete.stripped $(BUILD)/yamete
+	@# SVG minification (if svgo installed)
+	@mkdir -p $(BUILD)/resources
+	@cp $(BUNDLE_SRC)/Resources/* $(BUILD)/resources/
 	@which svgo > /dev/null 2>&1 && { \
 		printf "  minify    SVGs\n"; \
-		for f in $(RES_DIR)/face_*.svg; do svgo -q "$$f" -o "$$f"; done; \
+		for f in $(BUILD)/resources/face_*.svg; do svgo -q "$$f" -o "$$f" 2>/dev/null; done; \
 	} || true
-	@# ── Stage 3: Bundle ──
-	@cp Info.plist $(BUNDLE)/Contents/
-	@# ── Stage 4: Sign ──
-	@printf "  sign      ad-hoc + entitlements\n"
-	@codesign --sign - --force --deep --entitlements $(ENTITLE) $(BUNDLE) 2>/dev/null
-	@# ── Stage 5: Verify ──
-	@codesign --verify --deep --strict $(BUNDLE) 2>/dev/null
-	@printf "  bundle    $(BUNDLE)\n"
+	@touch $(BUILD)/.minified
 
-# ── Lint (strict concurrency) ─────────────────────────────────
+# ── Stage 3: Bundle ───────────────────────────────────────────
+build: $(BUILD)/yamete $(BUILD)/.minified
+	@mkdir -p $(TARGET)/Contents/MacOS $(RES_DIR)
+	@cp $(BUILD)/yamete $(BINARY)
+	@cp $(BUNDLE_SRC)/Info.plist $(TARGET)/Contents/
+	@cp $(BUILD)/resources/* $(RES_DIR)/
+	@# ── Stage 4: Sign ──
+	@printf "  sign      $(if $(filter -,$(SIGNING_ID)),ad-hoc,$(SIGNING_ID))\n"
+	@codesign --sign "$(SIGNING_ID)" --force --deep \
+		--entitlements $(ENTITLE) $(TARGET) 2>/dev/null
+	@codesign --verify --deep --strict $(TARGET) 2>/dev/null
+	@printf "  bundle    $(TARGET) ($$(du -sh $(TARGET) | awk '{print $$1}'))\n"
+
+# ── Lint ──────────────────────────────────────────────────────
 lint:
 	@printf "  lint      strict concurrency\n"
 	@swiftc -typecheck $(SWIFTFLAGS) -strict-concurrency=complete -warnings-as-errors $(SOURCES)
@@ -84,13 +79,24 @@ lint:
 test:
 	@swift test
 
+# ── Verify ────────────────────────────────────────────────────
+verify: build
+	@printf "  verify    bundle\n"
+	@test -f $(BINARY)
+	@test -f $(TARGET)/Contents/Info.plist
+	@FACES=$$(ls $(RES_DIR)/face_*.svg 2>/dev/null | wc -l | tr -d ' '); \
+	 SOUNDS=$$(ls $(RES_DIR)/sound_*.mp3 2>/dev/null | wc -l | tr -d ' '); \
+	 test "$$FACES" -ge 5 && test "$$SOUNDS" -ge 5 && \
+	 codesign --verify --deep --strict $(TARGET) 2>/dev/null && \
+	 printf "  verify    ✓ binary, plist, $$FACES faces, $$SOUNDS sounds, signature\n"
+
 # ── Install ───────────────────────────────────────────────────
 install: build
 	@printf "  stop      $(APP)\n"
 	@pkill -x $(APP) 2>/dev/null || true
 	@printf "  install   /Applications/$(APP).app\n"
 	@rm -rf /Applications/$(APP).app
-	@cp -R $(BUNDLE) /Applications/
+	@cp -R $(TARGET) /Applications/
 	@open /Applications/$(APP).app
 	@printf "  launch    $(APP)\n"
 
@@ -98,6 +104,18 @@ uninstall:
 	@pkill -x $(APP) 2>/dev/null || true
 	@rm -rf /Applications/$(APP).app
 	@printf "  remove    /Applications/$(APP).app\n"
+
+# ── Release (with Developer ID) ──────────────────────────────
+release: clean
+	@$(MAKE) build SIGNING_ID="$(SIGNING_ID)"
+	@printf "  hardened  runtime enabled\n"
+
+# ── Notarize ──────────────────────────────────────────────────
+notarize: release dmg
+	@printf "  notarize  $(DIST)/$(APP).dmg\n"
+	@xcrun notarytool submit "$(DIST)/$(APP).dmg" --wait --keychain-profile "yamete-notarize"
+	@xcrun stapler staple "$(DIST)/$(APP).dmg"
+	@printf "  stapled   $(DIST)/$(APP).dmg\n"
 
 # ── DMG ───────────────────────────────────────────────────────
 DMG     := $(DIST)/$(APP).dmg
@@ -107,7 +125,7 @@ dmg: build
 	@printf "  stage     DMG\n"
 	@rm -rf "$(DMG_TMP)" "$(DMG)"
 	@mkdir -p "$(DMG_TMP)"
-	@cp -R "$(BUNDLE)" "$(DMG_TMP)/"
+	@cp -R "$(TARGET)" "$(DMG_TMP)/"
 	@ln -sf /Applications "$(DMG_TMP)/Applications"
 	@mkdir -p "$(DMG_TMP)/.background"
 	@cp Assets/dmg_background.png "$(DMG_TMP)/.background/"
@@ -125,53 +143,7 @@ dmg: build
 	@rm -rf "$(DMG_TMP)"
 	@printf "  done      $(DMG)\n"
 
-# ── Verify (standalone) ───────────────────────────────────────
-verify:
-	@printf "  verify    bundle structure\n"
-	@test -f $(BINARY) || (echo "ERROR: no binary" && exit 1)
-	@test -f $(BUNDLE)/Contents/Info.plist || (echo "ERROR: no Info.plist" && exit 1)
-	@test $$(ls $(RES_DIR)/face_*.svg 2>/dev/null | wc -l) -ge 5 || (echo "ERROR: missing faces" && exit 1)
-	@test $$(ls $(RES_DIR)/sound_*.mp3 2>/dev/null | wc -l) -ge 5 || (echo "ERROR: missing sounds" && exit 1)
-	@codesign --verify --deep --strict $(BUNDLE) || (echo "ERROR: signature invalid" && exit 1)
-	@printf "  verify    ✓ binary, plist, %s faces, %s sounds, signature\n" \
-		$$(ls $(RES_DIR)/face_*.svg | wc -l | tr -d ' ') \
-		$$(ls $(RES_DIR)/sound_*.mp3 | wc -l | tr -d ' ')
-
+# ── Clean ─────────────────────────────────────────────────────
 clean:
-	@rm -rf $(DIST)
+	@rm -rf $(DIST) $(BUILD)
 	@printf "  clean\n"
-
-# ── App Store / Notarization ──────────────────────────────────
-# Set SIGNING_ID to your Developer ID:
-#   make release SIGNING_ID="Developer ID Application: Your Name (TEAMID)"
-# Or for App Store submission:
-#   make release SIGNING_ID="3rd Party Mac Developer Application: Your Name (TEAMID)"
-
-SIGNING_ID ?= -
-
-release: clean
-	@printf "  compile   $(APP) (release)\n"
-	@mkdir -p $(BUNDLE)/Contents/MacOS $(RES_DIR)
-	@swiftc $(SWIFTFLAGS) $(SOURCES) -o $(BINARY)
-	@printf "  assets    $(words $(FACES)) faces, $(words $(SOUNDS)) sounds\n"
-	@cp $(FACES) $(RES_DIR)/
-	@cp $(SOUNDS) $(RES_DIR)/
-	@cp $(ICONS) $(RES_DIR)/
-	@which svgo > /dev/null 2>&1 && { \
-		printf "  minify    SVGs\n"; \
-		for f in $(RES_DIR)/face_*.svg; do svgo -q "$$f" -o "$$f"; done; \
-	} || true
-	@cp Info.plist $(BUNDLE)/Contents/
-	@printf "  sign      $(SIGNING_ID)\n"
-	@codesign --sign "$(SIGNING_ID)" --force --deep \
-		--options runtime \
-		--entitlements $(ENTITLE) \
-		$(BUNDLE)
-	@codesign --verify --deep --strict $(BUNDLE)
-	@printf "  bundle    $(BUNDLE) (signed + hardened)\n"
-
-notarize: release dmg
-	@printf "  notarize  $(DMG)\n"
-	@xcrun notarytool submit "$(DMG)" --wait --keychain-profile "yamete-notarize"
-	@xcrun stapler staple "$(DMG)"
-	@printf "  stapled   $(DMG)\n"
