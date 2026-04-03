@@ -137,11 +137,11 @@ struct MenuBarView: View {
 
             // ── Footer row 1: auto-update toggle + version ───────
             HStack {
+                versionButton
+                Spacer()
                 Toggle("Auto-Update", isOn: $settings.autoCheckForUpdates)
                     .toggleStyle(.switch).tint(Theme.pink)
                     .controlSize(.mini)
-                Spacer()
-                versionButton
             }
             .font(.caption)
             .padding(.horizontal, 14).padding(.top, 6).padding(.bottom, 2)
