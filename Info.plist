@@ -8,6 +8,8 @@
     <string>yamete</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.yamete</string>
     <key>CFBundleName</key>
@@ -21,12 +23,16 @@
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.entertainment</string>
     <key>LSMinimumSystemVersion</key>
-    <string>14.6</string>
+    <string>14.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>© 2026 Studnicky</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>NSMotionUsageDescription</key>
+    <string>Yamete uses the accelerometer to detect physical impacts on your MacBook.</string>
 </dict>
 </plist>

@@ -140,3 +140,38 @@ verify:
 clean:
 	@rm -rf $(DIST)
 	@printf "  clean\n"
+
+# ── App Store / Notarization ──────────────────────────────────
+# Set SIGNING_ID to your Developer ID:
+#   make release SIGNING_ID="Developer ID Application: Your Name (TEAMID)"
+# Or for App Store submission:
+#   make release SIGNING_ID="3rd Party Mac Developer Application: Your Name (TEAMID)"
+
+SIGNING_ID ?= -
+
+release: clean
+	@printf "  compile   $(APP) (release)\n"
+	@mkdir -p $(BUNDLE)/Contents/MacOS $(RES_DIR)
+	@swiftc $(SWIFTFLAGS) $(SOURCES) -o $(BINARY)
+	@printf "  assets    $(words $(FACES)) faces, $(words $(SOUNDS)) sounds\n"
+	@cp $(FACES) $(RES_DIR)/
+	@cp $(SOUNDS) $(RES_DIR)/
+	@cp $(ICONS) $(RES_DIR)/
+	@which svgo > /dev/null 2>&1 && { \
+		printf "  minify    SVGs\n"; \
+		for f in $(RES_DIR)/face_*.svg; do svgo -q "$$f" -o "$$f"; done; \
+	} || true
+	@cp Info.plist $(BUNDLE)/Contents/
+	@printf "  sign      $(SIGNING_ID)\n"
+	@codesign --sign "$(SIGNING_ID)" --force --deep \
+		--options runtime \
+		--entitlements $(ENTITLE) \
+		$(BUNDLE)
+	@codesign --verify --deep --strict $(BUNDLE)
+	@printf "  bundle    $(BUNDLE) (signed + hardened)\n"
+
+notarize: release dmg
+	@printf "  notarize  $(DMG)\n"
+	@xcrun notarytool submit "$(DMG)" --wait --keychain-profile "yamete-notarize"
+	@xcrun stapler staple "$(DMG)"
+	@printf "  stapled   $(DMG)\n"
