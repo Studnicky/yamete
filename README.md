@@ -19,7 +19,7 @@ Download the latest `.dmg` from [Releases](../../releases), open it, and drag **
 ### From source
 
 ```sh
-git clone https://github.com/Studnicky/yamete.git
+git clone https://github.com/Studnicky/yamate.git
 cd yamete
 make install
 ```

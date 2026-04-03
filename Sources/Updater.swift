@@ -24,7 +24,7 @@ final class Updater: ObservableObject {
 
     @Published var state: State = .idle
 
-    private let repo = "Studnicky/yamete"
+    private let repo = "Studnicky/yamate"
     private let expectedBundleID = "com.yamete"
     private let currentVersion: String
     private let checkInterval: TimeInterval = 24 * 60 * 60
