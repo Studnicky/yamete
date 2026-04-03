@@ -10,8 +10,8 @@ private let log = AppLog(category: "Updater")
 /// 1. SHA256 checksum of the DMG is compared against the release manifest
 /// 2. Extracted .app must pass `codesign --verify --deep`
 /// 3. Bundle identifier must match `com.yamete`
-@MainActor
-final class Updater: ObservableObject {
+@MainActor @Observable
+final class Updater {
     enum State: Equatable {
         case idle
         case checking
@@ -22,7 +22,7 @@ final class Updater: ObservableObject {
         case failed(String)
     }
 
-    @Published var state: State = .idle
+    var state: State = .idle
 
     private let repo = "Studnicky/yamate"
     private let expectedBundleID = "com.yamete"
@@ -113,10 +113,15 @@ final class Updater: ObservableObject {
 
     func relaunch() {
         let appPath = Bundle.main.bundlePath
+        // Stage 1: spawn a background process that waits for this process to exit,
+        // then re-opens the app. Uses /usr/bin/open directly (no shell interpolation).
         let task = Process()
-        task.launchPath = "/bin/sh"
-        task.arguments = ["-c", "sleep 1 && open \"\(appPath)\""]
-        try? task.run()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = ["-W", "-n", "-a", appPath, "--args", "--relaunched"]
+        // Use a short delay so the current process can terminate first
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+            try? task.run()
+        }
         NSApp.terminate(nil)
     }
 
@@ -167,21 +172,16 @@ final class Updater: ObservableObject {
         }
         let version = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
 
-        // Parse SHA256 from release body: look for "sha256: <hex>" or "SHA256: <hex>"
+        // Parse SHA256 from release body: matches "sha256: <hex>" / "SHA-256: <hex>" / backtick-wrapped
         var sha256: String? = nil
         if let body = json["body"] as? String {
-            let pattern = #"(?i)sha256:\s*([0-9a-f]{64})"#
-            if let match = body.range(of: pattern, options: .regularExpression) {
-                let hashStart = body[match].dropFirst(body[match].contains(":") ? body[match].distance(from: match.lowerBound, to: body[match].firstIndex(of: ":")!) + 1 : 7)
-                let trimmed = hashStart.trimmingCharacters(in: .whitespaces)
-                if trimmed.count == 64 { sha256 = trimmed.lowercased() }
+            let pattern = #"(?i)sha-?256[:\s`]+([0-9a-f]{64})"#
+            if let range = body.range(of: pattern, options: .regularExpression),
+               let hexRange = body[range].range(of: #"[0-9a-f]{64}"#, options: .regularExpression) {
+                sha256 = String(body[hexRange]).lowercased()
             }
-            // Simpler fallback: find any 64-char hex string after "sha256"
-            if sha256 == nil, let range = body.range(of: #"(?i)sha256[:\s]+([0-9a-f]{64})"#, options: .regularExpression) {
-                let sub = body[range]
-                if let hexRange = sub.range(of: #"[0-9a-f]{64}"#, options: .regularExpression) {
-                    sha256 = String(sub[hexRange]).lowercased()
-                }
+            if sha256 == nil {
+                log.warning("activity:UpdateCheck — no SHA256 checksum found in release notes, update will proceed without integrity verification")
             }
         }
 
@@ -202,6 +202,8 @@ final class Updater: ObservableObject {
         return dest
     }
 
+    private static let mountTimeout: TimeInterval = 30
+
     private func installFromDMG(_ dmgPath: URL) async throws {
         let mountPoint = "/Volumes/Yamete-Update"
 
@@ -209,7 +211,16 @@ final class Updater: ObservableObject {
         mount.launchPath = "/usr/bin/hdiutil"
         mount.arguments = ["attach", dmgPath.path, "-mountpoint", mountPoint, "-quiet", "-nobrowse"]
         try mount.run()
-        mount.waitUntilExit()
+
+        let deadline = Date().addingTimeInterval(Self.mountTimeout)
+        while mount.isRunning && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(200))
+        }
+        if mount.isRunning {
+            mount.terminate()
+            log.error("activity:Install wasInvalidatedBy entity:MountTimeout after=\(Self.mountTimeout)s")
+            throw UpdateError.mountFailed
+        }
         guard mount.terminationStatus == 0 else { throw UpdateError.mountFailed }
 
         defer {

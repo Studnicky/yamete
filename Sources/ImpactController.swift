@@ -3,7 +3,7 @@ import Observation
 
 private let log = AppLog(category: "ImpactController")
 
-/// Central coordinator: accelerometer → detector → audio + flash.
+/// Central coordinator: sensor → detector → audio + flash.
 ///
 /// The signal chain uses normalized intensity as a shared parameter that
 /// flows through four sliding windows (all user-configurable range sliders):
@@ -14,30 +14,41 @@ private let log = AppLog(category: "ImpactController")
 ///
 /// Narrowing any window compresses the response; widening it expands it.
 /// All four are coupled through the same intensity value.
+///
+/// The sensor stream is consumed via `for await event in sensorManager.events()`.
+/// Cancelling `sensorTask` propagates through the entire chain — no callbacks,
+/// no weak self, no manual cleanup.
 @MainActor @Observable
 final class ImpactController: @unchecked Sendable {
     let settings: SettingsStore
     let audioPlayer: AudioPlayer
 
-    private let accelerometer = AccelerometerReader()
+    private let sensorManager: SensorManager
     private let detector = ImpactDetector()
     private let screenFlash = ScreenFlash()
 
     var impactCount: Int = 0
     var isEnabled = false
     var sensorError: String?
+    var sensorName: String?
 
+    private var sensorTask: Task<Void, Never>?
     private var playingUntil: Date = .distantPast
     private var countDate: Date = Calendar.current.startOfDay(for: Date())
+    private var cachedSensitivityMin: Double = -1
+    private var cachedSensitivityMax: Double = -1
 
-    // Calibrated for "fun impact" range. After HPF removes gravity:
-    //   0.15g = lightest detectable tap (above typing noise)
-    //   1.5g  = hard impact (approaching damage threshold)
-    private let intensityRange: ClosedRange<Float> = 0.15...1.5
+    /// After HPF removes gravity, this maps raw force to 0–1 intensity.
+    private static let intensityFloor: Float = 0.15
+    private static let intensityCeiling: Float = 1.5
+    private let intensityRange: ClosedRange<Float> = intensityFloor...intensityCeiling
 
-    init(settings: SettingsStore) {
+    init(settings: SettingsStore, adapters: [any SensorAdapter]? = nil) {
         self.settings = settings
         audioPlayer = AudioPlayer()
+        sensorManager = SensorManager(adapters: adapters ?? [
+            SPUAccelerometerAdapter(),
+        ])
     }
 
     func start() {
@@ -47,18 +58,22 @@ final class ImpactController: @unchecked Sendable {
         detector.sensitivity = (settings.sensitivityMin + settings.sensitivityMax) / 2.0
         log.info("activity:ImpactDetection wasStartedBy agent:ImpactController sensitivityBand=[\(String(format: "%.2f", settings.sensitivityMin)),\(String(format: "%.2f", settings.sensitivityMax))]")
 
-        accelerometer.onSample = { [weak self] vec in
-            MainActor.assumeIsolated { self?.handleSample(vec) }
+        sensorTask = Task {
+            for await event in sensorManager.events() {
+                switch event {
+                case .sample(let vec):  handleSample(vec)
+                case .error(let msg):   sensorError = msg
+                case .adapterChanged(let name): sensorName = name
+                }
+            }
         }
-        accelerometer.onError = { [weak self] msg in
-            MainActor.assumeIsolated { self?.sensorError = msg }
-        }
-        accelerometer.start()
     }
 
     func stop() {
+        sensorTask?.cancel()
+        sensorTask = nil
         isEnabled = false
-        accelerometer.stop()
+        sensorName = nil
         log.info("activity:ImpactDetection wasEndedBy agent:ImpactController")
     }
 
@@ -69,7 +84,11 @@ final class ImpactController: @unchecked Sendable {
     // MARK: - Private
 
     private func handleSample(_ vec: Vec3) {
-        detector.sensitivity = (settings.sensitivityMin + settings.sensitivityMax) / 2.0
+        if settings.sensitivityMin != cachedSensitivityMin || settings.sensitivityMax != cachedSensitivityMax {
+            cachedSensitivityMin = settings.sensitivityMin
+            cachedSensitivityMax = settings.sensitivityMax
+            detector.sensitivity = (cachedSensitivityMin + cachedSensitivityMax) / 2.0
+        }
 
         guard let event = detector.process(vec) else { return }
 
@@ -90,10 +109,6 @@ final class ImpactController: @unchecked Sendable {
         let intensity = ((rawIntensity - sMin) / bandWidth).clamped(to: 0...1)
 
         // ── Stage 2: Intensity flows through all output windows ───
-        // Volume:  intensity 0 → volumeMin,  intensity 1 → volumeMax
-        // Opacity: intensity 0 → opacityMin, intensity 1 → opacityMax
-        // Debounce: intensity 0 → debounceMin (quick), intensity 1 → debounceMax (long)
-
         let clipDuration = audioPlayer.play(
             intensity: intensity,
             volumeMin: Float(settings.volumeMin),

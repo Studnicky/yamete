@@ -123,10 +123,11 @@ final class KurtosisDetector: SignalDetector {
         let n = Float(max(1, samples.count))
         let mean = samples.reduce(0, +) / n
         let variance = samples.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / n
-        guard variance > 1e-10 else { inEvent = false; return false }
+        guard variance > 1e-6 else { inEvent = false; return false }
 
         let m4 = samples.map { let d = $0 - mean; return d*d*d*d }.reduce(0, +) / n
-        let triggered = (m4 / (variance * variance)) > config.kurtosisThreshold
+        let vSq = Double(variance) * Double(variance)
+        let triggered = Float(Double(m4) / vSq) > config.kurtosisThreshold
         let rising = !inEvent && triggered
         inEvent = triggered
         return rising
@@ -153,9 +154,9 @@ final class PeakMADDetector: SignalDetector {
 
         let samples = buffer.asArray().sorted()
         let median = samples[samples.count / 2]
-        let mad = samples.map { abs($0 - median) }.sorted()[samples.count / 2]
-            * config.peakMADConsistencyConstant
-        guard mad > 1e-6 else { return false }
+        let rawMAD = samples.map { abs($0 - median) }.sorted()[samples.count / 2]
+        let mad = rawMAD * config.peakMADConsistencyConstant
+        guard mad > 1e-6 else { inEvent = false; return false }
 
         let triggered = (samples.last ?? 0) / mad > config.peakMADThreshold
         let rising = !inEvent && triggered

@@ -5,7 +5,7 @@ import ServiceManagement
 struct MenuBarView: View {
     @Environment(ImpactController.self) var controller
     @Environment(SettingsStore.self) var settings
-    @EnvironmentObject var updater: Updater
+    @Environment(Updater.self) var updater
     @State private var launchAtLogin = (SMAppService.mainApp.status == .enabled)
     @State private var audioDevices: [AudioOutputDevice] = []
 

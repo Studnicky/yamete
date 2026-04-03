@@ -12,7 +12,7 @@ import Observation
 ///
 /// `@Observable` re-invokes setters on self-assignment in `didSet`, so clamping
 /// uses a guard-clamp-return pattern to prevent infinite recursion.
-@Observable
+@MainActor @Observable
 final class SettingsStore {
 
     // MARK: - Keys
@@ -28,7 +28,7 @@ final class SettingsStore {
 
     // MARK: - Defaults
 
-    nonisolated(unsafe) static let defaults: [String: Any] = [
+    static let defaults: [String: Any] = [
         Key.sensitivityMin.rawValue:  0.10,
         Key.sensitivityMax.rawValue:  0.90,
         Key.debounce.rawValue:        0.3,
@@ -217,7 +217,6 @@ final class SettingsStore {
             debounce = (lo + hi) / 2.0
             d.removeObject(forKey: "debounceMin")
             d.removeObject(forKey: "debounceMax")
-        d.synchronize() // Force flush removed keys
         }
     }
 

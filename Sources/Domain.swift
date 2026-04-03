@@ -37,12 +37,19 @@ extension Double {
     }
 }
 
-// MARK: - Concurrency helpers
+// MARK: - Bundle resources
 
-/// Erases `Sendable` checking for values whose thread safety is guaranteed
-/// by program structure (e.g., MainActor confinement) but not expressible
-/// in the type system.
-struct Transferred<T>: @unchecked Sendable {
-    let value: T
-    init(_ value: T) { self.value = value }
+enum BundleResources {
+    /// Returns sorted file URLs from the app bundle matching a prefix and set of extensions.
+    static func urls(prefix: String, extensions: Set<String>) -> [URL] {
+        guard let resourcePath = Bundle.main.resourcePath else { return [] }
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: resourcePath)) ?? []
+        return files
+            .filter { name in
+                name.hasPrefix(prefix) && extensions.contains(where: { name.hasSuffix("." + $0) })
+            }
+            .sorted()
+            .map { URL(fileURLWithPath: resourcePath + "/" + $0) }
+    }
 }
+

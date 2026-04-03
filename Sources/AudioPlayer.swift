@@ -5,6 +5,7 @@ private let log = AppLog(category: "AudioPlayer")
 
 /// Plays sound clips scaled by intensity, routable to a specific audio device.
 /// Uses NSSound for its `playbackDeviceIdentifier` support.
+@MainActor
 final class AudioPlayer {
     private struct SoundFile {
         let url: URL
@@ -91,12 +92,7 @@ final class AudioPlayer {
     }
 
     private func preload() {
-        guard let resourcePath = Bundle.main.resourcePath else { return }
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: resourcePath)) ?? []
-        let urls = files
-            .filter { $0.hasPrefix("sound_") && ($0.hasSuffix(".mp3") || $0.hasSuffix(".wav")) }
-            .sorted()
-            .compactMap { URL(fileURLWithPath: resourcePath + "/" + $0) }
+        let urls = BundleResources.urls(prefix: "sound_", extensions: ["mp3", "wav"])
 
         for url in urls {
             if let s = NSSound(contentsOf: url, byReference: true) {

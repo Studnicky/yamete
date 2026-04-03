@@ -10,19 +10,19 @@ struct YameteApp: App {
             MenuBarView()
                 .environment(appDelegate.settings)
                 .environment(appDelegate.controller)
-                .environmentObject(appDelegate.updater)
+                .environment(appDelegate.updater)
         } label: {
             MenuBarLabel()
                 .environment(appDelegate.settings)
                 .environment(appDelegate.controller)
-                .environmentObject(appDelegate.updater)
+                .environment(appDelegate.updater)
         }
         .menuBarExtraStyle(.window)
     }
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     let settings = SettingsStore()
     lazy var controller = ImpactController(settings: settings)
     let updater = Updater()
@@ -41,15 +41,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         guard !UserDefaults.standard.bool(forKey: Self.firstLaunchKey) else { return }
         UserDefaults.standard.set(true, forKey: Self.firstLaunchKey)
 
-        guard let resourcePath = Bundle.main.resourcePath else { return }
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: resourcePath))?
-            .filter { $0.hasPrefix("sound_") && $0.hasSuffix(".mp3") }
-            .sorted() ?? []
+        let urls = BundleResources.urls(prefix: "sound_", extensions: ["mp3"])
 
         // Find the longest clip
         var longest: (url: URL, duration: Double) = (URL(fileURLWithPath: "/"), 0)
-        for file in files {
-            let url = URL(fileURLWithPath: resourcePath + "/" + file)
+        for url in urls {
             if let s = NSSound(contentsOf: url, byReference: true), s.duration > longest.duration {
                 longest = (url, s.duration)
             }
