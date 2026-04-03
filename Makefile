@@ -31,7 +31,7 @@ SWIFTFLAGS := -O -module-name $(APP) -target arm64-apple-macosx14.0 -parse-as-li
               $(addprefix -framework ,$(FRAMEWORKS))
 
 RESOURCES := $(wildcard Resources/face_*.svg) $(wildcard Resources/sound_*.mp3)
-ICONS     := Assets/face_icon.png Assets/AppIcon.icns
+ICONS     := Assets/menubar_icon.png Assets/AppIcon.icns
 
 .PHONY: all build test install uninstall clean dmg
 
