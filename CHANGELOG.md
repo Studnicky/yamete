@@ -35,5 +35,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Swift 6 strict concurrency compliance (zero warnings)
 - MIT license
 
-[Unreleased]: https://github.com/Studnicky/yamete/compare/v0.0.0...HEAD
-[0.0.0]: https://github.com/Studnicky/yamete/releases/tag/v0.0.0
+[Unreleased]: https://github.com/Studnicky/yamate/compare/v0.0.0...HEAD
+[0.0.0]: https://github.com/Studnicky/yamate/releases/tag/v0.0.0
