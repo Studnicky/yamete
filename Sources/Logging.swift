@@ -9,8 +9,10 @@ struct AppLog: Sendable {
     private let osLog: Logger
     private let category: String
 
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.yamete"
+
     init(category: String) {
-        osLog = Logger(subsystem: "com.yamete", category: category)
+        osLog = Logger(subsystem: Self.subsystem, category: category)
         self.category = category
     }
 
@@ -67,7 +69,9 @@ final class LogStore: @unchecked Sendable {
     }()
 
     private init() {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            fatalError("Application Support directory unavailable")
+        }
         directory = support.appendingPathComponent("Yamete/logs", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         queue.sync {
