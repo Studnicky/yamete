@@ -49,13 +49,13 @@ enum SensorError: Error, LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .permissionDenied:
-            "Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security."
+            NSLocalizedString("Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security.", comment: "Sensor permission error")
         case .deviceNotFound:
-            "No accelerometer found — this Mac may not have a compatible motion sensor."
+            NSLocalizedString("No accelerometer found — this Mac may not have a compatible motion sensor.", comment: "Sensor not found error")
         case .ioKitError(let code):
-            "Accelerometer unavailable (IOKit error \(code)). This Mac may not have a compatible motion sensor."
+            String(format: NSLocalizedString("Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor.", comment: "IOKit error with code"), code)
         case .noAdaptersAvailable:
-            "No compatible motion sensor found on this Mac."
+            NSLocalizedString("No compatible motion sensor found on this Mac.", comment: "No adapters error")
         }
     }
 }
