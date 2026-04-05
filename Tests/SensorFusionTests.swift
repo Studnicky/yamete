@@ -7,10 +7,17 @@ final class SensorFusionTests: XCTestCase {
     // Tests use explicit thresholds and large input values to ensure signals
     // pass the bandpass filter (HP 18Hz + LP 25Hz attenuates ~5x vs raw).
 
+    /// Creates a permissive config — all gates disabled except spike threshold.
+    private func permissiveConfig(threshold: Float = 0.05, rearm: TimeInterval = 0, warmup: Int = 0) -> DetectionConfig {
+        DetectionConfig(
+            spikeThreshold: threshold,
+            minCrestFactor: 0, minRiseRate: 0, minConfirmations: 1,
+            minRearmDuration: rearm, minWarmupSamples: warmup
+        )
+    }
+
     func testSingleSourceCanTriggerConsensus() {
-        let engine = SensorFusionEngine(windowDuration: 0.12, spikeThreshold: 0.05,
-                                         minCrestFactor: 0, minRiseRate: 0, minConfirmations: 1,
-                                         minRearmDuration: 0, minWarmupSamples: 0)
+        let engine = SensorFusionEngine(config: permissiveConfig())
         let now = Date()
         let sample = SensorSample(source: "A", timestamp: now, value: Vec3(x: 2.0, y: 0, z: 0))
         let impact = engine.ingest(sample, activeSources: ["A"])
@@ -18,9 +25,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testTwoSourcesRequireTwoSourceConsensus() {
-        let engine = SensorFusionEngine(windowDuration: 0.12, spikeThreshold: 0.05,
-                                         minCrestFactor: 0, minRiseRate: 0, minConfirmations: 1,
-                                         minRearmDuration: 0, minWarmupSamples: 0)
+        let engine = SensorFusionEngine(config: permissiveConfig())
         let now = Date()
 
         let aOnly = engine.ingest(
@@ -37,9 +42,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testRearmsAfterCooldown() {
-        let engine = SensorFusionEngine(windowDuration: 0.05, spikeThreshold: 0.05,
-                                         minCrestFactor: 0, minRiseRate: 0, minConfirmations: 1,
-                                         minRearmDuration: 0.30, minWarmupSamples: 0)
+        let engine = SensorFusionEngine(windowDuration: 0.05, config: permissiveConfig(rearm: 0.30))
         let now = Date()
 
         let first = engine.ingest(
@@ -69,9 +72,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testGravityOnlyDoesNotTrigger() {
-        let engine = SensorFusionEngine(windowDuration: 0.12, spikeThreshold: 0.05,
-                                         minCrestFactor: 0, minRiseRate: 0, minConfirmations: 1,
-                                         minRearmDuration: 0, minWarmupSamples: 30)
+        let engine = SensorFusionEngine(config: permissiveConfig(warmup: 30))
         let start = Date()
         var triggered = false
 
@@ -86,9 +87,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testTypingNoiseDoesNotTrigger() {
-        let engine = SensorFusionEngine(windowDuration: 0.12, spikeThreshold: 0.05,
-                                         minCrestFactor: 0, minRiseRate: 0, minConfirmations: 1,
-                                         minRearmDuration: 0, minWarmupSamples: 30)
+        let engine = SensorFusionEngine(config: permissiveConfig(warmup: 30))
         let start = Date()
         var triggered = false
 
@@ -104,9 +103,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testImpactSpikeTriggersAfterSettling() {
-        let engine = SensorFusionEngine(windowDuration: 0.12, spikeThreshold: 0.05,
-                                         minCrestFactor: 0, minRiseRate: 0, minConfirmations: 1,
-                                         minRearmDuration: 0, minWarmupSamples: 30)
+        let engine = SensorFusionEngine(config: permissiveConfig(warmup: 30))
         let start = Date()
         var triggered = false
 
@@ -127,14 +124,15 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testCrestFactorRejectsSustainedVibration() {
-        let engine = SensorFusionEngine(windowDuration: 0.12, spikeThreshold: 0.01,
-                                         minCrestFactor: 5.0, minRiseRate: 0, minConfirmations: 1,
-                                         minRearmDuration: 0, minWarmupSamples: 50)
+        let config = DetectionConfig(
+            spikeThreshold: 0.01,
+            minCrestFactor: 5.0, minRiseRate: 0, minConfirmations: 1,
+            minRearmDuration: 0, minWarmupSamples: 50
+        )
+        let engine = SensorFusionEngine(config: config)
         let start = Date()
         var triggered = false
 
-        // Sustained in-band oscillation: alternating ±0.5 every sample (25Hz = in-band)
-        // Produces consistent filtered output where peak ≈ average (low crest factor)
         for i in 0..<200 {
             let t = start.addingTimeInterval(Double(i) * 0.02)
             let sign: Float = (i % 2 == 0) ? 1.0 : -1.0

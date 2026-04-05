@@ -32,16 +32,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         controller.start()
-        playFirstLaunchMoan()
+
+        if !UserDefaults.standard.bool(forKey: Self.firstLaunchKey) {
+            UserDefaults.standard.set(true, forKey: Self.firstLaunchKey)
+            controller.playWelcomeSound()
+        }
+
         updater.autoCheckIfNeeded(settings: settings)
-    }
-
-    /// On first launch, play the longest bundled clip on all output devices.
-    private func playFirstLaunchMoan() {
-        guard !UserDefaults.standard.bool(forKey: Self.firstLaunchKey) else { return }
-        UserDefaults.standard.set(true, forKey: Self.firstLaunchKey)
-
-        guard let url = controller.audioPlayer.longestSoundURL else { return }
-        controller.audioPlayer.playOnAllDevices(url: url, volume: 1.0)
     }
 }

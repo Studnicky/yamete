@@ -11,6 +11,18 @@ private let log = AppLog(category: "SensorFusion")
 ///   4. Rise rate requires fast signal onset (rejects slow transmitted vibrations)
 ///   5. Confirmation count requires multiple above-threshold samples in the window
 ///   6. Time-based rearm prevents retriggering from filter ringing
+/// Configurable detection parameters for the impact detection engine.
+struct DetectionConfig: Equatable {
+    var spikeThreshold: Float = 0.020
+    var minCrestFactor: Float = 6.0
+    var minRiseRate: Float = 0.010
+    var minConfirmations: Int = 3
+    var minRearmDuration: TimeInterval = 0.50
+    var minWarmupSamples: Int = 50
+    var bandpassLowHz: Float = 20.0
+    var bandpassHighHz: Float = 25.0
+}
+
 @MainActor
 final class SensorFusionEngine {
     struct FusedImpact {
@@ -25,12 +37,7 @@ final class SensorFusionEngine {
     }
 
     private let windowDuration: TimeInterval
-    var spikeThreshold: Float
-    var minCrestFactor: Float
-    var minRiseRate: Float
-    var minConfirmations: Int
-    var minRearmDuration: TimeInterval
-    var minWarmupSamples: Int
+    private(set) var config: DetectionConfig
 
     private var bySource: [String: [SamplePoint]] = [:]
     private var hpFiltersBySource: [String: HighPassFilter] = [:]
@@ -47,20 +54,23 @@ final class SensorFusionEngine {
     private var diagPeakRise: Float = 0
     #endif
 
-    init(windowDuration: TimeInterval = 0.12,
-         spikeThreshold: Float = 0.020,
-         minCrestFactor: Float = 6.0,
-         minRiseRate: Float = 0.010,
-         minConfirmations: Int = 3,
-         minRearmDuration: TimeInterval = 0.50,
-         minWarmupSamples: Int = 50) {
+    init(windowDuration: TimeInterval = 0.12, config: DetectionConfig = DetectionConfig()) {
         self.windowDuration = windowDuration
-        self.spikeThreshold = spikeThreshold
-        self.minCrestFactor = minCrestFactor
-        self.minRiseRate = minRiseRate
-        self.minConfirmations = minConfirmations
-        self.minRearmDuration = minRearmDuration
-        self.minWarmupSamples = minWarmupSamples
+        self.config = config
+    }
+
+    /// Atomically update detection parameters. Recreates bandpass filters only if cutoffs changed.
+    func configure(_ newConfig: DetectionConfig) {
+        let oldConfig = config
+        config = newConfig
+        if newConfig.bandpassLowHz != oldConfig.bandpassLowHz {
+            hpCutoffHz = newConfig.bandpassLowHz
+            hpFiltersBySource.removeAll()
+        }
+        if newConfig.bandpassHighHz != oldConfig.bandpassHighHz {
+            lpCutoffHz = newConfig.bandpassHighHz
+            lpFiltersBySource.removeAll()
+        }
     }
 
     func ingest(_ sample: SensorSample, activeSources: Set<String>) -> FusedImpact? {
@@ -90,7 +100,7 @@ final class SensorFusionEngine {
         if riseRate > diagPeakRise { diagPeakRise = riseRate }
         diagCounter += 1
         if diagCounter % 250 == 0 {
-            log.debug("entity:FusionDiag n=\(diagCounter) peak=\(String(format: "%.4f", diagPeakFiltered)) rms=\(String(format: "%.4f", rms)) rise=\(String(format: "%.4f", diagPeakRise)) thr=\(spikeThreshold) crest=\(minCrestFactor) riseReq=\(minRiseRate)")
+            log.debug("entity:FusionDiag n=\(diagCounter) peak=\(String(format: "%.4f", diagPeakFiltered)) rms=\(String(format: "%.4f", rms)) rise=\(String(format: "%.4f", diagPeakRise)) thr=\(config.spikeThreshold) crest=\(config.minCrestFactor) riseReq=\(config.minRiseRate)")
             diagPeakFiltered = 0
             diagPeakRise = 0
         }
@@ -106,32 +116,32 @@ final class SensorFusionEngine {
         let required = requiredConsensusCount(activeSourceCount: activeSources.count)
         let candidates = candidatePeaks(activeSources: activeSources)
 
-        let participating = candidates.filter { $0.magnitude >= spikeThreshold }
+        let participating = candidates.filter { $0.magnitude >= config.spikeThreshold }
         let hasConsensus = participating.count >= required
         let timeSinceLastTrigger = now.timeIntervalSince(lastTriggerAt)
 
-        guard hasConsensus, timeSinceLastTrigger >= minRearmDuration else { return nil }
+        guard hasConsensus, timeSinceLastTrigger >= config.minRearmDuration else { return nil }
 
         let peakMag = participating.map(\.magnitude).max() ?? 0
 
         // Gate 1: Crest factor — peak must be well above background
         let crestFactor = peakMag / rms
-        guard crestFactor >= minCrestFactor else {
+        guard crestFactor >= config.minCrestFactor else {
             log.debug("entity:FusionGate blocked=crest peak=\(String(format: "%.4f", peakMag)) rms=\(String(format: "%.4f", rms)) crest=\(String(format: "%.1f", crestFactor))")
             return nil
         }
 
         // Gate 2: Rise rate — direct impacts rise faster than transmitted vibrations
-        guard riseRate >= minRiseRate else {
-            log.debug("entity:FusionGate blocked=riseRate rise=\(String(format: "%.4f", riseRate)) required=\(minRiseRate)")
+        guard riseRate >= config.minRiseRate else {
+            log.debug("entity:FusionGate blocked=riseRate rise=\(String(format: "%.4f", riseRate)) required=\(config.minRiseRate)")
             return nil
         }
 
         // Gate 3: Confirmation count — require multiple above-threshold samples in window
         // Direct impacts produce a cluster of high samples; single-jolt events produce fewer
-        let aboveThreshold = bySource[sample.source]?.filter { $0.value.magnitude >= spikeThreshold }.count ?? 0
-        guard aboveThreshold >= minConfirmations else {
-            log.debug("entity:FusionGate blocked=confirmations count=\(aboveThreshold) required=\(minConfirmations)")
+        let aboveThreshold = bySource[sample.source]?.filter { $0.value.magnitude >= config.spikeThreshold }.count ?? 0
+        guard aboveThreshold >= config.minConfirmations else {
+            log.debug("entity:FusionGate blocked=confirmations count=\(aboveThreshold) required=\(config.minConfirmations)")
             return nil
         }
 
@@ -149,18 +159,6 @@ final class SensorFusionEngine {
         let confidence = Float(participating.count) / Float(max(required, 1))
 
         return FusedImpact(timestamp: now, amplitude: fused, confidence: confidence)
-    }
-
-    /// Update the bandpass filter cutoffs. Clears existing filters so they're recreated.
-    func setBandpass(lowHz: Float, highHz: Float) {
-        if lowHz != hpCutoffHz {
-            hpCutoffHz = lowHz
-            hpFiltersBySource.removeAll()
-        }
-        if highHz != lpCutoffHz {
-            lpCutoffHz = highHz
-            lpFiltersBySource.removeAll()
-        }
     }
 
     private func hpFilterForSource(_ source: String) -> HighPassFilter {
@@ -199,7 +197,7 @@ final class SensorFusionEngine {
 
     private func candidatePeaks(activeSources: Set<String>) -> [(source: String, vector: Vec3, magnitude: Float)] {
         activeSources.compactMap { source in
-            guard sampleCountBySource[source, default: 0] >= minWarmupSamples else { return nil }
+            guard sampleCountBySource[source, default: 0] >= config.minWarmupSamples else { return nil }
             guard let peak = bySource[source]?.max(by: { $0.value.magnitude < $1.value.magnitude }) else {
                 return nil
             }
