@@ -15,8 +15,9 @@ struct SliderRow: View {
                     .tint(Theme.pink)
                 Text(display)
                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                    .frame(width: 36, alignment: .trailing)
+                    .frame(width: 40, alignment: .trailing)
             }
         }
+        .help(tooltip)
     }
 }

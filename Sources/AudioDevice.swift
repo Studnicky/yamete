@@ -110,11 +110,10 @@ enum AudioDeviceManager {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var size: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(deviceID, &addr, 0, nil, &size) == noErr else { return nil }
-        let buf = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: 1)
-        defer { buf.deallocate() }
-        guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, buf) == noErr else { return nil }
-        return buf.load(as: CFString.self) as String
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, &value) == noErr,
+              let value else { return nil }
+        return value.takeUnretainedValue() as String
     }
 }

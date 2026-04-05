@@ -1,8 +1,7 @@
 import XCTest
 @testable import YameteLib
 
-/// Exhaustive settings tests. Every property tested for: defaults, rapid mutation,
-/// persistence roundtrip, boundary values, min≤max enforcement, stress, same-value no-op.
+/// Settings store coverage for defaults, persistence, clamping, and stress paths.
 @MainActor
 final class SettingsStoreTests: XCTestCase {
 
@@ -20,7 +19,7 @@ final class SettingsStoreTests: XCTestCase {
         let cases: [Case] = [
             .init(name: "sensitivityMin",  read: { "\($0.sensitivityMin)" },  expected: "0.1"),
             .init(name: "sensitivityMax",  read: { "\($0.sensitivityMax)" },  expected: "0.9"),
-            .init(name: "debounce",     read: { "\($0.debounce)" },     expected: "0.3"),
+            .init(name: "debounce",     read: { "\($0.debounce)" },     expected: "0.5"),
             .init(name: "screenFlash",     read: { "\($0.screenFlash)" },     expected: "true"),
             .init(name: "flashOpacityMin", read: { "\($0.flashOpacityMin)" }, expected: "0.5"),
             .init(name: "flashOpacityMax", read: { "\($0.flashOpacityMax)" }, expected: "0.9"),
@@ -109,14 +108,14 @@ final class SettingsStoreTests: XCTestCase {
             .init(name: "sensitivityMin over", write: { $0.sensitivityMin = $1 }, read: { $0.sensitivityMin }, input: 1.5,  validRange: 0...1),
             .init(name: "sensitivityMax neg",  write: { $0.sensitivityMax = $1 }, read: { $0.sensitivityMax }, input: -0.5, validRange: 0...1),
             .init(name: "sensitivityMax over", write: { $0.sensitivityMax = $1 }, read: { $0.sensitivityMax }, input: 1.5,  validRange: 0...1),
-            // Debounce (0...3)
+            // Debounce bounds.
             .init(name: "debounce neg",     write: { $0.debounce = $1 }, read: { $0.debounce }, input: -1,  validRange: 0...3),
             .init(name: "debounce over",    write: { $0.debounce = $1 }, read: { $0.debounce }, input: 5,   validRange: 0...3),
             .init(name: "debounce over",    write: { $0.debounce = $1 }, read: { $0.debounce }, input: 10,  validRange: 0...3),
-            // Flash opacity (0...1)
+            // Flash opacity bounds.
             .init(name: "flashOpacityMin neg", write: { $0.flashOpacityMin = $1 }, read: { $0.flashOpacityMin }, input: -1, validRange: 0...1),
             .init(name: "flashOpacityMax over", write: { $0.flashOpacityMax = $1 }, read: { $0.flashOpacityMax }, input: 5, validRange: 0...1),
-            // Volume (0...1)
+            // Volume bounds.
             .init(name: "volumeMin neg",       write: { $0.volumeMin = $1 }, read: { $0.volumeMin }, input: -2,  validRange: 0...1),
             .init(name: "volumeMax over",      write: { $0.volumeMax = $1 }, read: { $0.volumeMax }, input: 99,  validRange: 0...1),
         ]

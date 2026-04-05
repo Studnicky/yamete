@@ -36,23 +36,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updater.autoCheckIfNeeded(settings: settings)
     }
 
-    /// On first launch after install, play the longest sound on ALL audio devices at full volume.
+    /// On first launch, play the longest bundled clip on all output devices.
     private func playFirstLaunchMoan() {
         guard !UserDefaults.standard.bool(forKey: Self.firstLaunchKey) else { return }
         UserDefaults.standard.set(true, forKey: Self.firstLaunchKey)
 
-        let urls = BundleResources.urls(prefix: "sound_", extensions: ["mp3"])
-
-        // Find the longest clip
-        var longest: (url: URL, duration: Double) = (URL(fileURLWithPath: "/"), 0)
-        for url in urls {
-            if let s = NSSound(contentsOf: url, byReference: true), s.duration > longest.duration {
-                longest = (url, s.duration)
-            }
-        }
-        guard longest.duration > 0 else { return }
-
-        // Play on every output device simultaneously at full volume
-        controller.audioPlayer.playOnAllDevices(url: longest.url, volume: 1.0)
+        guard let url = controller.audioPlayer.longestSoundURL else { return }
+        controller.audioPlayer.playOnAllDevices(url: url, volume: 1.0)
     }
 }

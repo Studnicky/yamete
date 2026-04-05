@@ -27,7 +27,7 @@ final class EnvelopeTests: XCTestCase {
     }
 
     func testEnvelopeInvariants() {
-        // Sweep all intensities: envelope must always sum to duration, all components >= 0
+        // Envelope should always sum to duration and stay non-negative.
         for i in stride(from: Float(0), through: 1.0, by: 0.05) {
             for d in [0.0, 0.1, 0.5, 1.0, 2.5] {
                 let env = ScreenFlash.envelope(clipDuration: d, intensity: i)

@@ -2,7 +2,7 @@
 
 A macOS menu bar app that detects physical impacts on Apple Silicon MacBooks and responds with audio and visual feedback.
 
-Uses the built-in BMI286 accelerometer to detect impacts using four independent signal processing algorithms (STA/LTA, CUSUM, Kurtosis, PeakMAD) that vote on whether an impact occurred.
+Uses the built-in BMI286 accelerometer to detect impacts via high-pass filtered spike detection with multi-sensor consensus fusion.
 
 ## Requirements
 
@@ -19,7 +19,7 @@ Download the latest `.dmg` from [Releases](../../releases), open it, and drag **
 ### From source
 
 ```sh
-git clone https://github.com/Studnicky/yamate.git
+git clone https://github.com/Studnicky/yamete.git
 cd yamete
 make install
 ```
@@ -50,11 +50,11 @@ raw force → [sensitivity] → intensity 0–1 → [volume]   → audio level
 
 ### Sensitivity (range: 0–100%)
 
-Defines which impact forces register and maps them to a normalized 0–1 intensity.
+Higher = more reactive. The sensitivity values are inverted to force thresholds internally, so dragging the sliders right makes the app respond to lighter impacts.
 
-- **Low thumb (noise floor)**: impacts below this are ignored. Default 10%. Typing registers at ~3–5%, so 10% filters it out while catching light taps at ~15%+.
-- **High thumb (saturation ceiling)**: impacts at or above this produce full-intensity response. Default 70%.
-- **Band width effect**: a narrow band (e.g., 40–50%) creates steep, dramatic response to small force differences. A wide band (e.g., 5–90%) creates gradual, proportional response.
+- **Low thumb**: minimum sensitivity. Default 10% (inverts to 90% force threshold — only the strongest impacts produce any response at this level).
+- **High thumb**: maximum sensitivity. Default 90% (inverts to 10% force threshold — very light taps produce full-intensity response at this level).
+- **Band width effect**: a narrow band (e.g., 80–90%) creates steep, dramatic response within a small sensitivity range. A wide band (e.g., 10–90%) creates gradual, proportional response.
 
 ### Volume (range: 0–100%)
 
@@ -72,13 +72,9 @@ Screen flash brightness window. Each impact triggers a full-screen radial vignet
 - **High thumb**: opacity for the hardest impact. Default 65%.
 - The flash envelope (attack/sustain/decay) is gated inside the sound clip duration and shaped by intensity: hard impacts have fast attack and long sustain; light impacts have gentle attack and quick decay.
 
-### Debounce (range: 0.0–1.5s)
+### Debounce (range: 0.0–3.0s)
 
-Cooldown window — how long to wait before responding to the next impact. Scales with intensity so light taps recover quickly and hard impacts have longer cooldown.
-
-- **Low thumb**: cooldown after the lightest impact. Default 0.1s.
-- **High thumb**: cooldown after the hardest impact. Default 0.5s.
-- The actual cooldown is the greater of the debounce value and the playing clip's duration.
+Minimum seconds between reactions. The actual cooldown is the greater of the debounce value and the playing clip's duration.
 
 ### Other controls
 
@@ -91,13 +87,12 @@ Cooldown window — how long to wait before responding to the next impact. Scale
 ```
 Accelerometer (100Hz BMI286 via IOKit HID)
     → Decimation (÷2 → 50Hz)
-    → High-pass filter (5Hz cutoff, removes gravity)
-    → 4 signal detectors vote (need 2+ to trigger)
+    → Sensor fusion (per-source high-pass filter + rolling-window consensus)
     → Sensitivity band gates and normalizes intensity
     → Intensity flows through volume, opacity, debounce windows
-    → Audio clip selected and played (14 clips, scaled by intensity)
+    → Audio clip selected by duration (shortest → lightest, longest → hardest)
     → Screen flash envelope computed to fit inside clip duration
-    → Radial vignette + face overlay shown on all monitors
+    → Radial vignette + face overlay shown on selected monitors
 ```
 
 ## Project structure
@@ -105,24 +100,29 @@ Accelerometer (100Hz BMI286 via IOKit HID)
 ```
 Sources/
 ├── YameteApp.swift           App entry point, menu bar setup
-├── Domain.swift              Vec3, ImpactEvent, Transferred, clamping
+├── Domain.swift              Vec3, clamping, bundle resource discovery
 ├── Logging.swift             Dual-sink logger (os.Logger + file, 24h retention)
 ├── SignalProcessing.swift    RingBuffer, HighPassFilter
-├── SignalDetectors.swift     STA/LTA, CUSUM, Kurtosis, PeakMAD detectors
-├── ImpactDetector.swift      Detector orchestrator, threshold tuning
+├── SensorAdapter.swift       Sensor protocol, SensorManager, fan-in stream
+├── SensorFusion.swift        Rolling-window multi-source spike consensus
 ├── AccelerometerReader.swift BMI286 via IOHIDManager (SPU transport)
-├── AudioPlayer.swift         Sound playback, intensity-based clip selection
+├── AudioDevice.swift         CoreAudio output device enumeration
+├── AudioPlayer.swift         Sound playback, duration-sorted clip selection
 ├── ScreenFlash.swift         Per-monitor radial vignette overlay
 ├── SettingsStore.swift       UserDefaults persistence, range validation
-├── ImpactController.swift    Main coordinator, sliding window pipeline
+├── ImpactController.swift    Main coordinator, fusion → response pipeline
 └── Views/
     ├── MenuBarView.swift     Settings dropdown panel
     ├── MenuBarIcon.swift     Menu bar icon
     ├── SliderRow.swift       Single-value slider component
+    ├── Theme.swift           Shared color palette
     └── RangeSlider.swift     Dual-thumb range slider component
 
-Tests/                        30 tabular tests (unit, integration, E2E)
-Resources/                    13 face SVGs (uniform 5-color palette) + 14 sound clips
+Bundle/Contents/Resources/
+├── faces/                    Face images (any SVG/PNG/JPG)
+└── sounds/                   Sound clips (any MP3/WAV/M4A)
+
+Tests/                        Tabular tests (unit, integration, E2E)
 ```
 
 ## License

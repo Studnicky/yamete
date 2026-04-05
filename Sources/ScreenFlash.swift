@@ -3,15 +3,8 @@ import SwiftUI
 
 private let log = AppLog(category: "ScreenFlash")
 
-/// Flashes a random face full-screen on each impact.
-///
-/// Face selection guarantees:
-/// 1. Within a single event, every monitor gets a **different** face.
-/// 2. Faces used in the **previous event** are excluded from the next event's pool.
-/// 3. If there are more monitors than available faces, the per-monitor history
-///    ensures no monitor repeats its own last face.
-///
-/// All window operations are MainActor-confined.
+/// Flashes face overlays on impact across selected screens.
+/// Uses per-screen history to reduce immediate face repeats.
 @MainActor
 final class ScreenFlash {
     /// Rotation matrix: `history[monitorIndex]` is the ordered list of face indices
@@ -23,6 +16,8 @@ final class ScreenFlash {
 
     /// Reusable window pool keyed by screen index. Avoids NSWindow creation per impact.
     private var windowPool: [Int: NSWindow] = [:]
+    private var hideTask: Task<Void, Never>?
+    private var flashGeneration: UInt64 = 0
 
     /// Flashes all screens with a face overlay gated inside `clipDuration`.
     /// - Parameter enabledDisplayIDs: display IDs to flash. Empty = all displays.
@@ -68,8 +63,12 @@ final class ScreenFlash {
             activeWindows.append(win)
         }
 
-        Task {
+        flashGeneration &+= 1
+        let generation = flashGeneration
+        hideTask?.cancel()
+        hideTask = Task { [activeWindows] in
             try? await Task.sleep(for: .seconds(clipDuration + 0.05))
+            guard !Task.isCancelled, generation == flashGeneration else { return }
             activeWindows.forEach { $0.orderOut(nil) }
         }
     }
@@ -86,19 +85,14 @@ final class ScreenFlash {
 
     // MARK: - Face selection
 
-    /// Picks `count` unique face indices using the rotation matrix.
-    ///
-    /// Algorithm: for each monitor, score every face by how recently it appeared
-    /// on THAT monitor (from history) plus a penalty if already picked by another
-    /// monitor in this event. Pick the face with the lowest (least recent) score.
-    /// This produces maximum rotation with zero branching fallback logic.
+    /// Picks face indices using recency scoring across monitors and events.
     private func pickFaces(count: Int, total: Int) -> [Int?] {
         guard total > 0 else { return Array(repeating: nil, count: count) }
 
-        // Ensure history has a row for each monitor
+        // Ensure one history row per monitor.
         while history.count < count { history.append([]) }
 
-        // Flatten all recent faces across all monitors for cross-event penalty
+        // Recent faces across monitors for cross-event penalty.
         let recentGlobal = Set(history.flatMap { $0.suffix(count) })
 
         var usedThisEvent = Set<Int>()
@@ -107,19 +101,15 @@ final class ScreenFlash {
         for monitor in 0..<count {
             let monitorHistory = history[monitor]
 
-            // Score each face: lower = better candidate
-            // - Per-monitor recency: index in history (0 = oldest, len = most recent)
-            // - Cross-event penalty: +total if used in another monitor's recent history
-            // - Same-event penalty: +total*2 if already picked this event
+            // Lower score is better: recency + cross-event + same-event penalties.
             let scores: [(index: Int, score: Int)] = (0..<total).map { faceIdx in
                 let recency = monitorHistory.lastIndex(of: faceIdx)
-                    .map { monitorHistory.count - $0 }  // 1=most recent, count=oldest
-                    ?? (total + 1)                       // never shown = best
+                    .map { monitorHistory.count - $0 }
+                    ?? (total + 1)
 
                 let globalPenalty = recentGlobal.contains(faceIdx) ? total : 0
                 let eventPenalty = usedThisEvent.contains(faceIdx) ? total * 2 : 0
 
-                // Invert recency so "never shown" scores lowest
                 return (faceIdx, -(recency) + globalPenalty + eventPenalty)
             }
 
@@ -128,7 +118,7 @@ final class ScreenFlash {
             usedThisEvent.insert(best)
             history[monitor].append(best)
 
-            // Cap history length to 2x face count (enough for full rotation tracking)
+            // Cap per-monitor history length.
             if history[monitor].count > total * 2 {
                 history[monitor].removeFirst(history[monitor].count - total * 2)
             }
@@ -140,10 +130,10 @@ final class ScreenFlash {
     // MARK: - Resource loading
 
     private func loadFaceImages() -> [NSImage] {
-        let urls = BundleResources.urls(prefix: "face_", extensions: ["svg", "png", "jpg", "jpeg"])
+        let urls = BundleResources.urls(in: "faces", extensions: ["svg", "png", "jpg", "jpeg"])
         let images = urls.compactMap { NSImage(contentsOf: $0) }
         if images.isEmpty {
-            log.error("entity:FaceLibrary wasInvalidatedBy activity:ResourceLoad — no face images in bundle")
+            log.error("entity:FaceLibrary wasInvalidatedBy activity:ResourceLoad — no face images in bundle/faces")
         } else {
             log.info("entity:FaceLibrary wasGeneratedBy activity:ResourceLoad count=\(images.count)")
         }
@@ -152,8 +142,7 @@ final class ScreenFlash {
 
     // MARK: - Window pool
 
-    /// Returns a reusable borderless overlay window for the given screen index.
-    /// Creates a new window only on first use; subsequent calls return the existing one.
+    /// Returns a reusable borderless overlay window for a screen.
     private func windowForScreen(index: Int, screen: NSScreen) -> NSWindow {
         if let existing = windowPool[index] { return existing }
         let win = NSWindow(

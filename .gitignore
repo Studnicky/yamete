@@ -9,9 +9,10 @@ dist/
 # Claude Code sessions
 .claude/
 
-# Xcode (if ever used)
+# Xcode / SwiftPM IDE state
 *.xcodeproj/
 *.xcworkspace/
+.swiftpm/
 build/
 DerivedData/
 .build/

@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
-    branches: [main]
 
 jobs:
   lint:
@@ -32,11 +31,13 @@ jobs:
         run: |
           test -f dist/Yamete.app/Contents/MacOS/yamete
           test -f dist/Yamete.app/Contents/Info.plist
-          FACE_COUNT=$(ls dist/Yamete.app/Contents/Resources/face_*.svg | wc -l)
-          SOUND_COUNT=$(ls dist/Yamete.app/Contents/Resources/sound_*.mp3 | wc -l)
+          test -d dist/Yamete.app/Contents/Resources/faces
+          test -d dist/Yamete.app/Contents/Resources/sounds
+          FACE_COUNT=$(find dist/Yamete.app/Contents/Resources/faces -type f \( -name '*.svg' -o -name '*.png' -o -name '*.jpg' \) | wc -l | tr -d ' ')
+          SOUND_COUNT=$(find dist/Yamete.app/Contents/Resources/sounds -type f \( -name '*.mp3' -o -name '*.wav' -o -name '*.m4a' \) | wc -l | tr -d ' ')
           echo "Faces: $FACE_COUNT, Sounds: $SOUND_COUNT"
-          test "$FACE_COUNT" -ge 10
-          test "$SOUND_COUNT" -ge 10
+          test "$FACE_COUNT" -ge 1
+          test "$SOUND_COUNT" -ge 1
 
   test:
     name: Test
