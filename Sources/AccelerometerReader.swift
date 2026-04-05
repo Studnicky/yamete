@@ -43,9 +43,8 @@ final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
     var isAvailable: Bool {
         let matching: [String: Any] = [
-            kIOHIDDeviceUsagePageKey as String: pageAccel,
-            kIOHIDDeviceUsageKey     as String: usageAccel,
-            kIOHIDTransportKey       as String: "SPU"
+            "PrimaryUsagePage": pageAccel,
+            "PrimaryUsage": usageAccel
         ]
         let m = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
         IOHIDManagerSetDeviceMatching(m, matching as CFDictionary)
@@ -145,6 +144,7 @@ final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
             guard !Thread.current.isCancelled, ctx.accelDevice == nil else { return }
             continuation.finish(throwing: SensorError.deviceNotFound)
         }
+        IOHIDEventSystemClientRegisterEventCallback(c, eventCallback, nil, selfPtr.toOpaque())
 
         // Run until the consuming task cancels us (Thread.cancel sets isCancelled)
         while !Thread.current.isCancelled {
@@ -207,6 +207,7 @@ private final class HIDCallbackContext: @unchecked Sendable {
                        y: Float(y) * config.scale,
                        z: Float(z) * config.scale)
 
+        let vec = Vec3(x: x, y: y, z: z)
         let mag = vec.magnitude
         guard mag > config.magnitudeMin && mag < config.magnitudeMax else { return }
 
