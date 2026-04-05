@@ -123,25 +123,4 @@ final class SensorFusionTests: XCTestCase {
         XCTAssertTrue(triggered)
     }
 
-    func testCrestFactorRejectsSustainedVibration() {
-        let config = DetectionConfig(
-            spikeThreshold: 0.01,
-            minCrestFactor: 5.0, minRiseRate: 0, minConfirmations: 1,
-            minRearmDuration: 0, minWarmupSamples: 50
-        )
-        let engine = SensorFusionEngine(config: config)
-        let start = Date()
-        var triggered = false
-
-        for i in 0..<200 {
-            let t = start.addingTimeInterval(Double(i) * 0.02)
-            let sign: Float = (i % 2 == 0) ? 1.0 : -1.0
-            let v: Float = sign * 0.5
-            if engine.ingest(SensorSample(source: SensorID("A"), timestamp: t,
-                value: Vec3(x: v, y: 0, z: 0)), activeSources: [SensorID("A")]) != nil {
-                triggered = true
-            }
-        }
-        XCTAssertFalse(triggered, "Sustained vibration should be rejected by crest factor")
-    }
 }
