@@ -6,7 +6,7 @@ private let log = AppLog(category: "ScreenFlash")
 /// Flashes face overlays on impact across selected screens.
 /// Uses per-screen history to reduce immediate face repeats.
 @MainActor
-final class ScreenFlash {
+final class ScreenFlash: FlashResponder {
     /// Rotation matrix: `history[monitorIndex]` is the ordered list of face indices
     /// previously shown on that monitor, most recent last. The matrix drives all
     /// dedup logic from a single data structure — no separate event/monitor tracking.
