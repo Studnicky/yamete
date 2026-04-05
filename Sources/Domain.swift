@@ -48,6 +48,23 @@ enum ImpactTier: Int, CaseIterable, Sendable, CustomStringConvertible {
     }
 }
 
+// MARK: - Response protocols
+
+/// Plays audio scaled by impact intensity. Returns clip duration.
+@MainActor
+protocol AudioResponder {
+    @discardableResult
+    func play(intensity: Float, volumeMin: Float, volumeMax: Float, deviceUIDs: [String]) -> Double
+    func playOnAllDevices(url: URL, volume: Float)
+    var longestSoundURL: URL? { get }
+}
+
+/// Flashes screen overlay scaled by impact intensity.
+@MainActor
+protocol FlashResponder {
+    func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, enabledDisplayIDs: [Int])
+}
+
 // MARK: - Clamping
 
 extension Comparable {

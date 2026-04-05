@@ -10,11 +10,11 @@ private let log = AppLog(category: "ImpactController")
 @MainActor @Observable
 final class ImpactController {
     let settings: SettingsStore
-    let audioPlayer: AudioPlayer
+    let audioPlayer: any AudioResponder
 
     private let sensorManager: SensorManager
     private let fusion = SensorFusionEngine()
-    private let screenFlash = ScreenFlash()
+    private let screenFlash: any FlashResponder
 
     var impactCount: Int = 0
     var isEnabled = false
@@ -36,9 +36,13 @@ final class ImpactController {
     private static let intensityCeiling: Float = 0.060
     private let intensityRange: ClosedRange<Float> = intensityFloor...intensityCeiling
 
-    init(settings: SettingsStore, adapters: [any SensorAdapter]? = nil) {
+    init(settings: SettingsStore,
+         audioPlayer: (any AudioResponder)? = nil,
+         flashResponder: (any FlashResponder)? = nil,
+         adapters: [any SensorAdapter]? = nil) {
         self.settings = settings
-        audioPlayer = AudioPlayer()
+        self.audioPlayer = audioPlayer ?? AudioPlayer()
+        self.screenFlash = flashResponder ?? ScreenFlash()
         sensorManager = SensorManager(adapters: adapters ?? [
             SPUAccelerometerAdapter(),
         ])

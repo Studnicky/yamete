@@ -7,7 +7,7 @@ private let log = AppLog(category: "AudioPlayer")
 /// Sound files are loaded from the `sounds` resource folder at startup,
 /// sorted by duration, and cached for intensity-based selection.
 @MainActor
-final class AudioPlayer {
+final class AudioPlayer: AudioResponder {
     private struct SoundFile {
         let url: URL
         let duration: Double
