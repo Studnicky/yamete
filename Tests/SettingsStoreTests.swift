@@ -48,7 +48,11 @@ final class SettingsStoreTests: XCTestCase {
         for c in cases {
             let store = freshStore()
             for i in 0..<200 { c.mutate(store, Double(i) / 200.0) }
-            XCTAssertTrue(true, "\(c.name): survived 200 rapid mutations")
+            // Verify final value is within valid range (0...1 for most, 0...2 for debounce)
+            c.mutate(store, 0.5)
+            let d = UserDefaults.standard
+            let persisted = d.double(forKey: SettingsStore.Key.allCases.first(where: { $0.rawValue == c.name })?.rawValue ?? c.name)
+            XCTAssertEqual(persisted, 0.5, accuracy: 0.01, "\(c.name): value should persist after rapid mutations")
         }
     }
 
@@ -194,7 +198,7 @@ final class SettingsStoreTests: XCTestCase {
         for c in cases {
             let store = freshStore()
             c.setTwice(store)
-            XCTAssertTrue(true, "\(c.name): same-value survived")
+            // No crash = success. Verifies guard-clamp pattern handles same-value correctly.
         }
     }
 }
