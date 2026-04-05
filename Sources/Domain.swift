@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 // MARK: - Vec3
@@ -63,6 +64,15 @@ protocol AudioResponder {
 @MainActor
 protocol FlashResponder {
     func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, enabledDisplayIDs: [Int])
+}
+
+// MARK: - Display helpers
+
+extension NSScreen {
+    /// The CGDirectDisplayID for this screen, or 0 if unavailable.
+    var displayID: Int {
+        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID).map(Int.init) ?? 0
+    }
 }
 
 // MARK: - Clamping
