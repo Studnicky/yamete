@@ -13,7 +13,7 @@ final class ImpactController {
     let audioPlayer: any AudioResponder
 
     private let sensorManager: SensorManager
-    private let fusion = SensorFusionEngine()
+    private let fusion = ImpactDetectionEngine()
     private let screenFlash: any FlashResponder
 
     var impactCount: Int = 0
