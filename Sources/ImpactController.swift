@@ -4,14 +4,17 @@ import Observation
 private let log = AppLog(category: "ImpactController")
 
 /// Coordinates sensor input, impact detection, and app responses.
+///
+/// Signal chain:
+///   sensor sample → detection (fusion engine) → normalization → response (audio + flash)
 @MainActor @Observable
 final class ImpactController {
     let settings: SettingsStore
-    let audioPlayer: AudioPlayer
+    let audioPlayer: any AudioResponder
 
     private let sensorManager: SensorManager
     private let fusion = SensorFusionEngine()
-    private let screenFlash = ScreenFlash()
+    private let screenFlash: any FlashResponder
 
     var impactCount: Int = 0
     var isEnabled = false
@@ -22,13 +25,10 @@ final class ImpactController {
     var lastImpactFreqHz: String = "—"
 
     private var sensorTask: Task<Void, Never>?
-    private var playingUntil: Date = .distantPast
+    private var rearmUntil: Date = .distantPast
     private var countDate: Date = Calendar.current.startOfDay(for: Date())
     private var activeSensors: Set<String> = []
 
-    /// Maps post-fusion force to normalized intensity.
-    /// IOHIDEventSystem returns pre-smoothed values — typical range:
-    ///   light tap: ~0.003g filtered, hard hit: ~0.03g, maximum: ~0.6g
     /// Intensity mapping calibrated to IOHIDEventSystem data:
     ///   0.020g = firm desk slap (minimum useful impact)
     ///   0.060g = hard slap (approaching hardware stress)
@@ -36,9 +36,13 @@ final class ImpactController {
     private static let intensityCeiling: Float = 0.060
     private let intensityRange: ClosedRange<Float> = intensityFloor...intensityCeiling
 
-    init(settings: SettingsStore, adapters: [any SensorAdapter]? = nil) {
+    init(settings: SettingsStore,
+         audioPlayer: (any AudioResponder)? = nil,
+         flashResponder: (any FlashResponder)? = nil,
+         adapters: [any SensorAdapter]? = nil) {
         self.settings = settings
-        audioPlayer = AudioPlayer()
+        self.audioPlayer = audioPlayer ?? AudioPlayer()
+        self.screenFlash = flashResponder ?? ScreenFlash()
         sensorManager = SensorManager(adapters: adapters ?? [
             SPUAccelerometerAdapter(),
         ])
@@ -78,45 +82,93 @@ final class ImpactController {
 
     func toggle() { isEnabled ? stop() : start() }
 
+    /// Plays the longest loaded sound on all output devices at full volume.
+    func playWelcomeSound() {
+        guard let url = audioPlayer.longestSoundURL else { return }
+        audioPlayer.playOnAllDevices(url: url, volume: 1.0)
+    }
+
     // MARK: - Signal chain
 
     private func handleSample(_ sample: SensorSample) {
-        fusion.setBandpass(lowHz: Float(settings.bandpassLowHz), highHz: Float(settings.bandpassHighHz))
-        fusion.spikeThreshold = Float(settings.spikeThreshold)
-        fusion.minCrestFactor = Float(settings.crestFactor)
-        fusion.minRiseRate = Float(settings.riseRate)
-        fusion.minConfirmations = settings.confirmations
-        fusion.minRearmDuration = settings.debounce
-        fusion.minWarmupSamples = settings.warmupSamples
+        pushConfigToFusion()
+        guard let impact = detect(sample) else { return }
+        respond(to: impact)
+    }
+
+    // MARK: - Detection
+
+    private struct DetectedImpact {
+        let magnitude: Float
+        let intensity: Float
+        let tier: ImpactTier
+        let timestamp: Date
+        let confidence: Float
+    }
+
+    private func detect(_ sample: SensorSample) -> DetectedImpact? {
         let sources = activeSensors.isEmpty ? Set([sample.source]) : activeSensors
-        guard let fused = fusion.ingest(sample, activeSources: sources) else { return }
+        guard let fused = fusion.ingest(sample, activeSources: sources) else { return nil }
 
         let now = fused.timestamp
         let mag = fused.amplitude.magnitude
-        guard now >= playingUntil else {
-            log.debug("entity:Gate blocked=debounce mag=\(String(format: "%.4f", mag)) remaining=\(String(format: "%.2f", playingUntil.timeIntervalSince(now)))s")
-            return
-        }
 
-        guard let intensity = normalizeIntensity(mag) else {
-            log.debug("entity:Gate blocked=sensitivity mag=\(String(format: "%.4f", mag))")
-            return
-        }
+        guard now >= rearmUntil else { return nil }
+        guard let intensity = normalizeIntensity(mag) else { return nil }
 
-        let tier = ImpactTier.from(intensity: intensity)
-        lastImpactMagnitude = mag
-        lastImpactTier = tier
+        return DetectedImpact(
+            magnitude: mag,
+            intensity: intensity,
+            tier: ImpactTier.from(intensity: intensity),
+            timestamp: now,
+            confidence: fused.confidence
+        )
+    }
+
+    // MARK: - Response
+
+    private func respond(to impact: DetectedImpact) {
+        lastImpactMagnitude = impact.magnitude
+        lastImpactTier = impact.tier
         lastImpactFreqHz = "\(Int(settings.bandpassLowHz))–\(Int(settings.bandpassHighHz)) Hz"
 
-        let clipDuration = playAudioResponse(intensity: intensity)
-        playingUntil = now.addingTimeInterval(max(clipDuration, settings.debounce))
+        let clipDuration = audioPlayer.play(
+            intensity: impact.intensity,
+            volumeMin: Float(settings.volumeMin),
+            volumeMax: Float(settings.volumeMax),
+            deviceUIDs: settings.enabledAudioDevices
+        )
+
+        rearmUntil = impact.timestamp.addingTimeInterval(max(clipDuration, settings.debounce))
 
         if settings.screenFlash && clipDuration > 0 {
-            flashScreenResponse(intensity: intensity, clipDuration: clipDuration)
+            screenFlash.flash(
+                intensity: impact.intensity,
+                opacityMin: Float(settings.flashOpacityMin),
+                opacityMax: Float(settings.flashOpacityMax),
+                clipDuration: clipDuration,
+                enabledDisplayIDs: settings.enabledDisplays
+            )
         }
 
-        log.debug("entity:Impact tier=\(tier) intensity=\(String(format: "%.2f", intensity)) mag=\(String(format: "%.4f", mag)) confidence=\(String(format: "%.2f", fused.confidence))")
-        incrementDailyCount(now: now)
+        log.debug("entity:Impact tier=\(impact.tier) intensity=\(String(format: "%.2f", impact.intensity)) mag=\(String(format: "%.4f", impact.magnitude)) confidence=\(String(format: "%.2f", impact.confidence))")
+        incrementDailyCount(now: impact.timestamp)
+    }
+
+    // MARK: - Configuration
+
+    private func pushConfigToFusion() {
+        let config = DetectionConfig(
+            spikeThreshold: Float(settings.spikeThreshold),
+            minCrestFactor: Float(settings.crestFactor),
+            minRiseRate: Float(settings.riseRate),
+            minConfirmations: settings.confirmations,
+            minRearmDuration: settings.debounce,
+            minWarmupSamples: settings.warmupSamples,
+            bandpassLowHz: Float(settings.bandpassLowHz),
+            bandpassHighHz: Float(settings.bandpassHighHz)
+        )
+        fusion.configure(config)
     }
 
     // MARK: - Normalization
@@ -134,29 +186,6 @@ final class ImpactController {
 
         let bandWidth = max(Float(0.001), thresholdHigh - thresholdLow)
         return ((rawIntensity - thresholdLow) / bandWidth).clamped(to: 0...1)
-    }
-
-    // MARK: - Response
-
-    /// Plays audio scaled by intensity. Returns clip duration.
-    private func playAudioResponse(intensity: Float) -> Double {
-        audioPlayer.play(
-            intensity: intensity,
-            volumeMin: Float(settings.volumeMin),
-            volumeMax: Float(settings.volumeMax),
-            deviceUIDs: settings.enabledAudioDevices
-        )
-    }
-
-    /// Flashes screens with intensity-scaled overlay.
-    private func flashScreenResponse(intensity: Float, clipDuration: Double) {
-        screenFlash.flash(
-            intensity: intensity,
-            opacityMin: Float(settings.flashOpacityMin),
-            opacityMax: Float(settings.flashOpacityMax),
-            clipDuration: clipDuration,
-            enabledDisplayIDs: settings.enabledDisplays
-        )
     }
 
     // MARK: - Daily counter
