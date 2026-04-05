@@ -1,3 +1,9 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
+#if canImport(ResponseKit)
+import ResponseKit
+#endif
 import SwiftUI
 import AppKit
 import ServiceManagement

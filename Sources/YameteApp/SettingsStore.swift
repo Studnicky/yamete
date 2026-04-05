@@ -1,3 +1,6 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
 import Foundation
 import Observation
 

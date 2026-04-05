@@ -1,3 +1,6 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
 import Foundation
 import IOKit.hid
 
@@ -61,10 +64,12 @@ private func IOHIDEventGetFloatValue(_ event: IOHIDEventRef, _ field: Int32) -> 
 
 /// Reads BMI286 accelerometer via IOHIDEventSystemClient and streams Vec3 samples.
 /// Callbacks arrive on a dedicated dispatch queue; samples forwarded via continuation.
-final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
+public final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
-    let id = SensorID("spu-accelerometer")
-    let name = "Apple SPU Accelerometer"
+    public let id = SensorID("spu-accelerometer")
+    public let name = "Apple SPU Accelerometer"
+
+    public init() {}
 
     /// IOHIDEventSystemClient type: 1 = monitor mode (can read events from services)
     private let clientType: Int32 = 1
@@ -85,7 +90,7 @@ final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
     // MARK: - SensorAdapter
 
-    var isAvailable: Bool {
+    public var isAvailable: Bool {
         guard let c = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault, clientType, nil) else { return false }
         let matching: [String: Any] = ["PrimaryUsagePage": pageAccel, "PrimaryUsage": usageAccel]
         IOHIDEventSystemClientSetMatching(c, matching as CFDictionary)
@@ -98,7 +103,7 @@ final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
         return false
     }
 
-    func samples() -> AsyncThrowingStream<Vec3, Error> {
+    public func samples() -> AsyncThrowingStream<Vec3, Error> {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: Vec3.self)
 
         let ctx = EventContext(
