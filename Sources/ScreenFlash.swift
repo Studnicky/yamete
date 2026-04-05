@@ -38,10 +38,7 @@ final class ScreenFlash: FlashResponder {
             screens = allScreens
         } else {
             let enabled = Set(enabledDisplayIDs)
-            screens = allScreens.filter { screen in
-                guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else { return true }
-                return enabled.contains(Int(displayID))
-            }
+            screens = allScreens.filter { enabled.contains($0.displayID) }
         }
         guard !screens.isEmpty else { return }
         let picks = pickFaces(count: screens.count, total: faces.count)
