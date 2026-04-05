@@ -1,3 +1,6 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
 import AppKit
 import Foundation
 
@@ -7,7 +10,7 @@ private let log = AppLog(category: "AudioPlayer")
 /// Sound files are loaded from the `sounds` resource folder at startup,
 /// sorted by duration, and cached for intensity-based selection.
 @MainActor
-final class AudioPlayer: AudioResponder {
+public final class AudioPlayer: AudioResponder {
     private struct SoundFile {
         let url: URL
         let duration: Double
@@ -19,15 +22,15 @@ final class AudioPlayer: AudioResponder {
     private let historySize = 2
 
     /// URL and duration of the longest loaded sound (last in sorted cache).
-    var longestSoundURL: URL? { soundFiles.last?.url }
+    public var longestSoundURL: URL? { soundFiles.last?.url }
 
-    init() { preload() }
+    public init() { preload() }
 
     /// Plays a sound scaled to intensity on the specified device.
     /// Returns the clip duration (0 if nothing played).
     /// - Parameter deviceUIDs: Core Audio device UIDs. Empty = system default.
     @discardableResult
-    func play(intensity: Float, volumeMin: Float, volumeMax: Float, deviceUIDs: [String] = []) -> Double {
+    public func play(intensity: Float, volumeMin: Float, volumeMax: Float, deviceUIDs: [String] = []) -> Double {
         guard let sound = selectSound(intensity: intensity) else {
             log.warning("activity:Playback wasInvalidatedBy entity:EmptySoundPool")
             return 0
@@ -60,7 +63,7 @@ final class AudioPlayer: AudioResponder {
     }
 
     /// Plays a sound on ALL output devices simultaneously at the given volume.
-    func playOnAllDevices(url: URL, volume: Float) {
+    public func playOnAllDevices(url: URL, volume: Float) {
         let devices = AudioDeviceManager.outputDevices()
         if devices.isEmpty {
             // No enumerable devices — play on default

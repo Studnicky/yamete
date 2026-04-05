@@ -1,19 +1,22 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
 import CoreAudio
 import Foundation
 
 /// Represents a macOS audio output device.
-struct AudioOutputDevice: Identifiable, Sendable {
-    let id: AudioDeviceID
-    let uid: String
-    let name: String
+public struct AudioOutputDevice: Identifiable, Sendable {
+    public let id: AudioDeviceID
+    public let uid: String
+    public let name: String
     /// Disambiguated display name (appends " (2)" etc. for duplicates)
-    let displayName: String
+    public let displayName: String
 }
 
-enum AudioDeviceManager {
+public enum AudioDeviceManager {
 
     /// Returns all audio devices that have at least one output channel.
-    static func outputDevices() -> [AudioOutputDevice] {
+    public static func outputDevices() -> [AudioOutputDevice] {
         let deviceIDs = allDeviceIDs()
 
         var results: [AudioOutputDevice] = []
@@ -39,7 +42,7 @@ enum AudioDeviceManager {
     }
 
     /// UID of the current default output device.
-    static var defaultDeviceUID: String? {
+    public static var defaultDeviceUID: String? {
         var addr = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,

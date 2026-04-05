@@ -1,6 +1,9 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
 import Foundation
 
-private let log = AppLog(category: "SensorFusion")
+private let log = AppLog(category: "ImpactDetection")
 
 /// Impact detection engine with multi-stage filtering to reject non-impact vibrations.
 ///
@@ -12,27 +15,36 @@ private let log = AppLog(category: "SensorFusion")
 ///   5. Confirmation count requires multiple above-threshold samples in the window
 ///   6. Time-based rearm prevents retriggering from filter ringing
 /// Configurable detection parameters for the impact detection engine.
-struct DetectionConfig: Equatable {
-    var spikeThreshold: Float = 0.020
-    var minCrestFactor: Float = 4.0
-    var minRiseRate: Float = 0.010
-    var minConfirmations: Int = 3
-    var minRearmDuration: TimeInterval = 0.50
-    var minWarmupSamples: Int = 50
-    var bandpassLowHz: Float = 20.0
-    var bandpassHighHz: Float = 25.0
+public struct DetectionConfig: Equatable {
+    public var spikeThreshold: Float = 0.020
+    public var minCrestFactor: Float = 4.0
+    public var minRiseRate: Float = 0.010
+    public var minConfirmations: Int = 3
+    public var minRearmDuration: TimeInterval = 0.50
+    public var minWarmupSamples: Int = 50
+    public var bandpassLowHz: Float = 20.0
+    public var bandpassHighHz: Float = 25.0
+    public init(spikeThreshold: Float = 0.020, minCrestFactor: Float = 4.0,
+                minRiseRate: Float = 0.010, minConfirmations: Int = 3,
+                minRearmDuration: TimeInterval = 0.50, minWarmupSamples: Int = 50,
+                bandpassLowHz: Float = 20.0, bandpassHighHz: Float = 25.0) {
+        self.spikeThreshold = spikeThreshold; self.minCrestFactor = minCrestFactor
+        self.minRiseRate = minRiseRate; self.minConfirmations = minConfirmations
+        self.minRearmDuration = minRearmDuration; self.minWarmupSamples = minWarmupSamples
+        self.bandpassLowHz = bandpassLowHz; self.bandpassHighHz = bandpassHighHz
+    }
 }
 
 @MainActor
-final class SensorFusionEngine {
-    struct FusedImpact {
-        let timestamp: Date
-        let amplitude: Vec3
-        let confidence: Float
+public final class ImpactDetectionEngine {
+    public struct FusedImpact {
+        public let timestamp: Date
+        public let amplitude: Vec3
+        public let confidence: Float
     }
 
     private struct SamplePoint {
-        let timestamp: Date
+        public let timestamp: Date
         let value: Vec3
     }
 
@@ -54,13 +66,13 @@ final class SensorFusionEngine {
     private var diagPeakRise: Float = 0
     #endif
 
-    init(windowDuration: TimeInterval = 0.12, config: DetectionConfig = DetectionConfig()) {
+    public init(windowDuration: TimeInterval = 0.12, config: DetectionConfig = DetectionConfig()) {
         self.windowDuration = windowDuration
         self.config = config
     }
 
     /// Atomically update detection parameters. Recreates bandpass filters only if cutoffs changed.
-    func configure(_ newConfig: DetectionConfig) {
+    public func configure(_ newConfig: DetectionConfig) {
         let oldConfig = config
         config = newConfig
         if newConfig.bandpassLowHz != oldConfig.bandpassLowHz {
@@ -73,7 +85,7 @@ final class SensorFusionEngine {
         }
     }
 
-    func ingest(_ sample: SensorSample, activeSources: Set<SensorID>) -> FusedImpact? {
+    public func ingest(_ sample: SensorSample, activeSources: Set<SensorID>) -> FusedImpact? {
         let now = sample.timestamp
 
         let hp = hpFilterForSource(sample.source)
