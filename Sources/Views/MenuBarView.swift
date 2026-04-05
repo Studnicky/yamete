@@ -200,9 +200,7 @@ private struct DeviceSection: View {
 
     // MARK: - Helpers
 
-    private func displayID(for screen: NSScreen) -> Int {
-        (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID).map(Int.init) ?? 0
-    }
+    private func displayID(for screen: NSScreen) -> Int { screen.displayID }
 
     private func audioBinding(uid: String) -> Binding<Bool> {
         @Bindable var s = settings

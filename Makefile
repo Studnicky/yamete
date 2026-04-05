@@ -30,7 +30,7 @@ FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio ServiceManagement
 SWIFTFLAGS := -O -module-name $(APP) -target arm64-apple-macosx14.0 -parse-as-library \
               $(addprefix -framework ,$(FRAMEWORKS))
 
-ENTITLE   := Yamete-hardened.entitlements
+ENTITLE   := Yamete.entitlements
 SIGNING_ID ?= -
 
 .PHONY: all build test install uninstall clean dmg lint verify release notarize
@@ -107,10 +107,10 @@ uninstall:
 	@rm -rf /Applications/$(APP).app
 	@printf "  remove    /Applications/$(APP).app\n"
 
-# ── Release (with Developer ID + App Sandbox) ────────────────
+# ── Release (with Developer ID signing) ───────────────────────
 release: clean
-	@$(MAKE) build SIGNING_ID="$(SIGNING_ID)" ENTITLE=Yamete.entitlements
-	@printf "  hardened  sandbox + signed\n"
+	@$(MAKE) build SIGNING_ID="$(SIGNING_ID)"
+	@printf "  hardened  signed for distribution\n"
 
 # ── Notarize ──────────────────────────────────────────────────
 notarize: release dmg

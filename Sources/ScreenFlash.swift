@@ -6,7 +6,7 @@ private let log = AppLog(category: "ScreenFlash")
 /// Flashes face overlays on impact across selected screens.
 /// Uses per-screen history to reduce immediate face repeats.
 @MainActor
-final class ScreenFlash {
+final class ScreenFlash: FlashResponder {
     /// Rotation matrix: `history[monitorIndex]` is the ordered list of face indices
     /// previously shown on that monitor, most recent last. The matrix drives all
     /// dedup logic from a single data structure — no separate event/monitor tracking.
@@ -38,10 +38,7 @@ final class ScreenFlash {
             screens = allScreens
         } else {
             let enabled = Set(enabledDisplayIDs)
-            screens = allScreens.filter { screen in
-                guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else { return true }
-                return enabled.contains(Int(displayID))
-            }
+            screens = allScreens.filter { enabled.contains($0.displayID) }
         }
         guard !screens.isEmpty else { return }
         let picks = pickFaces(count: screens.count, total: faces.count)
@@ -66,7 +63,7 @@ final class ScreenFlash {
         flashGeneration &+= 1
         let generation = flashGeneration
         hideTask?.cancel()
-        hideTask = Task { [activeWindows] in
+        hideTask = Task { @MainActor [activeWindows] in
             try? await Task.sleep(for: .seconds(clipDuration + 0.05))
             guard !Task.isCancelled, generation == flashGeneration else { return }
             activeWindows.forEach { $0.orderOut(nil) }

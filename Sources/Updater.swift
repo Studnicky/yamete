@@ -41,7 +41,7 @@ final class Updater {
         log.info("activity:AutoUpdateCheck wasStartedBy agent:Updater interval=\(String(format: "%.0f", elapsed))s")
         state = .checking
 
-        Task {
+        Task { @MainActor in
             do {
                 let release = try await fetchLatestRelease()
                 if isNewer(release.version, than: currentVersion) {
@@ -62,7 +62,7 @@ final class Updater {
         state = .checking
         log.info("activity:UpdateCheck wasStartedBy agent:Updater current=\(currentVersion)")
 
-        Task {
+        Task { @MainActor in
             do {
                 let release = try await fetchLatestRelease()
                 if isNewer(release.version, than: currentVersion) {
@@ -82,7 +82,7 @@ final class Updater {
         guard case .available(let version) = state else { return }
         state = .downloading(version)
 
-        Task {
+        Task { @MainActor in
             do {
                 let tag = version.hasPrefix("v") ? version : "v\(version)"
                 let release = try await fetchRelease(tag: tag)
@@ -166,7 +166,9 @@ final class Updater {
 
     private func fetchRelease(tag: String?) async throws -> Release {
         let endpoint = tag.map { "releases/tags/\($0)" } ?? "releases/latest"
-        let url = URL(string: "https://api.github.com/repos/\(repo)/\(endpoint)")!
+        guard let url = URL(string: "https://api.github.com/repos/\(repo)/\(endpoint)") else {
+            throw UpdateError.parseError
+        }
         let (data, response) = try await URLSession.shared.data(from: url)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw UpdateError.networkError
@@ -192,7 +194,9 @@ final class Updater {
     // MARK: - Download + install
 
     private func downloadDMG(release: Release) async throws -> URL {
-        let dmgURL = URL(string: "https://github.com/\(repo)/releases/download/\(release.tag)/Yamete.dmg")!
+        guard let dmgURL = URL(string: "https://github.com/\(repo)/releases/download/\(release.tag)/Yamete.dmg") else {
+            throw UpdateError.parseError
+        }
         let (tempURL, response) = try await URLSession.shared.download(from: dmgURL)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw UpdateError.downloadFailed

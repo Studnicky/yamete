@@ -63,6 +63,7 @@ private func IOHIDEventGetFloatValue(_ event: IOHIDEventRef, _ field: Int32) -> 
 /// Callbacks arrive on a dedicated dispatch queue; samples forwarded via continuation.
 final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
+    let id = SensorID("spu-accelerometer")
     let name = "Apple SPU Accelerometer"
 
     private let clientType: Int32 = 1           // monitor
@@ -142,10 +143,13 @@ final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
         log.info("activity:SensorReading wasStartedBy agent:SPUAccelerometerAdapter")
 
-        // ctx holds the client reference; use it for cleanup
+        // Cleanup: invalidate context before releasing the Unmanaged pointer
+        // to prevent callbacks from accessing freed memory.
+        // OpaquePointer is safe to send — it's a raw CFType pointer with no mutable Swift state.
+        let clientHandle = SendablePointer(c)
         continuation.onTermination = { @Sendable _ in
-            guard let c = ctx.client else { return }
-            if let services = IOHIDEventSystemClientCopyServices(c) {
+            ctx.invalidate()
+            if let services = IOHIDEventSystemClientCopyServices(clientHandle.pointer) {
                 for i in 0..<CFArrayGetCount(services) {
                     let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClientRef.self)
                     IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, 0 as CFNumber)
@@ -159,8 +163,21 @@ final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
     }
 }
 
+// MARK: - Sendable pointer wrapper
+
+/// Wraps an OpaquePointer for safe capture in @Sendable closures.
+/// The wrapped pointer is a CFType reference — no mutable Swift state.
+private struct SendablePointer: @unchecked Sendable {
+    let pointer: OpaquePointer
+    init(_ pointer: OpaquePointer) { self.pointer = pointer }
+}
+
 // MARK: - Event callback context
 
+/// Bridges IOHIDEventSystem callbacks to the AsyncThrowingStream continuation.
+/// All mutable state is confined to the dispatch queue that IOHIDEventSystem delivers on.
+/// The `@unchecked Sendable` is safe because `handleEvent` is only called from that queue,
+/// and `invalidate`/`client` are only accessed from `onTermination` after callbacks stop.
 private final class EventContext: @unchecked Sendable {
     let continuation: AsyncThrowingStream<Vec3, Error>.Continuation
     let accelEventType: Int32
@@ -170,9 +187,14 @@ private final class EventContext: @unchecked Sendable {
 
     var client: IOHIDEventSystemClientRef?
     var queue: DispatchQueue?
-    var sampleCounter = 0
-    var peakMag: Float = 0
-    var peakVec: Vec3 = .zero
+    private var running = true
+
+    // Callback-queue-confined state (only accessed from handleEvent on the HID queue)
+    private var sampleCounter = 0
+    #if DEBUG
+    private var peakMag: Float = 0
+    private var peakVec: Vec3 = .zero
+    #endif
 
     init(continuation: AsyncThrowingStream<Vec3, Error>.Continuation,
          accelEventType: Int32, decimationFactor: Int,
@@ -184,11 +206,16 @@ private final class EventContext: @unchecked Sendable {
         self.magnitudeMax = magnitudeMax
     }
 
+    /// Called before releasing the Unmanaged pointer to prevent use-after-free.
+    func invalidate() {
+        running = false
+        client = nil
+    }
+
     func handleEvent(_ event: IOHIDEventRef) {
+        guard running else { return }
+
         let eventType = IOHIDEventGetType(event)
-        if sampleCounter < 5 {
-            log.debug("entity:HIDEvent type=\(eventType) expected=\(accelEventType)")
-        }
         guard eventType == accelEventType else { return }
 
         sampleCounter += 1
@@ -201,13 +228,16 @@ private final class EventContext: @unchecked Sendable {
 
         let vec = Vec3(x: x, y: y, z: z)
         let mag = vec.magnitude
+
+        #if DEBUG
         if mag > peakMag { peakMag = mag; peakVec = vec }
         if sampleCounter % 500 == 0 {
             log.debug("entity:AccelSample n=\(sampleCounter) cur=\(String(format: "%.3f", mag)) peak=\(String(format: "%.3f", peakMag)) peakVec=\(peakVec)")
             peakMag = 0
         }
-        guard mag > magnitudeMin && mag < magnitudeMax else { return }
+        #endif
 
+        guard mag > magnitudeMin && mag < magnitudeMax else { return }
         continuation.yield(vec)
     }
 }

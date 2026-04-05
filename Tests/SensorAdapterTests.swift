@@ -5,12 +5,14 @@ import XCTest
 
 /// Test adapter that yields a fixed sample sequence.
 final class MockSensorAdapter: SensorAdapter, @unchecked Sendable {
+    let id: SensorID
     let name: String
     let isAvailable: Bool
     private let sampleSequence: [Vec3]
     private let error: Error?
 
     init(name: String = "Mock", available: Bool = true, samples: [Vec3] = [], error: Error? = nil) {
+        self.id = SensorID(name)
         self.name = name
         self.isAvailable = available
         self.sampleSequence = samples
@@ -51,7 +53,7 @@ final class SensorManagerTests: XCTestCase {
         }
 
         XCTAssertEqual(received.count, expected.count)
-        XCTAssertTrue(received.allSatisfy { $0.source == "A" })
+        XCTAssertTrue(received.allSatisfy { $0.source == SensorID("A") })
         for (r, e) in zip(received.map(\.value), expected) {
             XCTAssertEqual(r.x, e.x, accuracy: 1e-6)
             XCTAssertEqual(r.y, e.y, accuracy: 1e-6)
@@ -67,7 +69,7 @@ final class SensorManagerTests: XCTestCase {
         var sampleCount = 0
         for await event in manager.events() {
             switch event {
-            case .adaptersActive(let names):
+            case .adaptersChanged(_, let names):
                 activeSnapshots.append(names)
             case .sample:
                 sampleCount += 1
@@ -99,7 +101,7 @@ final class SensorManagerTests: XCTestCase {
 
         var snapshots: [[String]] = []
         for await event in manager.events() {
-            if case .adaptersActive(let names) = event {
+            if case .adaptersChanged(_, let names) = event {
                 snapshots.append(names)
             }
         }

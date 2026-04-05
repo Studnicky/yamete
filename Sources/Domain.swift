@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 // MARK: - Vec3
@@ -45,6 +46,50 @@ enum ImpactTier: Int, CaseIterable, Sendable, CustomStringConvertible {
         case ..<0.80: .firm
         default:      .hard
         }
+    }
+}
+
+// MARK: - Response protocols
+
+/// Plays audio scaled by impact intensity. Returns clip duration.
+@MainActor
+protocol AudioResponder {
+    @discardableResult
+    func play(intensity: Float, volumeMin: Float, volumeMax: Float, deviceUIDs: [String]) -> Double
+    func playOnAllDevices(url: URL, volume: Float)
+    var longestSoundURL: URL? { get }
+}
+
+/// Flashes screen overlay scaled by impact intensity.
+@MainActor
+protocol FlashResponder {
+    func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, enabledDisplayIDs: [Int])
+}
+
+// MARK: - Type-safe identifiers
+
+/// Uniquely identifies a sensor adapter. Prevents accidental use of display names as dictionary keys.
+struct SensorID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    var description: String { rawValue }
+}
+
+/// Core Audio device UID. Prevents mixing with arbitrary strings.
+struct AudioDeviceUID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    var description: String { rawValue }
+}
+
+// MARK: - Display helpers
+
+extension NSScreen {
+    /// The CGDirectDisplayID for this screen, or 0 if unavailable.
+    var displayID: Int {
+        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID).map(Int.init) ?? 0
     }
 }
 
