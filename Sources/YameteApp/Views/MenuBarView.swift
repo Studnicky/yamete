@@ -345,7 +345,9 @@ private struct FooterSection: View {
     @Environment(ImpactController.self) var controller
     @Environment(SettingsStore.self) var settings
     @Environment(Updater.self) var updater
+    @Environment(LicenseManager.self) var license
     @State private var launchAtLogin = (SMAppService.mainApp.status == .enabled)
+    @State private var licenseKeyInput = ""
 
     private var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
@@ -355,6 +357,11 @@ private struct FooterSection: View {
         @Bindable var settings = settings
 
         VStack(spacing: 0) {
+            // License status
+            licenseRow
+
+            Divider()
+
             // Info row: counter + last impact tier
             HStack {
                 Text("\(controller.impactCount) impacts today")
@@ -459,6 +466,71 @@ private struct FooterSection: View {
             Button("v\(version) ✗") { updater.checkForUpdate() }
                 .buttonStyle(.plain).font(.caption).foregroundStyle(.red)
                 .help(msg)
+        }
+    }
+
+    @ViewBuilder
+    private var licenseRow: some View {
+        VStack(spacing: 4) {
+            switch license.status {
+            case .trial(let days):
+                HStack(spacing: 5) {
+                    Image(systemName: "clock.badge.exclamationmark")
+                        .font(.system(size: 10)).foregroundStyle(Theme.mauve)
+                    Text("Trial: \(days) day\(days == 1 ? "" : "s") remaining")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                }
+                activationField
+
+            case .active(let key):
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 10)).foregroundStyle(.green)
+                    Text("Licensed")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(verbatim: String(key.prefix(9)) + "…")
+                        .font(.system(size: 9)).foregroundStyle(.tertiary)
+                }
+
+            case .expired:
+                HStack(spacing: 5) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10)).foregroundStyle(.red)
+                    Text("Trial expired")
+                        .font(.caption).foregroundStyle(.red)
+                    Spacer()
+                }
+                activationField
+
+            case .invalid:
+                HStack(spacing: 5) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 10)).foregroundStyle(.red)
+                    Text("Invalid key")
+                        .font(.caption).foregroundStyle(.red)
+                    Spacer()
+                }
+                activationField
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private var activationField: some View {
+        HStack(spacing: 6) {
+            TextField("XXXX-XXXX-XXXX-XXXX", text: $licenseKeyInput)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 10, design: .monospaced))
+            Button("Activate") {
+                _ = license.activate(key: licenseKeyInput)
+                licenseKeyInput = ""
+            }
+            .buttonStyle(.plain)
+            .font(.caption.bold())
+            .foregroundStyle(Theme.pink)
         }
     }
 }
