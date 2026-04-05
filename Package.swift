@@ -5,22 +5,53 @@ let package = Package(
     name: "Yamete",
     platforms: [.macOS(.v14)],
     targets: [
+        // Shared types: Vec3, SensorID, ImpactTier, protocols, logging, signal processing
         .target(
-            name: "YameteLib",
-            path: "Sources",
-            exclude: ["YameteApp.swift"],
+            name: "YameteCore",
+            path: "Sources/YameteCore",
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+            ]
+        ),
+
+        // Sensor abstraction, impact detection engine, accelerometer adapter
+        .target(
+            name: "SensorKit",
+            dependencies: ["YameteCore"],
+            path: "Sources/SensorKit",
             linkerSettings: [
                 .linkedFramework("IOKit"),
-                .linkedFramework("AVFoundation"),
+            ]
+        ),
+
+        // Audio playback, device enumeration, screen flash overlay
+        .target(
+            name: "ResponseKit",
+            dependencies: ["YameteCore"],
+            path: "Sources/ResponseKit",
+            linkerSettings: [
+                .linkedFramework("AppKit"),
                 .linkedFramework("CoreAudio"),
+                .linkedFramework("SwiftUI"),
+            ]
+        ),
+
+        // App layer: controller, settings, updater, views
+        .target(
+            name: "YameteApp",
+            dependencies: ["YameteCore", "SensorKit", "ResponseKit"],
+            path: "Sources/YameteApp",
+            exclude: ["YameteApp.swift"],
+            linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("ServiceManagement"),
             ]
         ),
+
         .testTarget(
             name: "YameteTests",
-            dependencies: ["YameteLib"],
+            dependencies: ["YameteCore", "SensorKit", "ResponseKit", "YameteApp"],
             path: "Tests"
         ),
     ]

@@ -1,5 +1,8 @@
 import XCTest
-@testable import YameteLib
+@testable import YameteCore
+@testable import SensorKit
+@testable import ResponseKit
+@testable import YameteApp
 
 /// End-to-end tests for sensitivity gating (ImpactController normalization logic).
 /// Sensitivity is inverted to thresholds: high sensitivity → low threshold → more reactive.

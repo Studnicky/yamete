@@ -3,31 +3,32 @@ import Foundation
 
 // MARK: - Vec3
 
-struct Vec3: Sendable, CustomStringConvertible {
-    var x: Float
-    var y: Float
-    var z: Float
+public struct Vec3: Sendable, CustomStringConvertible {
+    public init(x: Float, y: Float, z: Float) { self.x = x; self.y = y; self.z = z }
+    public var x: Float
+    public var y: Float
+    public var z: Float
 
-    var magnitude: Float { sqrtf(x*x + y*y + z*z) }
+    public var magnitude: Float { sqrtf(x*x + y*y + z*z) }
 
-    var description: String {
+    public var description: String {
         "(\(String(format: "%.3f", x)), \(String(format: "%.3f", y)), \(String(format: "%.3f", z)))"
     }
 
-    static let zero = Vec3(x: 0, y: 0, z: 0)
+    public static let zero = Vec3(x: 0, y: 0, z: 0)
 }
 
 // MARK: - Impact tier
 
 /// Five-tier impact strength rating derived from normalized 0–1 intensity.
-enum ImpactTier: Int, CaseIterable, Sendable, CustomStringConvertible {
+public enum ImpactTier: Int, CaseIterable, Sendable, CustomStringConvertible {
     case tap = 1
     case light = 2
     case medium = 3
     case firm = 4
     case hard = 5
 
-    var description: String {
+    public var description: String {
         switch self {
         case .tap:    "Tap"
         case .light:  "Light"
@@ -38,7 +39,7 @@ enum ImpactTier: Int, CaseIterable, Sendable, CustomStringConvertible {
     }
 
     /// Maps normalized intensity (0–1) to a tier.
-    static func from(intensity: Float) -> ImpactTier {
+    public static func from(intensity: Float) -> ImpactTier {
         switch intensity {
         case ..<0.20: .tap
         case ..<0.40: .light
@@ -53,7 +54,7 @@ enum ImpactTier: Int, CaseIterable, Sendable, CustomStringConvertible {
 
 /// Plays audio scaled by impact intensity. Returns clip duration.
 @MainActor
-protocol AudioResponder {
+public protocol AudioResponder {
     @discardableResult
     func play(intensity: Float, volumeMin: Float, volumeMax: Float, deviceUIDs: [String]) -> Double
     func playOnAllDevices(url: URL, volume: Float)
@@ -62,33 +63,33 @@ protocol AudioResponder {
 
 /// Flashes screen overlay scaled by impact intensity.
 @MainActor
-protocol FlashResponder {
+public protocol FlashResponder {
     func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, enabledDisplayIDs: [Int])
 }
 
 // MARK: - Type-safe identifiers
 
 /// Uniquely identifies a sensor adapter. Prevents accidental use of display names as dictionary keys.
-struct SensorID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
-    let rawValue: String
-    init(rawValue: String) { self.rawValue = rawValue }
-    init(_ rawValue: String) { self.rawValue = rawValue }
-    var description: String { rawValue }
+public struct SensorID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+    public init(_ rawValue: String) { self.rawValue = rawValue }
+    public var description: String { rawValue }
 }
 
 /// Core Audio device UID. Prevents mixing with arbitrary strings.
-struct AudioDeviceUID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
-    let rawValue: String
-    init(rawValue: String) { self.rawValue = rawValue }
-    init(_ rawValue: String) { self.rawValue = rawValue }
-    var description: String { rawValue }
+public struct AudioDeviceUID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
+    public let rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+    public init(_ rawValue: String) { self.rawValue = rawValue }
+    public var description: String { rawValue }
 }
 
 // MARK: - Display helpers
 
 extension NSScreen {
     /// The CGDirectDisplayID for this screen, or 0 if unavailable.
-    var displayID: Int {
+    public var displayID: Int {
         (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID).map(Int.init) ?? 0
     }
 }
@@ -96,17 +97,17 @@ extension NSScreen {
 // MARK: - Clamping
 
 extension Comparable {
-    func clamped(to range: ClosedRange<Self>) -> Self {
+    public func clamped(to range: ClosedRange<Self>) -> Self {
         min(max(self, range.lowerBound), range.upperBound)
     }
 }
 
 // MARK: - Bundle resources
 
-enum BundleResources {
+public enum BundleResources {
     /// Returns sorted file URLs from a subfolder of the app bundle's Resources directory,
     /// recursively discovering files that match any of the given extensions.
-    static func urls(in subfolder: String, extensions: Set<String>) -> [URL] {
+    public static func urls(in subfolder: String, extensions: Set<String>) -> [URL] {
         guard let resourcePath = Bundle.main.resourcePath else { return [] }
         let folderPath = resourcePath + "/" + subfolder
         guard let enumerator = FileManager.default.enumerator(atPath: folderPath) else { return [] }
