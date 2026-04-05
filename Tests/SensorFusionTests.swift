@@ -19,8 +19,8 @@ final class SensorFusionTests: XCTestCase {
     func testSingleSourceCanTriggerConsensus() {
         let engine = SensorFusionEngine(config: permissiveConfig())
         let now = Date()
-        let sample = SensorSample(source: "A", timestamp: now, value: Vec3(x: 2.0, y: 0, z: 0))
-        let impact = engine.ingest(sample, activeSources: ["A"])
+        let sample = SensorSample(source: SensorID("A"), timestamp: now, value: Vec3(x: 2.0, y: 0, z: 0))
+        let impact = engine.ingest(sample, activeSources: [SensorID("A")])
         XCTAssertNotNil(impact)
     }
 
@@ -29,14 +29,14 @@ final class SensorFusionTests: XCTestCase {
         let now = Date()
 
         let aOnly = engine.ingest(
-            SensorSample(source: "A", timestamp: now, value: Vec3(x: 2.0, y: 0, z: 0)),
-            activeSources: ["A", "B"]
+            SensorSample(source: SensorID("A"), timestamp: now, value: Vec3(x: 2.0, y: 0, z: 0)),
+            activeSources: [SensorID("A"), SensorID("B")]
         )
         XCTAssertNil(aOnly)
 
         let both = engine.ingest(
-            SensorSample(source: "B", timestamp: now.addingTimeInterval(0.01), value: Vec3(x: 2.0, y: 0, z: 0)),
-            activeSources: ["A", "B"]
+            SensorSample(source: SensorID("B"), timestamp: now.addingTimeInterval(0.01), value: Vec3(x: 2.0, y: 0, z: 0)),
+            activeSources: [SensorID("A"), SensorID("B")]
         )
         XCTAssertNotNil(both)
     }
@@ -46,27 +46,27 @@ final class SensorFusionTests: XCTestCase {
         let now = Date()
 
         let first = engine.ingest(
-            SensorSample(source: "A", timestamp: now, value: Vec3(x: 2.0, y: 0, z: 0)),
-            activeSources: ["A"]
+            SensorSample(source: SensorID("A"), timestamp: now, value: Vec3(x: 2.0, y: 0, z: 0)),
+            activeSources: [SensorID("A")]
         )
         XCTAssertNotNil(first)
 
         let immediate = engine.ingest(
-            SensorSample(source: "A", timestamp: now.addingTimeInterval(0.01), value: Vec3(x: 3.0, y: 0, z: 0)),
-            activeSources: ["A"]
+            SensorSample(source: SensorID("A"), timestamp: now.addingTimeInterval(0.01), value: Vec3(x: 3.0, y: 0, z: 0)),
+            activeSources: [SensorID("A")]
         )
         XCTAssertNil(immediate)
 
         for i in 5...30 {
             _ = engine.ingest(
-                SensorSample(source: "A", timestamp: now.addingTimeInterval(Double(i) * 0.02), value: Vec3.zero),
-                activeSources: ["A"]
+                SensorSample(source: SensorID("A"), timestamp: now.addingTimeInterval(Double(i) * 0.02), value: Vec3.zero),
+                activeSources: [SensorID("A")]
             )
         }
 
         let second = engine.ingest(
-            SensorSample(source: "A", timestamp: now.addingTimeInterval(0.80), value: Vec3(x: 3.0, y: 0, z: 0)),
-            activeSources: ["A"]
+            SensorSample(source: SensorID("A"), timestamp: now.addingTimeInterval(0.80), value: Vec3(x: 3.0, y: 0, z: 0)),
+            activeSources: [SensorID("A")]
         )
         XCTAssertNotNil(second)
     }
@@ -78,8 +78,8 @@ final class SensorFusionTests: XCTestCase {
 
         for i in 0..<200 {
             let t = start.addingTimeInterval(Double(i) * 0.02)
-            if engine.ingest(SensorSample(source: "A", timestamp: t,
-                value: Vec3(x: 0.01, y: 0.01, z: 0.98)), activeSources: ["A"]) != nil {
+            if engine.ingest(SensorSample(source: SensorID("A"), timestamp: t,
+                value: Vec3(x: 0.01, y: 0.01, z: 0.98)), activeSources: [SensorID("A")]) != nil {
                 triggered = true
             }
         }
@@ -94,8 +94,8 @@ final class SensorFusionTests: XCTestCase {
         for i in 0..<300 {
             let t = start.addingTimeInterval(Double(i) * 0.02)
             let v = Float(i % 7) * 0.003
-            if engine.ingest(SensorSample(source: "A", timestamp: t,
-                value: Vec3(x: v, y: v * 0.8, z: 0.98)), activeSources: ["A"]) != nil {
+            if engine.ingest(SensorSample(source: SensorID("A"), timestamp: t,
+                value: Vec3(x: v, y: v * 0.8, z: 0.98)), activeSources: [SensorID("A")]) != nil {
                 triggered = true
             }
         }
@@ -109,14 +109,14 @@ final class SensorFusionTests: XCTestCase {
 
         for i in 0..<120 {
             let t = start.addingTimeInterval(Double(i) * 0.02)
-            _ = engine.ingest(SensorSample(source: "A", timestamp: t,
-                value: Vec3(x: 0.01, y: 0.01, z: 0.98)), activeSources: ["A"])
+            _ = engine.ingest(SensorSample(source: SensorID("A"), timestamp: t,
+                value: Vec3(x: 0.01, y: 0.01, z: 0.98)), activeSources: [SensorID("A")])
         }
 
         for i in 120..<130 {
             let t = start.addingTimeInterval(Double(i) * 0.02)
-            if engine.ingest(SensorSample(source: "A", timestamp: t,
-                value: Vec3(x: 1.2, y: 1.0, z: 2.0)), activeSources: ["A"]) != nil {
+            if engine.ingest(SensorSample(source: SensorID("A"), timestamp: t,
+                value: Vec3(x: 1.2, y: 1.0, z: 2.0)), activeSources: [SensorID("A")]) != nil {
                 triggered = true
             }
         }
@@ -137,8 +137,8 @@ final class SensorFusionTests: XCTestCase {
             let t = start.addingTimeInterval(Double(i) * 0.02)
             let sign: Float = (i % 2 == 0) ? 1.0 : -1.0
             let v: Float = sign * 0.5
-            if engine.ingest(SensorSample(source: "A", timestamp: t,
-                value: Vec3(x: v, y: 0, z: 0)), activeSources: ["A"]) != nil {
+            if engine.ingest(SensorSample(source: SensorID("A"), timestamp: t,
+                value: Vec3(x: v, y: 0, z: 0)), activeSources: [SensorID("A")]) != nil {
                 triggered = true
             }
         }
