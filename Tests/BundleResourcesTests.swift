@@ -1,5 +1,8 @@
 import XCTest
-@testable import YameteLib
+@testable import YameteCore
+@testable import SensorKit
+@testable import ResponseKit
+@testable import YameteApp
 
 final class BundleResourcesTests: XCTestCase {
 
