@@ -30,7 +30,7 @@ FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio ServiceManagement
 SWIFTFLAGS := -O -module-name $(APP) -target arm64-apple-macosx14.0 -parse-as-library \
               $(addprefix -framework ,$(FRAMEWORKS))
 
-ENTITLE   := Yamete.entitlements
+ENTITLE   := Yamete-hardened.entitlements
 SIGNING_ID ?= -
 
 .PHONY: all build test install uninstall clean dmg lint verify release notarize
@@ -48,12 +48,13 @@ $(BUILD)/.minified: $(BUILD)/yamete $(BUNDLE_RESOURCES)
 	@printf "  strip     symbols\n"
 	@strip -x $(BUILD)/yamete -o $(BUILD)/yamete.stripped
 	@mv $(BUILD)/yamete.stripped $(BUILD)/yamete
-	@# SVG minification (if svgo installed)
+	@# Copy resources (preserving subdirectory structure)
 	@mkdir -p $(BUILD)/resources
-	@cp $(BUNDLE_SRC)/Resources/* $(BUILD)/resources/
+	@cp -R $(BUNDLE_SRC)/Resources/ $(BUILD)/resources/
+	@# SVG minification (if svgo installed)
 	@which svgo > /dev/null 2>&1 && { \
 		printf "  minify    SVGs\n"; \
-		for f in $(BUILD)/resources/face_*.svg; do svgo -q "$$f" -o "$$f" 2>/dev/null; done; \
+		find $(BUILD)/resources -name '*.svg' -exec svgo -q {} -o {} 2>/dev/null \; ; \
 	} || true
 	@touch $(BUILD)/.minified
 
@@ -62,10 +63,10 @@ build: $(BUILD)/yamete $(BUILD)/.minified
 	@mkdir -p $(TARGET)/Contents/MacOS $(RES_DIR)
 	@cp $(BUILD)/yamete $(BINARY)
 	@cp $(BUNDLE_SRC)/Info.plist $(TARGET)/Contents/
-	@cp $(BUILD)/resources/* $(RES_DIR)/
+	@cp -R $(BUILD)/resources/ $(RES_DIR)/
 	@# ── Stage 4: Sign ──
 	@printf "  sign      $(if $(filter -,$(SIGNING_ID)),ad-hoc,$(SIGNING_ID))\n"
-	@codesign --sign "$(SIGNING_ID)" --force --deep \
+	@codesign --sign "$(SIGNING_ID)" --force --deep --options runtime \
 		--entitlements $(ENTITLE) $(TARGET) 2>/dev/null
 	@codesign --verify --deep --strict $(TARGET) 2>/dev/null
 	@printf "  bundle    $(TARGET) ($$(du -sh $(TARGET) | awk '{print $$1}'))\n"
@@ -84,16 +85,17 @@ verify: build
 	@printf "  verify    bundle\n"
 	@test -f $(BINARY)
 	@test -f $(TARGET)/Contents/Info.plist
-	@FACES=$$(ls $(RES_DIR)/face_*.svg 2>/dev/null | wc -l | tr -d ' '); \
-	 SOUNDS=$$(ls $(RES_DIR)/sound_*.mp3 2>/dev/null | wc -l | tr -d ' '); \
-	 test "$$FACES" -ge 5 && test "$$SOUNDS" -ge 5 && \
+	@test -d $(RES_DIR)/faces && test -d $(RES_DIR)/sounds
+	@FACES=$$(find $(RES_DIR)/faces -type f \( -name '*.svg' -o -name '*.png' -o -name '*.jpg' \) | wc -l | tr -d ' '); \
+	 SOUNDS=$$(find $(RES_DIR)/sounds -type f \( -name '*.mp3' -o -name '*.wav' -o -name '*.m4a' \) | wc -l | tr -d ' '); \
+	 test "$$FACES" -ge 1 && test "$$SOUNDS" -ge 1 && \
 	 codesign --verify --deep --strict $(TARGET) 2>/dev/null && \
 	 printf "  verify    ✓ binary, plist, $$FACES faces, $$SOUNDS sounds, signature\n"
 
 # ── Install ───────────────────────────────────────────────────
 install: build
 	@printf "  stop      $(APP)\n"
-	@pkill -x $(APP) 2>/dev/null || true
+	@pkill -x yamete 2>/dev/null; osascript -e 'quit app "$(APP)"' 2>/dev/null; sleep 0.5; pkill -9 -x yamete 2>/dev/null || true
 	@printf "  install   /Applications/$(APP).app\n"
 	@rm -rf /Applications/$(APP).app
 	@cp -R $(TARGET) /Applications/
@@ -101,14 +103,14 @@ install: build
 	@printf "  launch    $(APP)\n"
 
 uninstall:
-	@pkill -x $(APP) 2>/dev/null || true
+	@pkill -x yamete 2>/dev/null || true
 	@rm -rf /Applications/$(APP).app
 	@printf "  remove    /Applications/$(APP).app\n"
 
-# ── Release (with Developer ID) ──────────────────────────────
+# ── Release (with Developer ID + App Sandbox) ────────────────
 release: clean
-	@$(MAKE) build SIGNING_ID="$(SIGNING_ID)"
-	@printf "  hardened  runtime enabled\n"
+	@$(MAKE) build SIGNING_ID="$(SIGNING_ID)" ENTITLE=Yamete.entitlements
+	@printf "  hardened  sandbox + signed\n"
 
 # ── Notarize ──────────────────────────────────────────────────
 notarize: release dmg

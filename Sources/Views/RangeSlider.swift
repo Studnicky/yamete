@@ -4,6 +4,7 @@ struct RangeSlider: View {
     @Binding var low: Double
     @Binding var high: Double
     let bounds: ClosedRange<Double>
+    var labelWidth: CGFloat = 40
     let format: (Double) -> String
 
     private let thumbD: CGFloat = 20
@@ -14,7 +15,7 @@ struct RangeSlider: View {
         HStack(spacing: 8) {
             Text(format(low))
                 .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                .frame(width: 30, alignment: .leading)
+                .frame(width: labelWidth, alignment: .leading)
 
             GeometryReader { geo in
                 sliderBody(width: geo.size.width, height: geo.size.height)
@@ -23,7 +24,7 @@ struct RangeSlider: View {
 
             Text(format(high))
                 .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                .frame(width: 30, alignment: .trailing)
+                .frame(width: labelWidth, alignment: .trailing)
         }
     }
 
@@ -32,8 +33,8 @@ struct RangeSlider: View {
         let span  = bounds.upperBound - bounds.lowerBound
         let yC    = h / 2
         let safeW = max(w, 1)
-        let lowX  = CGFloat((low  - bounds.lowerBound) / span) * safeW
-        let highX = CGFloat((high - bounds.lowerBound) / span) * safeW
+        let lowX  = CGFloat((low  - bounds.lowerBound) / span).clamped(to: 0...1) * safeW
+        let highX = CGFloat((high - bounds.lowerBound) / span).clamped(to: 0...1) * safeW
 
         ZStack {
             RoundedRectangle(cornerRadius: trackH / 2)

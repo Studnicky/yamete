@@ -28,7 +28,7 @@ final class RingBufferTests: XCTestCase {
             .init(name: "empty",        values: [],               capacity: 5, expected: 0),
             .init(name: "positive",     values: [1, 2, 3],        capacity: 5, expected: 6),
             .init(name: "mixed signs",  values: [-3, 4, -1, 2],   capacity: 4, expected: 10),
-            .init(name: "after wrap",   values: [10, 20, 30, 40], capacity: 3, expected: 90), // [20,30,40]
+            .init(name: "after wrap",   values: [10, 20, 30, 40], capacity: 3, expected: 90),
         ]
         for c in cases {
             var buf = RingBuffer(capacity: c.capacity)

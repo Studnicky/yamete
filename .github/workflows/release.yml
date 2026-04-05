@@ -18,16 +18,16 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Run tests
+        run: swift test
+
       - name: Update Info.plist version
         run: |
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" Bundle/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Bundle/Contents/Info.plist
 
       - name: Build DMG
         run: make dmg
-
-      - name: Run tests
-        run: swift test
 
       - name: Compute SHA256 of DMG
         id: checksum
@@ -39,7 +39,6 @@ jobs:
       - name: Extract changelog for this version
         id: changelog
         run: |
-          # Extract the section for this version from CHANGELOG.md
           version="${{ steps.version.outputs.version }}"
           awk "/^## \[${version}\]/{found=1; next} /^## \[/{found=0} found" CHANGELOG.md > /tmp/release_notes.md
           echo "" >> /tmp/release_notes.md

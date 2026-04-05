@@ -16,12 +16,12 @@ final class LogStoreTests: XCTestCase {
             c.write(log)
         }
 
-        // Wait for async queue to flush
+        // Wait for async log writes.
         let e = expectation(description: "flush")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { e.fulfill() }
         wait(for: [e], timeout: 2.0)
 
-        // Verify file contains all entries
+        // Verify all levels were written.
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
         let logFile = support

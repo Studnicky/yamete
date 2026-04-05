@@ -1,17 +1,8 @@
 import Foundation
 import Observation
 
-/// User-configurable settings, persisted to UserDefaults.
-///
-/// All output parameters (volume, opacity, debounce) are range-based sliding
-/// windows driven by the normalized intensity from the sensitivity band:
-///
-///   raw force → [sensitivity] → intensity 0–1 → [volume]    → audio level
-///                                              → [opacity]   → flash brightness
-///                                              → [debounce]  → cooldown time
-///
-/// `@Observable` re-invokes setters on self-assignment in `didSet`, so clamping
-/// uses a guard-clamp-return pattern to prevent infinite recursion.
+/// User settings persisted in `UserDefaults`.
+/// Includes guard-clamp updates to avoid recursive `didSet` loops.
 @MainActor @Observable
 final class SettingsStore {
 
@@ -19,11 +10,14 @@ final class SettingsStore {
 
     enum Key: String, CaseIterable, Sendable {
         case sensitivityMin, sensitivityMax
+        case bandpassLowHz, bandpassHighHz
         case debounce
         case screenFlash
         case flashOpacityMin, flashOpacityMax
         case volumeMin, volumeMax
         case enabledDisplays, enabledAudioDevices, autoCheckForUpdates, lastUpdateCheck
+        // Advanced detection
+        case spikeThreshold, crestFactor, riseRate, confirmations, warmupSamples
     }
 
     // MARK: - Defaults
@@ -31,7 +25,9 @@ final class SettingsStore {
     static let defaults: [String: Any] = [
         Key.sensitivityMin.rawValue:  0.10,
         Key.sensitivityMax.rawValue:  0.90,
-        Key.debounce.rawValue:        0.3,
+        Key.bandpassLowHz.rawValue:   20.0,
+        Key.bandpassHighHz.rawValue:  25.0,
+        Key.debounce.rawValue:        0.5,
         Key.screenFlash.rawValue:     true,
         Key.flashOpacityMin.rawValue: 0.50,
         Key.flashOpacityMax.rawValue: 0.9,
@@ -41,6 +37,12 @@ final class SettingsStore {
         Key.enabledAudioDevices.rawValue: [String](),
         Key.autoCheckForUpdates.rawValue: true,
         Key.lastUpdateCheck.rawValue: 0.0,
+        // Advanced detection
+        Key.spikeThreshold.rawValue:  0.020,
+        Key.crestFactor.rawValue:     6.0,
+        Key.riseRate.rawValue:        0.010,
+        Key.confirmations.rawValue:   3,
+        Key.warmupSamples.rawValue:   50,
     ]
 
     // MARK: - Sensitivity band (input window)
@@ -65,12 +67,36 @@ final class SettingsStore {
         }
     }
 
+    // MARK: - Frequency band (bandpass filter)
+
+    /// High-pass cutoff: vibrations below this frequency are rejected (footsteps, HVAC).
+    var bandpassLowHz: Double {
+        didSet {
+            guard bandpassLowHz != oldValue else { return }
+            let c = bandpassLowHz.clamped(to: 10...25)
+            if c != bandpassLowHz { bandpassLowHz = c; return }
+            persist(bandpassLowHz, .bandpassLowHz)
+            if bandpassLowHz > bandpassHighHz { bandpassHighHz = bandpassLowHz }
+        }
+    }
+
+    /// Low-pass cutoff: vibrations above this frequency are rejected (electronic noise, rattling).
+    var bandpassHighHz: Double {
+        didSet {
+            guard bandpassHighHz != oldValue else { return }
+            let c = bandpassHighHz.clamped(to: 10...25)
+            if c != bandpassHighHz { bandpassHighHz = c; return }
+            persist(bandpassHighHz, .bandpassHighHz)
+            if bandpassHighHz < bandpassLowHz { bandpassLowHz = bandpassHighHz }
+        }
+    }
+
     // MARK: - Debounce
 
     var debounce: Double {
         didSet {
             guard debounce != oldValue else { return }
-            let c = debounce.clamped(to: 0...3)
+            let c = debounce.clamped(to: 0...2)
             if c != debounce { debounce = c; return }
             persist(debounce, .debounce)
         }
@@ -164,13 +190,63 @@ final class SettingsStore {
         }
     }
 
+    // MARK: - Advanced detection
+
+    var spikeThreshold: Double {
+        didSet {
+            guard spikeThreshold != oldValue else { return }
+            let c = spikeThreshold.clamped(to: 0.010...0.040)
+            if c != spikeThreshold { spikeThreshold = c; return }
+            persist(spikeThreshold, .spikeThreshold)
+        }
+    }
+
+    var crestFactor: Double {
+        didSet {
+            guard crestFactor != oldValue else { return }
+            let c = crestFactor.clamped(to: 2.0...10.0)
+            if c != crestFactor { crestFactor = c; return }
+            persist(crestFactor, .crestFactor)
+        }
+    }
+
+    var riseRate: Double {
+        didSet {
+            guard riseRate != oldValue else { return }
+            let c = riseRate.clamped(to: 0.005...0.020)
+            if c != riseRate { riseRate = c; return }
+            persist(riseRate, .riseRate)
+        }
+    }
+
+    var confirmations: Int {
+        didSet {
+            guard confirmations != oldValue else { return }
+            let c = max(1, min(5, confirmations))
+            if c != confirmations { confirmations = c; return }
+            persist(confirmations, .confirmations)
+        }
+    }
+
+    var warmupSamples: Int {
+        didSet {
+            guard warmupSamples != oldValue else { return }
+            let c = max(10, min(100, warmupSamples))
+            if c != warmupSamples { warmupSamples = c; return }
+            persist(warmupSamples, .warmupSamples)
+        }
+    }
+
     // MARK: - Init
 
     init() {
-        UserDefaults.standard.register(defaults: Self.defaults)
         let d = UserDefaults.standard
+        d.register(defaults: Self.defaults)
+
         sensitivityMin  = d.double(forKey: Key.sensitivityMin.rawValue)
         sensitivityMax  = d.double(forKey: Key.sensitivityMax.rawValue)
+        bandpassLowHz   = d.double(forKey: Key.bandpassLowHz.rawValue)
+        bandpassHighHz  = d.double(forKey: Key.bandpassHighHz.rawValue)
         debounce        = d.double(forKey: Key.debounce.rawValue)
         screenFlash     = d.bool(forKey:   Key.screenFlash.rawValue)
         flashOpacityMin = d.double(forKey: Key.flashOpacityMin.rawValue)
@@ -181,43 +257,12 @@ final class SettingsStore {
         enabledAudioDevices = d.array(forKey: Key.enabledAudioDevices.rawValue) as? [String] ?? []
         autoCheckForUpdates = d.bool(forKey: Key.autoCheckForUpdates.rawValue)
         lastUpdateCheck = d.double(forKey: Key.lastUpdateCheck.rawValue)
-
-        migrateOldKeys()
-    }
-
-    // MARK: - Migration
-
-    /// One-time migration of orphaned keys from earlier versions.
-    private func migrateOldKeys() {
-        let d = UserDefaults.standard
-
-        // v0: "sensitivity" (single Double) → sensitivityMin/Max
-        if d.object(forKey: "sensitivity") != nil && d.object(forKey: Key.sensitivityMin.rawValue) == nil {
-            let old = d.double(forKey: "sensitivity")
-            sensitivityMin = max(0, old - 0.3)
-            sensitivityMax = min(1, old + 0.3)
-            d.removeObject(forKey: "sensitivity")
-        }
-
-        // v0: "isEnabled" (Bool) → removed (use isEnabled on controller)
-        d.removeObject(forKey: "isEnabled")
-
-        // v0: "audioDeviceUID" (String) → enabledAudioDevices ([String])
-        if let old = d.string(forKey: "audioDeviceUID"), !old.isEmpty {
-            if enabledAudioDevices.isEmpty {
-                enabledAudioDevices = [old]
-            }
-            d.removeObject(forKey: "audioDeviceUID")
-        }
-
-        // v0: "debounceMin"/"debounceMax" → debounce (single)
-        if d.object(forKey: "debounceMin") != nil {
-            let lo = d.double(forKey: "debounceMin")
-            let hi = d.double(forKey: "debounceMax")
-            debounce = (lo + hi) / 2.0
-            d.removeObject(forKey: "debounceMin")
-            d.removeObject(forKey: "debounceMax")
-        }
+        // Advanced
+        spikeThreshold  = d.double(forKey: Key.spikeThreshold.rawValue)
+        crestFactor     = d.double(forKey: Key.crestFactor.rawValue)
+        riseRate        = d.double(forKey: Key.riseRate.rawValue)
+        confirmations   = d.integer(forKey: Key.confirmations.rawValue)
+        warmupSamples   = d.integer(forKey: Key.warmupSamples.rawValue)
     }
 
     // MARK: - Private

@@ -3,44 +3,37 @@ import Observation
 
 private let log = AppLog(category: "ImpactController")
 
-/// Central coordinator: sensor → detector → audio + flash.
-///
-/// The signal chain uses normalized intensity as a shared parameter that
-/// flows through four sliding windows (all user-configurable range sliders):
-///
-///   raw force → [sensitivity band] → intensity 0–1 → [volume band]    → audio level
-///                                                  → [opacity band]   → flash brightness
-///                                                  → debounce  → cooldown time
-///
-/// Narrowing any window compresses the response; widening it expands it.
-/// All four are coupled through the same intensity value.
-///
-/// The sensor stream is consumed via `for await event in sensorManager.events()`.
-/// Cancelling `sensorTask` propagates through the entire chain — no callbacks,
-/// no weak self, no manual cleanup.
+/// Coordinates sensor input, impact detection, and app responses.
 @MainActor @Observable
-final class ImpactController: @unchecked Sendable {
+final class ImpactController {
     let settings: SettingsStore
     let audioPlayer: AudioPlayer
 
     private let sensorManager: SensorManager
-    private let detector = ImpactDetector()
+    private let fusion = SensorFusionEngine()
     private let screenFlash = ScreenFlash()
 
     var impactCount: Int = 0
     var isEnabled = false
     var sensorError: String?
     var sensorName: String?
+    var lastImpactMagnitude: Float = 0
+    var lastImpactTier: ImpactTier?
+    var lastImpactFreqHz: String = "—"
 
     private var sensorTask: Task<Void, Never>?
     private var playingUntil: Date = .distantPast
     private var countDate: Date = Calendar.current.startOfDay(for: Date())
-    private var cachedSensitivityMin: Double = -1
-    private var cachedSensitivityMax: Double = -1
+    private var activeSensors: Set<String> = []
 
-    /// After HPF removes gravity, this maps raw force to 0–1 intensity.
-    private static let intensityFloor: Float = 0.15
-    private static let intensityCeiling: Float = 1.5
+    /// Maps post-fusion force to normalized intensity.
+    /// IOHIDEventSystem returns pre-smoothed values — typical range:
+    ///   light tap: ~0.003g filtered, hard hit: ~0.03g, maximum: ~0.6g
+    /// Intensity mapping calibrated to IOHIDEventSystem data:
+    ///   0.020g = firm desk slap (minimum useful impact)
+    ///   0.060g = hard slap (approaching hardware stress)
+    private static let intensityFloor: Float = 0.020
+    private static let intensityCeiling: Float = 0.060
     private let intensityRange: ClosedRange<Float> = intensityFloor...intensityCeiling
 
     init(settings: SettingsStore, adapters: [any SensorAdapter]? = nil) {
@@ -51,19 +44,24 @@ final class ImpactController: @unchecked Sendable {
         ])
     }
 
+    // MARK: - Lifecycle
+
     func start() {
         guard !isEnabled else { return }
         isEnabled = true
         sensorError = nil
-        detector.sensitivity = (settings.sensitivityMin + settings.sensitivityMax) / 2.0
-        log.info("activity:ImpactDetection wasStartedBy agent:ImpactController sensitivityBand=[\(String(format: "%.2f", settings.sensitivityMin)),\(String(format: "%.2f", settings.sensitivityMax))]")
+        log.info("activity:ImpactDetection wasStartedBy agent:ImpactController")
 
         sensorTask = Task {
             for await event in sensorManager.events() {
                 switch event {
-                case .sample(let vec):  handleSample(vec)
-                case .error(let msg):   sensorError = msg
-                case .adapterChanged(let name): sensorName = name
+                case .sample(let sample):
+                    handleSample(sample)
+                case .error(let msg):
+                    sensorError = msg
+                case .adaptersActive(let names):
+                    activeSensors = Set(names)
+                    sensorName = names.isEmpty ? nil : names.sorted().joined(separator: ", ")
                 }
             }
         }
@@ -74,62 +72,96 @@ final class ImpactController: @unchecked Sendable {
         sensorTask = nil
         isEnabled = false
         sensorName = nil
+        activeSensors = []
         log.info("activity:ImpactDetection wasEndedBy agent:ImpactController")
     }
 
-    func toggle() {
-        isEnabled ? stop() : start()
-    }
+    func toggle() { isEnabled ? stop() : start() }
 
-    // MARK: - Private
+    // MARK: - Signal chain
 
-    private func handleSample(_ vec: Vec3) {
-        if settings.sensitivityMin != cachedSensitivityMin || settings.sensitivityMax != cachedSensitivityMax {
-            cachedSensitivityMin = settings.sensitivityMin
-            cachedSensitivityMax = settings.sensitivityMax
-            detector.sensitivity = (cachedSensitivityMin + cachedSensitivityMax) / 2.0
+    private func handleSample(_ sample: SensorSample) {
+        fusion.setBandpass(lowHz: Float(settings.bandpassLowHz), highHz: Float(settings.bandpassHighHz))
+        fusion.spikeThreshold = Float(settings.spikeThreshold)
+        fusion.minCrestFactor = Float(settings.crestFactor)
+        fusion.minRiseRate = Float(settings.riseRate)
+        fusion.minConfirmations = settings.confirmations
+        fusion.minRearmDuration = settings.debounce
+        fusion.minWarmupSamples = settings.warmupSamples
+        let sources = activeSensors.isEmpty ? Set([sample.source]) : activeSensors
+        guard let fused = fusion.ingest(sample, activeSources: sources) else { return }
+
+        let now = fused.timestamp
+        let mag = fused.amplitude.magnitude
+        guard now >= playingUntil else {
+            log.debug("entity:Gate blocked=debounce mag=\(String(format: "%.4f", mag)) remaining=\(String(format: "%.2f", playingUntil.timeIntervalSince(now)))s")
+            return
         }
 
-        guard let event = detector.process(vec) else { return }
+        guard let intensity = normalizeIntensity(mag) else {
+            log.debug("entity:Gate blocked=sensitivity mag=\(String(format: "%.4f", mag))")
+            return
+        }
 
-        let now = Date()
-        guard now >= playingUntil else { return }
+        let tier = ImpactTier.from(intensity: intensity)
+        lastImpactMagnitude = mag
+        lastImpactTier = tier
+        lastImpactFreqHz = "\(Int(settings.bandpassLowHz))–\(Int(settings.bandpassHighHz)) Hz"
 
-        // ── Stage 1: Sensitivity band → normalized intensity ──────
-        let mag = event.amplitude.magnitude
-        let rawIntensity = ((mag - intensityRange.lowerBound)
+        let clipDuration = playAudioResponse(intensity: intensity)
+        playingUntil = now.addingTimeInterval(max(clipDuration, settings.debounce))
+
+        if settings.screenFlash && clipDuration > 0 {
+            flashScreenResponse(intensity: intensity, clipDuration: clipDuration)
+        }
+
+        log.debug("entity:Impact tier=\(tier) intensity=\(String(format: "%.2f", intensity)) mag=\(String(format: "%.4f", mag)) confidence=\(String(format: "%.2f", fused.confidence))")
+        incrementDailyCount(now: now)
+    }
+
+    // MARK: - Normalization
+
+    /// Converts force magnitude to 0...1 intensity; returns nil below threshold.
+    /// Sensitivity is inverted to thresholds: high sensitivity → low threshold → more reactive.
+    private func normalizeIntensity(_ magnitude: Float) -> Float? {
+        let rawIntensity = ((magnitude - intensityRange.lowerBound)
             / (intensityRange.upperBound - intensityRange.lowerBound))
             .clamped(to: 0...1)
 
-        let sMin = Float(settings.sensitivityMin)
-        let sMax = Float(settings.sensitivityMax)
-        guard rawIntensity >= sMin else { return }
+        let thresholdLow = 1.0 - Float(settings.sensitivityMax)
+        let thresholdHigh = 1.0 - Float(settings.sensitivityMin)
+        guard rawIntensity >= thresholdLow else { return nil }
 
-        let bandWidth = max(Float(0.001), sMax - sMin)
-        let intensity = ((rawIntensity - sMin) / bandWidth).clamped(to: 0...1)
+        let bandWidth = max(Float(0.001), thresholdHigh - thresholdLow)
+        return ((rawIntensity - thresholdLow) / bandWidth).clamped(to: 0...1)
+    }
 
-        // ── Stage 2: Intensity flows through all output windows ───
-        let clipDuration = audioPlayer.play(
+    // MARK: - Response
+
+    /// Plays audio scaled by intensity. Returns clip duration.
+    private func playAudioResponse(intensity: Float) -> Double {
+        audioPlayer.play(
             intensity: intensity,
             volumeMin: Float(settings.volumeMin),
             volumeMax: Float(settings.volumeMax),
             deviceUIDs: settings.enabledAudioDevices
         )
+    }
 
-        let debounce = settings.debounce
-        playingUntil = now.addingTimeInterval(max(clipDuration, debounce))
+    /// Flashes screens with intensity-scaled overlay.
+    private func flashScreenResponse(intensity: Float, clipDuration: Double) {
+        screenFlash.flash(
+            intensity: intensity,
+            opacityMin: Float(settings.flashOpacityMin),
+            opacityMax: Float(settings.flashOpacityMax),
+            clipDuration: clipDuration,
+            enabledDisplayIDs: settings.enabledDisplays
+        )
+    }
 
-        if settings.screenFlash && clipDuration > 0 {
-            screenFlash.flash(
-                intensity: intensity,
-                opacityMin: Float(settings.flashOpacityMin),
-                opacityMax: Float(settings.flashOpacityMax),
-                clipDuration: clipDuration,
-                enabledDisplayIDs: settings.enabledDisplays
-            )
-        }
+    // MARK: - Daily counter
 
-        // Reset counter at day boundary
+    private func incrementDailyCount(now: Date) {
         let today = Calendar.current.startOfDay(for: now)
         if today > countDate {
             impactCount = 0

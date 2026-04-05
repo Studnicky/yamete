@@ -41,8 +41,7 @@ final class HighPassFilter {
 
     /// - Parameters:
     ///   - cutoffHz: High-pass cutoff frequency.
-    ///   - sampleRate: Actual processing rate (post-decimation).
-    ///     The accelerometer reports at 100 Hz, decimated by 2 → 50 Hz.
+    ///   - sampleRate: Effective processing rate after decimation (100 Hz -> 50 Hz).
     init(cutoffHz: Float = 5.0, sampleRate: Float = 50.0) {
         let rc = 1.0 / (2.0 * Float.pi * cutoffHz)
         let dt = 1.0 / sampleRate
@@ -61,4 +60,32 @@ final class HighPassFilter {
     }
 
     func reset() { prev = .zero; prevFiltered = .zero }
+}
+
+// MARK: - LowPassFilter
+
+final class LowPassFilter {
+    private let alpha: Float
+    private var prevFiltered: Vec3 = .zero
+
+    /// - Parameters:
+    ///   - cutoffHz: Low-pass cutoff frequency.
+    ///   - sampleRate: Effective processing rate after decimation.
+    init(cutoffHz: Float = 25.0, sampleRate: Float = 50.0) {
+        let rc = 1.0 / (2.0 * Float.pi * cutoffHz)
+        let dt = 1.0 / sampleRate
+        alpha = dt / (rc + dt)
+    }
+
+    func process(_ sample: Vec3) -> Vec3 {
+        let filtered = Vec3(
+            x: prevFiltered.x + alpha * (sample.x - prevFiltered.x),
+            y: prevFiltered.y + alpha * (sample.y - prevFiltered.y),
+            z: prevFiltered.z + alpha * (sample.z - prevFiltered.z)
+        )
+        prevFiltered = filtered
+        return filtered
+    }
+
+    func reset() { prevFiltered = .zero }
 }

@@ -4,12 +4,7 @@ import Foundation
 
 private let log = AppLog(category: "Updater")
 
-/// Self-updater that checks GitHub Releases for newer versions.
-///
-/// Security: after downloading, the update is verified before installation:
-/// 1. SHA256 checksum of the DMG is compared against the release manifest
-/// 2. Extracted .app must pass `codesign --verify --deep`
-/// 3. Bundle identifier must match `com.yamete`
+/// Checks GitHub releases and installs verified app updates.
 @MainActor @Observable
 final class Updater {
     enum State: Equatable {
@@ -24,13 +19,15 @@ final class Updater {
 
     var state: State = .idle
 
-    private let repo = "Studnicky/yamate"
+    private let repo = "Studnicky/yamete"
     private let expectedBundleID = "com.yamete"
+    private let expectedTeamID: String?
     private let currentVersion: String
     private let checkInterval: TimeInterval = 24 * 60 * 60
 
     init() {
         currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        expectedTeamID = Self.teamIdentifier(appPath: Bundle.main.bundlePath)
     }
 
     // MARK: - Public API
@@ -87,23 +84,26 @@ final class Updater {
 
         Task {
             do {
-                let release = try await fetchLatestRelease()
-                let dmgURL = try await downloadDMG(version: version)
+                let tag = version.hasPrefix("v") ? version : "v\(version)"
+                let release = try await fetchRelease(tag: tag)
+                let dmgURL = try await downloadDMG(release: release)
 
-                // Security: verify SHA256 checksum if manifest provides one
-                if let expectedHash = release.sha256 {
-                    let actualHash = try sha256(of: dmgURL)
-                    guard actualHash == expectedHash.lowercased() else {
-                        try? FileManager.default.removeItem(at: dmgURL)
-                        log.error("activity:Install wasInvalidatedBy entity:ChecksumMismatch expected=\(expectedHash) actual=\(actualHash)")
-                        throw UpdateError.checksumMismatch
-                    }
-                    log.info("entity:DMG wasVerifiedBy activity:ChecksumVerify sha256=\(actualHash)")
+                guard let expectedHash = release.sha256 else {
+                    try? FileManager.default.removeItem(at: dmgURL)
+                    throw UpdateError.missingChecksum
                 }
+
+                let actualHash = try sha256(of: dmgURL)
+                guard actualHash == expectedHash.lowercased() else {
+                    try? FileManager.default.removeItem(at: dmgURL)
+                    log.error("activity:Install wasInvalidatedBy entity:ChecksumMismatch expected=\(expectedHash) actual=\(actualHash)")
+                    throw UpdateError.checksumMismatch
+                }
+                log.info("entity:DMG wasVerifiedBy activity:ChecksumVerify sha256=\(actualHash)")
 
                 try await installFromDMG(dmgURL)
                 state = .readyToRestart
-                promptUserToRestart(version: version)
+                promptUserToRestart(version: release.version)
             } catch {
                 state = .failed(error.localizedDescription)
                 log.error("activity:Install wasInvalidatedBy entity:Error — \(error.localizedDescription)")
@@ -113,12 +113,11 @@ final class Updater {
 
     func relaunch() {
         let appPath = Bundle.main.bundlePath
-        // Stage 1: spawn a background process that waits for this process to exit,
-        // then re-opens the app. Uses /usr/bin/open directly (no shell interpolation).
+        // Spawn a helper process that reopens the app after termination.
         let task = Process()
         task.launchPath = "/usr/bin/open"
         task.arguments = ["-W", "-n", "-a", appPath, "--args", "--relaunched"]
-        // Use a short delay so the current process can terminate first
+        // Use GCD so relaunch scheduling survives app termination.
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
             try? task.run()
         }
@@ -156,12 +155,18 @@ final class Updater {
     // MARK: - Release metadata
 
     private struct Release {
+        let tag: String
         let version: String
         let sha256: String?
     }
 
     private func fetchLatestRelease() async throws -> Release {
-        let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!
+        try await fetchRelease(tag: nil)
+    }
+
+    private func fetchRelease(tag: String?) async throws -> Release {
+        let endpoint = tag.map { "releases/tags/\($0)" } ?? "releases/latest"
+        let url = URL(string: "https://api.github.com/repos/\(repo)/\(endpoint)")!
         let (data, response) = try await URLSession.shared.data(from: url)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw UpdateError.networkError
@@ -172,7 +177,6 @@ final class Updater {
         }
         let version = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
 
-        // Parse SHA256 from release body: matches "sha256: <hex>" / "SHA-256: <hex>" / backtick-wrapped
         var sha256: String? = nil
         if let body = json["body"] as? String {
             let pattern = #"(?i)sha-?256[:\s`]+([0-9a-f]{64})"#
@@ -180,23 +184,20 @@ final class Updater {
                let hexRange = body[range].range(of: #"[0-9a-f]{64}"#, options: .regularExpression) {
                 sha256 = String(body[hexRange]).lowercased()
             }
-            if sha256 == nil {
-                log.warning("activity:UpdateCheck — no SHA256 checksum found in release notes, update will proceed without integrity verification")
-            }
         }
 
-        return Release(version: version, sha256: sha256)
+        return Release(tag: tagName, version: version, sha256: sha256)
     }
 
     // MARK: - Download + install
 
-    private func downloadDMG(version: String) async throws -> URL {
-        let dmgURL = URL(string: "https://github.com/\(repo)/releases/download/v\(version)/Yamete.dmg")!
+    private func downloadDMG(release: Release) async throws -> URL {
+        let dmgURL = URL(string: "https://github.com/\(repo)/releases/download/\(release.tag)/Yamete.dmg")!
         let (tempURL, response) = try await URLSession.shared.download(from: dmgURL)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw UpdateError.downloadFailed
         }
-        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("Yamete-\(version).dmg")
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("Yamete-\(release.version).dmg")
         try? FileManager.default.removeItem(at: dest)
         try FileManager.default.moveItem(at: tempURL, to: dest)
         return dest
@@ -250,7 +251,7 @@ final class Updater {
         }
         log.info("entity:AppBundle wasVerifiedBy activity:CodesignVerify")
 
-        // Security: verify bundle identifier
+        // Verify bundle identifier.
         let plistPath = sourceApp + "/Contents/Info.plist"
         guard let plist = NSDictionary(contentsOfFile: plistPath),
               let bundleID = plist["CFBundleIdentifier"] as? String,
@@ -260,7 +261,14 @@ final class Updater {
         }
         log.info("entity:AppBundle wasVerifiedBy activity:BundleIDCheck id=\(bundleID)")
 
-        // Replace current app
+        if let expectedTeamID,
+           let actualTeamID = Self.teamIdentifier(appPath: sourceApp),
+           actualTeamID != expectedTeamID {
+            log.error("activity:Install wasInvalidatedBy entity:TeamIDMismatch expected=\(expectedTeamID) actual=\(actualTeamID)")
+            throw UpdateError.teamIDMismatch
+        }
+
+        // Replace current app bundle.
         let destApp = Bundle.main.bundlePath
         let fm = FileManager.default
         let backup = destApp + ".bak"
@@ -273,6 +281,34 @@ final class Updater {
             try? fm.moveItem(atPath: backup, toPath: destApp)
             throw UpdateError.installFailed
         }
+    }
+
+    private static func teamIdentifier(appPath: String) -> String? {
+        let task = Process()
+        task.launchPath = "/usr/bin/codesign"
+        task.arguments = ["-dv", "--verbose=4", appPath]
+
+        let stderr = Pipe()
+        task.standardError = stderr
+        task.standardOutput = Pipe()
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            return nil
+        }
+
+        guard task.terminationStatus == 0,
+              let output = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
+        else { return nil }
+
+        for line in output.split(separator: "\n") {
+            if line.hasPrefix("TeamIdentifier=") {
+                return String(line.dropFirst("TeamIdentifier=".count))
+            }
+        }
+        return nil
     }
 
     // MARK: - Crypto
@@ -301,19 +337,21 @@ final class Updater {
     private enum UpdateError: LocalizedError {
         case networkError, parseError, downloadFailed, mountFailed
         case appNotFound, installFailed
-        case checksumMismatch, signatureInvalid, bundleIDMismatch
+        case missingChecksum, checksumMismatch, signatureInvalid, bundleIDMismatch, teamIDMismatch
 
         var errorDescription: String? {
             switch self {
-            case .networkError:     "Could not reach GitHub"
-            case .parseError:       "Could not parse release info"
-            case .downloadFailed:   "DMG download failed"
-            case .mountFailed:      "Could not mount DMG"
-            case .appNotFound:      "No app found in DMG"
-            case .installFailed:    "Could not replace app bundle"
-            case .checksumMismatch: "Download corrupted — SHA256 mismatch"
-            case .signatureInvalid: "Code signature verification failed"
-            case .bundleIDMismatch: "App bundle identifier mismatch"
+            case .networkError:      "Could not reach GitHub"
+            case .parseError:        "Could not parse release info"
+            case .downloadFailed:    "DMG download failed"
+            case .mountFailed:       "Could not mount DMG"
+            case .appNotFound:       "No app found in DMG"
+            case .installFailed:     "Could not replace app bundle"
+            case .missingChecksum:   "Release is missing SHA256 checksum"
+            case .checksumMismatch:  "Download corrupted — SHA256 mismatch"
+            case .signatureInvalid:  "Code signature verification failed"
+            case .bundleIDMismatch:  "App bundle identifier mismatch"
+            case .teamIDMismatch:    "Code signing team mismatch"
             }
         }
     }

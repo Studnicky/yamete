@@ -3,8 +3,9 @@ import Foundation
 
 private let log = AppLog(category: "AudioPlayer")
 
-/// Plays sound clips scaled by intensity, routable to a specific audio device.
-/// Uses NSSound for its `playbackDeviceIdentifier` support.
+/// Plays impact sounds on selected output devices.
+/// Sound files are loaded from the `sounds` resource folder at startup,
+/// sorted by duration, and cached for intensity-based selection.
 @MainActor
 final class AudioPlayer {
     private struct SoundFile {
@@ -12,9 +13,13 @@ final class AudioPlayer {
         let duration: Double
     }
 
+    /// Pre-sorted by duration (shortest first). Cached at startup.
     private var soundFiles: [SoundFile] = []
     private var recentlyPlayed: [URL] = []
     private let historySize = 2
+
+    /// URL and duration of the longest loaded sound (last in sorted cache).
+    var longestSoundURL: URL? { soundFiles.last?.url }
 
     init() { preload() }
 
@@ -82,17 +87,17 @@ final class AudioPlayer {
         let pool = available.isEmpty ? soundFiles : available
         guard !pool.isEmpty else { return nil }
 
-        let sorted = pool.sorted { $0.duration < $1.duration }
-        let idealIdx = Int((intensity * Float(sorted.count - 1)).rounded())
-        let half = max(1, sorted.count / 8)
+        // Pool preserves duration order from the pre-sorted cache.
+        let idealIdx = Int((intensity * Float(pool.count - 1)).rounded())
+        let half = max(1, pool.count / 8)
         let lo = max(0, idealIdx - half)
-        let hi = min(sorted.count - 1, idealIdx + half)
+        let hi = min(pool.count - 1, idealIdx + half)
 
-        return sorted[Int.random(in: lo...hi)]
+        return pool[Int.random(in: lo...hi)]
     }
 
     private func preload() {
-        let urls = BundleResources.urls(prefix: "sound_", extensions: ["mp3", "wav"])
+        let urls = BundleResources.urls(in: "sounds", extensions: ["mp3", "wav", "m4a", "aac"])
 
         for url in urls {
             if let s = NSSound(contentsOf: url, byReference: true) {
@@ -101,10 +106,13 @@ final class AudioPlayer {
                 log.error("entity:SoundClip wasInvalidatedBy activity:Preload file=\(url.lastPathComponent)")
             }
         }
+
+        soundFiles.sort { $0.duration < $1.duration }
+
         if soundFiles.isEmpty {
-            log.error("entity:SoundLibrary wasInvalidatedBy activity:Preload — no sound files in bundle")
+            log.error("entity:SoundLibrary wasInvalidatedBy activity:Preload — no sound files in bundle/sounds")
         } else {
-            log.info("entity:SoundLibrary wasGeneratedBy activity:Preload count=\(soundFiles.count)")
+            log.info("entity:SoundLibrary wasGeneratedBy activity:Preload count=\(soundFiles.count) shortest=\(String(format: "%.2f", soundFiles.first?.duration ?? 0))s longest=\(String(format: "%.2f", soundFiles.last?.duration ?? 0))s")
         }
     }
 }
