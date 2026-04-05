@@ -39,7 +39,7 @@ final class SettingsStore {
         Key.lastUpdateCheck.rawValue: 0.0,
         // Advanced detection
         Key.spikeThreshold.rawValue:  0.020,
-        Key.crestFactor.rawValue:     6.0,
+        Key.crestFactor.rawValue:     4.0,
         Key.riseRate.rawValue:        0.010,
         Key.confirmations.rawValue:   3,
         Key.warmupSamples.rawValue:   50,
