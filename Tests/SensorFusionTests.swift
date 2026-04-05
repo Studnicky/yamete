@@ -1,6 +1,7 @@
 import XCTest
 @testable import YameteLib
 
+@MainActor
 final class SensorFusionTests: XCTestCase {
 
     // Tests use explicit thresholds and large input values to ensure signals
