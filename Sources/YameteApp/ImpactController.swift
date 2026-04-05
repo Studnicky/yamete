@@ -1,3 +1,12 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
+#if canImport(SensorKit)
+import SensorKit
+#endif
+#if canImport(ResponseKit)
+import ResponseKit
+#endif
 import Foundation
 import Observation
 
@@ -13,7 +22,7 @@ final class ImpactController {
     let audioPlayer: any AudioResponder
 
     private let sensorManager: SensorManager
-    private let fusion = SensorFusionEngine()
+    private let fusion = ImpactDetectionEngine()
     private let screenFlash: any FlashResponder
 
     var impactCount: Int = 0

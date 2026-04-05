@@ -1,3 +1,6 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
 import AppKit
 import CommonCrypto
 import Foundation
@@ -128,11 +131,11 @@ final class Updater {
 
     private func promptUserForUpdate(version: String) {
         let alert = NSAlert()
-        alert.messageText = "Yamete v\(version) Available"
-        alert.informativeText = "A new version is available. Would you like to install it now?\n\nYou're currently running v\(currentVersion)."
+        alert.messageText = String(format: NSLocalizedString("Yamete v%@ Available", comment: "Update available title"), version)
+        alert.informativeText = String(format: NSLocalizedString("A new version is available. Would you like to install it now?\n\nYou're currently running v%@.", comment: "Update available body"), currentVersion)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Install Update")
-        alert.addButton(withTitle: "Later")
+        alert.addButton(withTitle: NSLocalizedString("Install Update", comment: "Update button"))
+        alert.addButton(withTitle: NSLocalizedString("Later", comment: "Dismiss button"))
         if alert.runModal() == .alertFirstButtonReturn {
             downloadAndInstall()
         } else {
@@ -142,11 +145,11 @@ final class Updater {
 
     private func promptUserToRestart(version: String) {
         let alert = NSAlert()
-        alert.messageText = "Yamete v\(version) Installed"
-        alert.informativeText = "The update has been installed and verified. Restart Yamete to use the new version."
+        alert.messageText = String(format: NSLocalizedString("Yamete v%@ Installed", comment: "Update installed title"), version)
+        alert.informativeText = NSLocalizedString("The update has been installed and verified. Restart Yamete to use the new version.", comment: "Update installed body")
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Restart Now")
-        alert.addButton(withTitle: "Later")
+        alert.addButton(withTitle: NSLocalizedString("Restart Now", comment: "Restart button"))
+        alert.addButton(withTitle: NSLocalizedString("Later", comment: "Dismiss button"))
         if alert.runModal() == .alertFirstButtonReturn {
             relaunch()
         }
@@ -345,17 +348,17 @@ final class Updater {
 
         var errorDescription: String? {
             switch self {
-            case .networkError:      "Could not reach GitHub"
-            case .parseError:        "Could not parse release info"
-            case .downloadFailed:    "DMG download failed"
-            case .mountFailed:       "Could not mount DMG"
-            case .appNotFound:       "No app found in DMG"
-            case .installFailed:     "Could not replace app bundle"
-            case .missingChecksum:   "Release is missing SHA256 checksum"
-            case .checksumMismatch:  "Download corrupted — SHA256 mismatch"
-            case .signatureInvalid:  "Code signature verification failed"
-            case .bundleIDMismatch:  "App bundle identifier mismatch"
-            case .teamIDMismatch:    "Code signing team mismatch"
+            case .networkError:      NSLocalizedString("Could not reach GitHub", comment: "Update error")
+            case .parseError:        NSLocalizedString("Could not parse release info", comment: "Update error")
+            case .downloadFailed:    NSLocalizedString("DMG download failed", comment: "Update error")
+            case .mountFailed:       NSLocalizedString("Could not mount DMG", comment: "Update error")
+            case .appNotFound:       NSLocalizedString("No app found in DMG", comment: "Update error")
+            case .installFailed:     NSLocalizedString("Could not replace app bundle", comment: "Update error")
+            case .missingChecksum:   NSLocalizedString("Release is missing SHA256 checksum", comment: "Update error")
+            case .checksumMismatch:  NSLocalizedString("Download corrupted — SHA256 mismatch", comment: "Update error")
+            case .signatureInvalid:  NSLocalizedString("Code signature verification failed", comment: "Update error")
+            case .bundleIDMismatch:  NSLocalizedString("App bundle identifier mismatch", comment: "Update error")
+            case .teamIDMismatch:    NSLocalizedString("Code signing team mismatch", comment: "Update error")
             }
         }
     }

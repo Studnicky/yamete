@@ -1,3 +1,6 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
 import Foundation
 import Observation
 
@@ -45,7 +48,7 @@ final class SettingsStore {
         Key.warmupSamples.rawValue:   50,
     ]
 
-    // MARK: - Sensitivity band (input window)
+    // MARK: - Reactivity (inverted sensitivity: higher value = lower force threshold)
 
     var sensitivityMin: Double {
         didSet {

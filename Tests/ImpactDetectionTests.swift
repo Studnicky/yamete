@@ -1,8 +1,11 @@
 import XCTest
-@testable import YameteLib
+@testable import YameteCore
+@testable import SensorKit
+@testable import ResponseKit
+@testable import YameteApp
 
 @MainActor
-final class SensorFusionTests: XCTestCase {
+final class ImpactDetectionTests: XCTestCase {
 
     // Tests use explicit thresholds and large input values to ensure signals
     // pass the bandpass filter (HP 18Hz + LP 25Hz attenuates ~5x vs raw).
@@ -17,7 +20,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testSingleSourceCanTriggerConsensus() {
-        let engine = SensorFusionEngine(config: permissiveConfig())
+        let engine = ImpactDetectionEngine(config: permissiveConfig())
         let now = Date()
         let sample = SensorSample(source: SensorID("A"), timestamp: now, value: Vec3(x: 2.0, y: 0, z: 0))
         let impact = engine.ingest(sample, activeSources: [SensorID("A")])
@@ -25,7 +28,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testTwoSourcesRequireTwoSourceConsensus() {
-        let engine = SensorFusionEngine(config: permissiveConfig())
+        let engine = ImpactDetectionEngine(config: permissiveConfig())
         let now = Date()
 
         let aOnly = engine.ingest(
@@ -42,7 +45,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testRearmsAfterCooldown() {
-        let engine = SensorFusionEngine(windowDuration: 0.05, config: permissiveConfig(rearm: 0.30))
+        let engine = ImpactDetectionEngine(windowDuration: 0.05, config: permissiveConfig(rearm: 0.30))
         let now = Date()
 
         let first = engine.ingest(
@@ -72,7 +75,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testGravityOnlyDoesNotTrigger() {
-        let engine = SensorFusionEngine(config: permissiveConfig(warmup: 30))
+        let engine = ImpactDetectionEngine(config: permissiveConfig(warmup: 30))
         let start = Date()
         var triggered = false
 
@@ -87,7 +90,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testTypingNoiseDoesNotTrigger() {
-        let engine = SensorFusionEngine(config: permissiveConfig(warmup: 30))
+        let engine = ImpactDetectionEngine(config: permissiveConfig(warmup: 30))
         let start = Date()
         var triggered = false
 
@@ -103,7 +106,7 @@ final class SensorFusionTests: XCTestCase {
     }
 
     func testImpactSpikeTriggersAfterSettling() {
-        let engine = SensorFusionEngine(config: permissiveConfig(warmup: 30))
+        let engine = ImpactDetectionEngine(config: permissiveConfig(warmup: 30))
         let start = Date()
         var triggered = false
 

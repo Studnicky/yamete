@@ -1,3 +1,6 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
 import Foundation
 import IOKit.hid
 
@@ -61,23 +64,33 @@ private func IOHIDEventGetFloatValue(_ event: IOHIDEventRef, _ field: Int32) -> 
 
 /// Reads BMI286 accelerometer via IOHIDEventSystemClient and streams Vec3 samples.
 /// Callbacks arrive on a dedicated dispatch queue; samples forwarded via continuation.
-final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
+public final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
-    let id = SensorID("spu-accelerometer")
-    let name = "Apple SPU Accelerometer"
+    public let id = SensorID("spu-accelerometer")
+    public let name = "Apple SPU Accelerometer"
 
-    private let clientType: Int32 = 1           // monitor
-    private let pageAccel:  Int = 0xFF00
+    public init() {}
+
+    /// IOHIDEventSystemClient type: 1 = monitor mode (can read events from services)
+    private let clientType: Int32 = 1
+    /// HID Usage Page 0xFF00: vendor-defined page used by Apple motion sensors
+    private let pageAccel: Int = 0xFF00
+    /// HID Usage 3: accelerometer within the vendor motion sensor page
     private let usageAccel: Int = 3
-    private let reportIntervalUS: Int = 10000   // 10ms = 100Hz
-    private let accelEventType: Int32 = 13      // accelerometer event type on macOS 15
+    /// Sensor report interval in microseconds (10000 = 10ms = 100Hz sample rate)
+    private let reportIntervalUS: Int = 10000
+    /// IOHIDEvent type for accelerometer data (empirically confirmed on macOS 15)
+    private let accelEventType: Int32 = 13
+    /// Skip every other sample (100Hz → 50Hz effective rate)
     private let decimationFactor = 2
+    /// Reject samples below 0.3g (sensor noise floor)
     private let magnitudeMin: Float = 0.3
+    /// Reject samples above 4.0g (corrupt/impossible data)
     private let magnitudeMax: Float = 4.0
 
     // MARK: - SensorAdapter
 
-    var isAvailable: Bool {
+    public var isAvailable: Bool {
         guard let c = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault, clientType, nil) else { return false }
         let matching: [String: Any] = ["PrimaryUsagePage": pageAccel, "PrimaryUsage": usageAccel]
         IOHIDEventSystemClientSetMatching(c, matching as CFDictionary)
@@ -90,7 +103,7 @@ final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
         return false
     }
 
-    func samples() -> AsyncThrowingStream<Vec3, Error> {
+    public func samples() -> AsyncThrowingStream<Vec3, Error> {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: Vec3.self)
 
         let ctx = EventContext(
