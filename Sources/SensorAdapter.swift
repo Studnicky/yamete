@@ -4,6 +4,9 @@ import Foundation
 
 /// Interface for adapters that stream normalized accelerometer samples.
 protocol SensorAdapter: AnyObject, Sendable {
+    /// Stable identifier for this adapter (used as dictionary key in fusion engine).
+    var id: SensorID { get }
+
     /// Human-readable name for logging and UI (e.g., "Apple SPU Accelerometer").
     var name: String { get }
 
@@ -21,7 +24,7 @@ protocol SensorAdapter: AnyObject, Sendable {
 
 /// A normalized sample with source and timestamp, ready for fan-in/fusion.
 struct SensorSample: Sendable {
-    let source: String
+    let source: SensorID
     let timestamp: Date
     let value: Vec3
 }
@@ -32,7 +35,7 @@ struct SensorSample: Sendable {
 enum SensorEvent: Sendable {
     case sample(SensorSample)
     case error(String)
-    case adaptersActive([String])
+    case adaptersChanged(ids: Set<SensorID>, names: [String])
 }
 
 // MARK: - SensorError
@@ -77,7 +80,7 @@ final class SensorManager {
 
         let (stream, continuation) = AsyncStream.makeStream(of: SensorEvent.self)
 
-        let activeTracker = ActiveAdapterTracker(active: Set(adapters.map(\.name)))
+        let activeTracker = ActiveAdapterTracker(adapters: adapters)
 
         let task = Task {
             defer { continuation.finish() }
@@ -87,7 +90,7 @@ final class SensorManager {
                 return
             }
 
-            continuation.yield(.adaptersActive(adapters.map(\.name).sorted()))
+            continuation.yield(.adaptersChanged(ids: Set(adapters.map(\.id)), names: adapters.map(\.name).sorted()))
 
             await withTaskGroup(of: Void.self) { group in
                 for adapter in adapters {
@@ -96,7 +99,7 @@ final class SensorManager {
                             log.info("activity:SensorDiscovery selected entity:Adapter name=\(adapter.name)")
                             for try await vec in adapter.samples() {
                                 continuation.yield(.sample(SensorSample(
-                                    source: adapter.name,
+                                    source: adapter.id,
                                     timestamp: Date(),
                                     value: vec
                                 )))
@@ -108,8 +111,8 @@ final class SensorManager {
                             continuation.yield(.error("\(adapter.name): \(error.localizedDescription)"))
                         }
 
-                        let remaining = await activeTracker.remove(adapter.name)
-                        continuation.yield(.adaptersActive(remaining.sorted()))
+                        let (remainingIDs, remainingNames) = await activeTracker.remove(adapter)
+                        continuation.yield(.adaptersChanged(ids: remainingIDs, names: remainingNames.sorted()))
                     }
                 }
 
@@ -123,14 +126,17 @@ final class SensorManager {
 }
 
 private actor ActiveAdapterTracker {
-    private var active: Set<String>
+    private var activeIDs: Set<SensorID>
+    private var namesByID: [SensorID: String]
 
-    init(active: Set<String>) {
-        self.active = active
+    init(adapters: [any SensorAdapter]) {
+        activeIDs = Set(adapters.map(\.id))
+        namesByID = Dictionary(uniqueKeysWithValues: adapters.map { ($0.id, $0.name) })
     }
 
-    func remove(_ name: String) -> [String] {
-        active.remove(name)
-        return Array(active)
+    func remove(_ adapter: any SensorAdapter) -> (ids: Set<SensorID>, names: [String]) {
+        activeIDs.remove(adapter.id)
+        namesByID.removeValue(forKey: adapter.id)
+        return (activeIDs, Array(namesByID.values))
     }
 }

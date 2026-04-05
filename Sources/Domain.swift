@@ -66,6 +66,24 @@ protocol FlashResponder {
     func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, enabledDisplayIDs: [Int])
 }
 
+// MARK: - Type-safe identifiers
+
+/// Uniquely identifies a sensor adapter. Prevents accidental use of display names as dictionary keys.
+struct SensorID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    var description: String { rawValue }
+}
+
+/// Core Audio device UID. Prevents mixing with arbitrary strings.
+struct AudioDeviceUID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
+    let rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(_ rawValue: String) { self.rawValue = rawValue }
+    var description: String { rawValue }
+}
+
 // MARK: - Display helpers
 
 extension NSScreen {

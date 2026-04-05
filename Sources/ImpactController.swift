@@ -27,7 +27,7 @@ final class ImpactController {
     private var sensorTask: Task<Void, Never>?
     private var rearmUntil: Date = .distantPast
     private var countDate: Date = Calendar.current.startOfDay(for: Date())
-    private var activeSensors: Set<String> = []
+    private var activeSensorIDs: Set<SensorID> = []
 
     /// Intensity mapping calibrated to IOHIDEventSystem data:
     ///   0.020g = firm desk slap (minimum useful impact)
@@ -63,8 +63,8 @@ final class ImpactController {
                     handleSample(sample)
                 case .error(let msg):
                     sensorError = msg
-                case .adaptersActive(let names):
-                    activeSensors = Set(names)
+                case .adaptersChanged(let ids, let names):
+                    activeSensorIDs = ids
                     sensorName = names.isEmpty ? nil : names.sorted().joined(separator: ", ")
                 }
             }
@@ -76,7 +76,7 @@ final class ImpactController {
         sensorTask = nil
         isEnabled = false
         sensorName = nil
-        activeSensors = []
+        activeSensorIDs = []
         log.info("activity:ImpactDetection wasEndedBy agent:ImpactController")
     }
 
@@ -107,7 +107,7 @@ final class ImpactController {
     }
 
     private func detect(_ sample: SensorSample) -> DetectedImpact? {
-        let sources = activeSensors.isEmpty ? Set([sample.source]) : activeSensors
+        let sources = activeSensorIDs.isEmpty ? Set([sample.source]) : activeSensorIDs
         guard let fused = fusion.ingest(sample, activeSources: sources) else { return nil }
 
         let now = fused.timestamp
