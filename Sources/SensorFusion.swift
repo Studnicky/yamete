@@ -14,7 +14,7 @@ private let log = AppLog(category: "SensorFusion")
 /// Configurable detection parameters for the impact detection engine.
 struct DetectionConfig: Equatable {
     var spikeThreshold: Float = 0.020
-    var minCrestFactor: Float = 6.0
+    var minCrestFactor: Float = 4.0
     var minRiseRate: Float = 0.010
     var minConfirmations: Int = 3
     var minRearmDuration: TimeInterval = 0.50
@@ -43,8 +43,8 @@ final class SensorFusionEngine {
     private var hpFiltersBySource: [SensorID: HighPassFilter] = [:]
     private var lpFiltersBySource: [SensorID: LowPassFilter] = [:]
     private var sampleCountBySource: [SensorID: Int] = [:]
-    private var rmsBySource: [SensorID: Float] = [:]
     private var prevFilteredMagBySource: [SensorID: Float] = [:]
+    private var peakRiseRateBySource: [SensorID: Float] = [:]
     private var lastTriggerAt: Date = .distantPast
     private var hpCutoffHz: Float = 18.0
     private var lpCutoffHz: Float = 25.0
@@ -82,25 +82,22 @@ final class SensorFusionEngine {
         sampleCountBySource[sample.source, default: 0] += 1
         let filteredMag = filtered.magnitude
 
-        // Rise rate: how fast the signal magnitude increased from previous sample
+        // Rise rate: track peak rise rate in the detection window.
+        // The instantaneous rise rate on the current sample may be negative (downslope)
+        // even during a valid impact — the sharp rise happened earlier in the window.
         let prevMag = prevFilteredMagBySource[sample.source, default: 0]
         let riseRate = filteredMag - prevMag
         prevFilteredMagBySource[sample.source] = filteredMag
-
-        // Slow-tracking RMS of all samples. Brief impacts barely move it;
-        // sustained vibrations raise it, lowering the crest factor.
-        let rmsAlpha: Float = 0.005
-        let prevRmsSq = rmsBySource[sample.source, default: 0]
-        let rmsSq = prevRmsSq + rmsAlpha * (filteredMag * filteredMag - prevRmsSq)
-        rmsBySource[sample.source] = rmsSq
-        let rms = sqrtf(max(rmsSq, 1e-12))
+        if riseRate > (peakRiseRateBySource[sample.source] ?? 0) {
+            peakRiseRateBySource[sample.source] = riseRate
+        }
 
         #if DEBUG
         if filteredMag > diagPeakFiltered { diagPeakFiltered = filteredMag }
         if riseRate > diagPeakRise { diagPeakRise = riseRate }
         diagCounter += 1
         if diagCounter % 250 == 0 {
-            log.debug("entity:FusionDiag n=\(diagCounter) peak=\(String(format: "%.4f", diagPeakFiltered)) rms=\(String(format: "%.4f", rms)) rise=\(String(format: "%.4f", diagPeakRise)) thr=\(config.spikeThreshold) crest=\(config.minCrestFactor) riseReq=\(config.minRiseRate)")
+            log.debug("entity:FusionDiag n=\(diagCounter) peak=\(String(format: "%.4f", diagPeakFiltered)) rise=\(String(format: "%.4f", diagPeakRise)) thr=\(config.spikeThreshold) riseReq=\(config.minRiseRate)")
             diagPeakFiltered = 0
             diagPeakRise = 0
         }
@@ -122,18 +119,11 @@ final class SensorFusionEngine {
 
         guard hasConsensus, timeSinceLastTrigger >= config.minRearmDuration else { return nil }
 
-        let peakMag = participating.map(\.magnitude).max() ?? 0
-
-        // Gate 1: Crest factor — peak must be well above background
-        let crestFactor = peakMag / rms
-        guard crestFactor >= config.minCrestFactor else {
-            log.debug("entity:FusionGate blocked=crest peak=\(String(format: "%.4f", peakMag)) rms=\(String(format: "%.4f", rms)) crest=\(String(format: "%.1f", crestFactor))")
-            return nil
-        }
-
-        // Gate 2: Rise rate — direct impacts rise faster than transmitted vibrations
-        guard riseRate >= config.minRiseRate else {
-            log.debug("entity:FusionGate blocked=riseRate rise=\(String(format: "%.4f", riseRate)) required=\(config.minRiseRate)")
+        // Gate 1: Rise rate — peak rise rate within the window, not instantaneous.
+        // A direct impact's sharp onset is captured even if the current sample is on the downslope.
+        let windowPeakRise = peakRiseRateBySource[sample.source] ?? 0
+        guard windowPeakRise >= config.minRiseRate else {
+            log.debug("entity:FusionGate blocked=riseRate rise=\(String(format: "%.4f", windowPeakRise)) required=\(config.minRiseRate)")
             return nil
         }
 
@@ -146,6 +136,7 @@ final class SensorFusionEngine {
         }
 
         lastTriggerAt = now
+        peakRiseRateBySource[sample.source] = 0
 
         let sum = participating.reduce(Vec3.zero) { partial, entry in
             Vec3(
