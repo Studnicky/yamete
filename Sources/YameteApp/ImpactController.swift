@@ -1,3 +1,12 @@
+#if canImport(YameteCore)
+import YameteCore
+#endif
+#if canImport(SensorKit)
+import SensorKit
+#endif
+#if canImport(ResponseKit)
+import ResponseKit
+#endif
 import Foundation
 import Observation
 

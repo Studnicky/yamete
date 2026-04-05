@@ -5,33 +5,33 @@ import os
 
 /// Dual-sink logger: writes to both `os.Logger` (unified log for Console.app)
 /// and the app's own ``LogStore`` (file-based, 24-hour retention).
-struct AppLog: Sendable {
+public struct AppLog: Sendable {
     private let osLog: Logger
     private let category: String
 
     private static let subsystem = Bundle.main.bundleIdentifier ?? "com.yamete"
 
-    init(category: String) {
+    public init(category: String) {
         osLog = Logger(subsystem: Self.subsystem, category: category)
         self.category = category
     }
 
-    func info(_ message: String) {
+    public func info(_ message: String) {
         osLog.info("\(message, privacy: .public)")
         LogStore.shared.append("INFO", category, message)
     }
 
-    func debug(_ message: String) {
+    public func debug(_ message: String) {
         osLog.debug("\(message, privacy: .public)")
         LogStore.shared.append("DEBUG", category, message)
     }
 
-    func warning(_ message: String) {
+    public func warning(_ message: String) {
         osLog.warning("\(message, privacy: .public)")
         LogStore.shared.append("WARN", category, message)
     }
 
-    func error(_ message: String) {
+    public func error(_ message: String) {
         osLog.error("\(message, privacy: .public)")
         LogStore.shared.append("ERROR", category, message)
     }
@@ -45,8 +45,8 @@ struct AppLog: Sendable {
 /// On startup and at each day boundary, log files older than 24 hours are deleted.
 ///
 /// Thread safety: all mutable state and formatter access is confined to `queue`.
-final class LogStore: @unchecked Sendable {
-    static let shared = LogStore()
+public final class LogStore: @unchecked Sendable {
+    public static let shared = LogStore()
 
     private let directory: URL
     private let maxAge: TimeInterval = 24 * 60 * 60
@@ -80,7 +80,7 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
-    func append(_ level: String, _ category: String, _ message: String) {
+    public func append(_ level: String, _ category: String, _ message: String) {
         let now = Date()
         queue.async { [self] in
             rotateIfNeeded()
