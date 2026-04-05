@@ -1,6 +1,6 @@
 import Foundation
 
-private let log = AppLog(category: "SensorFusion")
+private let log = AppLog(category: "ImpactDetection")
 
 /// Impact detection engine with multi-stage filtering to reject non-impact vibrations.
 ///
@@ -24,7 +24,7 @@ struct DetectionConfig: Equatable {
 }
 
 @MainActor
-final class SensorFusionEngine {
+final class ImpactDetectionEngine {
     struct FusedImpact {
         let timestamp: Date
         let amplitude: Vec3
