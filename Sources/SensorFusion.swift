@@ -11,6 +11,7 @@ private let log = AppLog(category: "SensorFusion")
 ///   4. Rise rate requires fast signal onset (rejects slow transmitted vibrations)
 ///   5. Confirmation count requires multiple above-threshold samples in the window
 ///   6. Time-based rearm prevents retriggering from filter ringing
+@MainActor
 final class SensorFusionEngine {
     struct FusedImpact {
         let timestamp: Date
@@ -40,9 +41,11 @@ final class SensorFusionEngine {
     private var lastTriggerAt: Date = .distantPast
     private var hpCutoffHz: Float = 18.0
     private var lpCutoffHz: Float = 25.0
+    #if DEBUG
     private var diagCounter = 0
     private var diagPeakFiltered: Float = 0
     private var diagPeakRise: Float = 0
+    #endif
 
     init(windowDuration: TimeInterval = 0.12,
          spikeThreshold: Float = 0.020,
@@ -82,7 +85,7 @@ final class SensorFusionEngine {
         rmsBySource[sample.source] = rmsSq
         let rms = sqrtf(max(rmsSq, 1e-12))
 
-        // Diagnostics
+        #if DEBUG
         if filteredMag > diagPeakFiltered { diagPeakFiltered = filteredMag }
         if riseRate > diagPeakRise { diagPeakRise = riseRate }
         diagCounter += 1
@@ -91,6 +94,7 @@ final class SensorFusionEngine {
             diagPeakFiltered = 0
             diagPeakRise = 0
         }
+        #endif
 
         // Accumulate filtered samples in rolling window
         var sourceSamples = bySource[sample.source] ?? []

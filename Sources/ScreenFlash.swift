@@ -66,7 +66,7 @@ final class ScreenFlash {
         flashGeneration &+= 1
         let generation = flashGeneration
         hideTask?.cancel()
-        hideTask = Task { [activeWindows] in
+        hideTask = Task { @MainActor [activeWindows] in
             try? await Task.sleep(for: .seconds(clipDuration + 0.05))
             guard !Task.isCancelled, generation == flashGeneration else { return }
             activeWindows.forEach { $0.orderOut(nil) }

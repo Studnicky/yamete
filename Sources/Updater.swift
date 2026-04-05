@@ -41,7 +41,7 @@ final class Updater {
         log.info("activity:AutoUpdateCheck wasStartedBy agent:Updater interval=\(String(format: "%.0f", elapsed))s")
         state = .checking
 
-        Task {
+        Task { @MainActor in
             do {
                 let release = try await fetchLatestRelease()
                 if isNewer(release.version, than: currentVersion) {
@@ -62,7 +62,7 @@ final class Updater {
         state = .checking
         log.info("activity:UpdateCheck wasStartedBy agent:Updater current=\(currentVersion)")
 
-        Task {
+        Task { @MainActor in
             do {
                 let release = try await fetchLatestRelease()
                 if isNewer(release.version, than: currentVersion) {
@@ -82,7 +82,7 @@ final class Updater {
         guard case .available(let version) = state else { return }
         state = .downloading(version)
 
-        Task {
+        Task { @MainActor in
             do {
                 let tag = version.hasPrefix("v") ? version : "v\(version)"
                 let release = try await fetchRelease(tag: tag)
