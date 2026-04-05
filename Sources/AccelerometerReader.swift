@@ -63,6 +63,7 @@ private func IOHIDEventGetFloatValue(_ event: IOHIDEventRef, _ field: Int32) -> 
 /// Callbacks arrive on a dedicated dispatch queue; samples forwarded via continuation.
 final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
+    let id = SensorID("spu-accelerometer")
     let name = "Apple SPU Accelerometer"
 
     private let clientType: Int32 = 1           // monitor

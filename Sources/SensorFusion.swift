@@ -39,12 +39,12 @@ final class SensorFusionEngine {
     private let windowDuration: TimeInterval
     private(set) var config: DetectionConfig
 
-    private var bySource: [String: [SamplePoint]] = [:]
-    private var hpFiltersBySource: [String: HighPassFilter] = [:]
-    private var lpFiltersBySource: [String: LowPassFilter] = [:]
-    private var sampleCountBySource: [String: Int] = [:]
-    private var rmsBySource: [String: Float] = [:]
-    private var prevFilteredMagBySource: [String: Float] = [:]
+    private var bySource: [SensorID: [SamplePoint]] = [:]
+    private var hpFiltersBySource: [SensorID: HighPassFilter] = [:]
+    private var lpFiltersBySource: [SensorID: LowPassFilter] = [:]
+    private var sampleCountBySource: [SensorID: Int] = [:]
+    private var rmsBySource: [SensorID: Float] = [:]
+    private var prevFilteredMagBySource: [SensorID: Float] = [:]
     private var lastTriggerAt: Date = .distantPast
     private var hpCutoffHz: Float = 18.0
     private var lpCutoffHz: Float = 25.0
@@ -73,7 +73,7 @@ final class SensorFusionEngine {
         }
     }
 
-    func ingest(_ sample: SensorSample, activeSources: Set<String>) -> FusedImpact? {
+    func ingest(_ sample: SensorSample, activeSources: Set<SensorID>) -> FusedImpact? {
         let now = sample.timestamp
 
         let hp = hpFilterForSource(sample.source)
@@ -161,14 +161,14 @@ final class SensorFusionEngine {
         return FusedImpact(timestamp: now, amplitude: fused, confidence: confidence)
     }
 
-    private func hpFilterForSource(_ source: String) -> HighPassFilter {
+    private func hpFilterForSource(_ source: SensorID) -> HighPassFilter {
         if let existing = hpFiltersBySource[source] { return existing }
         let filter = HighPassFilter(cutoffHz: hpCutoffHz, sampleRate: 50.0)
         hpFiltersBySource[source] = filter
         return filter
     }
 
-    private func lpFilterForSource(_ source: String) -> LowPassFilter {
+    private func lpFilterForSource(_ source: SensorID) -> LowPassFilter {
         if let existing = lpFiltersBySource[source] { return existing }
         let filter = LowPassFilter(cutoffHz: lpCutoffHz, sampleRate: 50.0)
         lpFiltersBySource[source] = filter
@@ -195,7 +195,7 @@ final class SensorFusionEngine {
         }
     }
 
-    private func candidatePeaks(activeSources: Set<String>) -> [(source: String, vector: Vec3, magnitude: Float)] {
+    private func candidatePeaks(activeSources: Set<SensorID>) -> [(source: SensorID, vector: Vec3, magnitude: Float)] {
         activeSources.compactMap { source in
             guard sampleCountBySource[source, default: 0] >= config.minWarmupSamples else { return nil }
             guard let peak = bySource[source]?.max(by: { $0.value.magnitude < $1.value.magnitude }) else {
