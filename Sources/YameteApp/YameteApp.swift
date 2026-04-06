@@ -1,5 +1,8 @@
 import SwiftUI
 import AppKit
+#if canImport(ResponseKit)
+import ResponseKit
+#endif
 
 @main
 struct YameteApp: App {
@@ -30,11 +33,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        controller.start()
+        migrateDeviceDefaults()
+        controller.bootstrap()
 
         if !UserDefaults.standard.bool(forKey: Self.firstLaunchKey) {
             UserDefaults.standard.set(true, forKey: Self.firstLaunchKey)
             controller.playWelcomeSound()
         }
+    }
+
+    /// Migrate from "empty = all" to "empty = none" by populating device arrays.
+    private func migrateDeviceDefaults() {
+        let d = UserDefaults.standard
+        let key = "deviceSettingsVersion"
+        guard d.integer(forKey: key) < 1 else { return }
+
+        if settings.enabledSensorIDs.isEmpty {
+            settings.enabledSensorIDs = controller.allAdapters
+                .filter { $0.isAvailable }
+                .map(\.id.rawValue)
+        }
+        if settings.enabledDisplays.isEmpty {
+            settings.enabledDisplays = NSScreen.screens.map { $0.displayID }
+        }
+        if settings.enabledAudioDevices.isEmpty {
+            if let uid = AudioDeviceManager.defaultDeviceUID {
+                settings.enabledAudioDevices = [uid]
+            }
+        }
+        d.set(1, forKey: key)
     }
 }

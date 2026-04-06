@@ -11,6 +11,10 @@ public struct AppLog: Sendable {
 
     private static let subsystem = Bundle.main.bundleIdentifier ?? "com.studnicky.yamete"
 
+    /// Controls whether debug-level messages are written to the file log.
+    /// Info, warning, and error always log. Set from the UI debug logging toggle.
+    public nonisolated(unsafe) static var debugEnabled: Bool = false
+
     public init(category: String) {
         osLog = Logger(subsystem: Self.subsystem, category: category)
         self.category = category
@@ -23,6 +27,7 @@ public struct AppLog: Sendable {
 
     public func debug(_ message: String) {
         osLog.debug("\(message, privacy: .public)")
+        guard Self.debugEnabled else { return }
         LogStore.shared.append("DEBUG", category, message)
     }
 
@@ -70,11 +75,11 @@ public final class LogStore: @unchecked Sendable {
     }()
 
     private init() {
-        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            fatalError("Application Support directory unavailable")
-        }
+        let fm = FileManager.default
+        let support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fm.temporaryDirectory
         directory = support.appendingPathComponent("Yamete/logs", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
         queue.sync {
             pruneStaleFiles()
             rotateIfNeeded()

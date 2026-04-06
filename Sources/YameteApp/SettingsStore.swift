@@ -18,9 +18,9 @@ final class SettingsStore {
         case screenFlash
         case flashOpacityMin, flashOpacityMax
         case volumeMin, volumeMax
-        case enabledDisplays, enabledAudioDevices
+        case soundEnabled, debugLogging, enabledDisplays, enabledAudioDevices, enabledSensorIDs
         // Advanced detection
-        case spikeThreshold, crestFactor, riseRate, confirmations, warmupSamples
+        case spikeThreshold, crestFactor, riseRate, confirmations, warmupSamples, reportInterval, consensusRequired
     }
 
     // MARK: - Defaults
@@ -31,6 +31,8 @@ final class SettingsStore {
         Key.bandpassLowHz.rawValue:   20.0,
         Key.bandpassHighHz.rawValue:  25.0,
         Key.debounce.rawValue:        0.5,
+        Key.soundEnabled.rawValue:    true,
+        Key.debugLogging.rawValue:    false,
         Key.screenFlash.rawValue:     true,
         Key.flashOpacityMin.rawValue: 0.50,
         Key.flashOpacityMax.rawValue: 0.9,
@@ -38,12 +40,15 @@ final class SettingsStore {
         Key.volumeMax.rawValue:       0.9,
         Key.enabledDisplays.rawValue: [Int](),
         Key.enabledAudioDevices.rawValue: [String](),
+        Key.enabledSensorIDs.rawValue: [String](),
         // Advanced detection
         Key.spikeThreshold.rawValue:  0.020,
-        Key.crestFactor.rawValue:     4.0,
+        Key.crestFactor.rawValue:     1.5,
         Key.riseRate.rawValue:        0.010,
         Key.confirmations.rawValue:   3,
         Key.warmupSamples.rawValue:   50,
+        Key.reportInterval.rawValue:  10000.0,
+        Key.consensusRequired.rawValue: 1,
     ]
 
     // MARK: - Reactivity (inverted sensitivity: higher value = lower force threshold)
@@ -103,7 +108,21 @@ final class SettingsStore {
         }
     }
 
-    // MARK: - Screen flash toggle
+    // MARK: - Response toggles
+
+    var soundEnabled: Bool {
+        didSet {
+            guard soundEnabled != oldValue else { return }
+            persist(soundEnabled, .soundEnabled)
+        }
+    }
+
+    var debugLogging: Bool {
+        didSet {
+            guard debugLogging != oldValue else { return }
+            persist(debugLogging, .debugLogging)
+        }
+    }
 
     var screenFlash: Bool {
         didSet {
@@ -174,6 +193,14 @@ final class SettingsStore {
         }
     }
 
+    /// SensorAdapter IDs to enable. Empty = all available adapters.
+    var enabledSensorIDs: [String] {
+        didSet {
+            guard enabledSensorIDs != oldValue else { return }
+            persist(enabledSensorIDs, .enabledSensorIDs)
+        }
+    }
+
     // MARK: - Advanced detection
 
     var spikeThreshold: Double {
@@ -188,7 +215,7 @@ final class SettingsStore {
     var crestFactor: Double {
         didSet {
             guard crestFactor != oldValue else { return }
-            let c = crestFactor.clamped(to: 2.0...10.0)
+            let c = crestFactor.clamped(to: 1.0...5.0)
             if c != crestFactor { crestFactor = c; return }
             persist(crestFactor, .crestFactor)
         }
@@ -221,6 +248,26 @@ final class SettingsStore {
         }
     }
 
+    /// Sensor report interval in microseconds (5000 = 200Hz, 10000 = 100Hz, 50000 = 20Hz).
+    var reportInterval: Double {
+        didSet {
+            guard reportInterval != oldValue else { return }
+            let c = reportInterval.clamped(to: 5000...50000)
+            if c != reportInterval { reportInterval = c; return }
+            persist(reportInterval, .reportInterval)
+        }
+    }
+
+    /// Number of sensors required to independently detect an impact before triggering.
+    var consensusRequired: Int {
+        didSet {
+            guard consensusRequired != oldValue else { return }
+            let c = max(1, min(10, consensusRequired))
+            if c != consensusRequired { consensusRequired = c; return }
+            persist(consensusRequired, .consensusRequired)
+        }
+    }
+
     // MARK: - Init
 
     init() {
@@ -232,6 +279,8 @@ final class SettingsStore {
         bandpassLowHz   = d.double(forKey: Key.bandpassLowHz.rawValue)
         bandpassHighHz  = d.double(forKey: Key.bandpassHighHz.rawValue)
         debounce        = d.double(forKey: Key.debounce.rawValue)
+        soundEnabled    = d.bool(forKey:   Key.soundEnabled.rawValue)
+        debugLogging    = d.bool(forKey:   Key.debugLogging.rawValue)
         screenFlash     = d.bool(forKey:   Key.screenFlash.rawValue)
         flashOpacityMin = d.double(forKey: Key.flashOpacityMin.rawValue)
         flashOpacityMax = d.double(forKey: Key.flashOpacityMax.rawValue)
@@ -239,12 +288,15 @@ final class SettingsStore {
         volumeMax       = d.double(forKey: Key.volumeMax.rawValue)
         enabledDisplays = d.array(forKey: Key.enabledDisplays.rawValue) as? [Int] ?? []
         enabledAudioDevices = d.array(forKey: Key.enabledAudioDevices.rawValue) as? [String] ?? []
+        enabledSensorIDs = d.array(forKey: Key.enabledSensorIDs.rawValue) as? [String] ?? []
         // Advanced
         spikeThreshold  = d.double(forKey: Key.spikeThreshold.rawValue)
         crestFactor     = d.double(forKey: Key.crestFactor.rawValue)
         riseRate        = d.double(forKey: Key.riseRate.rawValue)
         confirmations   = d.integer(forKey: Key.confirmations.rawValue)
         warmupSamples   = d.integer(forKey: Key.warmupSamples.rawValue)
+        reportInterval  = d.double(forKey: Key.reportInterval.rawValue)
+        consensusRequired = d.integer(forKey: Key.consensusRequired.rawValue)
     }
 
     // MARK: - Private
