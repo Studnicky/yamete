@@ -3,41 +3,52 @@ import YameteCore
 #endif
 import Foundation
 
-// MARK: - SensorAdapter Protocol
+// MARK: - API Classification
 
-/// Interface for adapters that stream normalized accelerometer samples.
-public protocol SensorAdapter: AnyObject, Sendable {
-    /// Stable identifier for this adapter (used as dictionary key in fusion engine).
-    var id: SensorID { get }
-
-    /// Human-readable name for logging and UI (e.g., "Apple SPU Accelerometer").
-    var name: String { get }
-
-    /// Whether this adapter's hardware is present on this machine.
-    /// Called during discovery and should be fast.
-    var isAvailable: Bool { get }
-
-    /// Returns a stream of normalized Vec3 samples in g-force.
-    /// - Throws on sensor failure (permission denied, device lost, etc.)
-    /// - Terminates when the consuming task is cancelled.
-    func samples() -> AsyncThrowingStream<Vec3, Error>
+/// Whether a sensor adapter uses public or private macOS APIs.
+public enum APIClassification: String, Sendable, CustomStringConvertible {
+    case publicAPI = "Public"
+    case privateAPI = "Private"
+    public var description: String { rawValue }
 }
 
-// MARK: - SensorSample
+// MARK: - SensorAdapter Protocol
 
-/// A normalized sample with source and timestamp, ready for fan-in/fusion.
-public struct SensorSample: Sendable {
-    public init(source: SensorID, timestamp: Date, value: Vec3) { self.source = source; self.timestamp = timestamp; self.value = value }
+/// Interface for adapters that detect impacts from a specific sensor.
+/// Each adapter runs its own sensor-specific detection pipeline internally
+/// (preprocessing, gating, thresholding) and emits impact events with 0–1 intensity.
+public protocol SensorAdapter: AnyObject, Sendable {
+    var id: SensorID { get }
+    var name: String { get }
+    var apiClassification: APIClassification { get }
+    var isAvailable: Bool { get }
+
+    /// Returns a stream of detected impacts. Each adapter applies its own
+    /// sensor-specific preprocessing and detection gates internally.
+    /// Intensity is 0–1 where the scale is specific to this sensor type:
+    /// 0 = weakest detectable impact, 1 = strongest expected impact.
+    func impacts() -> AsyncThrowingStream<SensorImpact, Error>
+}
+
+// MARK: - SensorImpact
+
+/// An impact detected by a single sensor adapter.
+public struct SensorImpact: Sendable {
     public let source: SensorID
     public let timestamp: Date
-    public let value: Vec3
+    /// 0–1 intensity relative to this sensor's detection range.
+    public let intensity: Float
+
+    public init(source: SensorID, timestamp: Date, intensity: Float) {
+        self.source = source; self.timestamp = timestamp; self.intensity = intensity
+    }
 }
 
 // MARK: - SensorEvent
 
 /// Events emitted by `SensorManager`.
 public enum SensorEvent: Sendable {
-    case sample(SensorSample)
+    case impact(SensorImpact)
     case error(String)
     case adaptersChanged(ids: Set<SensorID>, names: [String])
 }
@@ -66,7 +77,7 @@ public enum SensorError: Error, LocalizedError, Sendable {
 
 // MARK: - SensorManager
 
-/// Discovers adapters and fans in all available streams concurrently.
+/// Discovers adapters and fans in all impact streams concurrently.
 @MainActor
 public final class SensorManager {
     private let adapters: [any SensorAdapter]
@@ -76,14 +87,11 @@ public final class SensorManager {
         self.adapters = adapters
     }
 
-    /// Returns a stream of sensor events.
-    /// All available adapters are started concurrently and merged into one stream.
     public func events() -> AsyncStream<SensorEvent> {
         let adapters = self.adapters.filter { $0.isAvailable }
         let log = self.log
 
         let (stream, continuation) = AsyncStream.makeStream(of: SensorEvent.self)
-
         let activeTracker = ActiveAdapterTracker(adapters: adapters)
 
         let task = Task {
@@ -101,12 +109,8 @@ public final class SensorManager {
                     group.addTask {
                         do {
                             log.info("activity:SensorDiscovery selected entity:Adapter name=\(adapter.name)")
-                            for try await vec in adapter.samples() {
-                                continuation.yield(.sample(SensorSample(
-                                    source: adapter.id,
-                                    timestamp: Date(),
-                                    value: vec
-                                )))
+                            for try await impact in adapter.impacts() {
+                                continuation.yield(.impact(impact))
                             }
                         } catch is CancellationError {
                             return
@@ -119,7 +123,6 @@ public final class SensorManager {
                         continuation.yield(.adaptersChanged(ids: remainingIDs, names: remainingNames.sorted()))
                     }
                 }
-
                 await group.waitForAll()
             }
         }
@@ -133,7 +136,7 @@ private actor ActiveAdapterTracker {
     private var activeIDs: Set<SensorID>
     private var namesByID: [SensorID: String]
 
-    public init(adapters: [any SensorAdapter]) {
+    init(adapters: [any SensorAdapter]) {
         activeIDs = Set(adapters.map(\.id))
         namesByID = Dictionary(uniqueKeysWithValues: adapters.map { ($0.id, $0.name) })
     }

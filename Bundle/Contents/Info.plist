@@ -30,9 +30,13 @@
     <string>© 2026 Studnicky</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>NSMotionUsageDescription</key>
     <string>Yamete uses the accelerometer to detect physical impacts on your MacBook.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Yamete can use the microphone to detect impact sounds on your desk.</string>
 </dict>
 </plist>
