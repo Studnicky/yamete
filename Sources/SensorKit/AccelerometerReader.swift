@@ -4,29 +4,46 @@ import YameteCore
 import Foundation
 import IOKit.hid
 
-// MARK: - IOHIDEventSystem bindings (private but stable macOS API)
+// MARK: - SPUAccelerometerAdapter
 //
-// On macOS 15+, the SPU accelerometer is a motion-restricted HID event service.
-// Raw IOHIDManager reports are not delivered for restricted services. Instead,
-// we use IOHIDEventSystemClient (type 1/monitor) which:
-//   1. Matches the service by UsagePage=0xFF00, Usage=3
-//   2. Sets ReportInterval on the service to activate the sensor
-//   3. Receives structured IOHIDEvent callbacks with acceleration vectors
+// Reads the BMI286 accelerometer via a hybrid approach:
+//
+//   Activation:  IOHIDServiceClientSetProperty("ReportInterval") — this is the only
+//                way to wake the SPU sensor. IOHIDDeviceSetProperty does NOT propagate
+//                to the SPU service. These bindings use @_silgen_name for the service
+//                property functions only.
+//
+//   Reading:     IOHIDManager + IOHIDDeviceRegisterInputReportCallback — fully public
+//                IOKit C API. Works under App Sandbox with device.usb entitlement.
+//
+// The sensor appears as a vendor-defined HID device:
+//   PrimaryUsagePage = 0xFF00, PrimaryUsage = 3, Transport = "SPU"
+//
+// Raw reports are 22 bytes:
+//   Bytes  0–1:  uint16 LE sample counter (increments by 8 per sample at 10ms)
+//   Bytes  2–5:  padding (zeros)
+//   Bytes  6–9:  int32 LE X acceleration (unit: 1/65536 g)
+//   Bytes 10–13: int32 LE Y acceleration (unit: 1/65536 g)
+//   Bytes 14–17: int32 LE Z acceleration (unit: 1/65536 g)
+//   Bytes 18–21: configuration/status (constant)
+//
+// App Sandbox: Requires com.apple.security.device.usb entitlement.
 
 private let log = AppLog(category: "Accelerometer")
 
+// MARK: - SPU service activation bindings
+//
+// The SPU accelerometer requires ReportInterval to be set on the IOHIDServiceClient
+// (the kernel-side service), not the user-space IOHIDDevice. These are the minimal
+// bindings needed to activate/deactivate the sensor. Everything else uses public API.
+
 private typealias IOHIDEventSystemClientRef = OpaquePointer
 private typealias IOHIDServiceClientRef = OpaquePointer
-private typealias IOHIDEventRef = OpaquePointer
 
 @_silgen_name("IOHIDEventSystemClientCreateWithType")
 private func IOHIDEventSystemClientCreateWithType(
     _ allocator: CFAllocator?, _ type: Int32, _ properties: CFDictionary?
 ) -> IOHIDEventSystemClientRef?
-
-@_silgen_name("IOHIDEventSystemClientScheduleWithDispatchQueue")
-private func IOHIDEventSystemClientScheduleWithDispatchQueue(
-    _ client: IOHIDEventSystemClientRef, _ queue: DispatchQueue)
 
 @_silgen_name("IOHIDEventSystemClientSetMatching")
 private func IOHIDEventSystemClientSetMatching(
@@ -45,25 +62,8 @@ private func IOHIDServiceClientSetProperty(
 private func IOHIDServiceClientCopyProperty(
     _ service: IOHIDServiceClientRef, _ key: CFString) -> CFTypeRef?
 
-private typealias IOHIDEventCallback = @convention(c) (
-    UnsafeMutableRawPointer?, UnsafeMutableRawPointer?,
-    UnsafeMutableRawPointer?, IOHIDEventRef) -> Void
-
-@_silgen_name("IOHIDEventSystemClientRegisterEventCallback")
-private func IOHIDEventSystemClientRegisterEventCallback(
-    _ client: IOHIDEventSystemClientRef, _ callback: IOHIDEventCallback,
-    _ target: UnsafeMutableRawPointer?, _ refcon: UnsafeMutableRawPointer?)
-
-@_silgen_name("IOHIDEventGetType")
-private func IOHIDEventGetType(_ event: IOHIDEventRef) -> Int32
-
-@_silgen_name("IOHIDEventGetFloatValue")
-private func IOHIDEventGetFloatValue(_ event: IOHIDEventRef, _ field: Int32) -> Double
-
-// MARK: - SPUAccelerometerAdapter
-
-/// Reads BMI286 accelerometer via IOHIDEventSystemClient and streams Vec3 samples.
-/// Callbacks arrive on a dedicated dispatch queue; samples forwarded via continuation.
+/// Reads BMI286 accelerometer via IOHIDManager (public API) and streams Vec3 samples.
+/// Sensor activation uses IOHIDServiceClient to set ReportInterval on the SPU service.
 public final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
     public let id = SensorID("spu-accelerometer")
@@ -71,138 +71,218 @@ public final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
     public init() {}
 
-    /// IOHIDEventSystemClient type: 1 = monitor mode (can read events from services)
-    private let clientType: Int32 = 1
     /// HID Usage Page 0xFF00: vendor-defined page used by Apple motion sensors
     private let pageAccel: Int = 0xFF00
     /// HID Usage 3: accelerometer within the vendor motion sensor page
     private let usageAccel: Int = 3
-    /// Sensor report interval in microseconds (10000 = 10ms = 100Hz sample rate)
+    /// Transport identifier for the SPU (Sensor Processing Unit) accelerometer
+    private let requiredTransport = "SPU"
+    /// Sensor report interval in microseconds (10000 = 10ms = 100 Hz sample rate)
     private let reportIntervalUS: Int = 10000
-    /// IOHIDEvent type for accelerometer data (empirically confirmed on macOS 15)
-    private let accelEventType: Int32 = 13
+    /// IOHIDEventSystemClient type: 1 = monitor mode (can access services)
+    private let clientType: Int32 = 1
     /// Skip every other sample (100Hz → 50Hz effective rate)
     private let decimationFactor = 2
     /// Reject samples below 0.3g (sensor noise floor)
     private let magnitudeMin: Float = 0.3
     /// Reject samples above 4.0g (corrupt/impossible data)
     private let magnitudeMax: Float = 4.0
+    /// Minimum report length in bytes
+    private let minReportLength = 18
+    /// Scale factor: raw int32 values are in units of 1/65536 g
+    private let rawScale: Float = 65536.0
 
     // MARK: - SensorAdapter
 
     public var isAvailable: Bool {
-        guard let c = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault, clientType, nil) else { return false }
-        let matching: [String: Any] = ["PrimaryUsagePage": pageAccel, "PrimaryUsage": usageAccel]
-        IOHIDEventSystemClientSetMatching(c, matching as CFDictionary)
-        guard let services = IOHIDEventSystemClientCopyServices(c) else { return false }
-        for i in 0..<CFArrayGetCount(services) {
-            let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClientRef.self)
-            let transport = IOHIDServiceClientCopyProperty(svc, "Transport" as CFString)
-            if "\(transport ?? ("" as CFString))" == "SPU" { return true }
-        }
-        return false
+        let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
+        IOHIDManagerSetDeviceMatching(manager, matchingDict)
+        guard let devices = IOHIDManagerCopyDevices(manager) else { return false }
+        return findSPUDevice(in: devices) != nil
     }
 
     public func samples() -> AsyncThrowingStream<Vec3, Error> {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: Vec3.self)
 
-        let ctx = EventContext(
-            continuation: continuation,
-            accelEventType: accelEventType,
-            decimationFactor: decimationFactor,
-            magnitudeMin: magnitudeMin,
-            magnitudeMax: magnitudeMax
-        )
-
-        guard let c = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault, clientType, nil) else {
+        // Step 1: Activate the SPU sensor via IOHIDServiceClient
+        guard let svcClient = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault, clientType, nil) else {
             continuation.finish(throwing: SensorError.deviceNotFound)
             return stream
         }
-        ctx.client = c
+        let svcMatching: [String: Any] = ["PrimaryUsagePage": pageAccel, "PrimaryUsage": usageAccel]
+        IOHIDEventSystemClientSetMatching(svcClient, svcMatching as CFDictionary)
 
-        let matching: [String: Any] = ["PrimaryUsagePage": pageAccel, "PrimaryUsage": usageAccel]
-        IOHIDEventSystemClientSetMatching(c, matching as CFDictionary)
+        guard let services = IOHIDEventSystemClientCopyServices(svcClient) else {
+            continuation.finish(throwing: SensorError.deviceNotFound)
+            return stream
+        }
 
         var activated = false
-        if let services = IOHIDEventSystemClientCopyServices(c) {
-            for i in 0..<CFArrayGetCount(services) {
-                let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClientRef.self)
-                let transport = IOHIDServiceClientCopyProperty(svc, "Transport" as CFString)
-                if "\(transport ?? ("" as CFString))" == "SPU" {
-                    IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, reportIntervalUS as CFNumber)
-                    activated = true
-                    let serial = IOHIDServiceClientCopyProperty(svc, "SerialNumber" as CFString) ?? ("" as CFString)
-                    log.info("entity:AccelDevice wasAssociatedWith agent:SPUAccelerometerAdapter serial=\(serial) interval=\(reportIntervalUS)us")
-                }
+        for i in 0..<CFArrayGetCount(services) {
+            let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClientRef.self)
+            let transport = IOHIDServiceClientCopyProperty(svc, "Transport" as CFString)
+            if "\(transport ?? ("" as CFString))" == requiredTransport {
+                IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, reportIntervalUS as CFNumber)
+                activated = true
             }
         }
 
-        if !activated {
+        guard activated else {
             continuation.finish(throwing: SensorError.deviceNotFound)
             return stream
         }
 
-        let ctxPtr = Unmanaged.passRetained(ctx)
-        let eventCallback: IOHIDEventCallback = { _, refcon, _, event in
-            guard let refcon else { return }
-            let ctx = Unmanaged<EventContext>.fromOpaque(refcon).takeUnretainedValue()
-            ctx.handleEvent(event)
+        // Step 2: Open the device via public IOHIDManager for report reading
+        let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
+        let openResult = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        guard openResult == kIOReturnSuccess else {
+            let msg = String(format: "0x%08x", openResult)
+            log.warning("activity:SensorReading failed IOHIDManagerOpen status=\(msg)")
+            continuation.finish(throwing: SensorError.ioKitError(msg))
+            return stream
         }
-        IOHIDEventSystemClientRegisterEventCallback(c, eventCallback, nil, ctxPtr.toOpaque())
 
-        let q = DispatchQueue(label: "com.yamete.accelerometer", qos: .userInteractive)
-        ctx.queue = q
-        IOHIDEventSystemClientScheduleWithDispatchQueue(c, q)
+        IOHIDManagerSetDeviceMatching(manager, matchingDict)
+
+        guard let devices = IOHIDManagerCopyDevices(manager),
+              let device = findSPUDevice(in: devices) else {
+            IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            continuation.finish(throwing: SensorError.deviceNotFound)
+            return stream
+        }
+
+        let devOpenResult = IOHIDDeviceOpen(device, IOOptionBits(kIOHIDOptionsTypeNone))
+        guard devOpenResult == kIOReturnSuccess else {
+            let msg = String(format: "0x%08x", devOpenResult)
+            IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            continuation.finish(throwing: SensorError.ioKitError(msg))
+            return stream
+        }
+
+        let serial = IOHIDDeviceGetProperty(device, kIOHIDSerialNumberKey as CFString) ?? ("" as CFString)
+        log.info("entity:AccelDevice wasAssociatedWith agent:SPUAccelerometerAdapter serial=\(serial) interval=\(reportIntervalUS)us")
+
+        let maxSize = IOHIDDeviceGetProperty(device, kIOHIDMaxInputReportSizeKey as CFString) as? Int ?? 64
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxSize)
+        buffer.initialize(repeating: 0, count: maxSize)
+
+        let ctx = ReportContext(
+            continuation: continuation,
+            decimationFactor: decimationFactor,
+            magnitudeMin: magnitudeMin,
+            magnitudeMax: magnitudeMax,
+            minReportLength: minReportLength,
+            rawScale: rawScale
+        )
+        let ctxPtr = Unmanaged.passRetained(ctx)
+
+        IOHIDDeviceRegisterInputReportCallback(
+            device, buffer, maxSize,
+            { context, result, sender, type, reportID, report, reportLength in
+                guard let context else { return }
+                let ctx = Unmanaged<ReportContext>.fromOpaque(context).takeUnretainedValue()
+                ctx.handleReport(report: report, length: reportLength)
+            },
+            ctxPtr.toOpaque()
+        )
+
+        // Schedule manager on a dedicated run loop thread for report delivery
+        let thread = HIDRunLoopThread()
+        thread.start()
+        while thread.runLoop == nil { Thread.sleep(forTimeInterval: 0.001) }
+        let runLoop = thread.runLoop!
+        IOHIDManagerScheduleWithRunLoop(manager, runLoop, CFRunLoopMode.defaultMode!.rawValue)
 
         log.info("activity:SensorReading wasStartedBy agent:SPUAccelerometerAdapter")
 
-        // Cleanup: invalidate context before releasing the Unmanaged pointer
-        // to prevent callbacks from accessing freed memory.
-        // OpaquePointer is safe to send — it's a raw CFType pointer with no mutable Swift state.
-        let clientHandle = SendablePointer(c)
+        // Wrap cleanup resources for safe @Sendable capture
+        let cleanup = CleanupState(
+            manager: manager, device: device, buffer: buffer,
+            maxSize: maxSize, runLoop: runLoop, thread: thread,
+            ctxPtr: ctxPtr, ctx: ctx,
+            svcClient: svcClient, services: services
+        )
+
         continuation.onTermination = { @Sendable _ in
-            ctx.invalidate()
-            if let services = IOHIDEventSystemClientCopyServices(clientHandle.pointer) {
-                for i in 0..<CFArrayGetCount(services) {
-                    let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClientRef.self)
-                    IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, 0 as CFNumber)
-                }
-            }
-            ctxPtr.release()
+            cleanup.perform()
             log.info("activity:SensorReading wasEndedBy agent:SPUAccelerometerAdapter")
         }
 
         return stream
     }
+
+    // MARK: - Helpers
+
+    private var matchingDict: CFDictionary {
+        [
+            kIOHIDPrimaryUsagePageKey as String: pageAccel,
+            kIOHIDPrimaryUsageKey as String: usageAccel,
+        ] as CFDictionary
+    }
+
+    private func findSPUDevice(in devices: CFSet) -> IOHIDDevice? {
+        let count = CFSetGetCount(devices)
+        var values = [UnsafeRawPointer?](repeating: nil, count: count)
+        CFSetGetValues(devices, &values)
+
+        for v in values {
+            guard let v else { continue }
+            let device = Unmanaged<IOHIDDevice>.fromOpaque(v).takeUnretainedValue()
+            let transport = IOHIDDeviceGetProperty(device, kIOHIDTransportKey as CFString) as? String
+            if transport == requiredTransport { return device }
+        }
+        return nil
+    }
 }
 
-// MARK: - Sendable pointer wrapper
+// MARK: - Cleanup state
 
-/// Wraps an OpaquePointer for safe capture in @Sendable closures.
-/// The wrapped pointer is a CFType reference — no mutable Swift state.
-private struct SendablePointer: @unchecked Sendable {
-    let pointer: OpaquePointer
-    init(_ pointer: OpaquePointer) { self.pointer = pointer }
+/// Bundles all resources needed for teardown into a single @unchecked Sendable value.
+private struct CleanupState: @unchecked Sendable {
+    let manager: IOHIDManager
+    let device: IOHIDDevice
+    let buffer: UnsafeMutablePointer<UInt8>
+    let maxSize: Int
+    let runLoop: CFRunLoop
+    let thread: HIDRunLoopThread
+    let ctxPtr: Unmanaged<ReportContext>
+    let ctx: ReportContext
+    let svcClient: IOHIDEventSystemClientRef
+    let services: CFArray
+
+    func perform() {
+        ctx.invalidate()
+
+        // Deactivate SPU sensor via service property
+        for i in 0..<CFArrayGetCount(services) {
+            let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClientRef.self)
+            IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, 0 as CFNumber)
+        }
+
+        IOHIDDeviceRegisterInputReportCallback(device, buffer, maxSize, nil, nil)
+        IOHIDManagerUnscheduleFromRunLoop(manager, runLoop, CFRunLoopMode.defaultMode!.rawValue)
+        CFRunLoopStop(runLoop)
+        thread.cancel()
+        IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
+        IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        buffer.deallocate()
+        ctxPtr.release()
+    }
 }
 
-// MARK: - Event callback context
+// MARK: - Report decode context
 
-/// Bridges IOHIDEventSystem callbacks to the AsyncThrowingStream continuation.
-/// All mutable state is confined to the dispatch queue that IOHIDEventSystem delivers on.
-/// The `@unchecked Sendable` is safe because `handleEvent` is only called from that queue,
-/// and `invalidate`/`client` are only accessed from `onTermination` after callbacks stop.
-private final class EventContext: @unchecked Sendable {
+/// Bridges IOHIDDevice input report callbacks to the AsyncThrowingStream continuation.
+/// All mutable state is confined to the run loop thread that IOHIDManager delivers on.
+private final class ReportContext: @unchecked Sendable {
     let continuation: AsyncThrowingStream<Vec3, Error>.Continuation
-    let accelEventType: Int32
     let decimationFactor: Int
     let magnitudeMin: Float
     let magnitudeMax: Float
+    let minReportLength: Int
+    let rawScale: Float
 
-    var client: IOHIDEventSystemClientRef?
-    var queue: DispatchQueue?
     private var running = true
-
-    // Callback-queue-confined state (only accessed from handleEvent on the HID queue)
     private var sampleCounter = 0
     #if DEBUG
     private var peakMag: Float = 0
@@ -210,36 +290,34 @@ private final class EventContext: @unchecked Sendable {
     #endif
 
     init(continuation: AsyncThrowingStream<Vec3, Error>.Continuation,
-         accelEventType: Int32, decimationFactor: Int,
-         magnitudeMin: Float, magnitudeMax: Float) {
+         decimationFactor: Int, magnitudeMin: Float, magnitudeMax: Float,
+         minReportLength: Int, rawScale: Float) {
         self.continuation = continuation
-        self.accelEventType = accelEventType
         self.decimationFactor = decimationFactor
         self.magnitudeMin = magnitudeMin
         self.magnitudeMax = magnitudeMax
+        self.minReportLength = minReportLength
+        self.rawScale = rawScale
     }
 
-    /// Called before releasing the Unmanaged pointer to prevent use-after-free.
-    func invalidate() {
-        running = false
-        client = nil
-    }
+    func invalidate() { running = false }
 
-    func handleEvent(_ event: IOHIDEventRef) {
-        guard running else { return }
-
-        let eventType = IOHIDEventGetType(event)
-        guard eventType == accelEventType else { return }
+    func handleReport(report: UnsafeMutablePointer<UInt8>, length: Int) {
+        guard running, length >= minReportLength else { return }
 
         sampleCounter += 1
         guard sampleCounter % decimationFactor == 0 else { return }
 
-        let base = accelEventType << 16
-        let x = Float(IOHIDEventGetFloatValue(event, base | 0))
-        let y = Float(IOHIDEventGetFloatValue(event, base | 1))
-        let z = Float(IOHIDEventGetFloatValue(event, base | 2))
+        // Decode int32 LE at byte offsets 6, 10, 14 and scale to g-force
+        let rawX = report.advanced(by: 6).withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
+        let rawY = report.advanced(by: 10).withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
+        let rawZ = report.advanced(by: 14).withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
 
-        let vec = Vec3(x: x, y: y, z: z)
+        let vec = Vec3(
+            x: Float(rawX) / rawScale,
+            y: Float(rawY) / rawScale,
+            z: Float(rawZ) / rawScale
+        )
         let mag = vec.magnitude
 
         #if DEBUG
@@ -252,5 +330,19 @@ private final class EventContext: @unchecked Sendable {
 
         guard mag > magnitudeMin && mag < magnitudeMax else { return }
         continuation.yield(vec)
+    }
+}
+
+// MARK: - HID run loop thread
+
+/// Dedicated thread with its own CFRunLoop for IOHIDManager callbacks.
+private final class HIDRunLoopThread: Thread, @unchecked Sendable {
+    private(set) var runLoop: CFRunLoop?
+
+    override func main() {
+        runLoop = CFRunLoopGetCurrent()
+        while !isCancelled {
+            CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0.25, false)
+        }
     }
 }
