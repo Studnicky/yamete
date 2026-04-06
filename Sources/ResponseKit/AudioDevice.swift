@@ -15,13 +15,14 @@ public struct AudioOutputDevice: Identifiable, Sendable {
 
 public enum AudioDeviceManager {
 
-    /// Returns all audio devices that have at least one output channel.
+    /// Returns physical audio output devices (excludes aggregate and virtual devices).
     public static func outputDevices() -> [AudioOutputDevice] {
         let deviceIDs = allDeviceIDs()
 
         var results: [AudioOutputDevice] = []
         for deviceID in deviceIDs {
             guard outputChannelCount(deviceID) > 0 else { continue }
+            guard !isAggregateDevice(deviceID) else { continue }
             guard let uid = stringProperty(deviceID, selector: kAudioDevicePropertyDeviceUID),
                   let name = stringProperty(deviceID, selector: kAudioObjectPropertyName)
             else { continue }
@@ -75,6 +76,21 @@ public enum AudioDeviceManager {
             AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &ids
         ) == noErr else { return [] }
         return ids
+    }
+
+    /// Returns true for aggregate or virtual audio devices (Teams, Zoom, Audio MIDI Setup, etc.).
+    private static func isAggregateDevice(_ deviceID: AudioDeviceID) -> Bool {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var transport: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, &transport) == noErr else { return false }
+        // kAudioDeviceTransportTypeAggregate = 'grup', kAudioDeviceTransportTypeVirtual = 'virt'
+        return transport == kAudioDeviceTransportTypeAggregate
+            || transport == kAudioDeviceTransportTypeVirtual
     }
 
     /// Returns the number of output channels for a device (0 = input-only).

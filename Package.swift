@@ -21,6 +21,8 @@ let package = Package(
             path: "Sources/SensorKit",
             linkerSettings: [
                 .linkedFramework("IOKit"),
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("CoreMotion"),
             ]
         ),
 

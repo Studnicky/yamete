@@ -34,18 +34,28 @@ make test         # run test suite
 ## How it works
 
 ```
-BMI286 Accelerometer (100Hz via IOHIDEventSystemClient)
-    Decimation (2:1 to 50Hz)
-    Bandpass filter (HP 20Hz + LP 25Hz: rejects floor vibrations + electronic noise)
-    5-gate detection pipeline:
-      1. Spike threshold (0.020g minimum filtered magnitude)
-      2. Rise rate (peak onset speed within window rejects transmitted vibrations)
-      3. Confirmation count (3+ above-threshold samples in 120ms window)
-      4. Time-based rearm (0.5s cooldown prevents filter ringing retrigger)
-      5. Warmup gate (50 samples for filter settling after start)
-    Impact tier classification (Tap / Light / Medium / Firm / Hard)
-    Reactivity band maps magnitude to 0-1 intensity
+Sensor Adapters (each runs its own detection pipeline):
+    SPU Accelerometer (private API activation + public IOHIDManager reading)
+        100Hz raw → 2:1 decimation → bandpass (HP 20Hz + LP 25Hz)
+        → spike/rise/crest/confirmations gates → SensorImpact (0-1 intensity)
+    HID Accelerometer (public API only, requires external activation)
+        Same pipeline, IOHIDDeviceSetProperty activation attempt
+    Microphone (AVAudioEngine, public API, works on all Macs)
+        48kHz audio → per-buffer peak → DC-blocking HP filter
+        → spike/rise/crest/confirmations gates → SensorImpact (0-1 intensity)
+    Headphone Motion (CoreMotion, AirPods/Beats IMU)
+        userAcceleration magnitude → gates → SensorImpact (0-1 intensity)
+
+Impact Fusion Engine:
+    Collects SensorImpact events within a time window
+    Consensus: N sensors must independently detect (user-configurable, 1-5)
+    Rearm: cooldown between responses (user-configurable)
+    Fused intensity: average across participating sensors
+
+Response:
+    Reactivity band maps fused intensity to 0-1 response intensity
     Intensity drives audio clip selection, volume, flash opacity, and envelope
+    Impact tier classification (Tap / Light / Medium / Firm / Hard)
 ```
 
 ## Configuration
@@ -67,44 +77,52 @@ All settings are in the menu bar dropdown. Main controls use range sliders where
 
 - **Pause / Resume**: Stop/start the detection pipeline.
 - **Launch at Login**: Register with macOS for auto-start.
-- **Auto-Update**: Daily check for new releases on GitHub.
 - **Impact counter**: Shows daily count and last impact tier + magnitude.
 
 ## Distribution
 
-Yamete is distributed as a **notarized DMG** (direct distribution). The app uses private IOHIDEventSystemClient APIs for accelerometer access, which are not available under App Sandbox. App Store distribution is not possible.
-
-Self-updates are verified with SHA256 checksum + codesign + bundle ID + team ID before installation.
+Yamete runs under App Sandbox with the `device.usb` entitlement for accelerometer access via the public IOHIDManager API. Sensor activation uses IOHIDServiceClient property bindings (`@_silgen_name`) to set the SPU report interval — report reading is fully public API.
 
 ## Project structure
 
+Four SPM modules with a clean dependency graph: `YameteCore <- SensorKit, ResponseKit <- YameteApp`.
+
 ```
 Sources/
-  YameteApp.swift             App entry point, menu bar setup
-  Domain.swift                Vec3, ImpactTier, SensorID, AudioDeviceUID, protocols
-  Logging.swift               Dual-sink logger (os.Logger + file, 24h retention)
-  SignalProcessing.swift      RingBuffer, HighPassFilter, LowPassFilter
-  SensorAdapter.swift         SensorAdapter protocol, SensorManager, SensorEvent
-  ImpactDetection.swift       DetectionConfig, ImpactDetectionEngine (5-gate pipeline)
-  AccelerometerReader.swift   BMI286 via IOHIDEventSystemClient (SPU transport)
-  AudioDevice.swift           CoreAudio output device enumeration
-  AudioPlayer.swift           Sound playback, duration-sorted clip selection
-  ScreenFlash.swift           Per-monitor radial vignette overlay
-  SettingsStore.swift         UserDefaults persistence, range validation
-  ImpactController.swift      Coordinator: detect() -> respond() pipeline
-  Updater.swift               GitHub release checker, DMG installer, relaunch
-  Views/
-    MenuBarView.swift         Settings dropdown with accordion panels
-    MenuBarIcon.swift         Menu bar icon
-    SliderRow.swift           Single-value slider component
-    Theme.swift               Color palette, AccordionCard, SettingHeader
-    RangeSlider.swift         Dual-thumb range slider component
+  YameteCore/                 Shared types, logging, signal processing
+    Domain.swift              Vec3, ImpactTier, SensorID, protocols
+    Logging.swift             Dual-sink logger (os.Logger + file, 24h retention)
+    SignalProcessing.swift    RingBuffer, HighPassFilter, LowPassFilter
+
+  SensorKit/                  Sensor adapters, per-adapter detection, fusion
+    SensorAdapter.swift       SensorAdapter protocol, SensorImpact, SensorManager
+    ImpactDetector.swift      Per-adapter gate pipeline (spike, rise, crest, confirmations)
+    ImpactDetection.swift     ImpactFusionEngine (consensus, rearm, response dispatch)
+    AccelerometerReader.swift HID + SPU accelerometer adapters (BMI286 via IOHIDManager)
+    MicrophoneAdapter.swift   Audio transient detection (AVAudioEngine)
+    HeadphoneMotionAdapter.swift AirPods/Beats IMU (CoreMotion)
+
+  ResponseKit/                Audio playback, device enumeration, screen flash
+    AudioDevice.swift         CoreAudio output device enumeration
+    AudioPlayer.swift         Sound playback, duration-sorted clip selection
+    ScreenFlash.swift         Per-monitor radial vignette overlay
+
+  YameteApp/                  App layer: controller, settings, views
+    YameteApp.swift           App entry point, menu bar setup
+    ImpactController.swift    Coordinator: detect() -> respond() pipeline
+    SettingsStore.swift       UserDefaults persistence, range validation
+    Updater.swift             App version display
+    Views/
+      MenuBarView.swift       Settings dropdown with accordion panels
+      MenuBarIcon.swift       Menu bar icon
+      Theme.swift             Color palette, AccordionCard, SettingHeader
+      RangeSlider.swift       Dual-thumb range slider component
 
 Bundle/Contents/Resources/
   faces/                      Face images (any SVG/PNG/JPG, loaded recursively)
   sounds/                     Sound clips (any MP3/WAV/M4A, sorted by duration at startup)
 
-Tests/                        38 tests (unit, integration, E2E)
+Tests/                        41 tests (unit, integration, E2E)
 ```
 
 ## Privacy
