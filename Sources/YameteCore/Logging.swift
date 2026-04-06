@@ -9,7 +9,7 @@ public struct AppLog: Sendable {
     private let osLog: Logger
     private let category: String
 
-    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.yamete"
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.studnicky.yamete"
 
     public init(category: String) {
         osLog = Logger(subsystem: Self.subsystem, category: category)
@@ -41,7 +41,8 @@ public struct AppLog: Sendable {
 
 /// File-based log store with automatic 24-hour retention.
 ///
-/// Writes to `~/Library/Application Support/Yamete/logs/yamete-YYYY-MM-DD.log`.
+/// Writes to `Application Support/Yamete/logs/yamete-YYYY-MM-DD.log`
+/// (sandbox-redirected to the app container when running under App Sandbox).
 /// On startup and at each day boundary, log files older than 24 hours are deleted.
 ///
 /// Thread safety: all mutable state and formatter access is confined to `queue`.
@@ -50,7 +51,7 @@ public final class LogStore: @unchecked Sendable {
 
     private let directory: URL
     private let maxAge: TimeInterval = 24 * 60 * 60
-    private let queue = DispatchQueue(label: "com.yamete.logstore", qos: .utility)
+    private let queue = DispatchQueue(label: "com.studnicky.yamete.logstore", qos: .utility)
     private var fileHandle: FileHandle?
     private var currentDate = ""
 
