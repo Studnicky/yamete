@@ -77,14 +77,6 @@ public struct SensorID: Hashable, Sendable, RawRepresentable, CustomStringConver
     public var description: String { rawValue }
 }
 
-/// Core Audio device UID. Prevents mixing with arbitrary strings.
-public struct AudioDeviceUID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
-    public let rawValue: String
-    public init(rawValue: String) { self.rawValue = rawValue }
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-    public var description: String { rawValue }
-}
-
 // MARK: - Display helpers
 
 extension NSScreen {

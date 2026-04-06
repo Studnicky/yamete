@@ -26,7 +26,7 @@ struct AccordionCard<Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header bar
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() } }) {
+            Button(action: { isExpanded.toggle() }) {
                 HStack(spacing: 6) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.system(size: 9, weight: .bold))
@@ -51,6 +51,7 @@ struct AccordionCard<Content: View>: View {
                     content()
                 }
                 .padding(.top, 4)
+                .transition(.opacity)
             }
         }
         .overlay(
@@ -58,39 +59,49 @@ struct AccordionCard<Content: View>: View {
                 .stroke(Theme.deepRose.opacity(0.25), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 6))
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
         .padding(.horizontal, 8).padding(.vertical, 4)
     }
 }
 
 /// Setting header with icon and tappable inline help.
+/// Tap the icon or title to expand/collapse the help text.
 struct SettingHeader: View {
     let icon: String
     let title: String
     let help: String
     @State private var showHelp = false
+    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
                     .font(.system(size: 10))
-                    .foregroundStyle(Theme.pink)
+                    .foregroundStyle(showHelp ? Theme.lightPink : (isHovered ? Theme.lightPink : Theme.pink))
                     .frame(width: 14)
                 Text(title)
-                    .font(.caption).foregroundStyle(Theme.pink).textCase(.uppercase)
+                    .font(.caption)
+                    .foregroundStyle(showHelp ? Theme.lightPink : (isHovered ? Theme.lightPink : Theme.pink))
+                    .textCase(.uppercase)
                 Spacer()
-                Image(systemName: showHelp ? "questionmark.circle.fill" : "questionmark.circle")
-                    .font(.system(size: 10))
-                    .foregroundStyle(showHelp ? Theme.pink : Color.secondary.opacity(0.5))
-                    .contentShape(Rectangle().size(width: 20, height: 20))
-                    .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { showHelp.toggle() } }
             }
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                isHovered = hovering
+                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .onTapGesture { withAnimation(.easeInOut(duration: 0.15)) { showHelp.toggle() } }
+
             if showHelp {
+                Theme.deepRose.opacity(0.3)
+                    .frame(height: 1)
+                    .padding(.leading, 19).padding(.top, 2)
                 Text(help)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 19)
+                    .padding(.leading, 19).padding(.bottom, 4)
             }
         }
     }

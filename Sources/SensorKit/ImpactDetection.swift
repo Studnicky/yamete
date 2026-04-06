@@ -3,208 +3,102 @@ import YameteCore
 #endif
 import Foundation
 
-private let log = AppLog(category: "ImpactDetection")
+private let log = AppLog(category: "ImpactFusion")
 
-/// Impact detection engine with multi-stage filtering to reject non-impact vibrations.
-///
-/// Pipeline:
-///   1. Bandpass filter (HP + LP) removes gravity, floor vibrations, and electronic noise
-///   2. Spike threshold gates minimum filtered magnitude
-///   3. Crest factor requires peak >> background RMS (rejects sustained vibration)
-///   4. Rise rate requires fast signal onset (rejects slow transmitted vibrations)
-///   5. Confirmation count requires multiple above-threshold samples in the window
-///   6. Time-based rearm prevents retriggering from filter ringing
-/// Configurable detection parameters for the impact detection engine.
-public struct DetectionConfig: Equatable {
-    public var spikeThreshold: Float = 0.020
-    public var minCrestFactor: Float = 4.0
-    public var minRiseRate: Float = 0.010
-    public var minConfirmations: Int = 3
-    public var minRearmDuration: TimeInterval = 0.50
-    public var minWarmupSamples: Int = 50
-    public var bandpassLowHz: Float = 20.0
-    public var bandpassHighHz: Float = 25.0
-    public init(spikeThreshold: Float = 0.020, minCrestFactor: Float = 4.0,
-                minRiseRate: Float = 0.010, minConfirmations: Int = 3,
-                minRearmDuration: TimeInterval = 0.50, minWarmupSamples: Int = 50,
-                bandpassLowHz: Float = 20.0, bandpassHighHz: Float = 25.0) {
-        self.spikeThreshold = spikeThreshold; self.minCrestFactor = minCrestFactor
-        self.minRiseRate = minRiseRate; self.minConfirmations = minConfirmations
-        self.minRearmDuration = minRearmDuration; self.minWarmupSamples = minWarmupSamples
-        self.bandpassLowHz = bandpassLowHz; self.bandpassHighHz = bandpassHighHz
+/// Fusion engine configuration.
+public struct FusionConfig: Equatable {
+    /// Number of sensors that must independently detect an impact within the fusion window.
+    /// Clamped at runtime to never exceed the number of sensors reporting.
+    public var consensusRequired: Int = 1
+    /// Time window for collecting impacts from multiple sensors for consensus.
+    public var fusionWindow: TimeInterval = 0.15
+    /// Minimum time between fused impact responses.
+    public var rearmDuration: TimeInterval = 0.50
+
+    public init(consensusRequired: Int = 1, fusionWindow: TimeInterval = 0.15,
+                rearmDuration: TimeInterval = 0.50) {
+        self.consensusRequired = consensusRequired
+        self.fusionWindow = fusionWindow
+        self.rearmDuration = rearmDuration
     }
 }
 
+/// Fuses impact events from multiple independent sensor adapters.
+///
+/// Each adapter runs its own detection pipeline and emits SensorImpact events.
+/// The fusion engine collects these within a time window, checks consensus
+/// (N sensors must agree), applies rearm timing, and produces a fused result.
 @MainActor
-public final class ImpactDetectionEngine {
+public final class ImpactFusionEngine {
     public struct FusedImpact {
         public let timestamp: Date
-        public let amplitude: Vec3
+        /// Average intensity across participating sensors (0–1).
+        public let intensity: Float
+        /// Fraction of active sensors that detected the impact.
         public let confidence: Float
+        /// Which sensors participated.
+        public let sources: [SensorID]
     }
 
-    private struct SamplePoint {
-        public let timestamp: Date
-        let value: Vec3
-    }
-
-    private let windowDuration: TimeInterval
-    private(set) var config: DetectionConfig
-
-    private var bySource: [SensorID: [SamplePoint]] = [:]
-    private var hpFiltersBySource: [SensorID: HighPassFilter] = [:]
-    private var lpFiltersBySource: [SensorID: LowPassFilter] = [:]
-    private var sampleCountBySource: [SensorID: Int] = [:]
-    private var prevFilteredMagBySource: [SensorID: Float] = [:]
-    private var peakRiseRateBySource: [SensorID: Float] = [:]
+    private(set) var config: FusionConfig
+    private var recentImpacts: [SensorImpact] = []
     private var lastTriggerAt: Date = .distantPast
-    private var hpCutoffHz: Float = 18.0
-    private var lpCutoffHz: Float = 25.0
-    #if DEBUG
-    private var diagCounter = 0
-    private var diagPeakFiltered: Float = 0
-    private var diagPeakRise: Float = 0
-    #endif
 
-    public init(windowDuration: TimeInterval = 0.12, config: DetectionConfig = DetectionConfig()) {
-        self.windowDuration = windowDuration
+    public init(config: FusionConfig = FusionConfig()) {
         self.config = config
     }
 
-    /// Atomically update detection parameters. Recreates bandpass filters only if cutoffs changed.
-    public func configure(_ newConfig: DetectionConfig) {
-        let oldConfig = config
+    public func configure(_ newConfig: FusionConfig) {
         config = newConfig
-        if newConfig.bandpassLowHz != oldConfig.bandpassLowHz {
-            hpCutoffHz = newConfig.bandpassLowHz
-            hpFiltersBySource.removeAll()
-        }
-        if newConfig.bandpassHighHz != oldConfig.bandpassHighHz {
-            lpCutoffHz = newConfig.bandpassHighHz
-            lpFiltersBySource.removeAll()
-        }
     }
 
-    public func ingest(_ sample: SensorSample, activeSources: Set<SensorID>) -> FusedImpact? {
-        let now = sample.timestamp
+    public func reset() {
+        recentImpacts.removeAll()
+        lastTriggerAt = .distantPast
+    }
 
-        let hp = hpFilterForSource(sample.source)
-        let lp = lpFilterForSource(sample.source)
-        let filtered = lp.process(hp.process(sample.value))
-        sampleCountBySource[sample.source, default: 0] += 1
-        let filteredMag = filtered.magnitude
+    /// Ingest an impact event from an adapter. Returns a fused impact if consensus is met.
+    public func ingest(_ impact: SensorImpact, activeSources: Set<SensorID>) -> FusedImpact? {
+        let now = impact.timestamp
 
-        // Rise rate: track peak rise rate in the detection window.
-        // The instantaneous rise rate on the current sample may be negative (downslope)
-        // even during a valid impact — the sharp rise happened earlier in the window.
-        let prevMag = prevFilteredMagBySource[sample.source, default: 0]
-        let riseRate = filteredMag - prevMag
-        prevFilteredMagBySource[sample.source] = filteredMag
-        if riseRate > (peakRiseRateBySource[sample.source] ?? 0) {
-            peakRiseRateBySource[sample.source] = riseRate
+        // Prune impacts outside fusion window
+        recentImpacts.removeAll { now.timeIntervalSince($0.timestamp) > config.fusionWindow }
+        recentImpacts.append(impact)
+
+        // Rearm gate
+        guard now.timeIntervalSince(lastTriggerAt) >= config.rearmDuration else { return nil }
+
+        // Consensus: unique sources that reported an impact within the fusion window
+        let participatingSources = Set(recentImpacts.map(\.source))
+        let required = max(1, min(config.consensusRequired, activeSources.count))
+
+        guard participatingSources.count >= required else { return nil }
+
+        // Fuse: average intensity across participating sources
+        // Use the strongest impact per source
+        var bestPerSource: [SensorID: SensorImpact] = [:]
+        for imp in recentImpacts {
+            if let existing = bestPerSource[imp.source] {
+                if imp.intensity > existing.intensity { bestPerSource[imp.source] = imp }
+            } else {
+                bestPerSource[imp.source] = imp
+            }
         }
 
-        #if DEBUG
-        if filteredMag > diagPeakFiltered { diagPeakFiltered = filteredMag }
-        if riseRate > diagPeakRise { diagPeakRise = riseRate }
-        diagCounter += 1
-        if diagCounter % 250 == 0 {
-            log.debug("entity:FusionDiag n=\(diagCounter) peak=\(String(format: "%.4f", diagPeakFiltered)) rise=\(String(format: "%.4f", diagPeakRise)) thr=\(config.spikeThreshold) riseReq=\(config.minRiseRate)")
-            diagPeakFiltered = 0
-            diagPeakRise = 0
-        }
-        #endif
-
-        // Accumulate filtered samples in rolling window
-        var sourceSamples = bySource[sample.source] ?? []
-        sourceSamples.append(SamplePoint(timestamp: now, value: filtered))
-        bySource[sample.source] = sourceSamples
-
-        prune(before: now.addingTimeInterval(-windowDuration))
-
-        let required = requiredConsensusCount(activeSourceCount: activeSources.count)
-        let candidates = candidatePeaks(activeSources: activeSources)
-
-        let participating = candidates.filter { $0.magnitude >= config.spikeThreshold }
-        let hasConsensus = participating.count >= required
-        let timeSinceLastTrigger = now.timeIntervalSince(lastTriggerAt)
-
-        guard hasConsensus, timeSinceLastTrigger >= config.minRearmDuration else { return nil }
-
-        // Gate 1: Rise rate — peak rise rate within the window, not instantaneous.
-        // A direct impact's sharp onset is captured even if the current sample is on the downslope.
-        let windowPeakRise = peakRiseRateBySource[sample.source] ?? 0
-        guard windowPeakRise >= config.minRiseRate else {
-            log.debug("entity:FusionGate blocked=riseRate rise=\(String(format: "%.4f", windowPeakRise)) required=\(config.minRiseRate)")
-            return nil
-        }
-
-        // Gate 3: Confirmation count — require multiple above-threshold samples in window
-        // Direct impacts produce a cluster of high samples; single-jolt events produce fewer
-        let aboveThreshold = bySource[sample.source]?.filter { $0.value.magnitude >= config.spikeThreshold }.count ?? 0
-        guard aboveThreshold >= config.minConfirmations else {
-            log.debug("entity:FusionGate blocked=confirmations count=\(aboveThreshold) required=\(config.minConfirmations)")
-            return nil
-        }
+        let participants = Array(bestPerSource.values)
+        let avgIntensity = participants.reduce(Float(0)) { $0 + $1.intensity } / Float(participants.count)
+        let confidence = Float(participants.count) / Float(max(activeSources.count, 1))
 
         lastTriggerAt = now
-        peakRiseRateBySource[sample.source] = 0
+        recentImpacts.removeAll()
 
-        let sum = participating.reduce(Vec3.zero) { partial, entry in
-            Vec3(
-                x: partial.x + entry.vector.x,
-                y: partial.y + entry.vector.y,
-                z: partial.z + entry.vector.z
-            )
-        }
-        let count = Float(max(1, participating.count))
-        let fused = Vec3(x: sum.x / count, y: sum.y / count, z: sum.z / count)
-        let confidence = Float(participating.count) / Float(max(required, 1))
+        log.debug("entity:FusedImpact intensity=\(String(format: "%.2f", avgIntensity)) confidence=\(String(format: "%.2f", confidence)) sources=\(participants.map(\.source))")
 
-        return FusedImpact(timestamp: now, amplitude: fused, confidence: confidence)
-    }
-
-    private func hpFilterForSource(_ source: SensorID) -> HighPassFilter {
-        if let existing = hpFiltersBySource[source] { return existing }
-        let filter = HighPassFilter(cutoffHz: hpCutoffHz, sampleRate: 50.0)
-        hpFiltersBySource[source] = filter
-        return filter
-    }
-
-    private func lpFilterForSource(_ source: SensorID) -> LowPassFilter {
-        if let existing = lpFiltersBySource[source] { return existing }
-        let filter = LowPassFilter(cutoffHz: lpCutoffHz, sampleRate: 50.0)
-        lpFiltersBySource[source] = filter
-        return filter
-    }
-
-    private func prune(before cutoff: Date) {
-        for key in bySource.keys {
-            bySource[key]?.removeAll { $0.timestamp < cutoff }
-            if bySource[key]?.isEmpty == true {
-                bySource.removeValue(forKey: key)
-            }
-        }
-    }
-
-    private func requiredConsensusCount(activeSourceCount: Int) -> Int {
-        switch activeSourceCount {
-        case ..<2:
-            return 1
-        case 2...3:
-            return 2
-        default:
-            return max(2, Int(ceil(Double(activeSourceCount) * 0.6)))
-        }
-    }
-
-    private func candidatePeaks(activeSources: Set<SensorID>) -> [(source: SensorID, vector: Vec3, magnitude: Float)] {
-        activeSources.compactMap { source in
-            guard sampleCountBySource[source, default: 0] >= config.minWarmupSamples else { return nil }
-            guard let peak = bySource[source]?.max(by: { $0.value.magnitude < $1.value.magnitude }) else {
-                return nil
-            }
-            return (source: source, vector: peak.value, magnitude: peak.value.magnitude)
-        }
+        return FusedImpact(
+            timestamp: now,
+            intensity: avgIntensity,
+            confidence: confidence,
+            sources: participants.map(\.source)
+        )
     }
 }
