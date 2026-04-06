@@ -11,12 +11,10 @@ struct YameteApp: App {
                 .environment(appDelegate.settings)
                 .environment(appDelegate.controller)
                 .environment(appDelegate.updater)
-                .environment(appDelegate.license)
         } label: {
             MenuBarLabel()
                 .environment(appDelegate.settings)
                 .environment(appDelegate.controller)
-                .environment(appDelegate.updater)
         }
         .menuBarExtraStyle(.window)
     }
@@ -27,22 +25,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let settings = SettingsStore()
     lazy var controller = ImpactController(settings: settings)
     let updater = Updater()
-    let license = LicenseManager()
 
     private static let firstLaunchKey = "hasCompletedFirstLaunch"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-
-        if license.isUsable {
-            controller.start()
-        }
+        controller.start()
 
         if !UserDefaults.standard.bool(forKey: Self.firstLaunchKey) {
             UserDefaults.standard.set(true, forKey: Self.firstLaunchKey)
             controller.playWelcomeSound()
         }
-
-        updater.autoCheckIfNeeded(settings: settings)
     }
 }

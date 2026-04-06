@@ -13,7 +13,7 @@
 #   5. verify     validate structure, signature, asset counts
 
 APP       := Yamete
-BUNDLE_ID := com.yamete
+BUNDLE_ID := com.studnicky.yamete
 DIST      := dist
 BUILD     := .build-stage
 TARGET    := $(DIST)/$(APP).app
