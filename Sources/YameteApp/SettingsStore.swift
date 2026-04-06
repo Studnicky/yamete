@@ -18,7 +18,7 @@ final class SettingsStore {
         case screenFlash
         case flashOpacityMin, flashOpacityMax
         case volumeMin, volumeMax
-        case enabledDisplays, enabledAudioDevices, autoCheckForUpdates, lastUpdateCheck
+        case enabledDisplays, enabledAudioDevices
         // Advanced detection
         case spikeThreshold, crestFactor, riseRate, confirmations, warmupSamples
     }
@@ -38,8 +38,6 @@ final class SettingsStore {
         Key.volumeMax.rawValue:       0.9,
         Key.enabledDisplays.rawValue: [Int](),
         Key.enabledAudioDevices.rawValue: [String](),
-        Key.autoCheckForUpdates.rawValue: true,
-        Key.lastUpdateCheck.rawValue: 0.0,
         // Advanced detection
         Key.spikeThreshold.rawValue:  0.020,
         Key.crestFactor.rawValue:     4.0,
@@ -158,23 +156,6 @@ final class SettingsStore {
         }
     }
 
-    // MARK: - Update settings
-
-    var autoCheckForUpdates: Bool {
-        didSet {
-            guard autoCheckForUpdates != oldValue else { return }
-            persist(autoCheckForUpdates, .autoCheckForUpdates)
-        }
-    }
-
-    /// TimeInterval of last update check (for daily throttling).
-    var lastUpdateCheck: Double {
-        didSet {
-            guard lastUpdateCheck != oldValue else { return }
-            persist(lastUpdateCheck, .lastUpdateCheck)
-        }
-    }
-
     // MARK: - Display + audio device selection
 
     /// CGDirectDisplayID values of enabled displays. Empty = all displays.
@@ -258,8 +239,6 @@ final class SettingsStore {
         volumeMax       = d.double(forKey: Key.volumeMax.rawValue)
         enabledDisplays = d.array(forKey: Key.enabledDisplays.rawValue) as? [Int] ?? []
         enabledAudioDevices = d.array(forKey: Key.enabledAudioDevices.rawValue) as? [String] ?? []
-        autoCheckForUpdates = d.bool(forKey: Key.autoCheckForUpdates.rawValue)
-        lastUpdateCheck = d.double(forKey: Key.lastUpdateCheck.rawValue)
         // Advanced
         spikeThreshold  = d.double(forKey: Key.spikeThreshold.rawValue)
         crestFactor     = d.double(forKey: Key.crestFactor.rawValue)

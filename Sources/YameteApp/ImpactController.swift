@@ -38,7 +38,7 @@ final class ImpactController {
     private var countDate: Date = Calendar.current.startOfDay(for: Date())
     private var activeSensorIDs: Set<SensorID> = []
 
-    /// Intensity mapping calibrated to IOHIDEventSystem data:
+    /// Intensity mapping calibrated to accelerometer data:
     ///   0.020g = firm desk slap (minimum useful impact)
     ///   0.060g = hard slap (approaching hardware stress)
     private static let intensityFloor: Float = 0.020
