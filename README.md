@@ -2,7 +2,7 @@
 
 A macOS menu bar app that detects physical impacts on Apple Silicon MacBooks and responds with audio and visual feedback.
 
-Uses the built-in BMI286 accelerometer via the IOHIDEventSystemClient API (macOS 15+) with a multi-gate impact detection pipeline calibrated to reject ambient vibrations while responding to direct desk impacts.
+Uses the built-in BMI286 accelerometer via IOKit public APIs (IOHIDEventSystemClient + IOHIDManager) with a multi-gate impact detection pipeline calibrated to reject ambient vibrations while responding to direct desk impacts. Also supports microphone-based detection (all Macs) and headphone motion (AirPods/Beats).
 
 ## Requirements
 
@@ -35,11 +35,9 @@ make test         # run test suite
 
 ```
 Sensor Adapters (each runs its own detection pipeline):
-    SPU Accelerometer (private API activation + public IOHIDManager reading)
+    Accelerometer (IOHIDEventSystemClient activation + IOHIDManager reading)
         100Hz raw → 2:1 decimation → bandpass (HP 20Hz + LP 25Hz)
         → spike/rise/crest/confirmations gates → SensorImpact (0-1 intensity)
-    HID Accelerometer (public API only, requires external activation)
-        Same pipeline, IOHIDDeviceSetProperty activation attempt
     Microphone (AVAudioEngine, public API, works on all Macs)
         48kHz audio → per-buffer peak → DC-blocking HP filter
         → spike/rise/crest/confirmations gates → SensorImpact (0-1 intensity)
@@ -81,7 +79,7 @@ All settings are in the menu bar dropdown. Main controls use range sliders where
 
 ## Distribution
 
-Yamete runs under App Sandbox with the `device.usb` entitlement for accelerometer access via the public IOHIDManager API. Sensor activation uses IOHIDServiceClient property bindings (`@_silgen_name`) to set the SPU report interval — report reading is fully public API.
+Yamete runs under App Sandbox with the `device.usb` entitlement for accelerometer access via IOKit public APIs. Sensor activation uses `IOHIDEventSystemClientCreate` + `IOHIDServiceClientSetProperty` to set the SPU report interval. Report reading uses `IOHIDManager` with input report callbacks.
 
 ## Project structure
 
@@ -98,7 +96,7 @@ Sources/
     SensorAdapter.swift       SensorAdapter protocol, SensorImpact, SensorManager
     ImpactDetector.swift      Per-adapter gate pipeline (spike, rise, crest, confirmations)
     ImpactDetection.swift     ImpactFusionEngine (consensus, rearm, response dispatch)
-    AccelerometerReader.swift HID + SPU accelerometer adapters (BMI286 via IOHIDManager)
+    AccelerometerReader.swift BMI286 accelerometer adapter (IOKit public API)
     MicrophoneAdapter.swift   Audio transient detection (AVAudioEngine)
     HeadphoneMotionAdapter.swift AirPods/Beats IMU (CoreMotion)
 
@@ -122,7 +120,7 @@ Bundle/Contents/Resources/
   faces/                      Face images (any SVG/PNG/JPG, loaded recursively)
   sounds/                     Sound clips (any MP3/WAV/M4A, sorted by duration at startup)
 
-Tests/                        41 tests (unit, integration, E2E)
+Tests/                        37 tests (unit, integration, E2E)
 ```
 
 ## Privacy

@@ -1,0 +1,7 @@
+/* Info.plist localized strings */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete menggunakan akselerometer untuk mendeteksi benturan fisik pada MacBook Anda.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete dapat menggunakan mikrofon untuk mendeteksi suara benturan di meja Anda.";

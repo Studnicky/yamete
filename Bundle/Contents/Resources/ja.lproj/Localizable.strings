@@ -1,0 +1,205 @@
+/* Yamete — Japanese (ja) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "今日%lld回の衝撃";
+
+/* Last impact tier label */
+"last_impact" = "最後: %@";
+
+/* Detection paused indicator */
+"status_paused" = "一時停止中";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "反応感度";
+
+/* Reactivity setting help text */
+"help_reactivity" = "衝撃力の応答ウィンドウ。下のつまみ = トリガーとなる最小の力。上のつまみ = 最大応答のための力。値が高いほど軽い衝撃に反応します。";
+
+/* Volume setting title */
+"setting_volume" = "音量";
+
+/* Volume setting help text */
+"help_volume" = "オーディオ再生レベルウィンドウ。強度は低値と高値の間で線形にマッピングされます。クリップの選択も強度に従います — 軽い衝撃ほど短いクリップが再生されます。";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "フラッシュ不透明度";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "画面フラッシュの明るさウィンドウ。エンベロープのタイミングは強度によって形成されます。サウンドクリップの持続時間内にゲートされます。";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "強";
+
+/* Ruler label: firm impact */
+"tier_firm" = "やや強";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "中";
+
+/* Ruler label: light impact */
+"tier_light" = "軽";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "タップ";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "感度とセンサー";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "センサーコンセンサス";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "トリガーする前に独立して衝撃を検出する必要があるセンサーの数。データを提供しているセンサーの数にクランプされます。";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld個のセンサー";
+
+/* Cooldown setting title */
+"setting_cooldown" = "クールダウン";
+
+/* Cooldown setting help text */
+"help_cooldown" = "反応間の最小時間。0 = 再生中のクリップの持続時間のみによってゲートされます。";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "加速度センサーのチューニング";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "周波数帯域";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "生の加速度センサーデータへのバンドパスフィルター。低 = ハイパスカットオフ（床の振動を除去）。高 = ローパスカットオフ（電子ノイズを除去）。";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "スパイク閾値";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "潜在的な衝撃として考慮するための最小フィルタリング済み強度（g力）。バンドパスフィルタリング後に適用されます。値が高いほど強い力が必要です。";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "クレストファクター";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "ピーク信号はバックグラウンドRMSをこの倍数だけ超える必要があります。机への鋭い衝撃はバックグラウンドをはるかに超えてスパイクします。足音はピークとともにバックグラウンドも上昇させます。値が高いほど環境振動をより多く除去します。";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "上昇率";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "連続するサンプル間の最小強度増加量。直接の衝撃は1〜2サンプルで上昇します。伝達振動は徐々に上昇します。値が高いほど間接振動を除去します。";
+
+/* Confirmations setting title */
+"setting_confirmations" = "確認数";
+
+/* Confirmations setting help text */
+"help_confirmations" = "120ms検出ウィンドウ内で必要な閾値超えサンプル数。直接の衝撃は3〜5個の高いサンプルを生成します。単発の揺れは1〜2個を生成します。";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld回";
+
+/* Warmup setting title */
+"setting_warmup" = "ウォームアップ";
+
+/* Warmup setting help text */
+"help_warmup" = "検出が有効になる前のサンプル数。フィルターが安定するまでに時間が必要です。50 Hzで50サンプル = 1秒。";
+
+/* Report interval setting title */
+"setting_report_interval" = "レポート間隔";
+
+/* Report interval setting help text */
+"help_report_interval" = "加速度センサーのポーリング間隔。10ms = 100 Hz（デフォルト）、5ms = 200 Hz、20ms = 50 Hz。";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "デバイス";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lldディスプレイ、%lldオーディオ";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "フラッシュディスプレイ";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "衝撃時にフラッシュオーバーレイを表示するモニターを選択してください。";
+
+/* Audio output setting title */
+"setting_audio_output" = "オーディオ出力";
+
+/* Audio output setting help text */
+"help_audio_output" = "衝撃音を再生するオーディオデバイスを選択してください。未選択 = オーディオなし。";
+
+/* No audio output devices found message */
+"no_output_devices" = "出力デバイスが見つかりません";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "ログイン時に起動";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "デバッグログ";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "終了";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "タップ";
+
+/* Impact tier name: light */
+"tier_light_full" = "軽い";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "中程度";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "やや強い";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "強い";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "モーションセンサーへのアクセスが拒否されました — システム設定 > プライバシーとセキュリティでInput Monitoringの権限を付与してください。";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "加速度センサーが見つかりません — このMacには対応するモーションセンサーがない可能性があります。";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "加速度センサーが使用できません（IOKitエラー %@）。このMacには対応するモーションセンサーがない可能性があります。";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "このMacには対応するモーションセンサーが見つかりません。";

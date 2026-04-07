@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <!-- Daily impact counter -->
+    <!-- Romanian CLDR: one (1), few (0, 2-19 in last two digits, 2-19 in last three digits), other -->
+    <key>impacts_today</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@ azi</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>one</key>
+            <string>%lld impact azi</string>
+            <key>few</key>
+            <string>%lld impacturi azi</string>
+            <key>other</key>
+            <string>%lld de impacturi azi</string>
+        </dict>
+    </dict>
+
+    <!-- Sensor consensus count -->
+    <key>consensus_format</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>one</key>
+            <string>%lld senzor</string>
+            <key>few</key>
+            <string>%lld senzori</string>
+            <key>other</key>
+            <string>%lld de senzori</string>
+        </dict>
+    </dict>
+
+    <!-- Confirmation hit count -->
+    <key>confirmations_format</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>one</key>
+            <string>%lld lovitură</string>
+            <key>few</key>
+            <string>%lld lovituri</string>
+            <key>other</key>
+            <string>%lld de lovituri</string>
+        </dict>
+    </dict>
+
+</dict>
+</plist>

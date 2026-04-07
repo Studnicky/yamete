@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All user-facing strings wrapped in NSLocalizedString
 
 ### Changed
-- Accelerometer: hybrid IOHIDServiceClient activation + IOHIDManager reading (SPU transport)
+- Accelerometer: IOHIDEventSystemClient activation + IOHIDManager reading (public IOKit API)
 - Detection: 4-algorithm voting → 6-gate pipeline (bandpass, spike, rise rate, crest factor, confirmations, rearm)
 - Sensitivity renamed to Reactivity with inverted mapping (higher = more reactive)
 - Assets loaded from sounds/ and faces/ folders recursively by extension

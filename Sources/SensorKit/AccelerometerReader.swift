@@ -3,17 +3,38 @@ import YameteCore
 #endif
 import Foundation
 import IOKit.hid
+import IOHIDPublic
 
-// MARK: - BMI286 Accelerometer Adapters
+// MARK: - BMI286 Accelerometer Adapter
 //
-// Two adapters for the same BMI286 accelerometer on Apple Silicon Macs.
-// Each runs its own detection pipeline (bandpass → ImpactDetector) and
-// emits SensorImpact events with 0–1 intensity.
+// Reads the BMI286 accelerometer on Apple Silicon Macs via IOKit public APIs.
+// Runs its own detection pipeline (bandpass → ImpactDetector) and emits
+// SensorImpact events with 0–1 intensity.
 //
 // The sensor appears as a vendor-defined HID device:
 //   PrimaryUsagePage = 0xFF00, PrimaryUsage = 3, Transport = "SPU"
 //
+// Activation (IOHIDEventSystemClient API):
+//   IOHIDEventSystemClientCreate          → create event system client
+//   IOHIDEventSystemClientCopyServices    → enumerate HID services
+//   IOHIDServiceClientSetProperty         → set ReportInterval on SPU service
+//   IOHIDServiceClientCopyProperty        → read service properties (Transport, etc.)
+//
+// Reading (IOHIDManager API):
+//   IOHIDManagerCreate / Open / SetDeviceMatching / CopyDevices
+//   IOHIDDeviceOpen / RegisterInputReportCallback
+//
 // App Sandbox: Requires com.apple.security.device.usb entitlement.
+//
+// Public API documentation:
+//   https://developer.apple.com/documentation/iokit/iohidmanager_h
+//   https://developer.apple.com/documentation/iokit/iohiddevice_h
+//   https://developer.apple.com/documentation/iokit/iohideventsystemclientref
+//   https://developer.apple.com/documentation/iokit/iohidserviceclientref
+//   https://developer.apple.com/documentation/iokit/2269429-iohidserviceclientsetproperty
+//   https://developer.apple.com/documentation/iokit/2269430-iohidserviceclientcopyproperty
+//   https://developer.apple.com/documentation/iokit/2269432-iohideventsystemclientcopyservic
+//   https://developer.apple.com/documentation/iokit/1588653-iohiddevicesetproperty
 
 private let log = AppLog(category: "Accelerometer")
 
@@ -44,87 +65,20 @@ public func defaultAccelDetectorConfig(
     )
 }
 
-// MARK: - HID Accelerometer (public API only)
+// MARK: - Accelerometer Adapter
 
-/// Reads BMI286 accelerometer via public IOHIDManager API only.
-/// Attempts IOHIDDeviceSetProperty("ReportInterval") to activate the sensor.
-/// This public API call returns true but does NOT wake a sleeping SPU sensor —
-/// it only works if another adapter (SPU) has already activated the sensor,
-/// or if macOS has it awake for other purposes (lid angle detection, etc.).
-public final class HIDAccelerometerAdapter: SensorAdapter, Sendable {
-
-    public let id = SensorID("hid-accelerometer")
-    public let name = "HID Accelerometer"
-    public let apiClassification: APIClassification = .publicAPI
-    public let reportIntervalUS: Int
-    public let detectorConfig: ImpactDetectorConfig
-    public let bandpassLowHz: Float
-    public let bandpassHighHz: Float
-
-    public init(reportIntervalUS: Int = 10000,
-                bandpassLowHz: Float = 20.0, bandpassHighHz: Float = 25.0,
-                detectorConfig: ImpactDetectorConfig = defaultAccelDetectorConfig()) {
-        self.reportIntervalUS = reportIntervalUS
-        self.bandpassLowHz = bandpassLowHz
-        self.bandpassHighHz = bandpassHighHz
-        self.detectorConfig = detectorConfig
-    }
-
-    public var isAvailable: Bool { AccelHardware.isSPUDevicePresent() }
-
-    public func impacts() -> AsyncThrowingStream<SensorImpact, Error> {
-        AccelHardware.openStream(
-            adapterID: id, adapterName: name,
-            reportIntervalUS: reportIntervalUS,
-            bandpassLowHz: bandpassLowHz, bandpassHighHz: bandpassHighHz,
-            detectorConfig: detectorConfig,
-            activateViaDevice: true
-        )
-    }
-}
-
-// MARK: - SPU service activation bindings
-
-private typealias IOHIDEventSystemClientRef = OpaquePointer
-private typealias IOHIDServiceClientRef = OpaquePointer
-
-@_silgen_name("IOHIDEventSystemClientCreateWithType")
-private func IOHIDEventSystemClientCreateWithType(
-    _ allocator: CFAllocator?, _ type: Int32, _ properties: CFDictionary?
-) -> IOHIDEventSystemClientRef?
-
-@_silgen_name("IOHIDEventSystemClientSetMatching")
-private func IOHIDEventSystemClientSetMatching(
-    _ client: IOHIDEventSystemClientRef, _ matching: CFDictionary)
-
-@_silgen_name("IOHIDEventSystemClientCopyServices")
-private func IOHIDEventSystemClientCopyServices(
-    _ client: IOHIDEventSystemClientRef) -> CFArray?
-
-@_silgen_name("IOHIDServiceClientSetProperty")
-@discardableResult
-private func IOHIDServiceClientSetProperty(
-    _ service: IOHIDServiceClientRef, _ key: CFString, _ value: CFTypeRef) -> Bool
-
-@_silgen_name("IOHIDServiceClientCopyProperty")
-private func IOHIDServiceClientCopyProperty(
-    _ service: IOHIDServiceClientRef, _ key: CFString) -> CFTypeRef?
-
-// MARK: - SPU Accelerometer (private activation + public reading)
-
-/// Reads BMI286 accelerometer via IOHIDManager (public API) and streams impact events.
-/// Sensor activation uses IOHIDServiceClient to set ReportInterval on the SPU service.
+/// Reads BMI286 accelerometer via IOKit public APIs and streams impact events.
+///
+/// Activation: IOHIDEventSystemClientCreate → IOHIDServiceClientSetProperty("ReportInterval")
+/// Reading: IOHIDManager → IOHIDDeviceRegisterInputReportCallback → bandpass → ImpactDetector
 public final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
-    public let id = SensorID("spu-accelerometer")
-    public let name = "SPU Accelerometer"
-    public let apiClassification: APIClassification = .privateAPI
+    public let id = SensorID("accelerometer")
+    public let name = "Accelerometer"
     public let reportIntervalUS: Int
     public let detectorConfig: ImpactDetectorConfig
     public let bandpassLowHz: Float
     public let bandpassHighHz: Float
-
-    private let clientType: Int32 = 1
 
     public init(reportIntervalUS: Int = 10000,
                 bandpassLowHz: Float = 20.0, bandpassHighHz: Float = 25.0,
@@ -141,10 +95,11 @@ public final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
         let intervalUS = reportIntervalUS
 
-        guard let svcClient = IOHIDEventSystemClientCreateWithType(kCFAllocatorDefault, clientType, nil) else {
+        guard let svcClientUnmanaged = IOHIDEventSystemClientCreate(kCFAllocatorDefault) else {
             continuation.finish(throwing: SensorError.deviceNotFound)
             return stream
         }
+        let svcClient = svcClientUnmanaged.takeRetainedValue()
         let svcMatching: [String: Any] = ["PrimaryUsagePage": pageAccel, "PrimaryUsage": usageAccel]
         IOHIDEventSystemClientSetMatching(svcClient, svcMatching as CFDictionary)
 
@@ -155,7 +110,10 @@ public final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
         var activated = false
         for i in 0..<CFArrayGetCount(services) {
-            let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClientRef.self)
+            let svc = unsafeBitCast(
+                CFArrayGetValueAtIndex(services, i),
+                to: IOHIDServiceClient.self
+            )
             let transport = IOHIDServiceClientCopyProperty(svc, "Transport" as CFString)
             if "\(transport ?? ("" as CFString))" == requiredTransport {
                 IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, intervalUS as CFNumber)
@@ -196,8 +154,7 @@ private enum AccelHardware {
         bandpassLowHz: Float = 20.0,
         bandpassHighHz: Float = 25.0,
         detectorConfig: ImpactDetectorConfig,
-        activateViaDevice: Bool = false,
-        svcClient: IOHIDEventSystemClientRef? = nil,
+        svcClient: IOHIDEventSystemClient? = nil,
         services: CFArray? = nil
     ) -> AsyncThrowingStream<SensorImpact, Error> {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
@@ -226,11 +183,6 @@ private enum AccelHardware {
             IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
             continuation.finish(throwing: SensorError.ioKitError(msg))
             return stream
-        }
-
-        if activateViaDevice {
-            let set = IOHIDDeviceSetProperty(device, "ReportInterval" as CFString, reportIntervalUS as CFNumber)
-            log.info("activity:SensorActivation agent:\(adapterName) IOHIDDeviceSetProperty(ReportInterval=\(reportIntervalUS)us)=\(set)")
         }
 
         let serial = IOHIDDeviceGetProperty(device, kIOHIDSerialNumberKey as CFString) ?? ("" as CFString)
@@ -320,14 +272,14 @@ private struct CleanupState: @unchecked Sendable {
     let thread: HIDRunLoopThread
     let ctxPtr: Unmanaged<ReportContext>
     let ctx: ReportContext
-    let svcClient: IOHIDEventSystemClientRef?
+    let svcClient: IOHIDEventSystemClient?
     let services: CFArray?
 
     func perform() {
         ctx.invalidate()
         if let services {
             for i in 0..<CFArrayGetCount(services) {
-                let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClientRef.self)
+                let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClient.self)
                 IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, 0 as CFNumber)
             }
         }

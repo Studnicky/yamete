@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Danish */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete bruger accelerometeret til at registrere fysiske påvirkninger på din MacBook.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete kan bruge mikrofonen til at registrere påvirkningslyde på dit skrivebord.";

@@ -1,0 +1,205 @@
+/* Yamete — Arabic Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld صدمة اليوم";
+
+/* Last impact tier label */
+"last_impact" = "الأخيرة: %@";
+
+/* Detection paused indicator */
+"status_paused" = "متوقف مؤقتاً";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "الاستجابة";
+
+/* Reactivity setting help text */
+"help_reactivity" = "نافذة استجابة قوة الصدمة. الإبهام المنخفض = أضعف قوة تُشغّل الاستجابة. الإبهام العالي = القوة للاستجابة القصوى. القيم الأعلى تستجيب للصدمات الخفيفة.";
+
+/* Volume setting title */
+"setting_volume" = "مستوى الصوت";
+
+/* Volume setting help text */
+"help_volume" = "نافذة مستوى تشغيل الصوت. تُعيَّن الشدة بشكل خطي بين المنخفض والعالي. يتبع اختيار المقطع الصوتي الشدةَ أيضاً — تُشغّل الصدمات الخفيفة مقاطع أقصر.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "تعتيم الوميض";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "نافذة سطوع وميض الشاشة. يتشكّل توقيت المغلّف بحسب الشدة. مقيّد داخل مدة المقطع الصوتي.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "قوي";
+
+/* Ruler label: firm impact */
+"tier_firm" = "متين";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "متوسط";
+
+/* Ruler label: light impact */
+"tier_light" = "خفيف";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "نقرة";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "الحساسية والمستشعرات";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "إجماع المستشعرات";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "عدد المستشعرات التي يجب أن تكتشف الصدمة بشكل مستقل قبل التشغيل. مقيّد بعدد المستشعرات التي تُقدّم بيانات.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld مستشعر";
+
+/* Cooldown setting title */
+"setting_cooldown" = "وقت التهدئة";
+
+/* Cooldown setting help text */
+"help_cooldown" = "الحد الأدنى للوقت بين ردود الفعل. 0 = مقيّد فقط بمدة المقطع الصوتي الجاري.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "ضبط مقياس التسارع";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "نطاق التردد";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "مرشح تمرير النطاق على بيانات مقياس التسارع الخام. منخفض = قطع التردد العالي (يرفض اهتزازات الأرضية). عالٍ = قطع التردد المنخفض (يرفض الضوضاء الإلكترونية).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "عتبة الارتفاع المفاجئ";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "الحد الأدنى للسعة المُرشَّحة (قوة g) لاعتبارها صدمة محتملة. يُطبَّق بعد الفلترة بمرشح النطاق. القيم الأعلى تتطلب قوة أكبر.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "يجب أن تتجاوز إشارة الذروة RMS الخلفية بهذا المضاعف. الضربات الحادة على المكتب ترتفع كثيراً فوق الخلفية. خطوات الأقدام ترفع الخلفية مع الذروة. القيم الأعلى ترفض المزيد من الاهتزازات المحيطة.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "الحد الأدنى لزيادة السعة بين العينات المتتالية. الصدمات المباشرة ترتفع في عينة إلى عينتين. الاهتزازات المنقولة ترتفع تدريجياً. القيم الأعلى ترفض الاهتزاز غير المباشر.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "التأكيدات";
+
+/* Confirmations setting help text */
+"help_confirmations" = "العينات التي تتجاوز العتبة والمطلوبة في نافذة الكشف 120ms. الضربات المباشرة تنتج 3-5 عينات عالية. الهزات المفردة تنتج 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld ضربة";
+
+/* Warmup setting title */
+"setting_warmup" = "الإحماء";
+
+/* Warmup setting help text */
+"help_warmup" = "العينات قبل تفعيل الكشف. تحتاج المرشحات وقتاً للاستقرار. عند 50 Hz، 50 عينة = 1 ثانية.";
+
+/* Report interval setting title */
+"setting_report_interval" = "فاصل الإبلاغ";
+
+/* Report interval setting help text */
+"help_report_interval" = "فاصل استطلاع مقياس التسارع. 10ms = 100 Hz (الافتراضي)، 5ms = 200 Hz، 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "الأجهزة";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld شاشة، %lld صوت";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "وميض الشاشات";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "اختر الشاشات التي تُظهر طبقة الوميض عند الصدمة.";
+
+/* Audio output setting title */
+"setting_audio_output" = "مخرج الصوت";
+
+/* Audio output setting help text */
+"help_audio_output" = "اختر أجهزة الصوت التي تُشغّل أصوات الصدمة. لا يوجد تحديد = لا صوت.";
+
+/* No audio output devices found message */
+"no_output_devices" = "لم يتم العثور على أجهزة إخراج";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "التشغيل عند الدخول";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "سجل التصحيح";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "إنهاء";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "نقرة";
+
+/* Impact tier name: light */
+"tier_light_full" = "خفيف";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "متوسط";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "متين";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "قوي";
+
+/* Sensor Error Messages */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "تم رفض الوصول إلى مستشعر الحركة — امنح إذن مراقبة الإدخال في إعدادات النظام > الخصوصية والأمان.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "لم يتم العثور على مقياس تسارع — قد لا يحتوي هذا Mac على مستشعر حركة متوافق.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "مقياس التسارع غير متاح (خطأ IOKit %@). قد لا يحتوي هذا Mac على مستشعر حركة متوافق.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "لم يتم العثور على مستشعر حركة متوافق على هذا Mac.";

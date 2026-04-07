@@ -1,0 +1,205 @@
+/* Yamete — Українська (Ukrainian) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld ударів сьогодні";
+
+/* Last impact tier label */
+"last_impact" = "останній: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Призупинено";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Реактивність";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Вікно відгуку на силу удару. Нижній повзунок = мінімальна сила спрацювання. Верхній повзунок = сила для максимального відгуку. Вищі значення реагують на легші удари.";
+
+/* Volume setting title */
+"setting_volume" = "Гучність";
+
+/* Volume setting help text */
+"help_volume" = "Вікно рівня відтворення звуку. Інтенсивність лінійно відображається між мінімумом і максимумом. Вибір кліпу також слідує інтенсивності — легші удари відтворюють коротші кліпи.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Непрозорість спалаху";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Вікно яскравості спалаху на екрані. Форма обвідної визначається інтенсивністю. Обмежена тривалістю звукового кліпу.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Сильний";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Твердий";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Сер.";
+
+/* Ruler label: light impact */
+"tier_light" = "Легкий";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Дотик";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Чутливість і датчики";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Консенсус датчиків";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Кількість датчиків, які повинні незалежно виявити удар перед спрацюванням. Обмежено кількістю датчиків, що передають дані.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld датчиків";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Затримка";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Мінімальний час між реакціями. 0 = обмежено лише тривалістю відтворюваного кліпу.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Налаштування акселерометра";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Смуга частот";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Смуговий фільтр на необроблених даних акселерометра. Низьке = поріг ФВЧ (відхиляє вібрації підлоги). Високе = поріг ФНЧ (відхиляє електронні шуми).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Поріг піку";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Мінімальна відфільтрована амплітуда (g-сила) для розпізнавання потенційного удару. Застосовується після смугового фільтрування. Вищі значення вимагають більшої сили.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Піковий сигнал повинен перевищувати фонове RMS на цей множник. Різкі удари по столу значно перевищують фон. Кроки підвищують фон разом із піком. Вищі значення відхиляють більше фонових вібрацій.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Мінімальне збільшення амплітуди між послідовними відліками. Прямі удари наростають за 1-2 відліки. Передані вібрації наростають поступово. Вищі значення відхиляють непрямі вібрації.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Підтвердження";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Відліки вище порогу, необхідні у вікні виявлення 120 мс. Прямі удари дають 3-5 високих відліків. Поодинокі поштовхи дають 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld попадань";
+
+/* Warmup setting title */
+"setting_warmup" = "Прогрів";
+
+/* Warmup setting help text */
+"help_warmup" = "Відліки до активації виявлення. Фільтрам потрібен час для стабілізації. При 50 Гц 50 відліків = 1 секунда.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Інтервал опитування";
+
+/* Report interval setting help text */
+"help_report_interval" = "Інтервал опитування акселерометра. 10 мс = 100 Гц (за замовчуванням), 5 мс = 200 Гц, 20 мс = 50 Гц.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Пристрої";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld дисплеїв, %lld аудіо";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Дисплеї для спалаху";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Виберіть, на яких моніторах відображається накладення спалаху при ударі.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Аудіовихід";
+
+/* Audio output setting help text */
+"help_audio_output" = "Виберіть, які аудіопристрої відтворюють звуки ударів. Нічого не вибрано = без звуку.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Пристрої виводу не знайдені";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Запускати при вході";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Журнал налагодження";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Вийти";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Дотик";
+
+/* Impact tier name: light */
+"tier_light_full" = "Легкий";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Середній";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Твердий";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Сильний";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Доступ до датчика руху заборонено — надайте дозвіл «Моніторинг введення» у Системних налаштуваннях > Конфіденційність і безпека.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Акселерометр не знайдено — на цьому Mac може бути відсутній сумісний датчик руху.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Акселерометр недоступний (помилка IOKit %@). На цьому Mac може бути відсутній сумісний датчик руху.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "На цьому Mac не знайдено сумісного датчика руху.";

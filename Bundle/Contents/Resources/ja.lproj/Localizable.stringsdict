@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <!-- Daily impact counter -->
+    <key>impacts_today</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>今日%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>other</key>
+            <string>%lld回の衝撃</string>
+        </dict>
+    </dict>
+
+    <!-- Sensor consensus count -->
+    <key>consensus_format</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>other</key>
+            <string>%lld個のセンサー</string>
+        </dict>
+    </dict>
+
+    <!-- Confirmation hit count -->
+    <key>confirmations_format</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>other</key>
+            <string>%lld回</string>
+        </dict>
+    </dict>
+
+</dict>
+</plist>

@@ -1,0 +1,205 @@
+/* Yamete — 繁體中文 (香港) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "今日%lld次衝擊";
+
+/* Last impact tier label */
+"last_impact" = "上次：%@";
+
+/* Detection paused indicator */
+"status_paused" = "已暫停";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "靈敏度";
+
+/* Reactivity setting help text */
+"help_reactivity" = "衝擊力響應視窗。下滑桿 = 觸發所需的最弱力度。上滑桿 = 最大響應所需的力度。數值愈高，對較輕衝擊的響應愈靈敏。";
+
+/* Volume setting title */
+"setting_volume" = "音量";
+
+/* Volume setting help text */
+"help_volume" = "音訊播放音量視窗。強度在低高之間線性映射。片段選擇亦跟隨強度——較輕的衝擊播放較短的片段。";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "閃光透明度";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "螢幕閃光亮度視窗。包絡時序由強度調節。限定於音訊片段持續時間內。";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "強";
+
+/* Ruler label: firm impact */
+"tier_firm" = "實";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "中";
+
+/* Ruler label: light impact */
+"tier_light" = "輕";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "觸";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "靈敏度與感應器";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "感應器共識";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "觸發前必須獨立偵測到衝擊的感應器數量。上限為提供資料的感應器數量。";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld個感應器";
+
+/* Cooldown setting title */
+"setting_cooldown" = "冷卻時間";
+
+/* Cooldown setting help text */
+"help_cooldown" = "兩次反應之間的最短時間。0 = 僅受正在播放的片段時長限制。";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "加速度計調節";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "頻率範圍";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "原始加速度計資料的帶通濾波器。低 = 高通截止（過濾地板振動）。高 = 低通截止（過濾電子噪聲）。";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "峰值閾值";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "被視為潛在衝擊的最小濾波幅度（重力加速度）。在帶通濾波後應用。數值愈高，所需力度愈大。";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "波峰因數";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "峰值訊號必須超過背景RMS的倍數。桌面的急促敲擊遠超背景值。腳步聲會同時抬高背景和峰值。數值愈高，過濾的環境振動愈多。";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "上升速率";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "連續取樣之間的最小幅度增量。直接衝擊在1-2個取樣內上升。傳導振動緩慢上升。數值愈高，過濾的間接振動愈多。";
+
+/* Confirmations setting title */
+"setting_confirmations" = "確認次數";
+
+/* Confirmations setting help text */
+"help_confirmations" = "120毫秒偵測視窗內所需的超閾值取樣數。直接敲擊產生3-5個高值取樣。單次震動產生1-2個。";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld次";
+
+/* Warmup setting title */
+"setting_warmup" = "預熱";
+
+/* Warmup setting help text */
+"help_warmup" = "偵測啟動前的取樣數。濾波器需要時間穩定。在50 Hz下，50個取樣 = 1秒。";
+
+/* Report interval setting title */
+"setting_report_interval" = "回報間隔";
+
+/* Report interval setting help text */
+"help_report_interval" = "加速度計輪詢間隔。10ms = 100 Hz（預設），5ms = 200 Hz，20ms = 50 Hz。";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "裝置";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld個螢幕，%lld個音訊";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "閃光螢幕";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "選擇哪些螢幕在偵測到衝擊時顯示閃光覆蓋層。";
+
+/* Audio output setting title */
+"setting_audio_output" = "音訊輸出";
+
+/* Audio output setting help text */
+"help_audio_output" = "選擇哪些音訊裝置播放衝擊聲音。未選擇 = 無音訊。";
+
+/* No audio output devices found message */
+"no_output_devices" = "未找到輸出裝置";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "登入時啟動";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "除錯日誌";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "退出";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "輕觸";
+
+/* Impact tier name: light */
+"tier_light_full" = "輕擊";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "中等";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "實擊";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "強擊";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "動態感應器存取被拒——請在系統設定 > 私隱與安全性中授予輸入監控權限。";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "未找到加速度計——此Mac可能沒有相容的動態感應器。";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "加速度計不可用（IOKit錯誤 %@）。此Mac可能沒有相容的動態感應器。";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "此Mac上未找到相容的動態感應器。";

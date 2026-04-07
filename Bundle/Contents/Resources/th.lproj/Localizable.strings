@@ -1,0 +1,205 @@
+/* Yamete — ภาษาไทย (Thai) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld แรงกระแทกวันนี้";
+
+/* Last impact tier label */
+"last_impact" = "ล่าสุด: %@";
+
+/* Detection paused indicator */
+"status_paused" = "หยุดชั่วคราว";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "ความไวตอบสนอง";
+
+/* Reactivity setting help text */
+"help_reactivity" = "ช่วงการตอบสนองต่อแรงกระแทก แถบเลื่อนล่าง = แรงขั้นต่ำที่กระตุ้นการทำงาน แถบเลื่อนบน = แรงสำหรับการตอบสนองสูงสุด ค่าสูงขึ้นจะตอบสนองต่อแรงกระแทกที่เบากว่า";
+
+/* Volume setting title */
+"setting_volume" = "ระดับเสียง";
+
+/* Volume setting help text */
+"help_volume" = "ช่วงระดับการเล่นเสียง ความเข้มข้นจะถูกแมปแบบเชิงเส้นระหว่างต่ำสุดและสูงสุด การเลือกคลิปก็ตามความเข้มข้นด้วย — แรงกระแทกเบาจะเล่นคลิปที่สั้นกว่า";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "ความทึบแสงของแฟลช";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "ช่วงความสว่างของแฟลชบนหน้าจอ รูปทรงของเอนเวโลปถูกกำหนดโดยความเข้มข้น จำกัดอยู่ภายในระยะเวลาของคลิปเสียง";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "แรงมาก";
+
+/* Ruler label: firm impact */
+"tier_firm" = "แรง";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "ปานกลาง";
+
+/* Ruler label: light impact */
+"tier_light" = "เบา";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "เบาที่สุด";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "ความไวและเซ็นเซอร์";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "การเห็นชอบของเซ็นเซอร์";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "จำนวนเซ็นเซอร์ที่ต้องตรวจจับแรงกระแทกอย่างอิสระก่อนการกระตุ้น จำกัดตามจำนวนเซ็นเซอร์ที่ส่งข้อมูล";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld เซ็นเซอร์";
+
+/* Cooldown setting title */
+"setting_cooldown" = "คูลดาวน์";
+
+/* Cooldown setting help text */
+"help_cooldown" = "เวลาขั้นต่ำระหว่างการตอบสนอง 0 = จำกัดเฉพาะระยะเวลาของคลิปที่กำลังเล่นอยู่เท่านั้น";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "การปรับแต่งมาตรความเร่ง";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "แถบความถี่";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "ตัวกรองแบนด์พาสบนข้อมูลดิบของมาตรความเร่ง ต่ำ = เกณฑ์ไฮพาส (ปฏิเสธการสั่นสะเทือนจากพื้น) สูง = เกณฑ์โลว์พาส (ปฏิเสธสัญญาณรบกวนทางอิเล็กทรอนิกส์)";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "เกณฑ์สัญญาณพุ่ง";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "ขนาดแรงที่ผ่านการกรองขั้นต่ำ (แรง g) ที่ถือว่าเป็นแรงกระแทกที่อาจเกิดขึ้น ใช้หลังจากการกรองแบนด์พาส ค่าสูงขึ้นต้องการแรงที่มากขึ้น";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "สัญญาณยอดต้องเกินค่า RMS ของพื้นหลังตามตัวคูณนี้ การกระแทกโต๊ะอย่างรวดเร็วจะพุ่งสูงเหนือพื้นหลังอย่างมาก การเหยียบย่างทำให้พื้นหลังสูงขึ้นพร้อมกับยอด ค่าสูงขึ้นจะปฏิเสธการสั่นสะเทือนรอบข้างมากขึ้น";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "การเพิ่มขึ้นของขนาดขั้นต่ำระหว่างตัวอย่างที่ต่อเนื่องกัน การกระแทกโดยตรงจะเพิ่มขึ้นใน 1-2 ตัวอย่าง การสั่นสะเทือนที่ส่งผ่านจะค่อยๆ เพิ่มขึ้น ค่าสูงขึ้นจะปฏิเสธการสั่นสะเทือนทางอ้อม";
+
+/* Confirmations setting title */
+"setting_confirmations" = "การยืนยัน";
+
+/* Confirmations setting help text */
+"help_confirmations" = "ตัวอย่างที่อยู่เหนือเกณฑ์ที่ต้องการในหน้าต่างการตรวจจับ 120 มิลลิวินาที การกระแทกโดยตรงจะให้ตัวอย่างสูง 3-5 ตัวอย่าง การสั่นสะเทือนเดี่ยวจะให้ 1-2 ตัวอย่าง";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld ครั้ง";
+
+/* Warmup setting title */
+"setting_warmup" = "วอร์มอัพ";
+
+/* Warmup setting help text */
+"help_warmup" = "ตัวอย่างก่อนที่การตรวจจับจะเริ่มทำงาน ตัวกรองต้องการเวลาในการเสถียรภาพ ที่ 50 Hz, 50 ตัวอย่าง = 1 วินาที";
+
+/* Report interval setting title */
+"setting_report_interval" = "ช่วงเวลาการรายงาน";
+
+/* Report interval setting help text */
+"help_report_interval" = "ช่วงเวลาการสุ่มตัวอย่างมาตรความเร่ง 10 มิลลิวินาที = 100 Hz (ค่าเริ่มต้น), 5 มิลลิวินาที = 200 Hz, 20 มิลลิวินาที = 50 Hz";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "อุปกรณ์";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld จอแสดงผล, %lld เสียง";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "จอแสดงผลแฟลช";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "เลือกว่าจอใดจะแสดงการซ้อนทับแฟลชเมื่อมีแรงกระแทก";
+
+/* Audio output setting title */
+"setting_audio_output" = "เอาต์พุตเสียง";
+
+/* Audio output setting help text */
+"help_audio_output" = "เลือกว่าอุปกรณ์เสียงใดจะเล่นเสียงแรงกระแทก ไม่มีที่เลือก = ไม่มีเสียง";
+
+/* No audio output devices found message */
+"no_output_devices" = "ไม่พบอุปกรณ์เอาต์พุต";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "เปิดตอนเข้าสู่ระบบ";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "บันทึกการดีบัก";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "ออก";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "เบาที่สุด";
+
+/* Impact tier name: light */
+"tier_light_full" = "เบา";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "ปานกลาง";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "แรง";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "แรงมาก";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "การเข้าถึงเซ็นเซอร์การเคลื่อนไหวถูกปฏิเสธ — ให้สิทธิ์ Input Monitoring ใน การตั้งค่าระบบ > ความเป็นส่วนตัวและความปลอดภัย";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "ไม่พบมาตรความเร่ง — Mac เครื่องนี้อาจไม่มีเซ็นเซอร์การเคลื่อนไหวที่เข้ากันได้";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "มาตรความเร่งไม่พร้อมใช้งาน (ข้อผิดพลาด IOKit %@) Mac เครื่องนี้อาจไม่มีเซ็นเซอร์การเคลื่อนไหวที่เข้ากันได้";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "ไม่พบเซ็นเซอร์การเคลื่อนไหวที่เข้ากันได้บน Mac เครื่องนี้";

@@ -1,0 +1,205 @@
+/* Yamete — Hungarian Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld ütés ma";
+
+/* Last impact tier label */
+"last_impact" = "utolsó: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Szüneteltetve";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reaktivitás";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Az ütéserő-válasz ablaka. Alsó csúszka = a leggyengébb kiváltó erő. Felső csúszka = a maximális válaszhoz szükséges erő. Magasabb értékek könnyebb ütésekre is reagálnak.";
+
+/* Volume setting title */
+"setting_volume" = "Hangerő";
+
+/* Volume setting help text */
+"help_volume" = "Hanglejátszási szint ablaka. Az intenzitás lineárisan van leképezve az alacsony és magas között. A klipkiválasztás szintén az intenzitást követi — könnyebb ütések rövidebb klipeket játszanak le.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Villanás átlátszatlansága";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "A képernyővillanás fényerejének ablaka. A burkoló időzítése az intenzitás által formált. A hangklip időtartamán belül korlátozva.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Erős";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Határozott";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Közepes";
+
+/* Ruler label: light impact */
+"tier_light" = "Könnyű";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Érintés";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Érzékenység és érzékelők";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Érzékelők konszenzusa";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Az érzékelők száma, amelyeknek egymástól függetlenül kell ütést érzékelniük az indítás előtt. Adatot szolgáltató érzékelők számára korlátozva.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld érzékelő";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Visszatöltési idő";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Minimális idő a reakciók között. 0 = csak a lejátszott klip időtartama által korlátozva.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Gyorsulásmérő hangolása";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Frekvenciasáv";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Sávszűrő a nyers gyorsulásmérő-adatokon. Alacsony = felülvágó frekvencia (padlórezgések elutasítása). Magas = alulvágó frekvencia (elektronikus zaj elutasítása).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Csúcsérték-küszöb";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Minimális szűrt magnitúdó (g-erő) potenciális ütésnek tekintéshez. A sávszűrés után alkalmazva. Magasabb értékek erősebb erőt igényelnek.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "A csúcsjel ennyiszeresével kell meghaladnia a háttér RMS-t. Az asztalra mért éles ütések messze a háttér fölé emelkednek. A lépések a hátteret is emelik a csúccsal együtt. Magasabb értékek több környezeti rezgést utasítanak el.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Minimális magnitúdónövekedés egymást követő minták között. A közvetlen ütések 1-2 minta alatt emelkednek. Az átvitt rezgések fokozatosan emelkednek. Magasabb értékek közvetett rezgéseket utasítanak el.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Megerősítések";
+
+/* Confirmations setting help text */
+"help_confirmations" = "A 120ms-os érzékelési ablakon belül szükséges, küszöb feletti minták. A közvetlen ütések 3-5 magas mintát produkálnak. Az egyszeri lökések 1-2-t.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld találat";
+
+/* Warmup setting title */
+"setting_warmup" = "Felmelegítés";
+
+/* Warmup setting help text */
+"help_warmup" = "Minták az érzékelés aktiválása előtt. A szűrőknek időre van szükségük a beálláshoz. 50 Hz-en, 50 minta = 1 másodperc.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Jelentési intervallum";
+
+/* Report interval setting help text */
+"help_report_interval" = "Gyorsulásmérő lekérdezési intervalluma. 10ms = 100 Hz (alapértelmezett), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Eszközök";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld kijelző, %lld hang";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Villanást megjelenítő kijelzők";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Válassza ki, melyik monitor jelenítse meg a villanás-fedvényt ütéskor.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Hangkimenet";
+
+/* Audio output setting help text */
+"help_audio_output" = "Válassza ki, melyik hangeszközök játsszák le az ütés hangjait. Semmi sincs kiválasztva = nincs hang.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Nem találhatók kimeneti eszközök";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Indítás bejelentkezéskor";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Hibakeresési napló";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Kilépés";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Érintés";
+
+/* Impact tier name: light */
+"tier_light_full" = "Könnyű";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Közepes";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Határozott";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Erős";
+
+/* Sensor Error Messages */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "A mozgásérzékelőhöz való hozzáférés megtagadva — adjon Bemeneti figyelés engedélyt a Rendszerbeállítások > Adatvédelem és biztonság menüpontban.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Nem található gyorsulásmérő — ez a Mac lehet, hogy nem rendelkezik kompatibilis mozgásérzékelővel.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "A gyorsulásmérő nem elérhető (IOKit hiba %@). Ez a Mac lehet, hogy nem rendelkezik kompatibilis mozgásérzékelővel.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Nem található kompatibilis mozgásérzékelő ezen a Macen.";

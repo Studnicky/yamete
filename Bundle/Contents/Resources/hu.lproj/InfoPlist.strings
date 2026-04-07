@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Hungarian */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "A Yamete a gyorsulásmérőt használja a MacBookon bekövetkező fizikai ütések érzékeléséhez.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "A Yamete a mikrofont használhatja az asztalon keletkező ütési hangok érzékeléséhez.";

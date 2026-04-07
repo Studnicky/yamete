@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Arabic */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "يستخدم Yamete مقياس التسارع للكشف عن الصدمات الجسدية على MacBook الخاص بك.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "يمكن لـ Yamete استخدام الميكروفون للكشف عن أصوات الصدمات على مكتبك.";

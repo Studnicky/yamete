@@ -48,7 +48,6 @@ final class ImpactController {
         self.audioPlayer = audioPlayer ?? AudioPlayer()
         self.screenFlash = flashResponder ?? ScreenFlash()
         self.allAdapters = adapters ?? [
-            HIDAccelerometerAdapter(),
             SPUAccelerometerAdapter(),
             MicrophoneAdapter(),
             HeadphoneMotionAdapter(),
@@ -219,11 +218,7 @@ final class ImpactController {
         for template in allAdapters {
             guard enabled.contains(template.id.rawValue) else { continue }
             switch template.id.rawValue {
-            case "hid-accelerometer":
-                adapters.append(HIDAccelerometerAdapter(
-                    reportIntervalUS: interval, bandpassLowHz: bpLow,
-                    bandpassHighHz: bpHigh, detectorConfig: accelConfig))
-            case "spu-accelerometer":
+            case "accelerometer":
                 adapters.append(SPUAccelerometerAdapter(
                     reportIntervalUS: interval, bandpassLowHz: bpLow,
                     bandpassHighHz: bpHigh, detectorConfig: accelConfig))
