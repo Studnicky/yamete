@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Suomi */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete käyttää kiihtyvyysanturia havaitsemaan fyysiset iskut MacBookillesi.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete voi käyttää mikrofonia havaitsemaan iskuääniä pöydälläsi.";

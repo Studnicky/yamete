@@ -1,0 +1,205 @@
+/* Yamete — Greek Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld κρούσεις σήμερα";
+
+/* Last impact tier label */
+"last_impact" = "τελευταία: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Σε παύση";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Αντιδραστικότητα";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Παράθυρο απόκρισης δύναμης κρούσης. Κάτω ρυθμιστής = ελάχιστη δύναμη που ενεργοποιεί. Άνω ρυθμιστής = δύναμη για μέγιστη απόκριση. Υψηλότερες τιμές ανταποκρίνονται σε ελαφρύτερες κρούσεις.";
+
+/* Volume setting title */
+"setting_volume" = "Ένταση";
+
+/* Volume setting help text */
+"help_volume" = "Παράθυρο επιπέδου αναπαραγωγής ήχου. Η ένταση χαρτογραφείται γραμμικά μεταξύ χαμηλού και υψηλού. Η επιλογή κλιπ ακολουθεί επίσης την ένταση — οι ελαφρύτερες κρούσεις αναπαράγουν κοντύτερα κλιπ.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Αδιαφάνεια αναλαμπής";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Παράθυρο φωτεινότητας αναλαμπής οθόνης. Ο χρονισμός envelope διαμορφώνεται από την ένταση. Περιορισμένο εντός της διάρκειας του ηχητικού κλιπ.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Δυνατή";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Σταθερή";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Μέτρια";
+
+/* Ruler label: light impact */
+"tier_light" = "Ελαφριά";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Άγγιγμα";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Ευαισθησία & Αισθητήρες";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Συναίνεση αισθητήρων";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Αριθμός αισθητήρων που πρέπει να ανιχνεύσουν ανεξάρτητα μια κρούση πριν την ενεργοποίηση. Περιορισμένο στον αριθμό των αισθητήρων που παρέχουν δεδομένα.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld αισθητήρες";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Χρόνος επαναφοράς";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Ελάχιστος χρόνος μεταξύ αντιδράσεων. 0 = περιορισμένο μόνο από τη διάρκεια του κλιπ που παίζει.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Ρύθμιση επιταχυνσιόμετρου";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Εύρος συχνοτήτων";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Φίλτρο ζώνης διέλευσης σε ακατέργαστα δεδομένα επιταχυνσιόμετρου. Χαμηλό = αποκοπή υψηλής συχνότητας (απορρίπτει δονήσεις δαπέδου). Υψηλό = αποκοπή χαμηλής συχνότητας (απορρίπτει ηλεκτρονικό θόρυβο).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Κατώφλι αιχμής";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Ελάχιστο φιλτραρισμένο μέγεθος (δύναμη g) για να θεωρηθεί πιθανή κρούση. Εφαρμόζεται μετά το φιλτράρισμα ζώνης. Υψηλότερες τιμές απαιτούν μεγαλύτερη δύναμη.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Το σήμα κορυφής πρέπει να υπερβαίνει το RMS παρασκηνίου κατά αυτό το πολλαπλάσιο. Απότομα χτυπήματα στο γραφείο ανεβαίνουν πολύ πάνω από το παρασκήνιο. Βήματα ανεβάζουν το παρασκήνιο μαζί με την κορυφή. Υψηλότερες τιμές απορρίπτουν περισσότερη περιβαλλοντική δόνηση.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Ελάχιστη αύξηση μεγέθους μεταξύ διαδοχικών δειγμάτων. Άμεσες κρούσεις ανεβαίνουν σε 1-2 δείγματα. Μεταδοτικές δονήσεις ανεβαίνουν σταδιακά. Υψηλότερες τιμές απορρίπτουν έμμεσες δονήσεις.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Επιβεβαιώσεις";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Δείγματα πάνω από το κατώφλι που απαιτούνται στο παράθυρο ανίχνευσης 120ms. Άμεσα χτυπήματα παράγουν 3-5 υψηλά δείγματα. Μεμονωμένα χτυπήματα παράγουν 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld χτυπήματα";
+
+/* Warmup setting title */
+"setting_warmup" = "Προθέρμανση";
+
+/* Warmup setting help text */
+"help_warmup" = "Δείγματα πριν ενεργοποιηθεί η ανίχνευση. Τα φίλτρα χρειάζονται χρόνο για να σταθεροποιηθούν. Στα 50 Hz, 50 δείγματα = 1 δευτερόλεπτο.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Διάστημα αναφοράς";
+
+/* Report interval setting help text */
+"help_report_interval" = "Διάστημα δειγματοληψίας επιταχυνσιόμετρου. 10ms = 100 Hz (προεπιλογή), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Συσκευές";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld οθόνες, %lld ήχος";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Οθόνες αναλαμπής";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Επιλέξτε ποιες οθόνες εμφανίζουν την επικάλυψη αναλαμπής κατά τη κρούση.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Έξοδος ήχου";
+
+/* Audio output setting help text */
+"help_audio_output" = "Επιλέξτε ποιες συσκευές ήχου αναπαράγουν ήχους κρούσης. Καμία επιλογή = χωρίς ήχο.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Δεν βρέθηκαν συσκευές εξόδου";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Εκκίνηση κατά τη σύνδεση";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Καταγραφή εκσφαλμάτωσης";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Έξοδος";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Άγγιγμα";
+
+/* Impact tier name: light */
+"tier_light_full" = "Ελαφριά";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Μέτρια";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Σταθερή";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Δυνατή";
+
+/* Sensor Error Messages */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Η πρόσβαση στον αισθητήρα κίνησης απορρίφθηκε — δώστε άδεια Παρακολούθησης εισόδου στις Ρυθμίσεις συστήματος > Απόρρητο & Ασφάλεια.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Δεν βρέθηκε επιταχυνσιόμετρο — αυτό το Mac ενδέχεται να μην έχει συμβατό αισθητήρα κίνησης.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Το επιταχυνσιόμετρο δεν είναι διαθέσιμο (σφάλμα IOKit %@). Αυτό το Mac ενδέχεται να μην έχει συμβατό αισθητήρα κίνησης.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Δεν βρέθηκε συμβατός αισθητήρας κίνησης σε αυτό το Mac.";

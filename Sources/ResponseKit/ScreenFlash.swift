@@ -37,14 +37,18 @@ public final class ScreenFlash: FlashResponder {
         }
 
         let allScreens = NSScreen.screens
-        let screens: [NSScreen]
-        if enabledDisplayIDs.isEmpty {
-            screens = allScreens
-        } else {
-            let enabled = Set(enabledDisplayIDs)
-            screens = allScreens.filter { enabled.contains($0.displayID) }
-        }
+        let enabled = Set(enabledDisplayIDs)
+        let screens = allScreens.filter { enabled.contains($0.displayID) }
         guard !screens.isEmpty else { return }
+
+        // Prune window pool entries for disconnected screens
+        if windowPool.count > screens.count {
+            for key in windowPool.keys where key >= screens.count {
+                windowPool[key]?.orderOut(nil)
+                windowPool.removeValue(forKey: key)
+            }
+        }
+
         let picks = pickFaces(count: screens.count, total: faces.count)
 
         var activeWindows: [NSWindow] = []

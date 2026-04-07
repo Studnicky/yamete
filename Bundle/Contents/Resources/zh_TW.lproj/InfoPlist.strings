@@ -1,0 +1,7 @@
+/* Info.plist localized strings — 繁體中文 (台灣) */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete 使用加速度計偵測您 MacBook 上的實體衝擊。";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete 可以使用麥克風偵測您桌面上的衝擊聲音。";

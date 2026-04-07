@@ -1,0 +1,205 @@
+/* Yamete — Korean (ko) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "오늘 %lld번 충격";
+
+/* Last impact tier label */
+"last_impact" = "마지막: %@";
+
+/* Detection paused indicator */
+"status_paused" = "일시 정지";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "반응성";
+
+/* Reactivity setting help text */
+"help_reactivity" = "충격력 응답 창. 하단 슬라이더 = 트리거가 되는 최약 힘. 상단 슬라이더 = 최대 응답을 위한 힘. 값이 높을수록 더 가벼운 충격에 반응합니다.";
+
+/* Volume setting title */
+"setting_volume" = "음량";
+
+/* Volume setting help text */
+"help_volume" = "오디오 재생 레벨 창. 강도는 낮은 값과 높은 값 사이에서 선형으로 매핑됩니다. 클립 선택도 강도를 따릅니다 — 가벼운 충격일수록 짧은 클립이 재생됩니다.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "플래시 불투명도";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "화면 플래시 밝기 창. 엔벨로프 타이밍은 강도에 의해 형성됩니다. 사운드 클립 지속 시간 내에서 게이트됩니다.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "강";
+
+/* Ruler label: firm impact */
+"tier_firm" = "센";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "중";
+
+/* Ruler label: light impact */
+"tier_light" = "약";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "탭";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "감도 및 센서";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "센서 합의";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "트리거하기 전에 독립적으로 충격을 감지해야 하는 센서 수. 데이터를 제공하는 센서 수로 제한됩니다.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld개 센서";
+
+/* Cooldown setting title */
+"setting_cooldown" = "쿨다운";
+
+/* Cooldown setting help text */
+"help_cooldown" = "반응 간 최소 시간. 0 = 재생 중인 클립의 지속 시간에 의해서만 게이트됩니다.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "가속도 센서 조정";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "주파수 대역";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "원시 가속도 센서 데이터의 대역 통과 필터. 낮음 = 고역 통과 컷오프(바닥 진동 제거). 높음 = 저역 통과 컷오프(전자 소음 제거).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "스파이크 임계값";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "잠재적 충격으로 간주하기 위한 최소 필터링 진폭(g력). 대역 통과 필터링 후 적용됩니다. 값이 높을수록 더 강한 힘이 필요합니다.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "크레스트 팩터";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "피크 신호는 이 배수만큼 배경 RMS를 초과해야 합니다. 책상에 대한 날카로운 충격은 배경보다 훨씬 높이 스파이크됩니다. 발소리는 피크와 함께 배경도 높입니다. 값이 높을수록 더 많은 주변 진동을 제거합니다.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "상승률";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "연속 샘플 간 최소 진폭 증가. 직접 충격은 1-2 샘플 만에 상승합니다. 전달된 진동은 점진적으로 상승합니다. 값이 높을수록 간접 진동을 제거합니다.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "확인 수";
+
+/* Confirmations setting help text */
+"help_confirmations" = "120ms 감지 창에서 필요한 임계값 초과 샘플. 직접 충격은 3-5개의 높은 샘플을 생성합니다. 단일 흔들림은 1-2개를 생성합니다.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld회";
+
+/* Warmup setting title */
+"setting_warmup" = "워밍업";
+
+/* Warmup setting help text */
+"help_warmup" = "감지가 활성화되기 전 샘플 수. 필터가 안정되는 데 시간이 필요합니다. 50 Hz에서 50 샘플 = 1초.";
+
+/* Report interval setting title */
+"setting_report_interval" = "보고 간격";
+
+/* Report interval setting help text */
+"help_report_interval" = "가속도 센서 폴링 간격. 10ms = 100 Hz(기본값), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "장치";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld개 디스플레이, %lld개 오디오";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "플래시 디스플레이";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "충격 시 플래시 오버레이를 표시할 모니터를 선택하세요.";
+
+/* Audio output setting title */
+"setting_audio_output" = "오디오 출력";
+
+/* Audio output setting help text */
+"help_audio_output" = "충격음을 재생할 오디오 장치를 선택하세요. 선택 없음 = 오디오 없음.";
+
+/* No audio output devices found message */
+"no_output_devices" = "출력 장치를 찾을 수 없습니다";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "로그인 시 시작";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "디버그 로깅";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "종료";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "탭";
+
+/* Impact tier name: light */
+"tier_light_full" = "약함";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "보통";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "셈";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "강함";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "모션 센서 접근이 거부되었습니다 — 시스템 설정 > 개인 정보 보호 및 보안에서 입력 모니터링 권한을 부여하세요.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "가속도 센서를 찾을 수 없습니다 — 이 Mac에는 호환되는 모션 센서가 없을 수 있습니다.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "가속도 센서를 사용할 수 없습니다 (IOKit 오류 %@). 이 Mac에는 호환되는 모션 센서가 없을 수 있습니다.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "이 Mac에서 호환되는 모션 센서를 찾을 수 없습니다.";

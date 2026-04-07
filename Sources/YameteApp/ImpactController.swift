@@ -12,17 +12,18 @@ import Observation
 
 private let log = AppLog(category: "ImpactController")
 
-/// Coordinates sensor input, impact detection, and app responses.
+/// Coordinates sensor adapters, impact fusion, and app responses.
 ///
 /// Signal chain:
-///   sensor sample → detection (fusion engine) → normalization → response (audio + flash)
+///   adapter (per-sensor detection) → fusion engine (consensus + rearm) → response (audio + flash)
 @MainActor @Observable
 final class ImpactController {
     let settings: SettingsStore
     let audioPlayer: any AudioResponder
 
-    private let sensorManager: SensorManager
-    private let fusion = ImpactDetectionEngine()
+    let allAdapters: [any SensorAdapter]
+    private var sensorManager: SensorManager
+    private let fusion = ImpactFusionEngine()
     private let screenFlash: any FlashResponder
 
     var impactCount: Int = 0
@@ -31,19 +32,13 @@ final class ImpactController {
     var sensorName: String?
     var lastImpactMagnitude: Float = 0
     var lastImpactTier: ImpactTier?
-    var lastImpactFreqHz: String = "—"
 
     private var sensorTask: Task<Void, Never>?
+    private var settingsTask: Task<Void, Never>?
+    private var lastPushedConfig: FusionConfig?
     private var rearmUntil: Date = .distantPast
     private var countDate: Date = Calendar.current.startOfDay(for: Date())
     private var activeSensorIDs: Set<SensorID> = []
-
-    /// Intensity mapping calibrated to accelerometer data:
-    ///   0.020g = firm desk slap (minimum useful impact)
-    ///   0.060g = hard slap (approaching hardware stress)
-    private static let intensityFloor: Float = 0.020
-    private static let intensityCeiling: Float = 0.060
-    private let intensityRange: ClosedRange<Float> = intensityFloor...intensityCeiling
 
     init(settings: SettingsStore,
          audioPlayer: (any AudioResponder)? = nil,
@@ -52,24 +47,55 @@ final class ImpactController {
         self.settings = settings
         self.audioPlayer = audioPlayer ?? AudioPlayer()
         self.screenFlash = flashResponder ?? ScreenFlash()
-        sensorManager = SensorManager(adapters: adapters ?? [
+        self.allAdapters = adapters ?? [
             SPUAccelerometerAdapter(),
-        ])
+            MicrophoneAdapter(),
+            HeadphoneMotionAdapter(),
+        ]
+        sensorManager = SensorManager(adapters: allAdapters)
     }
 
-    // MARK: - Lifecycle
+    // MARK: - Lifecycle (driven by response toggles)
 
-    func start() {
+    /// Whether any response is enabled. Pipeline runs only when true.
+    var shouldBeEnabled: Bool { settings.soundEnabled || settings.screenFlash }
+
+    /// Called once at app launch. Starts the settings observation loop
+    /// which manages the pipeline lifecycle based on response toggles.
+    func bootstrap() {
+        AppLog.debugEnabled = settings.debugLogging
+        syncPipelineState()
+        startSettingsObservation()
+    }
+
+    private func syncPipelineState() {
+        if shouldBeEnabled && !isEnabled {
+            startPipeline()
+        } else if !shouldBeEnabled && isEnabled {
+            stopPipeline()
+        }
+    }
+
+    private func rebuildPipeline() {
+        AppLog.debugEnabled = settings.debugLogging
+        if isEnabled { stopPipeline() }
+        if shouldBeEnabled { startPipeline() }
+    }
+
+    private func startPipeline() {
         guard !isEnabled else { return }
         isEnabled = true
         sensorError = nil
-        log.info("activity:ImpactDetection wasStartedBy agent:ImpactController")
+
+        let adapters = buildAdapters()
+        sensorManager = SensorManager(adapters: adapters)
+        log.info("activity:ImpactDetection wasStartedBy agent:ImpactController adapters=\(adapters.map(\.name))")
 
         sensorTask = Task {
             for await event in sensorManager.events() {
                 switch event {
-                case .sample(let sample):
-                    handleSample(sample)
+                case .impact(let impact):
+                    handleImpact(impact)
                 case .error(let msg):
                     sensorError = msg
                 case .adaptersChanged(let ids, let names):
@@ -80,131 +106,156 @@ final class ImpactController {
         }
     }
 
-    func stop() {
+    private func stopPipeline() {
         sensorTask?.cancel()
         sensorTask = nil
         isEnabled = false
         sensorName = nil
         activeSensorIDs = []
+        fusion.reset()
+        lastPushedConfig = nil
         log.info("activity:ImpactDetection wasEndedBy agent:ImpactController")
     }
 
-    func toggle() { isEnabled ? stop() : start() }
+    private func startSettingsObservation() {
+        settingsTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                let changed = await withCheckedContinuation { continuation in
+                    withObservationTracking {
+                        guard let self else { return }
+                        _ = self.settings.soundEnabled
+                        _ = self.settings.screenFlash
+                        _ = self.settings.debugLogging
+                        _ = self.settings.spikeThreshold
+                        _ = self.settings.riseRate
+                        _ = self.settings.crestFactor
+                        _ = self.settings.confirmations
+                        _ = self.settings.warmupSamples
+                        _ = self.settings.bandpassLowHz
+                        _ = self.settings.bandpassHighHz
+                        _ = self.settings.reportInterval
+                        _ = self.settings.enabledSensorIDs
+                    } onChange: {
+                        continuation.resume(returning: true)
+                    }
+                }
+                guard changed, let self, !Task.isCancelled else { break }
+                self.rebuildPipeline()
+                // Re-register by looping
+            }
+        }
+    }
 
-    /// Plays the longest loaded sound on all output devices at full volume.
     func playWelcomeSound() {
         guard let url = audioPlayer.longestSoundURL else { return }
         audioPlayer.playOnAllDevices(url: url, volume: 1.0)
     }
 
-    // MARK: - Signal chain
+    // MARK: - Impact handling
 
-    private func handleSample(_ sample: SensorSample) {
-        pushConfigToFusion()
-        guard let impact = detect(sample) else { return }
-        respond(to: impact)
-    }
+    private func handleImpact(_ impact: SensorImpact) {
+        pushFusionConfigIfNeeded()
 
-    // MARK: - Detection
+        guard let fused = fusion.ingest(impact, activeSources: activeSensorIDs) else { return }
+        guard Date() >= rearmUntil else { return }
+        guard let intensity = mapSensitivity(fused.intensity) else { return }
 
-    private struct DetectedImpact {
-        let magnitude: Float
-        let intensity: Float
-        let tier: ImpactTier
-        let timestamp: Date
-        let confidence: Float
-    }
-
-    private func detect(_ sample: SensorSample) -> DetectedImpact? {
-        let sources = activeSensorIDs.isEmpty ? Set([sample.source]) : activeSensorIDs
-        guard let fused = fusion.ingest(sample, activeSources: sources) else { return nil }
-
-        let now = fused.timestamp
-        let mag = fused.amplitude.magnitude
-
-        guard now >= rearmUntil else { return nil }
-        guard let intensity = normalizeIntensity(mag) else { return nil }
-
-        return DetectedImpact(
-            magnitude: mag,
-            intensity: intensity,
-            tier: ImpactTier.from(intensity: intensity),
-            timestamp: now,
-            confidence: fused.confidence
-        )
+        respond(intensity: intensity, timestamp: fused.timestamp, confidence: fused.confidence)
     }
 
     // MARK: - Response
 
-    private func respond(to impact: DetectedImpact) {
-        lastImpactMagnitude = impact.magnitude
-        lastImpactTier = impact.tier
-        lastImpactFreqHz = "\(Int(settings.bandpassLowHz))–\(Int(settings.bandpassHighHz)) Hz"
+    private func respond(intensity: Float, timestamp: Date, confidence: Float) {
+        let tier = ImpactTier.from(intensity: intensity)
+        lastImpactMagnitude = intensity
+        lastImpactTier = tier
 
-        let clipDuration = audioPlayer.play(
-            intensity: impact.intensity,
-            volumeMin: Float(settings.volumeMin),
-            volumeMax: Float(settings.volumeMax),
-            deviceUIDs: settings.enabledAudioDevices
-        )
+        var clipDuration: Double = 0
+        if settings.soundEnabled {
+            clipDuration = audioPlayer.play(
+                intensity: intensity,
+                volumeMin: Float(settings.volumeMin),
+                volumeMax: Float(settings.volumeMax),
+                deviceUIDs: settings.enabledAudioDevices
+            )
+        }
 
-        rearmUntil = impact.timestamp.addingTimeInterval(max(clipDuration, settings.debounce))
+        rearmUntil = timestamp.addingTimeInterval(max(clipDuration, settings.debounce))
 
-        if settings.screenFlash && clipDuration > 0 {
+        if settings.screenFlash {
+            let flashDuration = clipDuration > 0 ? clipDuration : 0.5
             screenFlash.flash(
-                intensity: impact.intensity,
+                intensity: intensity,
                 opacityMin: Float(settings.flashOpacityMin),
                 opacityMax: Float(settings.flashOpacityMax),
-                clipDuration: clipDuration,
+                clipDuration: flashDuration,
                 enabledDisplayIDs: settings.enabledDisplays
             )
         }
 
-        log.debug("entity:Impact tier=\(impact.tier) intensity=\(String(format: "%.2f", impact.intensity)) mag=\(String(format: "%.4f", impact.magnitude)) confidence=\(String(format: "%.2f", impact.confidence))")
-        incrementDailyCount(now: impact.timestamp)
+        log.debug("entity:Impact tier=\(tier) intensity=\(String(format: "%.2f", intensity)) confidence=\(String(format: "%.2f", confidence))")
+        incrementDailyCount(now: timestamp)
     }
 
     // MARK: - Configuration
 
-    private func pushConfigToFusion() {
-        let config = DetectionConfig(
+    /// Builds fresh adapter instances configured from current settings.
+    /// Adapters are immutable after creation — config is baked in at init.
+    private func buildAdapters() -> [any SensorAdapter] {
+        let enabled = Set(settings.enabledSensorIDs)
+        let interval = Int(settings.reportInterval)
+        let bpLow = Float(settings.bandpassLowHz)
+        let bpHigh = Float(settings.bandpassHighHz)
+        let accelConfig = defaultAccelDetectorConfig(
             spikeThreshold: Float(settings.spikeThreshold),
-            minCrestFactor: Float(settings.crestFactor),
-            minRiseRate: Float(settings.riseRate),
-            minConfirmations: settings.confirmations,
-            minRearmDuration: settings.debounce,
-            minWarmupSamples: settings.warmupSamples,
-            bandpassLowHz: Float(settings.bandpassLowHz),
-            bandpassHighHz: Float(settings.bandpassHighHz)
+            riseRate: Float(settings.riseRate),
+            crestFactor: Float(settings.crestFactor),
+            confirmations: settings.confirmations,
+            warmupSamples: settings.warmupSamples
         )
+
+        var adapters: [any SensorAdapter] = []
+        for template in allAdapters {
+            guard enabled.contains(template.id.rawValue) else { continue }
+            switch template.id.rawValue {
+            case "accelerometer":
+                adapters.append(SPUAccelerometerAdapter(
+                    reportIntervalUS: interval, bandpassLowHz: bpLow,
+                    bandpassHighHz: bpHigh, detectorConfig: accelConfig))
+            default:
+                adapters.append(template)
+            }
+        }
+        return adapters
+    }
+
+    private func pushFusionConfigIfNeeded() {
+        let config = FusionConfig(
+            consensusRequired: settings.consensusRequired,
+            rearmDuration: settings.debounce
+        )
+        guard config != lastPushedConfig else { return }
+        lastPushedConfig = config
         fusion.configure(config)
     }
 
-    // MARK: - Normalization
+    // MARK: - Sensitivity mapping
 
-    /// Converts force magnitude to 0...1 intensity; returns nil below threshold.
-    /// Sensitivity is inverted to thresholds: high sensitivity → low threshold → more reactive.
-    private func normalizeIntensity(_ magnitude: Float) -> Float? {
-        let rawIntensity = ((magnitude - intensityRange.lowerBound)
-            / (intensityRange.upperBound - intensityRange.lowerBound))
-            .clamped(to: 0...1)
-
+    /// Maps 0–1 adapter intensity through the user's sensitivity window.
+    private func mapSensitivity(_ intensity: Float) -> Float? {
         let thresholdLow = 1.0 - Float(settings.sensitivityMax)
         let thresholdHigh = 1.0 - Float(settings.sensitivityMin)
-        guard rawIntensity >= thresholdLow else { return nil }
+        guard intensity >= thresholdLow else { return nil }
 
         let bandWidth = max(Float(0.001), thresholdHigh - thresholdLow)
-        return ((rawIntensity - thresholdLow) / bandWidth).clamped(to: 0...1)
+        return ((intensity - thresholdLow) / bandWidth).clamped(to: 0...1)
     }
 
     // MARK: - Daily counter
 
     private func incrementDailyCount(now: Date) {
         let today = Calendar.current.startOfDay(for: now)
-        if today > countDate {
-            impactCount = 0
-            countDate = today
-        }
+        if today > countDate { impactCount = 0; countDate = today }
         impactCount += 1
     }
 }

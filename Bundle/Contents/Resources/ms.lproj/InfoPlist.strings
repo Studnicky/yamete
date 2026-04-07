@@ -1,0 +1,7 @@
+/* Info.plist localized strings */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete menggunakan jangka pecutan untuk mengesan impak fizikal pada MacBook anda.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete boleh menggunakan mikrofon untuk mengesan bunyi impak di meja anda.";

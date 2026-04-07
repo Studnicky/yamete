@@ -1,0 +1,205 @@
+/* Yamete — Türkçe (Turkish) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "Bugün %lld darbe";
+
+/* Last impact tier label */
+"last_impact" = "son: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Duraklatıldı";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Tepkisellik";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Darbe kuvveti yanıt penceresi. Alt başparmak = tetikleyen en zayıf kuvvet. Üst başparmak = maksimum yanıt için kuvvet. Daha yüksek değerler daha hafif darbelere tepki verir.";
+
+/* Volume setting title */
+"setting_volume" = "Ses Seviyesi";
+
+/* Volume setting help text */
+"help_volume" = "Ses çalma seviyesi penceresi. Yoğunluk düşük ve yüksek arasında doğrusal olarak eşlenir. Klip seçimi de yoğunluğu takip eder — daha hafif darbeler daha kısa klipler çalar.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Flaş Opaklığı";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Ekran flaşı parlaklık penceresi. Zarf zamanlaması yoğunluk tarafından şekillendirilir. Ses klibi süresiyle sınırlandırılmıştır.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Güçlü";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Sert";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Orta";
+
+/* Ruler label: light impact */
+"tier_light" = "Hafif";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Dokunuş";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Duyarlılık ve Sensörler";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Sensör Mutabakatı";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Tetiklemeden önce bir darbeyi bağımsız olarak algılaması gereken sensör sayısı. Veri sağlayan sensör sayısıyla sınırlandırılmıştır.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld sensör";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Bekleme Süresi";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Tepkiler arasındaki minimum süre. 0 = yalnızca çalan klipın süresiyle sınırlandırılmıştır.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "İvme Ölçer Ayarı";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Frekans Bandı";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Ham ivme ölçer verileri üzerinde bant geçiren filtre. Düşük = yüksek geçiren eşiği (zemin titreşimlerini reddeder). Yüksek = alçak geçiren eşiği (elektronik gürültüyü reddeder).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Ani Artış Eşiği";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Olası darbe olarak değerlendirilen minimum filtrelenmiş büyüklük (g kuvveti). Bant geçiren filtreden sonra uygulanır. Daha yüksek değerler daha güçlü kuvvet gerektirir.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Tepe sinyali arka plan RMS'ini bu katla aşmalıdır. Masa üzerine keskin darbeler arka planın çok üzerine çıkar. Adımlar tepeyle birlikte arka planı da yükseltir. Daha yüksek değerler daha fazla çevresel titreşimi reddeder.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Ardışık örnekler arasındaki minimum büyüklük artışı. Doğrudan darbeler 1-2 örnekte yükselir. İletilen titreşimler kademeli olarak yükselir. Daha yüksek değerler dolaylı titreşimleri reddeder.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Onaylar";
+
+/* Confirmations setting help text */
+"help_confirmations" = "120 ms algılama penceresinde gereken eşik üzeri örnekler. Doğrudan darbeler 3-5 yüksek örnek üretir. Tekli sarsıntılar 1-2 üretir.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld isabet";
+
+/* Warmup setting title */
+"setting_warmup" = "Isınma";
+
+/* Warmup setting help text */
+"help_warmup" = "Algılama etkinleşmeden önceki örnekler. Filtrelerin stabil hale gelmesi için zamana ihtiyaç vardır. 50 Hz'de 50 örnek = 1 saniye.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Raporlama Aralığı";
+
+/* Report interval setting help text */
+"help_report_interval" = "İvme ölçer örnekleme aralığı. 10 ms = 100 Hz (varsayılan), 5 ms = 200 Hz, 20 ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Aygıtlar";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld ekran, %lld ses";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Flaş Ekranları";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Darbeye tepki olarak flaş bindirmesini gösterecek monitörleri seçin.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Ses Çıkışı";
+
+/* Audio output setting help text */
+"help_audio_output" = "Darbe seslerini çalacak ses aygıtlarını seçin. Hiçbiri seçilmemiş = ses yok.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Çıkış aygıtı bulunamadı";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Girişte Başlat";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Hata Ayıklama Kaydı";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Çıkış";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Dokunuş";
+
+/* Impact tier name: light */
+"tier_light_full" = "Hafif";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Orta";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Sert";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Güçlü";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Hareket sensörü erişimi reddedildi — Sistem Ayarları > Gizlilik ve Güvenlik bölümünden Giriş İzleme iznini verin.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "İvme ölçer bulunamadı — bu Mac'te uyumlu bir hareket sensörü olmayabilir.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "İvme ölçer kullanılamıyor (IOKit hatası %@). Bu Mac'te uyumlu bir hareket sensörü olmayabilir.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Bu Mac'te uyumlu hareket sensörü bulunamadı.";

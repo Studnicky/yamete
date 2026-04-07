@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <!-- Daily impact counter -->
+    <!-- Slovenian CLDR: one (v0 and n%100=1), two (v0 and n%100=2), few (v0 and n%100=3..4), other -->
+    <key>impacts_today</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@ danes</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>one</key>
+            <string>%lld udarec danes</string>
+            <key>two</key>
+            <string>%lld udarca danes</string>
+            <key>few</key>
+            <string>%lld udarci danes</string>
+            <key>other</key>
+            <string>%lld udarcev danes</string>
+        </dict>
+    </dict>
+
+    <!-- Sensor consensus count -->
+    <key>consensus_format</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>one</key>
+            <string>%lld senzor</string>
+            <key>two</key>
+            <string>%lld senzorja</string>
+            <key>few</key>
+            <string>%lld senzorji</string>
+            <key>other</key>
+            <string>%lld senzorjev</string>
+        </dict>
+    </dict>
+
+    <!-- Confirmation hit count -->
+    <key>confirmations_format</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>one</key>
+            <string>%lld zadetek</string>
+            <key>two</key>
+            <string>%lld zadetka</string>
+            <key>few</key>
+            <string>%lld zadetki</string>
+            <key>other</key>
+            <string>%lld zadetkov</string>
+        </dict>
+    </dict>
+
+</dict>
+</plist>

@@ -1,0 +1,205 @@
+/* Yamete — Norwegian Bokmål (no) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld støt i dag";
+
+/* Last impact tier label */
+"last_impact" = "siste: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Pauset";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reaktivitet";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Responsvindu for støtkraft. Nedre tommel = svakeste kraft som utløser. Øvre tommel = kraft for maksimal respons. Høyere verdier reagerer på lettere støt.";
+
+/* Volume setting title */
+"setting_volume" = "Volum";
+
+/* Volume setting help text */
+"help_volume" = "Vindu for lydavspillingsnivå. Intensitet kartlegges lineært mellom lav og høy. Klipputvalg følger også intensitet — lettere støt spiller kortere klipp.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Flash-ugjennomsiktighet";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Vindu for skjermblitsens lysstyrke. Konvolutttiming formes av intensitet. Gated innenfor lydklippets varighet.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Hardt";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Fast";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Mid";
+
+/* Ruler label: light impact */
+"tier_light" = "Lett";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Trykk";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Følsomhet & Sensorer";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Sensorkonsensus";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Antall sensorer som uavhengig må oppdage et støt før utløsing. Begrenset til antall sensorer som leverer data.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld sensorer";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Nedkjølingstid";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Minimum tid mellom reaksjoner. 0 = gated kun av den spillende klippets varighet.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Akselerometerjustering";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Frekvensbånd";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Båndpassfilter på råe akselerometerdata. Lav = høypassavskjæring (avviser gulvvibrasjoner). Høy = lavpassavskjæring (avviser elektronisk støy).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Spissterskel";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Minimum filtrert magnitude (g-kraft) for å vurdere som potensielt støt. Brukt etter båndpassfiltrering. Høyere verdier krever sterkere kraft.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest-faktor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Toppignalet må overskride bakgrunns-RMS med dette flertallet. Skarpe skrivebordsstøt pigg godt over bakgrunnen. Fottrinn hever bakgrunnen sammen med toppen. Høyere verdier avviser mer omgivende vibrasjon.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Stigningsrate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Minimum magnitudeøkning mellom påfølgende prøver. Direkte støt stiger i 1-2 prøver. Overført vibrasjon stiger gradvis. Høyere verdier avviser indirekte vibrasjon.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Bekreftelser";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Prøver over terskel kreves i 120ms deteksjonsvinduet. Direkte treff produserer 3-5 høye prøver. Enkle støt produserer 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld treff";
+
+/* Warmup setting title */
+"setting_warmup" = "Oppvarming";
+
+/* Warmup setting help text */
+"help_warmup" = "Prøver før deteksjon aktiveres. Filtre trenger tid for å stabilisere seg. Ved 50 Hz, 50 prøver = 1 sekund.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Rapportintervall";
+
+/* Report interval setting help text */
+"help_report_interval" = "Akselerometerpollingintervall. 10ms = 100 Hz (standard), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Enheter";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld skjermer, %lld lyd";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Flash-skjermer";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Velg hvilke monitorer som viser flash-overlappen ved støt.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Lydutgang";
+
+/* Audio output setting help text */
+"help_audio_output" = "Velg hvilke lydenheter som spiller av støtlyder. Ingen valgt = ingen lyd.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Ingen utgangsenheter funnet";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Start ved Innlogging";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Debug-logging";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Avslutt";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Trykk";
+
+/* Impact tier name: light */
+"tier_light_full" = "Lett";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Middels";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Fast";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Hardt";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Tilgang til bevegelsessensor nektet — gi Input Monitoring-tillatelse i Systeminnstillinger > Personvern og sikkerhet.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Ingen akselerometer funnet — denne Mac-en har kanskje ikke en kompatibel bevegelsessensor.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Akselerometer utilgjengelig (IOKit-feil %@). Denne Mac-en har kanskje ikke en kompatibel bevegelsessensor.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Ingen kompatibel bevegelsessensor funnet på denne Mac-en.";

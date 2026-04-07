@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Greek */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Το Yamete χρησιμοποιεί το επιταχυνσιόμετρο για να ανιχνεύει φυσικές κρούσεις στο MacBook σας.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Το Yamete μπορεί να χρησιμοποιεί το μικρόφωνο για να ανιχνεύει ήχους κρούσης στο γραφείο σας.";

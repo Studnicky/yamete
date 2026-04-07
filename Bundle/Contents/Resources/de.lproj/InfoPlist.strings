@@ -1,0 +1,7 @@
+/* Info.plist localized strings — German */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete verwendet den Beschleunigungssensor, um physische Einschläge auf Ihrem MacBook zu erkennen.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete kann das Mikrofon verwenden, um Einschlaggeräusche auf Ihrem Schreibtisch zu erkennen.";

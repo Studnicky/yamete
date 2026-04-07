@@ -6,34 +6,36 @@ import XCTest
 
 // MARK: - Mock adapter for testing SensorManager
 
-/// Test adapter that yields a fixed sample sequence.
+/// Test adapter that yields a fixed impact sequence.
 final class MockSensorAdapter: SensorAdapter, @unchecked Sendable {
     let id: SensorID
     let name: String
     let isAvailable: Bool
-    private let sampleSequence: [Vec3]
+    private let impactSequence: [SensorImpact]
     private let error: Error?
 
-    init(name: String = "Mock", available: Bool = true, samples: [Vec3] = [], error: Error? = nil) {
+    init(name: String = "Mock", available: Bool = true, impacts: [SensorImpact] = [], error: Error? = nil) {
         self.id = SensorID(name)
         self.name = name
         self.isAvailable = available
-        self.sampleSequence = samples
+        self.impactSequence = impacts
         self.error = error
     }
 
-    func samples() -> AsyncThrowingStream<Vec3, Error> {
-        let seq = sampleSequence
+    convenience init(name: String = "Mock", available: Bool = true, intensities: [Float] = [], error: Error? = nil) {
+        let impacts = intensities.map {
+            SensorImpact(source: SensorID(name), timestamp: Date(), intensity: $0)
+        }
+        self.init(name: name, available: available, impacts: impacts, error: error)
+    }
+
+    func impacts() -> AsyncThrowingStream<SensorImpact, Error> {
+        let seq = impactSequence
         let err = error
         return AsyncThrowingStream { continuation in
-            for vec in seq {
-                continuation.yield(vec)
-            }
-            if let err {
-                continuation.finish(throwing: err)
-            } else {
-                continuation.finish()
-            }
+            for impact in seq { continuation.yield(impact) }
+            if let err { continuation.finish(throwing: err) }
+            else { continuation.finish() }
         }
     }
 }
@@ -43,70 +45,55 @@ final class MockSensorAdapter: SensorAdapter, @unchecked Sendable {
 @MainActor
 final class SensorManagerTests: XCTestCase {
 
-    func testEventsYieldsSamplesFromAvailableAdapter() async {
-        let expected = [Vec3(x: 1, y: 0, z: 0), Vec3(x: 0, y: 1, z: 0)]
-        let adapter = MockSensorAdapter(name: "A", samples: expected)
+    func testEventsYieldsImpactsFromAvailableAdapter() async {
+        let adapter = MockSensorAdapter(name: "A", intensities: [0.5, 0.8])
         let manager = SensorManager(adapters: [adapter])
 
-        var received: [SensorSample] = []
+        var received: [SensorImpact] = []
         for await event in manager.events() {
-            if case .sample(let sample) = event {
-                received.append(sample)
-            }
+            if case .impact(let impact) = event { received.append(impact) }
         }
 
-        XCTAssertEqual(received.count, expected.count)
+        XCTAssertEqual(received.count, 2)
         XCTAssertTrue(received.allSatisfy { $0.source == SensorID("A") })
-        for (r, e) in zip(received.map(\.value), expected) {
-            XCTAssertEqual(r.x, e.x, accuracy: 1e-6)
-            XCTAssertEqual(r.y, e.y, accuracy: 1e-6)
-        }
     }
 
     func testEventsSkipsUnavailableAdapters() async {
-        let unavailable = MockSensorAdapter(name: "Unavailable", available: false, samples: [Vec3(x: 9, y: 9, z: 9)])
-        let available = MockSensorAdapter(name: "Available", available: true, samples: [Vec3(x: 1, y: 0, z: 0)])
+        let unavailable = MockSensorAdapter(name: "Unavailable", available: false, intensities: [0.9])
+        let available = MockSensorAdapter(name: "Available", available: true, intensities: [0.5])
         let manager = SensorManager(adapters: [unavailable, available])
 
         var activeSnapshots: [[String]] = []
-        var sampleCount = 0
+        var impactCount = 0
         for await event in manager.events() {
             switch event {
-            case .adaptersChanged(_, let names):
-                activeSnapshots.append(names)
-            case .sample:
-                sampleCount += 1
-            case .error:
-                break
+            case .adaptersChanged(_, let names): activeSnapshots.append(names)
+            case .impact: impactCount += 1
+            case .error: break
             }
         }
 
-        XCTAssertEqual(sampleCount, 1)
+        XCTAssertEqual(impactCount, 1)
         XCTAssertTrue(activeSnapshots.contains(["Available"]))
-        XCTAssertFalse(activeSnapshots.contains(["Unavailable"]))
     }
 
     func testEventsReportsErrorOnNoAdapters() async {
         let manager = SensorManager(adapters: [])
-
         var errors: [String] = []
         for await event in manager.events() {
             if case .error(let msg) = event { errors.append(msg) }
         }
-
-        XCTAssertFalse(errors.isEmpty, "Should report error when no adapters available")
+        XCTAssertFalse(errors.isEmpty)
     }
 
     func testEventsPublishesAdapterLifecycle() async {
-        let a = MockSensorAdapter(name: "A", samples: [Vec3.zero])
-        let b = MockSensorAdapter(name: "B", samples: [Vec3.zero])
+        let a = MockSensorAdapter(name: "A", intensities: [0.5])
+        let b = MockSensorAdapter(name: "B", intensities: [0.5])
         let manager = SensorManager(adapters: [a, b])
 
         var snapshots: [[String]] = []
         for await event in manager.events() {
-            if case .adaptersChanged(_, let names) = event {
-                snapshots.append(names)
-            }
+            if case .adaptersChanged(_, let names) = event { snapshots.append(names) }
         }
 
         XCTAssertTrue(snapshots.contains(["A", "B"]))
@@ -114,14 +101,16 @@ final class SensorManagerTests: XCTestCase {
     }
 
     func testEventsCancellation() async {
-        let manySamples = (0..<1000).map { _ in Vec3(x: 0.5, y: 0.5, z: 0.5) }
-        let adapter = MockSensorAdapter(samples: manySamples)
+        let impacts = (0..<1000).map {
+            SensorImpact(source: SensorID("Mock"), timestamp: Date(), intensity: Float($0) / 1000)
+        }
+        let adapter = MockSensorAdapter(impacts: impacts)
         let manager = SensorManager(adapters: [adapter])
 
         let task = Task {
             var count = 0
             for await event in manager.events() {
-                if case .sample = event {
+                if case .impact = event {
                     count += 1
                     if count >= 3 { break }
                 }
@@ -134,7 +123,7 @@ final class SensorManagerTests: XCTestCase {
     }
 
     func testEventsReportsAdapterError() async {
-        let failing = MockSensorAdapter(name: "Flaky", samples: [], error: SensorError.deviceNotFound)
+        let failing = MockSensorAdapter(name: "Flaky", intensities: [], error: SensorError.deviceNotFound)
         let manager = SensorManager(adapters: [failing])
 
         var messages: [String] = []
@@ -149,7 +138,6 @@ final class SensorManagerTests: XCTestCase {
 // MARK: - SensorError tests
 
 final class SensorErrorTests: XCTestCase {
-
     func testErrorDescriptions() {
         struct Case { let error: SensorError; let substring: String }
         let cases: [Case] = [

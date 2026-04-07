@@ -1,0 +1,4 @@
+module IOHIDPublic {
+    header "IOHIDPublic.h"
+    export *
+}

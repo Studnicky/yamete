@@ -1,0 +1,7 @@
+/* Info.plist localized strings — ภาษาไทย */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete ใช้มาตรความเร่งเพื่อตรวจจับแรงกระแทกทางกายภาพบน MacBook ของคุณ";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete สามารถใช้ไมโครโฟนเพื่อตรวจจับเสียงแรงกระแทกบนโต๊ะของคุณ";

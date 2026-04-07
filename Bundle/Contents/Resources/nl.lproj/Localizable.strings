@@ -1,0 +1,205 @@
+/* Yamete — Dutch (nl) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld impacts vandaag";
+
+/* Last impact tier label */
+"last_impact" = "laatste: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Gepauzeerd";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reactiviteit";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Responsvenster voor impactkracht. Onderste duim = zwakste kracht die activeert. Bovenste duim = kracht voor maximale respons. Hogere waarden reageren op lichtere impacts.";
+
+/* Volume setting title */
+"setting_volume" = "Volume";
+
+/* Volume setting help text */
+"help_volume" = "Venster voor audioweergaveniveau. Intensiteit wordt lineair tussen laag en hoog toegewezen. Clipkeuze volgt ook intensiteit — lichtere impacts spelen kortere clips.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Flash-doorzichtigheid";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Venster voor helderheid van het schermflits. Envelopetiming wordt gevormd door intensiteit. Gepoort binnen de duur van de geluidclip.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Hard";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Stevig";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Mid";
+
+/* Ruler label: light impact */
+"tier_light" = "Licht";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Tik";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Gevoeligheid & Sensoren";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Sensorconsensus";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Aantal sensoren dat onafhankelijk een impact moet detecteren voordat er wordt geactiveerd. Beperkt tot het aantal sensoren dat gegevens levert.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld sensoren";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Afkoeltijd";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Minimale tijd tussen reacties. 0 = alleen gepoort door de duur van de spelende clip.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Versnellingsmeter Afstemming";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Frequentieband";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Bandpassfilter op ruwe versnellingsmetergegevens. Laag = hoogdoorlaatafsnijding (verwerpt vloervibraties). Hoog = laagdoorlaatafsnijding (verwerpt elektronisch ruis).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Piekdrempel";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Minimale gefilterde magnitude (g-kracht) om als potentiële impact te beschouwen. Toegepast na bandpassfiltering. Hogere waarden vereisen sterkere kracht.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crestfactor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Pieksignaal moet de achtergrond-RMS met dit veelvoud overschrijden. Scherpe bureau-hits pieken ver boven de achtergrond. Voetstappen verhogen de achtergrond samen met de piek. Hogere waarden verwerpen meer omgevingstrillingen.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Stijgsnelheid";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Minimale magnitudestijging tussen opeenvolgende monsters. Directe impacts stijgen in 1-2 monsters. Overgedragen vibraties stijgen geleidelijk. Hogere waarden verwerpen indirecte trillingen.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Bevestigingen";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Monsters boven drempel vereist in het 120ms detectievenster. Directe treffers produceren 3-5 hoge monsters. Enkelvoudige schokken produceren 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld treffers";
+
+/* Warmup setting title */
+"setting_warmup" = "Opwarmen";
+
+/* Warmup setting help text */
+"help_warmup" = "Monsters voordat detectie activeert. Filters hebben tijd nodig om te stabiliseren. Bij 50 Hz, 50 monsters = 1 seconde.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Rapportage-interval";
+
+/* Report interval setting help text */
+"help_report_interval" = "Polling-interval versnellingsmeter. 10ms = 100 Hz (standaard), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Apparaten";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld beeldschermen, %lld audio";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Flash-beeldschermen";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Selecteer welke monitors de flash-overlay tonen bij impact.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Audio-uitvoer";
+
+/* Audio output setting help text */
+"help_audio_output" = "Selecteer welke audioapparaten impactgeluiden afspelen. Niets geselecteerd = geen audio.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Geen uitvoerapparaten gevonden";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Opstarten bij Aanmelden";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Debug-logging";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Afsluiten";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Tik";
+
+/* Impact tier name: light */
+"tier_light_full" = "Licht";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Gemiddeld";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Stevig";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Hard";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Toegang tot bewegingssensor geweigerd — verleen Input Monitoring-toestemming in Systeeminstellingen > Privacy en Beveiliging.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Geen versnellingsmeter gevonden — deze Mac heeft mogelijk geen compatibele bewegingssensor.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Versnellingsmeter niet beschikbaar (IOKit-fout %@). Deze Mac heeft mogelijk geen compatibele bewegingssensor.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Geen compatibele bewegingssensor gevonden op deze Mac.";

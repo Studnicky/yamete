@@ -1,0 +1,205 @@
+/* Yamete — English (United Kingdom) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld impacts today";
+
+/* Last impact tier label */
+"last_impact" = "last: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Paused";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reactivity";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Impact force response window. Low thumb = weakest force that triggers. High thumb = force for maximum response. Higher values respond to lighter impacts.";
+
+/* Volume setting title */
+"setting_volume" = "Volume";
+
+/* Volume setting help text */
+"help_volume" = "Audio playback level window. Intensity maps linearly between low and high. Clip selection also follows intensity — lighter impacts play shorter clips.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Flash Opacity";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Screen flash brightness window. Envelope timing shaped by intensity. Gated inside the sound clip duration.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Hard";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Firm";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Med";
+
+/* Ruler label: light impact */
+"tier_light" = "Light";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Tap";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Sensitivity & Sensors";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Sensor Consensus";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Number of sensors that must independently detect an impact before triggering. Clamped to the number of sensors delivering data.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld sensors";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Cooldown";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Minimum time between reactions. 0 = gated only by the playing clip's duration.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Accelerometer Tuning";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Frequency Band";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Bandpass filter on raw accelerometer data. Low = high-pass cutoff (rejects floor vibrations). High = low-pass cutoff (rejects electronic noise).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Spike Threshold";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Minimum filtered magnitude (g-force) to consider as a potential impact. Applied after bandpass filtering. Higher values require stronger force.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Peak signal must exceed background RMS by this multiple. Sharp desk hits spike well above background. Footsteps raise background along with peak. Higher values reject more ambient vibration.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Minimum magnitude increase between consecutive samples. Direct impacts rise in 1-2 samples. Transmitted vibrations rise gradually. Higher values reject indirect vibration.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Confirmations";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Above-threshold samples required in the 120ms detection window. Direct hits produce 3-5 high samples. Single jolts produce 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld hits";
+
+/* Warmup setting title */
+"setting_warmup" = "Warmup";
+
+/* Warmup setting help text */
+"help_warmup" = "Samples before detection activates. Filters need time to settle. At 50 Hz, 50 samples = 1 second.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Report Interval";
+
+/* Report interval setting help text */
+"help_report_interval" = "Accelerometer polling interval. 10ms = 100 Hz (default), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Devices";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld displays, %lld audio";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Flash Displays";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Select which monitors show the flash overlay on impact.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Audio Output";
+
+/* Audio output setting help text */
+"help_audio_output" = "Select which audio devices play impact sounds. None selected = no audio.";
+
+/* No audio output devices found message */
+"no_output_devices" = "No output devices found";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Launch at Login";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Debug Logging";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Quit";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Tap";
+
+/* Impact tier name: light */
+"tier_light_full" = "Light";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Medium";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Firm";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Hard";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "No accelerometer found — this Mac may not have a compatible motion sensor.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "No compatible motion sensor found on this Mac.";

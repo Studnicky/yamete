@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Türkçe */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete, MacBook'unuzdaki fiziksel darbeleri algılamak için ivme ölçeri kullanır.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete, masanızdaki darbe seslerini algılamak için mikrofonu kullanabilir.";
