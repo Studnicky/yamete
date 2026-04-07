@@ -10,7 +10,6 @@ import XCTest
 final class MockSensorAdapter: SensorAdapter, @unchecked Sendable {
     let id: SensorID
     let name: String
-    let apiClassification: APIClassification = .publicAPI
     let isAvailable: Bool
     private let impactSequence: [SensorImpact]
     private let error: Error?

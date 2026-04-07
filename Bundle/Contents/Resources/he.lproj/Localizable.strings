@@ -1,0 +1,205 @@
+/* Yamete — Hebrew Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld פגיעות היום";
+
+/* Last impact tier label */
+"last_impact" = "אחרון: %@";
+
+/* Detection paused indicator */
+"status_paused" = "מושהה";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "תגובתיות";
+
+/* Reactivity setting help text */
+"help_reactivity" = "חלון תגובה לעוצמת הפגיעה. המחוון התחתון = עוצמה מינימלית להפעלה. המחוון העליון = עוצמה לתגובה מקסימלית. ערכים גבוהים יותר מגיבים לפגיעות קלות יותר.";
+
+/* Volume setting title */
+"setting_volume" = "עוצמת שמע";
+
+/* Volume setting help text */
+"help_volume" = "חלון רמת ניגון השמע. העוצמה ממופה בצורה לינארית בין נמוך לגבוה. בחירת הקליפ גם כן עוקבת אחר העוצמה — פגיעות קלות מנגנות קליפים קצרים יותר.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "אטימות ההבזק";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "חלון בהירות הבזק המסך. תזמון מעטפת מעוצב על ידי העוצמה. מוגבל בתוך משך קליפ הצליל.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "חזקה";
+
+/* Ruler label: firm impact */
+"tier_firm" = "יציבה";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "בינונית";
+
+/* Ruler label: light impact */
+"tier_light" = "קלה";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "הקשה";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "רגישות וחיישנים";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "הסכמת חיישנים";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "מספר החיישנים שצריכים לזהות פגיעה באופן עצמאי לפני הפעלה. מוגבל למספר החיישנים המספקים נתונים.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld חיישנים";
+
+/* Cooldown setting title */
+"setting_cooldown" = "זמן התאוששות";
+
+/* Cooldown setting help text */
+"help_cooldown" = "זמן מינימלי בין תגובות. 0 = מוגבל רק על ידי משך הקליפ המתנגן.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "כיוון מד התאוצה";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "רצועת תדר";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "מסנן מעבר רצועה על נתוני מד התאוצה הגולמיים. נמוך = חיתוך גבוה-תדר (דוחה רעידות רצפה). גבוה = חיתוך נמוך-תדר (דוחה רעש אלקטרוני).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "סף ספייק";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "גודל מינימלי מסונן (כוח g) לצורך שקילה כפגיעה פוטנציאלית. מוחל לאחר סינון הרצועה. ערכים גבוהים יותר דורשים כוח גדול יותר.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "אות השיא חייב לחרוג מ-RMS הרקע בכפולה זו. הקשות חדות על השולחן מזנקות הרבה מעל הרקע. צעדים מעלים את הרקע יחד עם השיא. ערכים גבוהים יותר דוחים יותר רטט סביבתי.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "עלייה מינימלית בגודל בין דגימות עוקבות. פגיעות ישירות עולות ב-1-2 דגימות. רטט מועבר עולה בהדרגה. ערכים גבוהים יותר דוחים רטט עקיף.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "אישורים";
+
+/* Confirmations setting help text */
+"help_confirmations" = "דגימות מעל הסף הנדרשות בחלון הזיהוי של 120ms. פגיעות ישירות מייצרות 3-5 דגימות גבוהות. זעזועים בודדים מייצרים 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld פגיעות";
+
+/* Warmup setting title */
+"setting_warmup" = "חימום";
+
+/* Warmup setting help text */
+"help_warmup" = "דגימות לפני הפעלת הזיהוי. המסננים צריכים זמן להתייצב. ב-50 Hz, 50 דגימות = 1 שנייה.";
+
+/* Report interval setting title */
+"setting_report_interval" = "מרווח דיווח";
+
+/* Report interval setting help text */
+"help_report_interval" = "מרווח סקירת מד התאוצה. 10ms = 100 Hz (ברירת מחדל), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "מכשירים";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld תצוגות, %lld שמע";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "תצוגות הבזק";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "בחר אילו מסכים מציגים שכבת הבזק בעת פגיעה.";
+
+/* Audio output setting title */
+"setting_audio_output" = "פלט שמע";
+
+/* Audio output setting help text */
+"help_audio_output" = "בחר אילו מכשירי שמע מנגנים צלילי פגיעה. ללא בחירה = ללא שמע.";
+
+/* No audio output devices found message */
+"no_output_devices" = "לא נמצאו מכשירי פלט";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "הפעל בכניסה";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "רישום ניפוי שגיאות";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "יציאה";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "הקשה";
+
+/* Impact tier name: light */
+"tier_light_full" = "קלה";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "בינונית";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "יציבה";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "חזקה";
+
+/* Sensor Error Messages */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "הגישה לחיישן התנועה נדחתה — הענק הרשאת ניטור קלט בהגדרות המערכת > פרטיות ואבטחה.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "לא נמצא מד תאוצה — ייתכן של-Mac זה אין חיישן תנועה תואם.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "מד התאוצה אינו זמין (שגיאת IOKit %@). ייתכן של-Mac זה אין חיישן תנועה תואם.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "לא נמצא חיישן תנועה תואם ב-Mac זה.";

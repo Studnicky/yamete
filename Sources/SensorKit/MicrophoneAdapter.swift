@@ -9,8 +9,17 @@ private let log = AppLog(category: "Microphone")
 // MARK: - Microphone Adapter
 //
 // Detects impact transients via the built-in or external microphone using
-// AVAudioEngine (fully public API). Runs its own detection pipeline:
+// AVAudioEngine. Runs its own detection pipeline:
 // per-buffer peak → DC-blocking HP filter → ImpactDetector gates → SensorImpact.
+//
+// Works on all Macs (not just Apple Silicon). Requires microphone permission
+// (com.apple.security.device.audio-input entitlement under App Sandbox).
+//
+// Public API documentation:
+//   https://developer.apple.com/documentation/avfaudio/avaudioengine
+//   https://developer.apple.com/documentation/avfaudio/avaudioinputnode
+//   https://developer.apple.com/documentation/avfaudio/avaudioinputnode/1390585-installtap
+//   https://developer.apple.com/documentation/avfoundation/avcapturedevice
 
 /// Detects impact transients via microphone audio using AVAudioEngine.
 /// Works on all Macs. Requires microphone permission (audio-input entitlement).
@@ -18,7 +27,6 @@ public final class MicrophoneAdapter: SensorAdapter, @unchecked Sendable {
 
     public let id = SensorID("microphone")
     public let name = "Microphone"
-    public let apiClassification: APIClassification = .publicAPI
 
     /// Microphone detection config: thresholds in HP-filtered PCM amplitude units.
     /// Floor: quiet ambient (~0.005). Ceiling: firm desk slap (~0.300).

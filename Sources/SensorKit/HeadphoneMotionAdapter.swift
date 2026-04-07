@@ -6,14 +6,24 @@ import Foundation
 
 private let log = AppLog(category: "HeadphoneMotion")
 
+// MARK: - Headphone Motion Adapter
+//
+// Detects impact vibrations via AirPods/Beats IMU using CMHeadphoneMotionManager.
+// Reads userAcceleration (gravity-subtracted) and runs the standard gate pipeline.
+// Only active when compatible headphones with motion sensors are connected.
+//
+// Public API documentation:
+//   https://developer.apple.com/documentation/coremotion/cmheadphonemotionmanager
+//   https://developer.apple.com/documentation/coremotion/cmheadphonemotionmanager/3552067-startdevicemotionupdates
+//   https://developer.apple.com/documentation/coremotion/cmdevicemotion/1616149-useracceleration
+
 /// Detects impact vibrations via AirPods/Beats accelerometer using CoreMotion.
-/// Public API. Requires connected headphones with motion sensors.
+/// Requires connected headphones with motion sensors.
 /// Thresholds calibrated for userAcceleration (gravity-subtracted) in g-force.
 public final class HeadphoneMotionAdapter: SensorAdapter, @unchecked Sendable {
 
     public let id = SensorID("headphone-motion")
     public let name = "Headphone Motion"
-    public let apiClassification: APIClassification = .publicAPI
 
     private let manager = CMHeadphoneMotionManager()
 

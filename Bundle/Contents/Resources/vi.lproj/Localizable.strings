@@ -1,0 +1,205 @@
+/* Yamete — Tiếng Việt (Vietnamese) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld va chạm hôm nay";
+
+/* Last impact tier label */
+"last_impact" = "gần nhất: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Đã tạm dừng";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Độ phản ứng";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Cửa sổ phản hồi lực va chạm. Thanh trượt dưới = lực yếu nhất kích hoạt. Thanh trượt trên = lực cho phản hồi tối đa. Giá trị cao hơn phản hồi với va chạm nhẹ hơn.";
+
+/* Volume setting title */
+"setting_volume" = "Âm lượng";
+
+/* Volume setting help text */
+"help_volume" = "Cửa sổ mức phát âm thanh. Cường độ được ánh xạ tuyến tính giữa thấp và cao. Lựa chọn clip cũng theo cường độ — va chạm nhẹ hơn phát clip ngắn hơn.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Độ mờ đục của đèn flash";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Cửa sổ độ sáng đèn flash màn hình. Thời gian bao được định hình bởi cường độ. Giới hạn trong thời gian của clip âm thanh.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Mạnh";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Chắc";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "TB";
+
+/* Ruler label: light impact */
+"tier_light" = "Nhẹ";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Chạm";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Độ nhạy và cảm biến";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Đồng thuận cảm biến";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Số lượng cảm biến phải độc lập phát hiện va chạm trước khi kích hoạt. Bị giới hạn bởi số lượng cảm biến cung cấp dữ liệu.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld cảm biến";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Thời gian chờ";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Thời gian tối thiểu giữa các phản hồi. 0 = chỉ bị giới hạn bởi thời lượng clip đang phát.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Điều chỉnh gia tốc kế";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Dải tần số";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Bộ lọc dải thông trên dữ liệu gia tốc kế thô. Thấp = ngưỡng lọc thông cao (loại bỏ rung sàn). Cao = ngưỡng lọc thông thấp (loại bỏ nhiễu điện tử).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Ngưỡng đỉnh";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Biên độ lọc tối thiểu (lực g) để xem xét như va chạm tiềm năng. Áp dụng sau khi lọc dải thông. Giá trị cao hơn yêu cầu lực mạnh hơn.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Tín hiệu đỉnh phải vượt RMS nền bởi bội số này. Các cú đập bàn sắc nét tăng vọt cao hơn nền. Tiếng bước chân làm tăng nền cùng với đỉnh. Giá trị cao hơn loại bỏ nhiều rung nền hơn.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Tăng biên độ tối thiểu giữa các mẫu liên tiếp. Va chạm trực tiếp tăng trong 1-2 mẫu. Rung truyền dẫn tăng dần. Giá trị cao hơn loại bỏ rung gián tiếp.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Xác nhận";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Các mẫu trên ngưỡng cần thiết trong cửa sổ phát hiện 120ms. Các cú đánh trực tiếp tạo ra 3-5 mẫu cao. Các cú giật đơn tạo ra 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld lần";
+
+/* Warmup setting title */
+"setting_warmup" = "Khởi động";
+
+/* Warmup setting help text */
+"help_warmup" = "Các mẫu trước khi phát hiện kích hoạt. Các bộ lọc cần thời gian để ổn định. Ở 50 Hz, 50 mẫu = 1 giây.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Khoảng thời gian báo cáo";
+
+/* Report interval setting help text */
+"help_report_interval" = "Khoảng thời gian lấy mẫu gia tốc kế. 10ms = 100 Hz (mặc định), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Thiết bị";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld màn hình, %lld âm thanh";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Màn hình đèn flash";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Chọn màn hình nào hiển thị lớp phủ đèn flash khi va chạm.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Đầu ra âm thanh";
+
+/* Audio output setting help text */
+"help_audio_output" = "Chọn thiết bị âm thanh nào phát âm thanh va chạm. Không chọn gì = không có âm thanh.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Không tìm thấy thiết bị đầu ra";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Khởi động khi đăng nhập";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Nhật ký gỡ lỗi";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Thoát";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Chạm";
+
+/* Impact tier name: light */
+"tier_light_full" = "Nhẹ";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Trung bình";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Chắc";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Mạnh";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Truy cập cảm biến chuyển động bị từ chối — cấp quyền Giám sát đầu vào trong Cài đặt hệ thống > Quyền riêng tư và bảo mật.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Không tìm thấy gia tốc kế — Mac này có thể không có cảm biến chuyển động tương thích.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Gia tốc kế không khả dụng (lỗi IOKit %@). Mac này có thể không có cảm biến chuyển động tương thích.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Không tìm thấy cảm biến chuyển động tương thích trên Mac này.";

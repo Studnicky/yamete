@@ -14,10 +14,20 @@ let package = Package(
             ]
         ),
 
+        // C bridging module for IOKit HID Event System public API
+        .target(
+            name: "IOHIDPublic",
+            path: "Sources/IOHIDPublic",
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .linkedFramework("IOKit"),
+            ]
+        ),
+
         // Sensor abstraction, impact detection engine, accelerometer adapter
         .target(
             name: "SensorKit",
-            dependencies: ["YameteCore"],
+            dependencies: ["YameteCore", "IOHIDPublic"],
             path: "Sources/SensorKit",
             linkerSettings: [
                 .linkedFramework("IOKit"),

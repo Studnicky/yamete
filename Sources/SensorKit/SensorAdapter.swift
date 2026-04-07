@@ -3,15 +3,6 @@ import YameteCore
 #endif
 import Foundation
 
-// MARK: - API Classification
-
-/// Whether a sensor adapter uses public or private macOS APIs.
-public enum APIClassification: String, Sendable, CustomStringConvertible {
-    case publicAPI = "Public"
-    case privateAPI = "Private"
-    public var description: String { rawValue }
-}
-
 // MARK: - SensorAdapter Protocol
 
 /// Interface for adapters that detect impacts from a specific sensor.
@@ -20,7 +11,6 @@ public enum APIClassification: String, Sendable, CustomStringConvertible {
 public protocol SensorAdapter: AnyObject, Sendable {
     var id: SensorID { get }
     var name: String { get }
-    var apiClassification: APIClassification { get }
     var isAvailable: Bool { get }
 
     /// Returns a stream of detected impacts. Each adapter applies its own

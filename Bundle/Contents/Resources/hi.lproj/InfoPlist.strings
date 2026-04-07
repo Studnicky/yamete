@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Hindi */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete आपके MacBook पर भौतिक प्रभावों का पता लगाने के लिए एक्सेलेरोमीटर का उपयोग करता है।";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete आपकी डेस्क पर प्रभाव ध्वनियों का पता लगाने के लिए माइक्रोफ़ोन का उपयोग कर सकता है।";

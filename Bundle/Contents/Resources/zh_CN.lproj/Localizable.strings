@@ -1,0 +1,205 @@
+/* Yamete — 简体中文 (中国大陆) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "今日%lld次冲击";
+
+/* Last impact tier label */
+"last_impact" = "上次：%@";
+
+/* Detection paused indicator */
+"status_paused" = "已暂停";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "灵敏度";
+
+/* Reactivity setting help text */
+"help_reactivity" = "冲击力响应窗口。下滑块 = 触发所需的最弱力度。上滑块 = 最大响应所需的力度。数值越高，对较轻冲击的响应越灵敏。";
+
+/* Volume setting title */
+"setting_volume" = "音量";
+
+/* Volume setting help text */
+"help_volume" = "音频播放音量窗口。强度在低高之间线性映射。片段选择也跟随强度——较轻的冲击播放较短的片段。";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "闪光透明度";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "屏幕闪光亮度窗口。包络时序由强度调节。限定在音频片段持续时间内。";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "强";
+
+/* Ruler label: firm impact */
+"tier_firm" = "实";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "中";
+
+/* Ruler label: light impact */
+"tier_light" = "轻";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "触";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "灵敏度与传感器";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "传感器共识";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "触发前必须独立检测到冲击的传感器数量。上限为提供数据的传感器数量。";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld个传感器";
+
+/* Cooldown setting title */
+"setting_cooldown" = "冷却时间";
+
+/* Cooldown setting help text */
+"help_cooldown" = "两次反应之间的最短时间。0 = 仅受正在播放的片段时长限制。";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "加速度计调节";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "频率范围";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "原始加速度计数据的带通滤波器。低 = 高通截止（过滤地板振动）。高 = 低通截止（过滤电子噪声）。";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "峰值阈值";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "被视为潜在冲击的最小滤波幅度（重力加速度）。在带通滤波后应用。数值越高，所需力度越大。";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "峰值因数";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "峰值信号必须超过背景RMS的倍数。桌面的急促敲击远超背景值。脚步声会同时抬高背景和峰值。数值越高，过滤的环境振动越多。";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "上升速率";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "连续采样之间的最小幅度增量。直接冲击在1-2个采样内上升。传导振动缓慢上升。数值越高，过滤的间接振动越多。";
+
+/* Confirmations setting title */
+"setting_confirmations" = "确认次数";
+
+/* Confirmations setting help text */
+"help_confirmations" = "120毫秒检测窗口内所需的超阈值采样数。直接敲击产生3-5个高值采样。单次震动产生1-2个。";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld次";
+
+/* Warmup setting title */
+"setting_warmup" = "预热";
+
+/* Warmup setting help text */
+"help_warmup" = "检测激活前的采样数。滤波器需要时间稳定。在50 Hz下，50个采样 = 1秒。";
+
+/* Report interval setting title */
+"setting_report_interval" = "报告间隔";
+
+/* Report interval setting help text */
+"help_report_interval" = "加速度计轮询间隔。10ms = 100 Hz（默认），5ms = 200 Hz，20ms = 50 Hz。";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "设备";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld个显示器，%lld个音频";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "闪光显示器";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "选择哪些显示器在检测到冲击时显示闪光覆盖层。";
+
+/* Audio output setting title */
+"setting_audio_output" = "音频输出";
+
+/* Audio output setting help text */
+"help_audio_output" = "选择哪些音频设备播放冲击声音。未选择 = 无音频。";
+
+/* No audio output devices found message */
+"no_output_devices" = "未找到输出设备";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "登录时启动";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "调试日志";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "退出";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "触碰";
+
+/* Impact tier name: light */
+"tier_light_full" = "轻击";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "中等";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "实击";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "强击";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "运动传感器访问被拒绝——请在系统设置 > 隐私与安全性中授予输入监控权限。";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "未找到加速度计——此Mac可能没有兼容的运动传感器。";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "加速度计不可用（IOKit错误 %@）。此Mac可能没有兼容的运动传感器。";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "此Mac上未找到兼容的运动传感器。";

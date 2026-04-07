@@ -15,8 +15,8 @@ struct MenuBarView: View {
     @Environment(SettingsStore.self) var settings
     @Environment(Updater.self) var updater
     @State private var audioDevices: [AudioOutputDevice] = []
-
-    private let deviceRefreshTimer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
+    @State private var displays: [NSScreen] = NSScreen.screens
+    @State private var availableSensors: [String] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,9 +24,9 @@ struct MenuBarView: View {
             Divider()
             BasicSection()
             Divider()
-            SensitivitySection()
+            SensitivitySection(availableSensors: availableSensors)
             Divider()
-            DeviceSection(audioDevices: audioDevices)
+            DeviceSection(audioDevices: audioDevices, displays: displays)
 
             if let error = controller.sensorError {
                 Divider()
@@ -39,8 +39,23 @@ struct MenuBarView: View {
             FooterSection()
         }
         .frame(width: 290)
-        .onAppear { refreshAudioDevices() }
-        .onReceive(deviceRefreshTimer) { _ in refreshAudioDevices() }
+        .onAppear {
+            AudioDeviceManager.startObserving()
+            refreshAll()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AudioDeviceManager.devicesDidChangeNotification)) { _ in
+            refreshAudioDevices()
+            refreshSensors()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            refreshDisplays()
+        }
+    }
+
+    private func refreshAll() {
+        refreshAudioDevices()
+        refreshDisplays()
+        refreshSensors()
     }
 
     private func refreshAudioDevices() {
@@ -48,6 +63,22 @@ struct MenuBarView: View {
         if latest.map(\.uid) != audioDevices.map(\.uid)
             || latest.map(\.displayName) != audioDevices.map(\.displayName) {
             audioDevices = latest
+        }
+    }
+
+    private func refreshDisplays() {
+        let latest = NSScreen.screens
+        if latest.map(\.displayID) != displays.map(\.displayID) {
+            displays = latest
+        }
+    }
+
+    private func refreshSensors() {
+        let latest = controller.allAdapters
+            .filter { $0.isAvailable }
+            .map(\.id.rawValue)
+        if latest != availableSensors {
+            availableSensors = latest
         }
     }
 }
@@ -59,14 +90,14 @@ private struct HeaderSection: View {
 
     var body: some View {
         HStack {
-            Text("\(controller.impactCount) impacts today")
+            Text(String(format: NSLocalizedString("impacts_today", comment: "Daily impact counter"), controller.impactCount))
             Spacer()
             if let tier = controller.lastImpactTier {
-                Text(verbatim: "last: \(tier)")
+                Text(verbatim: String(format: NSLocalizedString("last_impact", comment: "Last impact tier label"), String(describing: tier)))
                     .foregroundStyle(.tertiary)
             }
             if !controller.isEnabled {
-                Text("Paused").foregroundStyle(Theme.mauve)
+                Text(NSLocalizedString("status_paused", comment: "Detection paused indicator")).foregroundStyle(Theme.mauve)
             }
         }
         .font(.caption).foregroundStyle(.secondary)
@@ -84,19 +115,19 @@ private struct BasicSection: View {
 
         Group {
             VStack(alignment: .leading, spacing: 6) {
-                SettingHeader(icon: "gauge.with.needle", title: "Reactivity",
-                              help: "Impact force response window. Low thumb = weakest force that triggers. High thumb = force for maximum response. Higher values respond to lighter impacts.")
+                SettingHeader(icon: "gauge.with.needle", title: NSLocalizedString("setting_reactivity", comment: "Reactivity setting title"),
+                              help: NSLocalizedString("help_reactivity", comment: "Reactivity setting help text"))
                 SensitivityRuler()
                 RangeSlider(low: $s.sensitivityMin, high: $s.sensitivityMax,
-                            bounds: 0...1, labelWidth: 50, format: { String(format: "%.0f%%", $0 * 100) })
+                            bounds: 0...1, labelWidth: 50, format: { String(format: NSLocalizedString("unit_percent", comment: "Percentage format"), Int($0 * 100)) })
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    SettingHeader(icon: "speaker.wave.2", title: "Volume",
-                                  help: "Audio playback level window. Intensity maps linearly between low and high. Clip selection also follows intensity — lighter impacts play shorter clips.")
+                    SettingHeader(icon: "speaker.wave.2", title: NSLocalizedString("setting_volume", comment: "Volume setting title"),
+                                  help: NSLocalizedString("help_volume", comment: "Volume setting help text"))
                     Spacer()
                     Toggle("", isOn: $s.soundEnabled)
                         .toggleStyle(.switch).tint(Theme.pink)
@@ -104,7 +135,7 @@ private struct BasicSection: View {
                 }
                 if s.soundEnabled {
                     RangeSlider(low: $s.volumeMin, high: $s.volumeMax,
-                                bounds: 0...1, labelWidth: 50, format: { "\(Int($0 * 100))%" })
+                                bounds: 0...1, labelWidth: 50, format: { String(format: NSLocalizedString("unit_percent", comment: "Percentage format"), Int($0 * 100)) })
                 }
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
@@ -112,8 +143,8 @@ private struct BasicSection: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    SettingHeader(icon: "sun.max", title: "Flash Opacity",
-                                  help: "Screen flash brightness window. Envelope timing shaped by intensity. Gated inside the sound clip duration.")
+                    SettingHeader(icon: "sun.max", title: NSLocalizedString("setting_flash_opacity", comment: "Flash opacity setting title"),
+                                  help: NSLocalizedString("help_flash_opacity", comment: "Flash opacity setting help text"))
                     Spacer()
                     Toggle("", isOn: $s.screenFlash)
                         .toggleStyle(.switch).tint(Theme.pink)
@@ -121,7 +152,7 @@ private struct BasicSection: View {
                 }
                 if s.screenFlash {
                     RangeSlider(low: $s.flashOpacityMin, high: $s.flashOpacityMax,
-                                bounds: 0...1, labelWidth: 50, format: { "\(Int($0 * 100))%" })
+                                bounds: 0...1, labelWidth: 50, format: { String(format: NSLocalizedString("unit_percent", comment: "Percentage format"), Int($0 * 100)) })
                 }
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
@@ -133,7 +164,11 @@ private struct BasicSection: View {
 
 private struct SensitivityRuler: View {
     private static let ticks: [(position: Double, label: String)] = [
-        (0.0, "Hard"), (0.25, "Firm"), (0.50, "Med"), (0.75, "Light"), (1.0, "Tap"),
+        (0.0, NSLocalizedString("tier_hard", comment: "Ruler label: hardest impact")),
+        (0.25, NSLocalizedString("tier_firm", comment: "Ruler label: firm impact")),
+        (0.50, NSLocalizedString("tier_medium", comment: "Ruler label: medium impact (abbreviated)")),
+        (0.75, NSLocalizedString("tier_light", comment: "Ruler label: light impact")),
+        (1.0, NSLocalizedString("tier_tap", comment: "Ruler label: lightest impact")),
     ]
 
     var body: some View {
@@ -160,93 +195,93 @@ private struct SensitivityRuler: View {
 private struct SensitivitySection: View {
     @Environment(SettingsStore.self) var settings
     @Environment(ImpactController.self) var controller
+    let availableSensors: [String]
     @State private var isExpanded = false
 
     var body: some View {
         @Bindable var s = settings
 
-        AccordionCard(title: "Sensitivity & Sensors", isExpanded: $isExpanded) {
+        AccordionCard(title: NSLocalizedString("section_sensitivity_sensors", comment: "Sensitivity & Sensors accordion title"), isExpanded: $isExpanded) {
             let _ = clampConsensus()
             let lw: CGFloat = 50
 
             sensorList()
 
-            let enabledCount = controller.allAdapters
-                .filter { $0.isAvailable && s.enabledSensorIDs.contains($0.id.rawValue) }.count
+            let enabledCount = availableSensors.filter { s.enabledSensorIDs.contains($0) }.count
 
             VStack(spacing: 10) {
                 if enabledCount >= 2 {
                     Divider()
-                    advRow(icon: "person.3", title: "Sensor Consensus",
-                           help: "Number of sensors that must independently detect an impact before triggering. Clamped to the number of sensors delivering data.") {
+                    advRow(icon: "person.3", title: NSLocalizedString("setting_consensus", comment: "Sensor consensus setting title"),
+                           help: NSLocalizedString("help_consensus", comment: "Sensor consensus setting help text")) {
                         SingleSliderInt(value: $s.consensusRequired, bounds: 1...enabledCount,
-                                        labelWidth: lw, format: { "\($0) sensor\($0 == 1 ? "" : "s")" })
+                                        labelWidth: lw, format: { String(format: NSLocalizedString("consensus_format", comment: "Sensor consensus count"), $0) })
                     }
                 }
 
                 Divider()
 
-                advRow(icon: "timer", title: "Cooldown",
-                       help: "Minimum time between reactions. 0 = gated only by the playing clip's duration.") {
+                advRow(icon: "timer", title: NSLocalizedString("setting_cooldown", comment: "Cooldown setting title"),
+                       help: NSLocalizedString("help_cooldown", comment: "Cooldown setting help text")) {
                     SingleSlider(value: $s.debounce, bounds: 0...2,
-                                 labelWidth: lw, format: { String(format: "%.1fs", $0) })
+                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), $0) })
                 }
 
                 Divider()
-                Theme.sectionHeader("Accelerometer Tuning")
+                Theme.sectionHeader(NSLocalizedString("section_accel_tuning", comment: "Accelerometer tuning section header"))
 
-                advRow(icon: "waveform.path", title: "Frequency Band",
-                       help: "Bandpass filter on raw accelerometer data. Low = high-pass cutoff (rejects floor vibrations). High = low-pass cutoff (rejects electronic noise).") {
+                advRow(icon: "waveform.path", title: NSLocalizedString("setting_frequency_band", comment: "Frequency band setting title"),
+                       help: NSLocalizedString("help_frequency_band", comment: "Frequency band setting help text")) {
                     RangeSlider(low: $s.bandpassLowHz, high: $s.bandpassHighHz,
-                                bounds: 10...25, labelWidth: lw, format: { "\(Int($0)) Hz" })
+                                bounds: 10...25, labelWidth: lw, format: { String(format: NSLocalizedString("unit_hz", comment: "Hertz format"), Int($0)) })
                 }
 
                 Divider()
 
-                advRow(icon: "arrow.up.to.line", title: "Spike Threshold",
-                       help: "Minimum filtered magnitude (g-force) to consider as a potential impact. Applied after bandpass filtering. Higher values require stronger force.") {
+                advRow(icon: "arrow.up.to.line", title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
+                       help: NSLocalizedString("help_spike_threshold", comment: "Spike threshold setting help text")) {
                     SingleSlider(value: $s.spikeThreshold, bounds: 0.010...0.040,
-                                 labelWidth: lw, format: { String(format: "%.3fg", $0) })
+                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_gforce", comment: "G-force format"), $0) })
                 }
 
                 Divider()
 
-                advRow(icon: "chart.line.uptrend.xyaxis", title: "Crest Factor",
-                       help: "Peak signal must exceed background RMS by this multiple. Sharp desk hits spike well above background. Footsteps raise background along with peak. Higher values reject more ambient vibration.") {
+                advRow(icon: "chart.line.uptrend.xyaxis", title: NSLocalizedString("setting_crest_factor", comment: "Crest factor setting title"),
+                       help: NSLocalizedString("help_crest_factor", comment: "Crest factor setting help text")) {
                     SingleSlider(value: $s.crestFactor, bounds: 1.0...5.0,
-                                 labelWidth: lw, format: { String(format: "%.1f\u{00D7}", $0) })
+                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_multiplier", comment: "Multiplier format"), $0) })
                 }
 
                 Divider()
 
-                advRow(icon: "bolt", title: "Rise Rate",
-                       help: "Minimum magnitude increase between consecutive samples. Direct impacts rise in 1-2 samples. Transmitted vibrations rise gradually. Higher values reject indirect vibration.") {
+                advRow(icon: "bolt", title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
+                       help: NSLocalizedString("help_rise_rate", comment: "Rise rate setting help text")) {
                     SingleSlider(value: $s.riseRate, bounds: 0.005...0.020,
-                                 labelWidth: lw, format: { String(format: "%.3fg", $0) })
+                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_gforce", comment: "G-force format"), $0) })
                 }
 
                 Divider()
 
-                advRow(icon: "checkmark.circle", title: "Confirmations",
-                       help: "Above-threshold samples required in the 120ms detection window. Direct hits produce 3-5 high samples. Single jolts produce 1-2.") {
+                advRow(icon: "checkmark.circle", title: NSLocalizedString("setting_confirmations", comment: "Confirmations setting title"),
+                       help: NSLocalizedString("help_confirmations", comment: "Confirmations setting help text")) {
                     SingleSliderInt(value: $s.confirmations, bounds: 1...5,
-                                    labelWidth: lw, format: { "\($0) hit\($0 == 1 ? "" : "s")" })
+                                    labelWidth: lw, format: { String(format: NSLocalizedString("confirmations_format", comment: "Confirmation hit count"), $0) })
                 }
 
                 Divider()
 
-                advRow(icon: "flame", title: "Warmup",
-                       help: "Samples before detection activates. Filters need time to settle. At 50 Hz, 50 samples = 1 second.") {
+                advRow(icon: "flame", title: NSLocalizedString("setting_warmup", comment: "Warmup setting title"),
+                       help: NSLocalizedString("help_warmup", comment: "Warmup setting help text")) {
                     SingleSliderInt(value: $s.warmupSamples, bounds: 10...100,
-                                    labelWidth: lw, format: { String(format: "%.1fs", Double($0) / 50.0) })
+                                    labelWidth: lw, format: { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), Double($0) / 50.0) })
                 }
 
                 Divider()
 
-                advRow(icon: "clock.arrow.2.circlepath", title: "Report Interval",
-                       help: "Accelerometer polling interval. 10ms = 100 Hz (default), 5ms = 200 Hz, 20ms = 50 Hz.") {
+                advRow(icon: "clock.arrow.2.circlepath", title: NSLocalizedString("setting_report_interval", comment: "Report interval setting title"),
+                       help: NSLocalizedString("help_report_interval", comment: "Report interval setting help text")) {
                     SingleSlider(value: $s.reportInterval, bounds: 5000...50000, step: 1000,
-                                 labelWidth: lw, format: { String(format: "%.0fms", $0 / 1000) })
+                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_milliseconds", comment: "Milliseconds format"), $0 / 1000) })
                 }
             }
             .padding(.horizontal, 6).padding(.vertical, 8)
@@ -256,26 +291,13 @@ private struct SensitivitySection: View {
     @ViewBuilder
     private func sensorList() -> some View {
         let adapters = controller.allAdapters
-            .filter { $0.isAvailable }
-            .sorted { a, b in
-                if a.apiClassification != b.apiClassification {
-                    return a.apiClassification == .publicAPI
-                }
-                return a.name < b.name
-            }
+            .filter { availableSensors.contains($0.id.rawValue) }
+            .sorted { $0.name < $1.name }
         VStack(spacing: 0) {
             ForEach(Array(adapters.enumerated()), id: \.offset) { i, adapter in
                 Toggle(isOn: sensorBinding(id: adapter.id.rawValue)) {
-                    HStack(spacing: 4) {
-                        Text(adapter.name).font(.caption)
-                        Text(adapter.apiClassification.rawValue)
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundStyle(adapter.apiClassification == .publicAPI ? Theme.pink : Theme.mauve)
-                            .padding(.horizontal, 4).padding(.vertical, 1)
-                            .background((adapter.apiClassification == .publicAPI ? Theme.pink : Theme.mauve).opacity(0.15))
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(adapter.name).font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .toggleStyle(.switch).tint(Theme.pink).controlSize(.mini)
                 .padding(.vertical, 3).padding(.horizontal, 6)
@@ -286,8 +308,7 @@ private struct SensitivitySection: View {
     }
 
     private func clampConsensus() {
-        let enabledCount = controller.allAdapters
-            .filter { $0.isAvailable && settings.enabledSensorIDs.contains($0.id.rawValue) }.count
+        let enabledCount = availableSensors.filter { settings.enabledSensorIDs.contains($0) }.count
         if enabledCount >= 1 && settings.consensusRequired > enabledCount {
             settings.consensusRequired = enabledCount
         }
@@ -322,13 +343,14 @@ private struct SensitivitySection: View {
 private struct DeviceSection: View {
     @Environment(SettingsStore.self) var settings
     let audioDevices: [AudioOutputDevice]
+    let displays: [NSScreen]
     @State private var isExpanded = false
 
     var body: some View {
         @Bindable var s = settings
 
-        AccordionCard(title: "Devices",
-                      subtitle: "\(NSScreen.screens.count) displays, \(audioDevices.count) audio",
+        AccordionCard(title: NSLocalizedString("section_devices", comment: "Devices accordion title"),
+                      subtitle: String(format: NSLocalizedString("devices_subtitle", comment: "Devices section subtitle: display and audio count"), displays.count, audioDevices.count),
                       isExpanded: $isExpanded) {
             displayList()
             Divider()
@@ -338,14 +360,14 @@ private struct DeviceSection: View {
 
     @ViewBuilder
     private func displayList() -> some View {
-        let screens = NSScreen.screens.sorted { a, b in
+        let screens = displays.sorted { a, b in
             if a == NSScreen.main && b != NSScreen.main { return true }
             if b == NSScreen.main && a != NSScreen.main { return false }
             return a.localizedName.localizedStandardCompare(b.localizedName) == .orderedAscending
         }
         VStack(alignment: .leading, spacing: 6) {
-            SettingHeader(icon: "display", title: "Flash Displays",
-                         help: "Select which monitors show the flash overlay on impact.")
+            SettingHeader(icon: "display", title: NSLocalizedString("setting_flash_displays", comment: "Flash displays setting title"),
+                         help: NSLocalizedString("help_flash_displays", comment: "Flash displays setting help text"))
             VStack(spacing: 0) {
                 ForEach(0..<screens.count, id: \.self) { i in
                     let screen = screens[i]
@@ -373,8 +395,8 @@ private struct DeviceSection: View {
             return a.displayName.localizedStandardCompare(b.displayName) == .orderedAscending
         }
         VStack(alignment: .leading, spacing: 6) {
-            SettingHeader(icon: "hifispeaker", title: "Audio Output",
-                         help: "Select which audio devices play impact sounds. None selected = no audio.")
+            SettingHeader(icon: "hifispeaker", title: NSLocalizedString("setting_audio_output", comment: "Audio output setting title"),
+                         help: NSLocalizedString("help_audio_output", comment: "Audio output setting help text"))
             VStack(spacing: 0) {
                 ForEach(Array(sorted.enumerated()), id: \.offset) { i, device in
                     Toggle(isOn: audioBinding(uid: device.uid)) {
@@ -386,7 +408,7 @@ private struct DeviceSection: View {
                     if i < sorted.count - 1 { Divider().padding(.leading, 22) }
                 }
                 if audioDevices.isEmpty {
-                    Text("No output devices found")
+                    Text(NSLocalizedString("no_output_devices", comment: "No audio output devices found message"))
                         .font(.caption).foregroundStyle(.secondary)
                         .padding(.vertical, 3).padding(.horizontal, 4)
                 }
@@ -441,7 +463,7 @@ private struct FooterSection: View {
             HStack(spacing: 5) {
                 Image(systemName: "power")
                     .font(.system(size: 10)).foregroundStyle(Theme.pink)
-                Text("Launch at Login")
+                Text(NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label"))
                 Spacer()
                 Toggle("", isOn: $launchAtLogin)
                     .toggleStyle(.switch).tint(Theme.pink)
@@ -459,7 +481,7 @@ private struct FooterSection: View {
             HStack(spacing: 5) {
                 Image(systemName: "ladybug")
                     .font(.system(size: 10)).foregroundStyle(Theme.pink)
-                Text("Debug Logging")
+                Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label"))
                 Spacer()
                 Toggle("", isOn: $s.debugLogging)
                     .toggleStyle(.switch).tint(Theme.pink)
@@ -471,11 +493,11 @@ private struct FooterSection: View {
             HStack(spacing: 5) {
                 Image(systemName: "info.circle")
                     .font(.system(size: 10)).foregroundStyle(Theme.pink)
-                Text("v\(updater.currentVersion)")
+                Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
                     .font(.caption).foregroundStyle(.tertiary)
                 Spacer()
                 Button(action: { NSApp.terminate(nil) }) {
-                    Text("Quit")
+                    Text(NSLocalizedString("button_quit", comment: "Quit application button"))
                         .font(.caption.bold())
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10).padding(.vertical, 3)

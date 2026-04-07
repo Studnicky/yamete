@@ -1,0 +1,205 @@
+/* Yamete — Italian (it) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld impatti oggi";
+
+/* Last impact tier label */
+"last_impact" = "ultimo: %@";
+
+/* Detection paused indicator */
+"status_paused" = "In pausa";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reattività";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Finestra di risposta alla forza d'impatto. Cursore inferiore = forza minima che attiva. Cursore superiore = forza per risposta massima. Valori più alti rispondono a impatti più leggeri.";
+
+/* Volume setting title */
+"setting_volume" = "Volume";
+
+/* Volume setting help text */
+"help_volume" = "Finestra del livello di riproduzione audio. L'intensità viene mappata linearmente tra basso e alto. La selezione della clip segue anche l'intensità — impatti più leggeri riproducono clip più brevi.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Opacità Flash";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Finestra di luminosità del flash dello schermo. Il tempo dell'inviluppo è modellato dall'intensità. Limitato alla durata della clip audio.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Forte";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Deciso";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Med";
+
+/* Ruler label: light impact */
+"tier_light" = "Leggero";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Tocco";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Sensibilità e Sensori";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Consenso Sensori";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Numero di sensori che devono rilevare indipendentemente un impatto prima di attivare. Limitato al numero di sensori che forniscono dati.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld sensori";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Raffreddamento";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Tempo minimo tra le reazioni. 0 = limitato solo dalla durata della clip in riproduzione.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Regolazione Accelerometro";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Banda di Frequenza";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Filtro bandpass sui dati grezzi dell'accelerometro. Basso = taglio high-pass (rigetta le vibrazioni del pavimento). Alto = taglio low-pass (rigetta il rumore elettronico).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Soglia di Picco";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Magnitudine filtrata minima (forza g) da considerare come potenziale impatto. Applicata dopo il filtraggio bandpass. Valori più alti richiedono una forza maggiore.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Fattore di Cresta";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Il segnale di picco deve superare il RMS di fondo di questo multiplo. I colpi netti sulla scrivania spiccano molto al di sopra del fondo. I passi alzano il fondo insieme al picco. Valori più alti rigettano più vibrazioni ambientali.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Velocità di Salita";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Aumento minimo di magnitudine tra campioni consecutivi. Gli impatti diretti salgono in 1-2 campioni. Le vibrazioni trasmesse salgono gradualmente. Valori più alti rigettano le vibrazioni indirette.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Conferme";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Campioni sopra la soglia richiesti nella finestra di rilevamento di 120ms. I colpi diretti producono 3-5 campioni alti. Le scosse singole producono 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld colpi";
+
+/* Warmup setting title */
+"setting_warmup" = "Riscaldamento";
+
+/* Warmup setting help text */
+"help_warmup" = "Campioni prima che la rilevazione si attivi. I filtri hanno bisogno di tempo per stabilizzarsi. A 50 Hz, 50 campioni = 1 secondo.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Intervallo di Report";
+
+/* Report interval setting help text */
+"help_report_interval" = "Intervallo di polling dell'accelerometro. 10ms = 100 Hz (predefinito), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Dispositivi";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld display, %lld audio";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Display Flash";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Seleziona quali monitor mostrano l'overlay flash all'impatto.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Uscita Audio";
+
+/* Audio output setting help text */
+"help_audio_output" = "Seleziona quali dispositivi audio riproducono i suoni d'impatto. Nessuno selezionato = nessun audio.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Nessun dispositivo di uscita trovato";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Avvia all'Accesso";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Log di Debug";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Esci";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Tocco";
+
+/* Impact tier name: light */
+"tier_light_full" = "Leggero";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Medio";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Deciso";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Forte";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Accesso al sensore di movimento negato — concedi il permesso di Monitoraggio Input in Impostazioni di Sistema > Privacy e Sicurezza.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Nessun accelerometro trovato — questo Mac potrebbe non avere un sensore di movimento compatibile.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Accelerometro non disponibile (errore IOKit %@). Questo Mac potrebbe non avere un sensore di movimento compatibile.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Nessun sensore di movimento compatibile trovato su questo Mac.";

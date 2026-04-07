@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <!-- Daily impact counter -->
+    <key>impacts_today</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@ اليوم</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>zero</key>
+            <string>لا صدمات اليوم</string>
+            <key>one</key>
+            <string>%lld صدمة اليوم</string>
+            <key>two</key>
+            <string>%lld صدمتان اليوم</string>
+            <key>few</key>
+            <string>%lld صدمات اليوم</string>
+            <key>many</key>
+            <string>%lld صدمة اليوم</string>
+            <key>other</key>
+            <string>%lld صدمة اليوم</string>
+        </dict>
+    </dict>
+
+    <!-- Sensor consensus count -->
+    <key>consensus_format</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>zero</key>
+            <string>%lld مستشعر</string>
+            <key>one</key>
+            <string>%lld مستشعر</string>
+            <key>two</key>
+            <string>%lld مستشعران</string>
+            <key>few</key>
+            <string>%lld مستشعرات</string>
+            <key>many</key>
+            <string>%lld مستشعر</string>
+            <key>other</key>
+            <string>%lld مستشعر</string>
+        </dict>
+    </dict>
+
+    <!-- Confirmation hit count -->
+    <key>confirmations_format</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>zero</key>
+            <string>%lld ضربة</string>
+            <key>one</key>
+            <string>%lld ضربة</string>
+            <key>two</key>
+            <string>%lld ضربتان</string>
+            <key>few</key>
+            <string>%lld ضربات</string>
+            <key>many</key>
+            <string>%lld ضربة</string>
+            <key>other</key>
+            <string>%lld ضربة</string>
+        </dict>
+    </dict>
+
+</dict>
+</plist>

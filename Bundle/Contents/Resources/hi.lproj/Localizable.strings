@@ -1,0 +1,205 @@
+/* Yamete — Hindi Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "आज %lld प्रभाव";
+
+/* Last impact tier label */
+"last_impact" = "अंतिम: %@";
+
+/* Detection paused indicator */
+"status_paused" = "रुका हुआ";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "प्रतिक्रियाशीलता";
+
+/* Reactivity setting help text */
+"help_reactivity" = "प्रभाव बल प्रतिक्रिया विंडो। निचला स्लाइडर = सबसे कमज़ोर बल जो ट्रिगर करता है। ऊपरी स्लाइडर = अधिकतम प्रतिक्रिया के लिए बल। अधिक मान हल्के प्रभावों पर प्रतिक्रिया करते हैं।";
+
+/* Volume setting title */
+"setting_volume" = "ध्वनि";
+
+/* Volume setting help text */
+"help_volume" = "ऑडियो प्लेबैक स्तर विंडो। तीव्रता कम और अधिक के बीच रैखिक रूप से मैप होती है। क्लिप चयन भी तीव्रता का अनुसरण करता है — हल्के प्रभाव छोटे क्लिप चलाते हैं।";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "फ्लैश अपारदर्शिता";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "स्क्रीन फ्लैश चमक विंडो। एनवलप टाइमिंग तीव्रता द्वारा आकारित होती है। साउंड क्लिप की अवधि के भीतर सीमित।";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "कठोर";
+
+/* Ruler label: firm impact */
+"tier_firm" = "दृढ़";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "मध्यम";
+
+/* Ruler label: light impact */
+"tier_light" = "हल्का";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "थपकी";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "संवेदनशीलता और सेंसर";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "सेंसर सहमति";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "ट्रिगर से पहले कितने सेंसरों को स्वतंत्र रूप से प्रभाव का पता लगाना होगा। डेटा देने वाले सेंसरों की संख्या तक सीमित।";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld सेंसर";
+
+/* Cooldown setting title */
+"setting_cooldown" = "कूलडाउन";
+
+/* Cooldown setting help text */
+"help_cooldown" = "प्रतिक्रियाओं के बीच न्यूनतम समय। 0 = केवल चल रहे क्लिप की अवधि द्वारा सीमित।";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "एक्सेलेरोमीटर ट्यूनिंग";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "फ्रीक्वेंसी बैंड";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "कच्चे एक्सेलेरोमीटर डेटा पर बैंडपास फिल्टर। कम = हाई-पास कटऑफ (फर्श कंपन अस्वीकार करता है)। अधिक = लो-पास कटऑफ (इलेक्ट्रॉनिक शोर अस्वीकार करता है)।";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "स्पाइक थ्रेशोल्ड";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "संभावित प्रभाव मानने के लिए न्यूनतम फ़िल्टर किया गया परिमाण (g-बल)। बैंडपास फ़िल्टरिंग के बाद लागू होता है। अधिक मान अधिक बल की आवश्यकता रखते हैं।";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "पीक सिग्नल को इस गुणक से बैकग्राउंड RMS से अधिक होना चाहिए। डेस्क पर तेज़ प्रहार बैकग्राउंड से काफी ऊपर उठते हैं। पैरों की आवाज़ बैकग्राउंड को पीक के साथ उठाती है। अधिक मान अधिक परिवेश कंपन को अस्वीकार करते हैं।";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "लगातार नमूनों के बीच न्यूनतम परिमाण वृद्धि। प्रत्यक्ष प्रभाव 1-2 नमूनों में उठते हैं। प्रेषित कंपन धीरे-धीरे उठता है। अधिक मान अप्रत्यक्ष कंपन को अस्वीकार करते हैं।";
+
+/* Confirmations setting title */
+"setting_confirmations" = "पुष्टि";
+
+/* Confirmations setting help text */
+"help_confirmations" = "120ms डिटेक्शन विंडो में थ्रेशोल्ड से ऊपर के नमूने आवश्यक हैं। प्रत्यक्ष प्रहार 3-5 उच्च नमूने उत्पन्न करते हैं। एकल झटके 1-2 उत्पन्न करते हैं।";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld हिट";
+
+/* Warmup setting title */
+"setting_warmup" = "वार्मअप";
+
+/* Warmup setting help text */
+"help_warmup" = "डिटेक्शन सक्रिय होने से पहले नमूने। फ़िल्टरों को स्थिर होने के लिए समय चाहिए। 50 Hz पर, 50 नमूने = 1 सेकंड।";
+
+/* Report interval setting title */
+"setting_report_interval" = "रिपोर्ट अंतराल";
+
+/* Report interval setting help text */
+"help_report_interval" = "एक्सेलेरोमीटर पोलिंग अंतराल। 10ms = 100 Hz (डिफ़ॉल्ट), 5ms = 200 Hz, 20ms = 50 Hz।";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "डिवाइस";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld डिस्प्ले, %lld ऑडियो";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "फ्लैश डिस्प्ले";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "चुनें कि प्रभाव पर कौन से मॉनिटर फ्लैश ओवरले दिखाएं।";
+
+/* Audio output setting title */
+"setting_audio_output" = "ऑडियो आउटपुट";
+
+/* Audio output setting help text */
+"help_audio_output" = "चुनें कि कौन से ऑडियो डिवाइस प्रभाव ध्वनियां चलाएं। कोई चयन नहीं = कोई ऑडियो नहीं।";
+
+/* No audio output devices found message */
+"no_output_devices" = "कोई आउटपुट डिवाइस नहीं मिला";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "लॉगिन पर लॉन्च करें";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "डीबग लॉगिंग";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "छोड़ें";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "थपकी";
+
+/* Impact tier name: light */
+"tier_light_full" = "हल्का";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "मध्यम";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "दृढ़";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "कठोर";
+
+/* Sensor Error Messages */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "मोशन सेंसर एक्सेस अस्वीकृत — सिस्टम सेटिंग्स > गोपनीयता और सुरक्षा में इनपुट मॉनिटरिंग अनुमति दें।";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "कोई एक्सेलेरोमीटर नहीं मिला — इस Mac में संगत मोशन सेंसर नहीं हो सकता।";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "एक्सेलेरोमीटर अनुपलब्ध (IOKit त्रुटि %@)। इस Mac में संगत मोशन सेंसर नहीं हो सकता।";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "इस Mac पर कोई संगत मोशन सेंसर नहीं मिला।";

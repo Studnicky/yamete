@@ -1,0 +1,7 @@
+/* Info.plist localized strings */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yameteは加速度センサーを使用して、MacBookへの物理的な衝撃を検出します。";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yameteはマイクを使用して、デスクへの衝撃音を検出することができます。";

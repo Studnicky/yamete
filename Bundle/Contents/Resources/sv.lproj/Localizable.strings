@@ -1,0 +1,205 @@
+/* Yamete — Svenska (Swedish) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld slag idag";
+
+/* Last impact tier label */
+"last_impact" = "senaste: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Pausad";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reaktivitet";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Svarsfönster för slagkraft. Undre reglaget = svagaste kraft som utlöser. Övre reglaget = kraft för maximal respons. Högre värden reagerar på lättare slag.";
+
+/* Volume setting title */
+"setting_volume" = "Volym";
+
+/* Volume setting help text */
+"help_volume" = "Fönster för uppspelningsnivå. Intensiteten mappas linjärt mellan låg och hög. Klipval följer också intensitet — lättare slag spelar kortare klipp.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Blixtopacitet";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Fönster för skärmblixtens ljusstyrka. Kurvformen formad av intensitet. Begränsad av ljudklippets längd.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Hårt";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Fast";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Med";
+
+/* Ruler label: light impact */
+"tier_light" = "Lätt";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Knack";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Känslighet och sensorer";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Sensorkonsensus";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Antal sensorer som oberoende måste detektera ett slag innan utlösning. Begränsas till antalet sensorer som levererar data.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld sensorer";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Cooldown";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Minsta tid mellan reaktioner. 0 = begränsas endast av det spelande klippets längd.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Accelerometerjustering";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Frekvensband";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Bandpassfilter på råa accelerometerdata. Låg = högpassgräns (avvisar golvvibrationer). Hög = lågpassgräns (avvisar elektroniskt brus).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Spiktröskel";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Minsta filtrerad amplitud (g-kraft) för att betraktas som ett potentiellt slag. Tillämpas efter bandpassfiltrering. Högre värden kräver starkare kraft.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Toppignalen måste överstiga bakgrunds-RMS med denna multipel. Skarpa bordsstötar toppar väl över bakgrunden. Fotsteg höjer bakgrunden tillsammans med toppen. Högre värden avvisar mer omgivningsvibrationer.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Minsta amplitudökning mellan på varandra följande samplar. Direkta stötar stiger på 1-2 samplar. Överförda vibrationer stiger gradvis. Högre värden avvisar indirekta vibrationer.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Bekräftelser";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Samplar över tröskel som krävs i 120 ms detektionsfönstret. Direkta träffar ger 3-5 höga samplar. Enstaka stötar ger 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld träffar";
+
+/* Warmup setting title */
+"setting_warmup" = "Uppvärmning";
+
+/* Warmup setting help text */
+"help_warmup" = "Samplar innan detektering aktiveras. Filter behöver tid för att stabiliseras. Vid 50 Hz ger 50 samplar = 1 sekund.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Rapporteringsintervall";
+
+/* Report interval setting help text */
+"help_report_interval" = "Accelerometerns avläsningsintervall. 10 ms = 100 Hz (standard), 5 ms = 200 Hz, 20 ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Enheter";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld skärmar, %lld ljud";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Blixtskärmar";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Välj vilka bildskärmar som visar blixtöverlagringen vid slag.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Ljudutgång";
+
+/* Audio output setting help text */
+"help_audio_output" = "Välj vilka ljudenheter som spelar slagljud. Ingen vald = inget ljud.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Inga utdataenheter hittades";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Starta vid inloggning";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Felsökningsloggning";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Avsluta";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Knack";
+
+/* Impact tier name: light */
+"tier_light_full" = "Lätt";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Medel";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Fast";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Hårt";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Åtkomst till rörelsesensor nekad — bevilja behörigheten Indataövervakning i Systeminställningar > Integritet och säkerhet.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Ingen accelerometer hittades — den här Macen kanske inte har en kompatibel rörelsesensor.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Accelerometer otillgänglig (IOKit-fel %@). Den här Macen kanske inte har en kompatibel rörelsesensor.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Ingen kompatibel rörelsesensor hittades på den här Macen.";

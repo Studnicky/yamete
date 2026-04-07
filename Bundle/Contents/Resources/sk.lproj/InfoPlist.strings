@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Slovenčina */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete používa akcelerometer na detekciu fyzických nárazov na váš MacBook.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete môže používať mikrofón na detekciu zvukov nárazov na vašom stole.";

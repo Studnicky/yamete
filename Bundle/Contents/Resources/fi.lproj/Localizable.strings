@@ -1,0 +1,205 @@
+/* Yamete — Suomi (Finnish) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld iskua tänään";
+
+/* Last impact tier label */
+"last_impact" = "viimeisin: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Tauotettu";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reagointiherkkyys";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Iskuvoiman vastausikkuna. Alempi liukusäädin = heikoin laukaiseva voima. Ylempi liukusäädin = voima maksimaalista vastausta varten. Korkeammat arvot reagoivat kevyempiin iskuihin.";
+
+/* Volume setting title */
+"setting_volume" = "Äänenvoimakkuus";
+
+/* Volume setting help text */
+"help_volume" = "Äänen toistotasoikkuna. Voimakkuus kartoitetaan lineaarisesti minimi- ja maksimiarvojen välille. Leikkeen valinta seuraa myös voimakkuutta — kevyemmät iskut toistavat lyhyempiä leikkeitä.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Välähdyksen peittävyys";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Näyttövälähdyksen kirkkauden ikkuna. Verhon ajoitus muotoillaan voimakkuuden mukaan. Rajattu ääninauhan keston mukaan.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Voimakas";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Napakka";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Keski";
+
+/* Ruler label: light impact */
+"tier_light" = "Kevyt";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Naputus";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Herkkyys ja anturit";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Anturikonsensus";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Antureiden määrä, joiden täytyy itsenäisesti havaita isku ennen laukaisemista. Rajoitettu datan toimittavien antureiden määrään.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld anturia";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Jäähtymisaika";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Vähimmäisaika reaktioiden välillä. 0 = rajoitetaan vain toistettavan leikkeen keston mukaan.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Kiihtyvyysanturin säätö";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Taajuuskaista";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Kaistanpäästösuodatin kiihtyvyysanturin raakatiedoille. Matala = ylipäästökynnys (hylkää lattiatärinät). Korkea = alipäästökynnys (hylkää elektroniset kohina).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Piikkynnys";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Vähimmäissuodatettu suuruus (g-voima) mahdollisena iskuna pidettäväksi. Käytetään kaistanpäästösuodatuksen jälkeen. Korkeammat arvot vaativat suurempaa voimaa.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Huippusignaalin täytyy ylittää taustan RMS tällä kertoimella. Terävät pöytäiskut piikkiävät selvästi taustan yläpuolelle. Askeleet nostavat taustaa huipun mukana. Korkeammat arvot hylkäävät enemmän ympäristövibratioita.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Vähimmäissuuruuden kasvu peräkkäisten näytteiden välillä. Suorat iskut nousevat 1-2 näytteessä. Välitetty tärinä nousee asteittain. Korkeammat arvot hylkäävät epäsuoran tärinän.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Vahvistukset";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Kynnyksen ylittävät näytteet 120 ms havaitsemisikkunassa. Suorat iskut tuottavat 3-5 korkeaa näytettä. Yksittäiset nykäykset tuottavat 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld osumaa";
+
+/* Warmup setting title */
+"setting_warmup" = "Lämmittelyaika";
+
+/* Warmup setting help text */
+"help_warmup" = "Näytteet ennen havaitsemisen aktivoitumista. Suodattimet tarvitsevat aikaa vakautumiseen. 50 Hz:llä 50 näytettä = 1 sekunti.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Raportointiväli";
+
+/* Report interval setting help text */
+"help_report_interval" = "Kiihtyvyysanturin kyselyväli. 10 ms = 100 Hz (oletus), 5 ms = 200 Hz, 20 ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Laitteet";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld näyttöä, %lld ääni";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Välähdysnäytöt";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Valitse, mitkä näytöt näyttävät välähdyksen peittokuvan iskun yhteydessä.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Äänilähtö";
+
+/* Audio output setting help text */
+"help_audio_output" = "Valitse, mitkä äänilaitteet toistavat iskuääniä. Ei valittuja = ei ääntä.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Lähtölaitteita ei löydy";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Käynnistä kirjautuessa";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Vianselvityslokit";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Lopeta";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Naputus";
+
+/* Impact tier name: light */
+"tier_light_full" = "Kevyt";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Keskitaso";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Napakka";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Voimakas";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Liikeanturin käyttö estetty — myönnä Syötteen valvonta -käyttöoikeus kohdassa Järjestelmäasetukset > Tietosuoja ja turvallisuus.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Kiihtyvyysanturia ei löydy — tässä Macissa ei ehkä ole yhteensopivaa liikianturia.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Kiihtyvyysanturi ei ole käytettävissä (IOKit-virhe %@). Tässä Macissa ei ehkä ole yhteensopivaa liikeanturia.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Tästä Macista ei löydy yhteensopivaa liikeanturia.";

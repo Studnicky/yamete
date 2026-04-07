@@ -123,6 +123,31 @@ public enum AudioDeviceManager {
         return totalChannels
     }
 
+    // MARK: - Device change notifications
+
+    /// Posts to `NotificationCenter.default` when audio devices are added or removed.
+    /// Call `startObserving()` once at app launch; the listener persists for the process lifetime.
+    /// https://developer.apple.com/documentation/coreaudio/audioobjectaddpropertylistener(_:_:_:_:)
+    public static let devicesDidChangeNotification = Notification.Name("AudioDeviceManager.devicesDidChange")
+
+    @MainActor private static var listenerInstalled = false
+
+    @MainActor public static func startObserving() {
+        guard !listenerInstalled else { return }
+        listenerInstalled = true
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &addr,
+            DispatchQueue.main
+        ) { _, _ in
+            NotificationCenter.default.post(name: devicesDidChangeNotification, object: nil)
+        }
+    }
+
     private static func stringProperty(_ deviceID: AudioDeviceID, selector: AudioObjectPropertySelector) -> String? {
         var addr = AudioObjectPropertyAddress(
             mSelector: selector,

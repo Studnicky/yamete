@@ -30,11 +30,11 @@ public enum ImpactTier: Int, CaseIterable, Sendable, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .tap:    "Tap"
-        case .light:  "Light"
-        case .medium: "Medium"
-        case .firm:   "Firm"
-        case .hard:   "Hard"
+        case .tap:    NSLocalizedString("tier_tap_full", comment: "Impact tier name: lightest")
+        case .light:  NSLocalizedString("tier_light_full", comment: "Impact tier name: light")
+        case .medium: NSLocalizedString("tier_medium_full", comment: "Impact tier name: medium")
+        case .firm:   NSLocalizedString("tier_firm_full", comment: "Impact tier name: firm")
+        case .hard:   NSLocalizedString("tier_hard_full", comment: "Impact tier name: hardest")
         }
     }
 

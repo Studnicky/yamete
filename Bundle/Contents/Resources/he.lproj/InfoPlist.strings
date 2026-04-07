@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Hebrew */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "‏Yamete משתמש במד התאוצה לזיהוי פגיעות פיזיות ב-MacBook שלך.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "‏Yamete יכול להשתמש במיקרופון לזיהוי צלילי פגיעה על השולחן שלך.";
