@@ -7,7 +7,7 @@ import Observation
 /// User settings persisted in `UserDefaults`.
 /// Includes guard-clamp updates to avoid recursive `didSet` loops.
 @MainActor @Observable
-final class SettingsStore {
+public final class SettingsStore {
 
     // MARK: - Keys
 
@@ -178,7 +178,7 @@ final class SettingsStore {
     // MARK: - Display + audio device selection
 
     /// CGDirectDisplayID values of enabled displays. Empty = all displays.
-    var enabledDisplays: [Int] {
+    public var enabledDisplays: [Int] {
         didSet {
             guard enabledDisplays != oldValue else { return }
             persist(enabledDisplays, .enabledDisplays)
@@ -186,7 +186,7 @@ final class SettingsStore {
     }
 
     /// Core Audio device UIDs for audio output. Empty = system default only.
-    var enabledAudioDevices: [String] {
+    public var enabledAudioDevices: [String] {
         didSet {
             guard enabledAudioDevices != oldValue else { return }
             persist(enabledAudioDevices, .enabledAudioDevices)
@@ -194,7 +194,7 @@ final class SettingsStore {
     }
 
     /// SensorAdapter IDs to enable. Empty = all available adapters.
-    var enabledSensorIDs: [String] {
+    public var enabledSensorIDs: [String] {
         didSet {
             guard enabledSensorIDs != oldValue else { return }
             persist(enabledSensorIDs, .enabledSensorIDs)
@@ -270,7 +270,7 @@ final class SettingsStore {
 
     // MARK: - Init
 
-    init() {
+    public init() {
         let d = UserDefaults.standard
         d.register(defaults: Self.defaults)
 
@@ -297,6 +297,35 @@ final class SettingsStore {
         warmupSamples   = d.integer(forKey: Key.warmupSamples.rawValue)
         reportInterval  = d.double(forKey: Key.reportInterval.rawValue)
         consensusRequired = d.integer(forKey: Key.consensusRequired.rawValue)
+    }
+
+    // MARK: - Reset
+
+    /// Restores all settings to their factory default values.
+    func resetToDefaults() {
+        let d = Self.defaults
+        sensitivityMin    = d[Key.sensitivityMin.rawValue]  as! Double
+        sensitivityMax    = d[Key.sensitivityMax.rawValue]  as! Double
+        bandpassLowHz     = d[Key.bandpassLowHz.rawValue]   as! Double
+        bandpassHighHz    = d[Key.bandpassHighHz.rawValue]   as! Double
+        debounce          = d[Key.debounce.rawValue]         as! Double
+        soundEnabled      = d[Key.soundEnabled.rawValue]     as! Bool
+        debugLogging      = d[Key.debugLogging.rawValue]     as! Bool
+        screenFlash       = d[Key.screenFlash.rawValue]      as! Bool
+        flashOpacityMin   = d[Key.flashOpacityMin.rawValue]  as! Double
+        flashOpacityMax   = d[Key.flashOpacityMax.rawValue]  as! Double
+        volumeMin         = d[Key.volumeMin.rawValue]        as! Double
+        volumeMax         = d[Key.volumeMax.rawValue]        as! Double
+        enabledDisplays   = d[Key.enabledDisplays.rawValue]  as! [Int]
+        enabledAudioDevices = d[Key.enabledAudioDevices.rawValue] as! [String]
+        enabledSensorIDs  = d[Key.enabledSensorIDs.rawValue] as! [String]
+        spikeThreshold    = d[Key.spikeThreshold.rawValue]   as! Double
+        crestFactor       = d[Key.crestFactor.rawValue]      as! Double
+        riseRate          = d[Key.riseRate.rawValue]          as! Double
+        confirmations     = d[Key.confirmations.rawValue]    as! Int
+        warmupSamples     = d[Key.warmupSamples.rawValue]    as! Int
+        reportInterval    = d[Key.reportInterval.rawValue]   as! Double
+        consensusRequired = d[Key.consensusRequired.rawValue] as! Int
     }
 
     // MARK: - Private

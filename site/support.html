@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support — Yamete</title>
+  <style>
+    :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --muted: #888; --card: #1a1a1a; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif; background: var(--bg); color: var(--fg); line-height: 1.7; }
+    a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+    .container { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .subtitle { color: var(--muted); margin-bottom: 2rem; }
+    h2 { font-size: 1.25rem; font-weight: 600; margin: 2rem 0 0.75rem; border-bottom: 1px solid #333; padding-bottom: 0.4rem; }
+    p { margin-bottom: 0.75rem; color: #ccc; }
+    .card { background: var(--card); border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
+    .card h3 { font-size: 1rem; margin-bottom: 0.4rem; }
+    .card p { font-size: 0.9rem; color: var(--muted); margin-bottom: 0; }
+    details { margin-bottom: 0.75rem; } details summary { cursor: pointer; font-weight: 500; padding: 0.4rem 0; }
+    details p { margin-top: 0.5rem; font-size: 0.95rem; }
+    footer { text-align: center; padding: 2rem 0; color: var(--muted); font-size: 0.85rem; border-top: 1px solid #222; margin-top: 3rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Support</h1>
+    <p class="subtitle">Yamete for macOS</p>
+
+    <div class="card">
+      <h3>Bug Reports & Feature Requests</h3>
+      <p><a href="https://github.com/Studnicky/yamete/issues">Open an issue on GitHub</a></p>
+    </div>
+
+    <div class="card">
+      <h3>Email Support</h3>
+      <p><a href="mailto:support@studnicky.com">support@studnicky.com</a></p>
+    </div>
+
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>No impacts are detected</summary>
+      <p>Make sure you have an Apple Silicon Mac (M1/M2/M3/M4). Check that Reactivity is not set too low. Try lowering the Spike Threshold in Accelerometer Tuning. If using microphone detection, grant microphone permission in System Settings > Privacy & Security.</p>
+    </details>
+
+    <details>
+      <summary>The app detects too many false positives</summary>
+      <p>Increase the Spike Threshold, Crest Factor, and Rise Rate in Accelerometer Tuning. Set Confirmations to 3 or higher. Increase Sensor Consensus to require multiple sensors to agree. Add a Cooldown to space out reactions.</p>
+    </details>
+
+    <details>
+      <summary>No sound plays on impact</summary>
+      <p>Check the Volume range slider — both thumbs should be above zero. Verify an audio device is selected in the Devices panel. Make sure sounds are not muted at the system level.</p>
+    </details>
+
+    <details>
+      <summary>Screen flash doesn't appear</summary>
+      <p>Check the Flash Opacity range slider — both thumbs should be above zero. Verify displays are selected in the Devices panel. The flash is gated to the sound clip duration, so audio must also be working.</p>
+    </details>
+
+    <details>
+      <summary>The app uses too much CPU</summary>
+      <p>Try increasing the Report Interval (e.g., 20ms instead of 10ms) to reduce accelerometer polling rate. Disable sensors you don't need. The app should use less than 2% CPU during idle monitoring.</p>
+    </details>
+
+    <details>
+      <summary>How do I uninstall?</summary>
+      <p>Drag Yamete.app from Applications to the Trash. To remove preferences: delete <code>~/Library/Preferences/com.studnicky.yamete.plist</code>. To remove logs: delete <code>~/Library/Application Support/Yamete/</code>.</p>
+    </details>
+
+    <details>
+      <summary>Does the app work on Intel Macs?</summary>
+      <p>Partially. Intel Macs lack the BMI286 accelerometer, but microphone-based impact detection works on any Mac with a microphone. Headphone motion also works with compatible AirPods/Beats.</p>
+    </details>
+
+    <h2>System Requirements</h2>
+    <p>macOS 14.0+ (Sonoma), Apple Silicon recommended. Requires USB entitlement for accelerometer access and optional microphone permission.</p>
+
+    <footer>
+      <p>&copy; 2026 Studnicky &middot; <a href="index.html">Home</a> &middot; <a href="privacy.html">Privacy</a></p>
+    </footer>
+  </div>
+</body>
+</html>

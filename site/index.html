@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yamete — Desk Impact Reactions for Mac</title>
+  <meta name="description" content="A macOS menu bar app that detects physical impacts on Apple Silicon MacBooks and responds with audio and visual feedback.">
+  <style>
+    :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --muted: #888; --card: #1a1a1a; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; }
+    a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+    .container { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem; }
+    header { text-align: center; padding: 4rem 0 2rem; }
+    header h1 { font-size: 3rem; font-weight: 700; letter-spacing: -0.02em; }
+    header p { font-size: 1.15rem; color: var(--muted); margin-top: 0.5rem; }
+    .badge { display: inline-block; background: var(--accent); color: #000; font-size: 0.8rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 999px; margin-top: 1rem; }
+    section { margin: 2.5rem 0; }
+    section h2 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.75rem; border-bottom: 1px solid #333; padding-bottom: 0.5rem; }
+    section p, section li { color: #ccc; }
+    ul { list-style: none; padding: 0; } ul li { padding: 0.3rem 0; } ul li::before { content: "- "; color: var(--accent); }
+    .features { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+    .feature { background: var(--card); border-radius: 8px; padding: 1.25rem; }
+    .feature h3 { font-size: 1rem; margin-bottom: 0.4rem; }
+    .feature p { font-size: 0.9rem; color: var(--muted); }
+    .cta { text-align: center; margin: 3rem 0; }
+    .cta a { display: inline-block; background: var(--accent); color: #000; font-weight: 600; padding: 0.75rem 2rem; border-radius: 8px; font-size: 1.05rem; }
+    .cta a:hover { text-decoration: none; opacity: 0.9; }
+    footer { text-align: center; padding: 2rem 0; color: var(--muted); font-size: 0.85rem; border-top: 1px solid #222; margin-top: 3rem; }
+    footer a { color: var(--muted); } footer a:hover { color: var(--accent); }
+    @media (max-width: 600px) { .features { grid-template-columns: 1fr; } header h1 { font-size: 2.2rem; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Yamete</h1>
+      <p>Desk Impact Reactions for Mac</p>
+      <span class="badge">macOS 14+ &middot; Apple Silicon</span>
+    </header>
+
+    <section>
+      <p>A macOS menu bar app that detects physical impacts on Apple Silicon MacBooks and responds with audio and visual feedback. Slap your desk, tap the laptop, get a reaction.</p>
+    </section>
+
+    <section>
+      <h2>Features</h2>
+      <div class="features">
+        <div class="feature">
+          <h3>Multi-Sensor Detection</h3>
+          <p>Built-in accelerometer, microphone, and AirPods IMU work together with configurable consensus.</p>
+        </div>
+        <div class="feature">
+          <h3>Audio Reactions</h3>
+          <p>Impact intensity selects from a library of sound clips. Harder hits play longer, louder sounds.</p>
+        </div>
+        <div class="feature">
+          <h3>Screen Flash</h3>
+          <p>Per-monitor radial flash overlay with animated faces. Intensity controls opacity and envelope.</p>
+        </div>
+        <div class="feature">
+          <h3>Fine-Tuned Control</h3>
+          <p>Reactivity, volume, and flash windows with range sliders. Advanced detection gate tuning.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>How It Works</h2>
+      <p>Each sensor runs its own detection pipeline: raw data passes through bandpass filtering and a 6-gate analysis (spike threshold, rise rate, crest factor, confirmation count). When enough sensors agree within a time window, the app responds with sound and screen flash scaled to impact intensity.</p>
+    </section>
+
+    <section>
+      <h2>Privacy</h2>
+      <p>Yamete makes zero network connections. All sensor data is processed locally in real-time. No audio is recorded or stored. Logs auto-delete after 24 hours. No accounts, no tracking, no ads.</p>
+      <p style="margin-top: 0.75rem;"><a href="privacy.html">Full Privacy Policy</a></p>
+    </section>
+
+    <section>
+      <h2>Requirements</h2>
+      <ul>
+        <li>macOS 14.0+ (Sonoma)</li>
+        <li>Apple Silicon Mac (M1/M2/M3/M4) for accelerometer</li>
+        <li>Any Mac for microphone-only detection</li>
+        <li>AirPods Pro / Beats for headphone motion (optional)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Support</h2>
+      <p>For bug reports, feature requests, or questions: <a href="https://github.com/Studnicky/yamete/issues">GitHub Issues</a></p>
+      <p style="margin-top: 0.5rem;">Email: <a href="mailto:support@studnicky.com">support@studnicky.com</a></p>
+    </section>
+
+    <div class="cta">
+      <a href="https://github.com/Studnicky/yamete/releases">Download Latest Release</a>
+    </div>
+
+    <footer>
+      <p>&copy; 2026 Studnicky &middot; <a href="privacy.html">Privacy</a> &middot; <a href="https://github.com/Studnicky/yamete">GitHub</a> &middot; <a href="support.html">Support</a></p>
+    </footer>
+  </div>
+</body>
+</html>

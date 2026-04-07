@@ -4,6 +4,13 @@ import PackageDescription
 let package = Package(
     name: "Yamete",
     platforms: [.macOS(.v14)],
+    products: [
+        .library(name: "YameteCore", targets: ["YameteCore"]),
+        .library(name: "IOHIDPublic", targets: ["IOHIDPublic"]),
+        .library(name: "SensorKit", targets: ["SensorKit"]),
+        .library(name: "ResponseKit", targets: ["ResponseKit"]),
+        .library(name: "YameteApp", targets: ["YameteApp"]),
+    ],
     targets: [
         // Shared types: Vec3, SensorID, ImpactTier, protocols, logging, signal processing
         .target(
