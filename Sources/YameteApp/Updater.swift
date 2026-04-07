@@ -6,10 +6,10 @@ import Observation
 
 /// App version info. Updates are delivered through the Mac App Store.
 @MainActor @Observable
-final class Updater {
+public final class Updater {
     let currentVersion: String
 
-    init() {
+    public init() {
         currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
     }
 }

@@ -1,0 +1,116 @@
+name: Yamete
+options:
+  bundleIdPrefix: com.studnicky
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.4"
+  createIntermediateGroups: true
+  defaultConfig: Release
+
+configs:
+  Debug: debug
+  Release: release
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ARCHS: arm64
+    PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete
+    MARKETING_VERSION: "0.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: true
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""
+
+packages:
+  Yamete:
+    path: .
+
+targets:
+  Yamete:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/YameteApp/YameteApp.swift
+    dependencies:
+      - package: Yamete
+        product: YameteApp
+      - package: Yamete
+        product: YameteCore
+      - package: Yamete
+        product: SensorKit
+      - package: Yamete
+        product: ResponseKit
+      - sdk: IOKit.framework
+      - sdk: AVFoundation.framework
+      - sdk: CoreAudio.framework
+      - sdk: CoreMotion.framework
+      - sdk: ServiceManagement.framework
+      - sdk: SwiftUI.framework
+      - sdk: AppKit.framework
+    info:
+      path: Bundle/Contents/Info.plist
+      properties:
+        CFBundleDisplayName: Yamete
+        CFBundleExecutable: Yamete
+        CFBundleIconFile: AppIcon
+        CFBundleIconName: AppIcon
+        CFBundleIdentifier: com.studnicky.yamete
+        CFBundleName: Yamete
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: "0.0.0"
+        CFBundleVersion: "1"
+        LSApplicationCategoryType: public.app-category.entertainment
+        LSMinimumSystemVersion: "14.0"
+        LSUIElement: true
+        NSHumanReadableCopyright: "© 2026 Studnicky"
+        NSPrincipalClass: NSApplication
+        NSHighResolutionCapable: true
+        ITSAppUsesNonExemptEncryption: false
+        NSMotionUsageDescription: "Yamete uses the accelerometer to detect physical impacts on your MacBook."
+        NSMicrophoneUsageDescription: "Yamete can use the microphone to detect impact sounds on your desk."
+    settings:
+      base:
+        PRODUCT_NAME: Yamete
+        PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete
+        CODE_SIGN_ENTITLEMENTS: Yamete.entitlements
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+        SWIFT_INCLUDE_PATHS: "$(SRCROOT)/Sources/IOHIDPublic/include"
+        HEADER_SEARCH_PATHS: "$(SRCROOT)/Sources/IOHIDPublic/include"
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+          SWIFT_COMPILATION_MODE: wholemodule
+    preBuildScripts: []
+    postBuildScripts: []
+    entitlements:
+      path: Yamete.entitlements
+
+  YameteTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Yamete
+      - package: Yamete
+        product: YameteCore
+      - package: Yamete
+        product: SensorKit
+      - package: Yamete
+        product: ResponseKit
+      - package: Yamete
+        product: YameteApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete.tests
+
+fileGroups:
+  - Bundle
+  - Assets
+  - docs
+  - site

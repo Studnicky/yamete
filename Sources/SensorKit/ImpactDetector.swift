@@ -52,7 +52,6 @@ public final class ImpactDetector: @unchecked Sendable {
 
     private var window: [(timestamp: Date, magnitude: Float)] = []
     private var sampleCount = 0
-    private var prevMag: Float = 0
     private var backgroundMeanSq: Float
     private static let rmsAlpha: Float = 0.02
 
@@ -71,9 +70,6 @@ public final class ImpactDetector: @unchecked Sendable {
         let magSq = magnitude * magnitude
         backgroundMeanSq = Self.rmsAlpha * magSq + (1 - Self.rmsAlpha) * backgroundMeanSq
         let backgroundRMS = sqrtf(backgroundMeanSq)
-
-        // Track current sample
-        prevMag = magnitude
 
         // Accumulate in window and prune
         window.append((timestamp, magnitude))

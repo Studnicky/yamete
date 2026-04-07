@@ -25,6 +25,7 @@ BUNDLE_SRC := Bundle/Contents
 
 SOURCES := $(shell find Sources -name '*.swift' | sort)
 BUNDLE_RESOURCES := $(shell find $(BUNDLE_SRC)/Resources -type f 2>/dev/null)
+LPROJ_DIRS := $(wildcard $(BUNDLE_SRC)/Resources/*.lproj)
 
 FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio CoreMotion ServiceManagement
 SWIFTFLAGS := -O -module-name $(APP) -target arm64-apple-macosx14.0 -parse-as-library \
@@ -66,6 +67,12 @@ build: $(BUILD)/yamete $(BUILD)/.minified
 	@cp $(BUNDLE_SRC)/Info.plist $(TARGET)/Contents/
 	@cp $(BUNDLE_SRC)/PkgInfo $(TARGET)/Contents/
 	@cp -R $(BUILD)/resources/ $(RES_DIR)/
+	@# ── Localizations ──
+	@for lproj in $(LPROJ_DIRS); do \
+		cp -R "$$lproj" $(RES_DIR)/; \
+	done
+	@LCOUNT=$$(find $(RES_DIR) -maxdepth 1 -name '*.lproj' -type d | wc -l | tr -d ' '); \
+	 printf "  l10n      $$LCOUNT locales\n"
 	@# ── Stage 4: Sign ──
 	@printf "  sign      $(if $(filter -,$(SIGNING_ID)),ad-hoc,$(SIGNING_ID))\n"
 	@codesign --sign "$(SIGNING_ID)" --force --deep --options runtime \
@@ -90,9 +97,10 @@ verify: build
 	@test -d $(RES_DIR)/faces && test -d $(RES_DIR)/sounds
 	@FACES=$$(find $(RES_DIR)/faces -type f \( -name '*.svg' -o -name '*.png' -o -name '*.jpg' \) | wc -l | tr -d ' '); \
 	 SOUNDS=$$(find $(RES_DIR)/sounds -type f \( -name '*.mp3' -o -name '*.wav' -o -name '*.m4a' \) | wc -l | tr -d ' '); \
-	 test "$$FACES" -ge 1 && test "$$SOUNDS" -ge 1 && \
+	 LPROJS=$$(find $(RES_DIR) -maxdepth 1 -name '*.lproj' -type d | wc -l | tr -d ' '); \
+	 test "$$FACES" -ge 1 && test "$$SOUNDS" -ge 1 && test "$$LPROJS" -ge 1 && \
 	 codesign --verify --deep --strict $(TARGET) 2>/dev/null && \
-	 printf "  verify    ✓ binary, plist, $$FACES faces, $$SOUNDS sounds, signature\n"
+	 printf "  verify    ✓ binary, plist, $$FACES faces, $$SOUNDS sounds, $$LPROJS locales, signature\n"
 
 # ── Install ───────────────────────────────────────────────────
 install: build

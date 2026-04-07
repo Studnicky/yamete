@@ -1,8 +1,9 @@
 import SwiftUI
 import AppKit
-#if canImport(ResponseKit)
+import YameteCore
+import SensorKit
 import ResponseKit
-#endif
+import YameteApp
 
 @main
 struct YameteApp: App {
@@ -30,15 +31,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let updater = Updater()
 
     private static let firstLaunchKey = "hasCompletedFirstLaunch"
+    private static let microphonePromptKey = "hasShownMicrophonePrompt"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         migrateDeviceDefaults()
+        showMicrophoneOnboardingIfNeeded()
         controller.bootstrap()
 
         if !UserDefaults.standard.bool(forKey: Self.firstLaunchKey) {
             UserDefaults.standard.set(true, forKey: Self.firstLaunchKey)
             controller.playWelcomeSound()
+        }
+    }
+
+    /// On first launch, explain microphone usage before the pipeline starts.
+    /// "Allow" proceeds normally (macOS shows its own permission dialog when
+    /// AVAudioEngine starts). "Skip" removes the microphone adapter from the
+    /// enabled sensor list so it never requests permission.
+    private func showMicrophoneOnboardingIfNeeded() {
+        let d = UserDefaults.standard
+        guard !d.bool(forKey: Self.microphonePromptKey) else { return }
+        d.set(true, forKey: Self.microphonePromptKey)
+
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("mic_onboarding_title", comment: "Microphone onboarding dialog title")
+        alert.informativeText = NSLocalizedString("mic_onboarding_body", comment: "Microphone onboarding dialog body")
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: NSLocalizedString("mic_onboarding_allow", comment: "Microphone onboarding allow button"))
+        alert.addButton(withTitle: NSLocalizedString("mic_onboarding_skip", comment: "Microphone onboarding skip button"))
+
+        let response = alert.runModal()
+        if response == .alertSecondButtonReturn {
+            // User chose Skip — disable microphone adapter
+            settings.enabledSensorIDs = settings.enabledSensorIDs.filter { $0 != "microphone" }
         }
     }
 

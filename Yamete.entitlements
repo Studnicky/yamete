@@ -1,16 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-    <!-- App Sandbox — required for Mac App Store distribution.
-         Accelerometer access uses IOHIDManager (public API) which works
-         under sandbox with the device.usb entitlement (grants IOHIDLibUserClient).
-         Verified 2026-04-05 on macOS 26.3 with BMI286 SPU accelerometer. -->
-    <key>com.apple.security.app-sandbox</key>
-    <true/>
-    <key>com.apple.security.device.usb</key>
-    <true/>
-    <key>com.apple.security.device.audio-input</key>
-    <true/>
-</dict>
+<dict/>
 </plist>

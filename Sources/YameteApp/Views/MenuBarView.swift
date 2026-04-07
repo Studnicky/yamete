@@ -10,7 +10,7 @@ import ServiceManagement
 
 // MARK: - MenuBarView (composition root)
 
-struct MenuBarView: View {
+public struct MenuBarView: View {
     @Environment(ImpactController.self) var controller
     @Environment(SettingsStore.self) var settings
     @Environment(Updater.self) var updater
@@ -18,7 +18,9 @@ struct MenuBarView: View {
     @State private var displays: [NSScreen] = NSScreen.screens
     @State private var availableSensors: [String] = []
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         VStack(spacing: 0) {
             HeaderSection()
             Divider()
@@ -455,6 +457,7 @@ private struct FooterSection: View {
     @Environment(SettingsStore.self) var settings
     @Environment(Updater.self) var updater
     @State private var launchAtLogin = (SMAppService.mainApp.status == .enabled)
+    @State private var showResetConfirmation = false
 
     var body: some View {
         @Bindable var s = settings
@@ -496,6 +499,15 @@ private struct FooterSection: View {
                 Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
                     .font(.caption).foregroundStyle(.tertiary)
                 Spacer()
+                Button(action: { showResetConfirmation = true }) {
+                    Text(NSLocalizedString("button_reset", comment: "Reset to defaults button"))
+                        .font(.caption)
+                        .foregroundStyle(Theme.pink)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Theme.deepRose.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
                 Button(action: { NSApp.terminate(nil) }) {
                     Text(NSLocalizedString("button_quit", comment: "Quit application button"))
                         .font(.caption.bold())
@@ -508,6 +520,17 @@ private struct FooterSection: View {
                 .keyboardShortcut("q")
             }
             .padding(.horizontal, 14).padding(.vertical, 4).padding(.bottom, 4)
+        }
+        .alert(
+            NSLocalizedString("reset_confirm_title", comment: "Reset confirmation dialog title"),
+            isPresented: $showResetConfirmation
+        ) {
+            Button(NSLocalizedString("reset_confirm_cancel", comment: "Reset confirmation cancel button"), role: .cancel) {}
+            Button(NSLocalizedString("reset_confirm_reset", comment: "Reset confirmation reset button"), role: .destructive) {
+                settings.resetToDefaults()
+            }
+        } message: {
+            Text(NSLocalizedString("reset_confirm_message", comment: "Reset confirmation dialog message"))
         }
     }
 }

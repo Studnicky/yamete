@@ -173,6 +173,21 @@
 /* Quit application button */
 "button_quit" = "Quit";
 
+/* Reset to defaults button */
+"button_reset" = "Reset";
+
+/* Reset confirmation dialog title */
+"reset_confirm_title" = "Reset Settings";
+
+/* Reset confirmation dialog message */
+"reset_confirm_message" = "Reset all settings to their default values? This cannot be undone.";
+
+/* Reset confirmation cancel button */
+"reset_confirm_cancel" = "Cancel";
+
+/* Reset confirmation reset button */
+"reset_confirm_reset" = "Reset";
+
 /* Impact Tier Full Names (used in ImpactTier.description) */
 
 /* Impact tier name: lightest */
@@ -203,3 +218,17 @@
 
 /* No adapters error */
 "No compatible motion sensor found on this Mac." = "No compatible motion sensor found on this Mac.";
+
+/* Microphone Onboarding */
+
+/* Microphone onboarding dialog title */
+"mic_onboarding_title" = "Microphone Access";
+
+/* Microphone onboarding dialog body */
+"mic_onboarding_body" = "Yamete can use your microphone to detect desk impacts. Audio is processed in real-time and never recorded or transmitted.";
+
+/* Microphone onboarding allow button */
+"mic_onboarding_allow" = "Allow";
+
+/* Microphone onboarding skip button */
+"mic_onboarding_skip" = "Skip";

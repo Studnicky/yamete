@@ -17,11 +17,11 @@ private let log = AppLog(category: "ImpactController")
 /// Signal chain:
 ///   adapter (per-sensor detection) → fusion engine (consensus + rearm) → response (audio + flash)
 @MainActor @Observable
-final class ImpactController {
+public final class ImpactController {
     let settings: SettingsStore
     let audioPlayer: any AudioResponder
 
-    let allAdapters: [any SensorAdapter]
+    public let allAdapters: [any SensorAdapter]
     private var sensorManager: SensorManager
     private let fusion = ImpactFusionEngine()
     private let screenFlash: any FlashResponder
@@ -40,7 +40,7 @@ final class ImpactController {
     private var countDate: Date = Calendar.current.startOfDay(for: Date())
     private var activeSensorIDs: Set<SensorID> = []
 
-    init(settings: SettingsStore,
+    public init(settings: SettingsStore,
          audioPlayer: (any AudioResponder)? = nil,
          flashResponder: (any FlashResponder)? = nil,
          adapters: [any SensorAdapter]? = nil) {
@@ -62,7 +62,7 @@ final class ImpactController {
 
     /// Called once at app launch. Starts the settings observation loop
     /// which manages the pipeline lifecycle based on response toggles.
-    func bootstrap() {
+    public func bootstrap() {
         AppLog.debugEnabled = settings.debugLogging
         syncPipelineState()
         startSettingsObservation()
@@ -146,7 +146,7 @@ final class ImpactController {
         }
     }
 
-    func playWelcomeSound() {
+    public func playWelcomeSound() {
         guard let url = audioPlayer.longestSoundURL else { return }
         audioPlayer.playOnAllDevices(url: url, volume: 1.0)
     }

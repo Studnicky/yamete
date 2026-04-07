@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — Yamete</title>
+  <style>
+    :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --muted: #888; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif; background: var(--bg); color: var(--fg); line-height: 1.7; }
+    a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+    .container { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+    h2 { font-size: 1.25rem; font-weight: 600; margin: 2rem 0 0.75rem; border-bottom: 1px solid #333; padding-bottom: 0.4rem; }
+    p { margin-bottom: 0.75rem; color: #ccc; }
+    ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; } li { color: #ccc; padding: 0.15rem 0; }
+    footer { text-align: center; padding: 2rem 0; color: var(--muted); font-size: 0.85rem; border-top: 1px solid #222; margin-top: 3rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <p class="meta">Effective: April 7, 2026 &middot; App: Yamete for macOS</p>
+
+    <p><strong>Yamete</strong> is a macOS menu bar app that detects physical impacts on Apple Silicon MacBooks and responds with audio and visual feedback.</p>
+
+    <h2>Data Collection</h2>
+    <p>Yamete collects and stores the following data <strong>locally on your Mac only</strong>:</p>
+
+    <h2>Activity Logs</h2>
+    <ul>
+      <li>Timestamped sensor and detection events written to <code>~/Library/Application Support/Yamete/logs/</code></li>
+      <li>Logs may include your Mac's accelerometer serial number</li>
+      <li><strong>Retention: 24 hours</strong> — log files older than 24 hours are automatically deleted</li>
+      <li>Logs are never transmitted over the network</li>
+    </ul>
+
+    <h2>User Preferences</h2>
+    <ul>
+      <li>Detection sensitivity, volume, opacity, frequency band, and device settings</li>
+      <li>Stored in macOS UserDefaults (standard app preferences)</li>
+      <li>No personally identifiable information</li>
+    </ul>
+
+    <h2>Device Identifiers</h2>
+    <ul>
+      <li>Core Audio device UIDs (for audio output routing)</li>
+      <li>Display IDs (for flash overlay targeting)</li>
+      <li>These are hardware identifiers used only for local device selection</li>
+    </ul>
+
+    <h2>Network Access</h2>
+    <p>Yamete does not make any network connections. All data stays on your Mac.</p>
+
+    <h2>No Data Sharing</h2>
+    <p>Yamete does not:</p>
+    <ul>
+      <li>Collect personal information</li>
+      <li>Track usage patterns</li>
+      <li>Send data to third parties</li>
+      <li>Use advertising identifiers</li>
+      <li>Require an account or login</li>
+    </ul>
+
+    <h2>Sensor Data</h2>
+    <p>Accelerometer, microphone, and headphone motion data is processed in real-time for impact detection only. No sensor data is recorded, stored beyond the detection moment, or transmitted.</p>
+    <p>Microphone audio buffers are analyzed for transient peaks and immediately discarded. No audio recording occurs.</p>
+
+    <h2>Children's Privacy</h2>
+    <p>Yamete does not collect any personal information from any user, including children under 13.</p>
+
+    <h2>Changes to This Policy</h2>
+    <p>If this policy changes, the updated version will be posted at this URL. The effective date at the top of the page will be updated.</p>
+
+    <h2>Contact</h2>
+    <p>For privacy questions: <a href="mailto:support@studnicky.com">support@studnicky.com</a></p>
+    <p>Source code: <a href="https://github.com/Studnicky/yamete">github.com/Studnicky/yamete</a></p>
+
+    <footer>
+      <p>&copy; 2026 Studnicky &middot; <a href="index.html">Home</a> &middot; <a href="support.html">Support</a></p>
+    </footer>
+  </div>
+</body>
+</html>
