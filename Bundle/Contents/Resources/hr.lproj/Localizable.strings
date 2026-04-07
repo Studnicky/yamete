@@ -142,7 +142,7 @@
 "section_devices" = "Uređaji";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld zaslona, %lld zvuk";
+"devices_subtitle" = "%1$lld zaslona, %2$lld zvuk";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Zasloni bljeska";

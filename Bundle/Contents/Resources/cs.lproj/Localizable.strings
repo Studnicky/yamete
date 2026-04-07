@@ -142,7 +142,7 @@
 "section_devices" = "Zařízení";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld displeje, %lld zvuk";
+"devices_subtitle" = "%1$lld displeje, %2$lld zvuk";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Zábleskové displeje";

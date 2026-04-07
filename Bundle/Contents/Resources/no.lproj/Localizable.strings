@@ -142,7 +142,7 @@
 "section_devices" = "Enheter";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld skjermer, %lld lyd";
+"devices_subtitle" = "%1$lld skjermer, %2$lld lyd";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Flash-skjermer";

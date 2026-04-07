@@ -142,7 +142,7 @@
 "section_devices" = "الأجهزة";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld شاشة، %lld صوت";
+"devices_subtitle" = "%1$lld شاشة، %2$lld صوت";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "وميض الشاشات";
@@ -172,6 +172,21 @@
 
 /* Quit application button */
 "button_quit" = "إنهاء";
+
+/* Reset to defaults button */
+"button_reset" = "إعادة تعيين";
+
+/* Reset confirmation dialog title */
+"reset_confirm_title" = "إعادة تعيين الإعدادات";
+
+/* Reset confirmation dialog message */
+"reset_confirm_message" = "إعادة تعيين جميع الإعدادات إلى قيمها الافتراضية؟ لا يمكن التراجع عن هذا.";
+
+/* Reset confirmation cancel button */
+"reset_confirm_cancel" = "إلغاء";
+
+/* Reset confirmation reset button */
+"reset_confirm_reset" = "إعادة تعيين";
 
 /* Impact Tier Full Names (used in ImpactTier.description) */
 
@@ -203,3 +218,17 @@
 
 /* No adapters error */
 "No compatible motion sensor found on this Mac." = "لم يتم العثور على مستشعر حركة متوافق على هذا Mac.";
+
+/* Microphone Onboarding */
+
+/* Microphone onboarding dialog title */
+"mic_onboarding_title" = "الوصول إلى الميكروفون";
+
+/* Microphone onboarding dialog body */
+"mic_onboarding_body" = "يمكن لـ Yamete استخدام الميكروفون لاكتشاف صدمات المكتب. تتم معالجة الصوت في الوقت الفعلي ولا يتم تسجيله أو إرساله.";
+
+/* Microphone onboarding allow button */
+"mic_onboarding_allow" = "السماح";
+
+/* Microphone onboarding skip button */
+"mic_onboarding_skip" = "تخطي";

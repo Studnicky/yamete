@@ -18,6 +18,8 @@
             <string>%lld פגיעה היום</string>
             <key>two</key>
             <string>%lld פגיעות היום</string>
+            <key>many</key>
+            <string>%lld פגיעות היום</string>
             <key>other</key>
             <string>%lld פגיעות היום</string>
         </dict>
@@ -38,6 +40,8 @@
             <string>%lld חיישן</string>
             <key>two</key>
             <string>%lld חיישנים</string>
+            <key>many</key>
+            <string>%lld חיישנים</string>
             <key>other</key>
             <string>%lld חיישנים</string>
         </dict>
@@ -57,6 +61,8 @@
             <key>one</key>
             <string>%lld פגיעה</string>
             <key>two</key>
+            <string>%lld פגיעות</string>
+            <key>many</key>
             <string>%lld פגיעות</string>
             <key>other</key>
             <string>%lld פגיעות</string>

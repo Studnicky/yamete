@@ -142,7 +142,7 @@
 "section_devices" = "Устройства";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld дисплеев, %lld аудио";
+"devices_subtitle" = "%1$lld дисплеев, %2$lld аудио";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Дисплеи для вспышки";

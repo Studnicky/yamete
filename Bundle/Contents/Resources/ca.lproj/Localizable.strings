@@ -142,7 +142,7 @@
 "section_devices" = "Dispositius";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld pantalles, %lld àudio";
+"devices_subtitle" = "%1$lld pantalles, %2$lld àudio";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Pantalles de flaix";
