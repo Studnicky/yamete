@@ -142,7 +142,7 @@
 "section_devices" = "Enheter";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld skärmar, %lld ljud";
+"devices_subtitle" = "%1$lld skärmar, %2$lld ljud";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Blixtskärmar";

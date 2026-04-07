@@ -142,7 +142,7 @@
 "section_devices" = "อุปกรณ์";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld จอแสดงผล, %lld เสียง";
+"devices_subtitle" = "%1$lld จอแสดงผล, %2$lld เสียง";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "จอแสดงผลแฟลช";

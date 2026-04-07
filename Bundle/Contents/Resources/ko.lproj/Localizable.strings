@@ -142,7 +142,7 @@
 "section_devices" = "장치";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld개 디스플레이, %lld개 오디오";
+"devices_subtitle" = "%1$lld개 디스플레이, %2$lld개 오디오";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "플래시 디스플레이";
@@ -172,6 +172,21 @@
 
 /* Quit application button */
 "button_quit" = "종료";
+
+/* Reset to defaults button */
+"button_reset" = "초기화";
+
+/* Reset confirmation dialog title */
+"reset_confirm_title" = "설정 초기화";
+
+/* Reset confirmation dialog message */
+"reset_confirm_message" = "모든 설정을 기본값으로 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.";
+
+/* Reset confirmation cancel button */
+"reset_confirm_cancel" = "취소";
+
+/* Reset confirmation reset button */
+"reset_confirm_reset" = "초기화";
 
 /* Impact Tier Full Names (used in ImpactTier.description) */
 
@@ -203,3 +218,17 @@
 
 /* No adapters error */
 "No compatible motion sensor found on this Mac." = "이 Mac에서 호환되는 모션 센서를 찾을 수 없습니다.";
+
+/* Microphone Onboarding */
+
+/* Microphone onboarding dialog title */
+"mic_onboarding_title" = "마이크 접근";
+
+/* Microphone onboarding dialog body */
+"mic_onboarding_body" = "Yamete는 마이크를 사용하여 책상 충격을 감지할 수 있습니다. 오디오는 실시간으로 처리되며 녹음되거나 전송되지 않습니다.";
+
+/* Microphone onboarding allow button */
+"mic_onboarding_allow" = "허용";
+
+/* Microphone onboarding skip button */
+"mic_onboarding_skip" = "건너뛰기";

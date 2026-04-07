@@ -142,7 +142,7 @@
 "section_devices" = "Urządzenia";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld ekrany, %lld audio";
+"devices_subtitle" = "%1$lld ekrany, %2$lld audio";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Ekrany Błysku";

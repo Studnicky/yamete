@@ -142,7 +142,7 @@
 "section_devices" = "Dispositivi";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld display, %lld audio";
+"devices_subtitle" = "%1$lld display, %2$lld audio";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Display Flash";

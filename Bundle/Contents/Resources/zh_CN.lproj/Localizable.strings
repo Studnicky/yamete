@@ -142,7 +142,7 @@
 "section_devices" = "设备";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld个显示器，%lld个音频";
+"devices_subtitle" = "%1$lld个显示器，%2$lld个音频";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "闪光显示器";
@@ -172,6 +172,21 @@
 
 /* Quit application button */
 "button_quit" = "退出";
+
+/* Reset to defaults button */
+"button_reset" = "重置";
+
+/* Reset confirmation dialog title */
+"reset_confirm_title" = "重置设置";
+
+/* Reset confirmation dialog message */
+"reset_confirm_message" = "将所有设置重置为默认值？此操作无法撤消。";
+
+/* Reset confirmation cancel button */
+"reset_confirm_cancel" = "取消";
+
+/* Reset confirmation reset button */
+"reset_confirm_reset" = "重置";
 
 /* Impact Tier Full Names (used in ImpactTier.description) */
 
@@ -203,3 +218,17 @@
 
 /* No adapters error */
 "No compatible motion sensor found on this Mac." = "此Mac上未找到兼容的运动传感器。";
+
+/* Microphone Onboarding */
+
+/* Microphone onboarding dialog title */
+"mic_onboarding_title" = "麦克风访问";
+
+/* Microphone onboarding dialog body */
+"mic_onboarding_body" = "Yamete可以使用麦克风检测桌面冲击。音频实时处理，绝不会录制或传输。";
+
+/* Microphone onboarding allow button */
+"mic_onboarding_allow" = "允许";
+
+/* Microphone onboarding skip button */
+"mic_onboarding_skip" = "跳过";

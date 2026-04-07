@@ -142,7 +142,7 @@
 "section_devices" = "Laitteet";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld näyttöä, %lld ääni";
+"devices_subtitle" = "%1$lld näyttöä, %2$lld ääni";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Välähdysnäytöt";

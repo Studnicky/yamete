@@ -142,7 +142,7 @@
 "section_devices" = "裝置";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld個螢幕，%lld個音訊";
+"devices_subtitle" = "%1$lld個螢幕，%2$lld個音訊";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "閃光螢幕";
@@ -172,6 +172,21 @@
 
 /* Quit application button */
 "button_quit" = "結束";
+
+/* Reset to defaults button */
+"button_reset" = "重置";
+
+/* Reset confirmation dialog title */
+"reset_confirm_title" = "重置設定";
+
+/* Reset confirmation dialog message */
+"reset_confirm_message" = "將所有設定重置為預設值？此操作無法復原。";
+
+/* Reset confirmation cancel button */
+"reset_confirm_cancel" = "取消";
+
+/* Reset confirmation reset button */
+"reset_confirm_reset" = "重置";
 
 /* Impact Tier Full Names (used in ImpactTier.description) */
 
@@ -203,3 +218,17 @@
 
 /* No adapters error */
 "No compatible motion sensor found on this Mac." = "此Mac上未找到相容的動態感測器。";
+
+/* Microphone Onboarding */
+
+/* Microphone onboarding dialog title */
+"mic_onboarding_title" = "麥克風取用";
+
+/* Microphone onboarding dialog body */
+"mic_onboarding_body" = "Yamete可以使用麥克風偵測桌面撞擊。音訊會即時處理，絕不會錄製或傳輸。";
+
+/* Microphone onboarding allow button */
+"mic_onboarding_allow" = "允許";
+
+/* Microphone onboarding skip button */
+"mic_onboarding_skip" = "略過";

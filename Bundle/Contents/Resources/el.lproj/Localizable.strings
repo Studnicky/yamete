@@ -142,7 +142,7 @@
 "section_devices" = "Συσκευές";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld οθόνες, %lld ήχος";
+"devices_subtitle" = "%1$lld οθόνες, %2$lld ήχος";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Οθόνες αναλαμπής";

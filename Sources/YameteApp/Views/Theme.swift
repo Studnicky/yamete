@@ -28,7 +28,7 @@ struct AccordionCard<Content: View>: View {
             // Header bar
             Button(action: { isExpanded.toggle() }) {
                 HStack(spacing: 6) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.forward")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(Theme.mauve)
                     Text(title)

@@ -142,7 +142,7 @@
 "section_devices" = "Peranti";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%lld paparan, %lld audio";
+"devices_subtitle" = "%1$lld paparan, %2$lld audio";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Paparan Denyar";
