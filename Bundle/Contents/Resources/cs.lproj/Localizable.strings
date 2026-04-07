@@ -1,0 +1,205 @@
+/* Yamete — Czech Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld dopadů dnes";
+
+/* Last impact tier label */
+"last_impact" = "poslední: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Pozastaveno";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reaktivita";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Okno odezvy na sílu dopadu. Dolní posuvník = nejslabší síla, která spustí reakci. Horní posuvník = síla pro maximální odezvu. Vyšší hodnoty reagují na lehčí dopady.";
+
+/* Volume setting title */
+"setting_volume" = "Hlasitost";
+
+/* Volume setting help text */
+"help_volume" = "Okno úrovně přehrávání zvuku. Intenzita se mapuje lineárně mezi nízkou a vysokou hodnotou. Výběr klipu také sleduje intenzitu — lehčí dopady přehrávají kratší klipy.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Krytí záblesku";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Okno jasu záblesku obrazovky. Časování obálky je formováno intenzitou. Ohraničeno délkou zvukového klipu.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Silný";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Pevný";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Střed";
+
+/* Ruler label: light impact */
+"tier_light" = "Lehký";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Klepnutí";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Citlivost a senzory";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Shoda senzorů";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Počet senzorů, které musí nezávisle detekovat dopad před spuštěním. Omezeno na počet senzorů poskytujících data.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld senzory";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Prodleva";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Minimální čas mezi reakcemi. 0 = omezeno pouze délkou přehrávaného klipu.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Ladění akcelerometru";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Frekvenční pásmo";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Pásmový filtr na surová data akcelerometru. Nízká = mez horní propusti (odmítá vibrace podlahy). Vysoká = mez dolní propusti (odmítá elektronický šum).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Práh špičky";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Minimální filtrovaná velikost (g-síla) pro považování za potenciální dopad. Aplikováno po pásmové filtraci. Vyšší hodnoty vyžadují větší sílu.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Špičkový signál musí překročit RMS pozadí tímto násobkem. Ostré údery do stolu se výrazně zvedají nad pozadí. Kroky zvyšují pozadí spolu se špičkou. Vyšší hodnoty odmítají více okolních vibrací.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Minimální nárůst velikosti mezi po sobě jdoucími vzorky. Přímé dopady stoupají za 1-2 vzorky. Přenášené vibrace stoupají postupně. Vyšší hodnoty odmítají nepřímé vibrace.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Potvrzení";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Vzorky nad prahem požadované v detekčním okně 120ms. Přímé údery produkují 3-5 vysokých vzorků. Jednotlivé nárazy produkují 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld zásahy";
+
+/* Warmup setting title */
+"setting_warmup" = "Zahřívání";
+
+/* Warmup setting help text */
+"help_warmup" = "Vzorky před aktivací detekce. Filtry potřebují čas na ustálení. Při 50 Hz, 50 vzorků = 1 sekunda.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Interval hlášení";
+
+/* Report interval setting help text */
+"help_report_interval" = "Interval dotazování akcelerometru. 10ms = 100 Hz (výchozí), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Zařízení";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld displeje, %lld zvuk";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Zábleskové displeje";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Vyberte, které monitory zobrazí překryv záblesku při dopadu.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Výstup zvuku";
+
+/* Audio output setting help text */
+"help_audio_output" = "Vyberte, která zvuková zařízení přehrávají zvuky dopadu. Nic nevybráno = žádný zvuk.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Nenalezena žádná výstupní zařízení";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Spustit při přihlášení";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Ladění protokolu";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Ukončit";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Klepnutí";
+
+/* Impact tier name: light */
+"tier_light_full" = "Lehký";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Střední";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Pevný";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Silný";
+
+/* Sensor Error Messages */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Přístup k pohybovému senzoru odepřen — udělte oprávnění Monitorování vstupu v Nastavení systému > Soukromí a zabezpečení.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Nenalezen žádný akcelerometr — tento Mac nemusí mít kompatibilní pohybový senzor.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Akcelerometr nedostupný (chyba IOKit %@). Tento Mac nemusí mít kompatibilní pohybový senzor.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Na tomto Macu nebyl nalezen žádný kompatibilní pohybový senzor.";

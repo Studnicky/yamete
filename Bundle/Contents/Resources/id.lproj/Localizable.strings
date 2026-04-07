@@ -1,0 +1,205 @@
+/* Yamete — Indonesian (id) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld benturan hari ini";
+
+/* Last impact tier label */
+"last_impact" = "terakhir: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Dijeda";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reaktivitas";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Jendela respons gaya benturan. Ibu jari bawah = gaya terkecil yang memicu. Ibu jari atas = gaya untuk respons maksimum. Nilai lebih tinggi merespons benturan lebih ringan.";
+
+/* Volume setting title */
+"setting_volume" = "Volume";
+
+/* Volume setting help text */
+"help_volume" = "Jendela tingkat pemutaran audio. Intensitas dipetakan secara linier antara rendah dan tinggi. Pemilihan klip juga mengikuti intensitas — benturan lebih ringan memainkan klip lebih pendek.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Opasitas Kilat";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Jendela kecerahan kilat layar. Waktu amplop dibentuk oleh intensitas. Terkunci dalam durasi klip suara.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Keras";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Kuat";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Sedang";
+
+/* Ruler label: light impact */
+"tier_light" = "Ringan";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Ketuk";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Sensitivitas & Sensor";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Konsensus Sensor";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Jumlah sensor yang harus mendeteksi benturan secara independen sebelum memicu. Dibatasi oleh jumlah sensor yang mengirimkan data.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld sensor";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Jeda Pendinginan";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Waktu minimum antara reaksi. 0 = hanya dibatasi oleh durasi klip yang diputar.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Penyetelan Akselerometer";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Pita Frekuensi";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Filter bandpass pada data akselerometer mentah. Rendah = cutoff high-pass (menolak getaran lantai). Tinggi = cutoff low-pass (menolak kebisingan elektronik).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Ambang Lonjakan";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Magnitudo terfilter minimum (g-force) untuk dianggap sebagai benturan potensial. Diterapkan setelah penyaringan bandpass. Nilai lebih tinggi membutuhkan gaya lebih kuat.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Faktor Puncak";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Sinyal puncak harus melebihi RMS latar belakang dengan kelipatan ini. Benturan meja tajam melonjak jauh di atas latar belakang. Langkah kaki meningkatkan latar belakang bersama puncaknya. Nilai lebih tinggi menolak lebih banyak getaran sekitar.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Laju Naik";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Peningkatan magnitudo minimum antara sampel berurutan. Benturan langsung naik dalam 1-2 sampel. Getaran yang ditransmisikan naik secara bertahap. Nilai lebih tinggi menolak getaran tidak langsung.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Konfirmasi";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Sampel di atas ambang yang diperlukan dalam jendela deteksi 120ms. Benturan langsung menghasilkan 3-5 sampel tinggi. Guncangan tunggal menghasilkan 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld detakan";
+
+/* Warmup setting title */
+"setting_warmup" = "Pemanasan";
+
+/* Warmup setting help text */
+"help_warmup" = "Sampel sebelum deteksi aktif. Filter membutuhkan waktu untuk stabil. Pada 50 Hz, 50 sampel = 1 detik.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Interval Laporan";
+
+/* Report interval setting help text */
+"help_report_interval" = "Interval polling akselerometer. 10ms = 100 Hz (default), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Perangkat";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld layar, %lld audio";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Layar Kilat";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Pilih monitor mana yang menampilkan overlay kilat saat benturan.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Output Audio";
+
+/* Audio output setting help text */
+"help_audio_output" = "Pilih perangkat audio mana yang memutar suara benturan. Tidak ada yang dipilih = tidak ada audio.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Tidak ada perangkat output yang ditemukan";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Mulai saat Login";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Log Debug";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Keluar";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Ketuk";
+
+/* Impact tier name: light */
+"tier_light_full" = "Ringan";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Sedang";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Kuat";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Keras";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Akses sensor gerak ditolak — berikan izin Input Monitoring di Pengaturan Sistem > Privasi & Keamanan.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Tidak ada akselerometer yang ditemukan — Mac ini mungkin tidak memiliki sensor gerak yang kompatibel.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Akselerometer tidak tersedia (error IOKit %@). Mac ini mungkin tidak memiliki sensor gerak yang kompatibel.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Tidak ada sensor gerak yang kompatibel ditemukan di Mac ini.";

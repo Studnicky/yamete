@@ -24,10 +24,7 @@ Yamete collects and stores the following data **locally on your Mac only**:
 
 ## Network Access
 
-Yamete connects to the internet **only** for automatic update checks:
-- Queries `api.github.com` for the latest release (once per day when enabled)
-- Downloads update DMGs from `github.com` when you approve an update
-- No analytics, telemetry, or usage data is transmitted
+Yamete does not make any network connections. All data stays on your Mac.
 
 ## No Data Sharing
 

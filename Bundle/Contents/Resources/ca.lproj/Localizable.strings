@@ -1,0 +1,205 @@
+/* Yamete — Catalan Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld impactes avui";
+
+/* Last impact tier label */
+"last_impact" = "últim: %@";
+
+/* Detection paused indicator */
+"status_paused" = "En pausa";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reactivitat";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Finestra de resposta a la força d'impacte. Polzador baix = força mínima que l'activa. Polzador alt = força per a la resposta màxima. Valors més alts responen a impactes més lleugers.";
+
+/* Volume setting title */
+"setting_volume" = "Volum";
+
+/* Volume setting help text */
+"help_volume" = "Finestra de nivell de reproducció d'àudio. La intensitat es mapeja linealment entre baix i alt. La selecció de clips també segueix la intensitat — els impactes més lleugers reprodueixen clips més curts.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Opacitat del flaix";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Finestra de brillantor del flaix de pantalla. El temps d'envolupant és definit per la intensitat. Limitat a la durada del clip de so.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Fort";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Ferm";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Mitjà";
+
+/* Ruler label: light impact */
+"tier_light" = "Lleuger";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Toc";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Sensibilitat i sensors";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Consens de sensors";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Nombre de sensors que han de detectar un impacte de manera independent abans d'activar-se. Limitat al nombre de sensors que proporcionen dades.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld sensors";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Temps de recuperació";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Temps mínim entre reaccions. 0 = limitat només per la durada del clip en reproducció.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Ajust de l'acceleròmetre";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Banda de freqüència";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Filtre de pas de banda sobre les dades en brut de l'acceleròmetre. Baix = tall d'alta freqüència (rebutja vibracions del terra). Alt = tall de baixa freqüència (rebutja soroll electrònic).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Llindar de pic";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Magnitud filtrada mínima (força g) per considerar-la un possible impacte. S'aplica després del filtratge de pas de banda. Valors més alts requereixen més força.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "El pic del senyal ha de superar el RMS de fons per aquest múltiple. Els cops directes a la taula pugen molt per sobre del fons. Els passos elevan el fons juntament amb el pic. Valors més alts rebutgen més vibració ambient.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Increment mínim de magnitud entre mostres consecutives. Els impactes directes pugen en 1-2 mostres. Les vibracions transmeses pugen gradualment. Valors més alts rebutgen vibracions indirectes.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Confirmacions";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Mostres per sobre del llindar necessàries en la finestra de detecció de 120ms. Els cops directes produeixen 3-5 mostres altes. Els cops únics produeixen 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld impactes";
+
+/* Warmup setting title */
+"setting_warmup" = "Escalfament";
+
+/* Warmup setting help text */
+"help_warmup" = "Mostres abans que s'activi la detecció. Els filtres necessiten temps per estabilitzar-se. A 50 Hz, 50 mostres = 1 segon.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Interval d'informe";
+
+/* Report interval setting help text */
+"help_report_interval" = "Interval de sondeig de l'acceleròmetre. 10ms = 100 Hz (per defecte), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Dispositius";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld pantalles, %lld àudio";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Pantalles de flaix";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Seleccioneu quines pantalles mostren la capa de flaix en cas d'impacte.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Sortida d'àudio";
+
+/* Audio output setting help text */
+"help_audio_output" = "Seleccioneu quins dispositius d'àudio reprodueixen els sons d'impacte. Cap seleccionat = sense àudio.";
+
+/* No audio output devices found message */
+"no_output_devices" = "No s'han trobat dispositius de sortida";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Iniciar en accedir";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Registre de depuració";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Sortir";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Toc";
+
+/* Impact tier name: light */
+"tier_light_full" = "Lleuger";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Mitjà";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Ferm";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Fort";
+
+/* Sensor Error Messages */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Accés al sensor de moviment denegat — concediu el permís de monitoratge d'entrada a Configuració del sistema > Privadesa i seguretat.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "No s'ha trobat cap acceleròmetre — és possible que aquest Mac no tingui un sensor de moviment compatible.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Acceleròmetre no disponible (error IOKit %@). És possible que aquest Mac no tingui un sensor de moviment compatible.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "No s'ha trobat cap sensor de moviment compatible en aquest Mac.";

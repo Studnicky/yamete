@@ -1,0 +1,205 @@
+/* Yamete — Slovenščina (Slovenian) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld udarcev danes";
+
+/* Last impact tier label */
+"last_impact" = "zadnji: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Zaustavljeno";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Odzivnost";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Okno odziva na silo udarca. Spodnji drsnik = najšibkejša sila, ki sproži odziv. Zgornji drsnik = sila za največji odziv. Višje vrednosti se odzivajo na lažje udarce.";
+
+/* Volume setting title */
+"setting_volume" = "Glasnost";
+
+/* Volume setting help text */
+"help_volume" = "Okno ravni predvajanja zvoka. Intenzivnost se linearno preslika med minimumom in maksimumom. Izbor posnetka prav tako sledi intenzivnosti — lažji udarci predvajajo krajše posnetke.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Neprozornost bliska";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Okno svetlosti bliska na zaslonu. Oblika ovojnice oblikovana z intenzivnostjo. Omejena na trajanje zvočnega posnetka.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Močan";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Trden";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Sred.";
+
+/* Ruler label: light impact */
+"tier_light" = "Lahek";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Dotik";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Občutljivost in senzorji";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Soglasje senzorjev";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Število senzorjev, ki morajo neodvisno zaznati udarec pred sprožitvijo. Omejeno na število senzorjev, ki zagotavljajo podatke.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld senzorjev";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Cooldown";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Minimalni čas med odzivi. 0 = omejeno samo z trajanjem predvajanega posnetka.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Nastavitev pospeševalnika";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Frekvenčni pas";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Pasovni filter na surovih podatkih pospeševalnika. Nizka vrednost = prag visokopasovnega filtra (zavrača vibracije tal). Visoka vrednost = prag nizkopasovnega filtra (zavrača elektronski šum).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Prag konice";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Minimalna filtrirana amplituda (g-sila), ki se upošteva kot potencialni udarec. Uporablja se po pasovnem filtriranju. Višje vrednosti zahtevajo večjo silo.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Koničasti signal mora preseči ozadje RMS za ta množitelj. Ostri udarci po mizi precej presegajo ozadje. Koraki dvigajo ozadje skupaj s konico. Višje vrednosti zavrnejo več okoliških vibracij.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Minimalno povečanje amplitude med zaporednimi vzorci. Neposredni udarci narastejo v 1-2 vzorcih. Prenesene vibracije naraščajo postopoma. Višje vrednosti zavrnejo posredne vibracije.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Potrditve";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Vzorci nad pragom, potrebni v 120 ms oknu zaznavanja. Neposredni udarci dajo 3-5 visokih vzorcev. Enkratni sunki dajo 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld zadetkov";
+
+/* Warmup setting title */
+"setting_warmup" = "Ogrevanje";
+
+/* Warmup setting help text */
+"help_warmup" = "Vzorci pred aktivacijo zaznavanja. Filtri potrebujejo čas za stabilizacijo. Pri 50 Hz, 50 vzorcev = 1 sekunda.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Interval poročanja";
+
+/* Report interval setting help text */
+"help_report_interval" = "Interval vzorčenja pospeševalnika. 10 ms = 100 Hz (privzeto), 5 ms = 200 Hz, 20 ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Naprave";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld zaslonov, %lld avdio";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Zasloni za blisk";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Izberite, kateri monitorji prikazujejo prekrivanje bliska ob udarcu.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Zvočni izhod";
+
+/* Audio output setting help text */
+"help_audio_output" = "Izberite, katere zvočne naprave predvajajo zvoke udarcev. Nič ni izbrano = brez zvoka.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Ni najdenih izhodnih naprav";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Zaženi ob prijavi";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Dnevnik odpravljanja napak";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Zapri";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Dotik";
+
+/* Impact tier name: light */
+"tier_light_full" = "Lahek";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Srednji";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Trden";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Močan";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Dostop do senzorja gibanja zavrnjen — podelite dovoljenje za nadzor vnosa v Sistemskih nastavitvah > Zasebnost in varnost.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Pospeševalnik ni najden — ta Mac morda nima združljivega senzorja gibanja.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Pospeševalnik ni na voljo (napaka IOKit %@). Ta Mac morda nima združljivega senzorja gibanja.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Na tem Macu ni najden noben združljivi senzor gibanja.";

@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Svenska */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete använder accelerometern för att detektera fysiska slag mot din MacBook.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete kan använda mikrofonen för att detektera slagljud på ditt skrivbord.";

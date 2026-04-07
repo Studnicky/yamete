@@ -15,9 +15,12 @@ final class LogStoreTests: XCTestCase {
             .init(name: "error",   level: "ERROR") { $0.error("test-error") },
         ]
         let log = AppLog(category: "LogTest")
+        let previousDebug = AppLog.debugEnabled
+        AppLog.debugEnabled = true
         for c in cases {
             c.write(log)
         }
+        AppLog.debugEnabled = previousDebug
 
         // Wait for async log writes.
         let e = expectation(description: "flush")

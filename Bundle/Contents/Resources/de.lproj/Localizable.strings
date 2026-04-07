@@ -1,0 +1,205 @@
+/* Yamete — German Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld Einschläge heute";
+
+/* Last impact tier label */
+"last_impact" = "letzter: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Pausiert";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reaktivität";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Ansprechfenster für die Einschlagkraft. Unterer Regler = schwächste auslösende Kraft. Oberer Regler = Kraft für maximale Reaktion. Höhere Werte reagieren auf leichtere Einschläge.";
+
+/* Volume setting title */
+"setting_volume" = "Lautstärke";
+
+/* Volume setting help text */
+"help_volume" = "Fenster für die Audiowiedergabelautstärke. Die Intensität wird linear zwischen niedrig und hoch abgebildet. Die Clip-Auswahl folgt ebenfalls der Intensität — leichtere Einschläge spielen kürzere Clips.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Blitz-Deckkraft";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Fenster für die Bildschirmblitz-Helligkeit. Hüllkurven-Timing wird durch Intensität geformt. Begrenzt auf die Dauer des Soundclips.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Hart";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Fest";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Mittel";
+
+/* Ruler label: light impact */
+"tier_light" = "Leicht";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Tippen";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Empfindlichkeit & Sensoren";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Sensorkonsens";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Anzahl der Sensoren, die unabhängig voneinander einen Einschlag erkennen müssen, bevor ausgelöst wird. Begrenzt auf die Anzahl der Sensoren, die Daten liefern.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld Sensoren";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Abklingzeit";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Mindestzeit zwischen Reaktionen. 0 = nur durch die Dauer des laufenden Clips begrenzt.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Beschleunigungssensor-Feinabstimmung";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Frequenzband";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Bandpassfilter auf rohe Beschleunigungsmessdaten. Niedrig = Hochpassgrenzfrequenz (lehnt Bodenvibrationen ab). Hoch = Tiefpassgrenzfrequenz (lehnt elektronisches Rauschen ab).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Spitzenwert-Schwelle";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Minimale gefilterte Magnitude (g-Kraft), um als potenzieller Einschlag zu gelten. Wird nach der Bandpassfilterung angewendet. Höhere Werte erfordern stärkere Kraft.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Das Spitzensignal muss den Hintergrund-RMS um dieses Vielfache überschreiten. Scharfe Tischeinschläge steigen weit über den Hintergrund. Fußschritte heben den Hintergrund zusammen mit dem Spitzenwert an. Höhere Werte lehnen mehr Umgebungsvibrationen ab.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rise Rate";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Minimaler Magnitudeanstieg zwischen aufeinanderfolgenden Abtastwerten. Direkte Einschläge steigen in 1-2 Abtastwerten. Übertragene Vibrationen steigen allmählich. Höhere Werte lehnen indirekte Vibration ab.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Bestätigungen";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Über-Schwellen-Abtastwerte, die im 120ms-Erkennungsfenster erforderlich sind. Direkte Treffer erzeugen 3-5 hohe Abtastwerte. Einzelne Stöße erzeugen 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld Treffer";
+
+/* Warmup setting title */
+"setting_warmup" = "Aufwärmphase";
+
+/* Warmup setting help text */
+"help_warmup" = "Abtastwerte, bevor die Erkennung aktiviert wird. Filter brauchen Zeit zum Einpendeln. Bei 50 Hz, 50 Abtastwerte = 1 Sekunde.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Meldeintervall";
+
+/* Report interval setting help text */
+"help_report_interval" = "Beschleunigungssensor-Abfrageintervall. 10ms = 100 Hz (Standard), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Geräte";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld Displays, %lld Audio";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Blitz-Displays";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Wählen Sie, welche Monitore bei einem Einschlag die Blitz-Überlagerung anzeigen.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Audioausgabe";
+
+/* Audio output setting help text */
+"help_audio_output" = "Wählen Sie, welche Audiogeräte Einschlaggeräusche abspielen. Keine Auswahl = kein Audio.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Keine Ausgabegeräte gefunden";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Bei Anmeldung starten";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Debug-Protokollierung";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Beenden";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Tippen";
+
+/* Impact tier name: light */
+"tier_light_full" = "Leicht";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Mittel";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Fest";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Hart";
+
+/* Sensor Error Messages */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Zugriff auf Bewegungssensor verweigert — erteilen Sie die Berechtigung zur Eingabeüberwachung unter Systemeinstellungen > Datenschutz & Sicherheit.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Kein Beschleunigungssensor gefunden — dieser Mac verfügt möglicherweise nicht über einen kompatiblen Bewegungssensor.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Beschleunigungssensor nicht verfügbar (IOKit-Fehler %@). Dieser Mac verfügt möglicherweise nicht über einen kompatiblen Bewegungssensor.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Kein kompatibler Bewegungssensor auf diesem Mac gefunden.";

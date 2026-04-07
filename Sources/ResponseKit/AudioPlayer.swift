@@ -39,22 +39,15 @@ public final class AudioPlayer: AudioResponder {
         recentlyPlayed.append(sound.url)
         if recentlyPlayed.count > historySize { recentlyPlayed.removeFirst() }
 
+        guard !deviceUIDs.isEmpty else { return 0 }
+
         let volume = volumeMin + intensity * (volumeMax - volumeMin)
 
-        if deviceUIDs.isEmpty {
-            guard let s = NSSound(contentsOf: sound.url, byReference: true) else {
-                log.error("entity:AudioPlayer wasInvalidatedBy activity:PlayerCreation file=\(sound.url.lastPathComponent)")
-                return 0
-            }
-            s.volume = volume
-            s.play()
-        } else {
-            for uid in deviceUIDs {
-                if let s = NSSound(contentsOf: sound.url, byReference: true) {
-                    s.playbackDeviceIdentifier = uid
-                    s.volume = volume
-                    s.play()
-                }
+        for uid in deviceUIDs {
+            if let s = NSSound(contentsOf: sound.url, byReference: true) {
+                s.playbackDeviceIdentifier = uid
+                s.volume = volume
+                s.play()
             }
         }
 

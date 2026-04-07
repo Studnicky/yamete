@@ -15,13 +15,14 @@ public struct AudioOutputDevice: Identifiable, Sendable {
 
 public enum AudioDeviceManager {
 
-    /// Returns all audio devices that have at least one output channel.
+    /// Returns physical audio output devices (excludes aggregate and virtual devices).
     public static func outputDevices() -> [AudioOutputDevice] {
         let deviceIDs = allDeviceIDs()
 
         var results: [AudioOutputDevice] = []
         for deviceID in deviceIDs {
             guard outputChannelCount(deviceID) > 0 else { continue }
+            guard !isAggregateDevice(deviceID) else { continue }
             guard let uid = stringProperty(deviceID, selector: kAudioDevicePropertyDeviceUID),
                   let name = stringProperty(deviceID, selector: kAudioObjectPropertyName)
             else { continue }
@@ -77,6 +78,21 @@ public enum AudioDeviceManager {
         return ids
     }
 
+    /// Returns true for aggregate or virtual audio devices (Teams, Zoom, Audio MIDI Setup, etc.).
+    private static func isAggregateDevice(_ deviceID: AudioDeviceID) -> Bool {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var transport: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, &transport) == noErr else { return false }
+        // kAudioDeviceTransportTypeAggregate = 'grup', kAudioDeviceTransportTypeVirtual = 'virt'
+        return transport == kAudioDeviceTransportTypeAggregate
+            || transport == kAudioDeviceTransportTypeVirtual
+    }
+
     /// Returns the number of output channels for a device (0 = input-only).
     private static func outputChannelCount(_ deviceID: AudioDeviceID) -> Int {
         var addr = AudioObjectPropertyAddress(
@@ -105,6 +121,31 @@ public enum AudioDeviceManager {
             }
         }
         return totalChannels
+    }
+
+    // MARK: - Device change notifications
+
+    /// Posts to `NotificationCenter.default` when audio devices are added or removed.
+    /// Call `startObserving()` once at app launch; the listener persists for the process lifetime.
+    /// https://developer.apple.com/documentation/coreaudio/audioobjectaddpropertylistener(_:_:_:_:)
+    public static let devicesDidChangeNotification = Notification.Name("AudioDeviceManager.devicesDidChange")
+
+    @MainActor private static var listenerInstalled = false
+
+    @MainActor public static func startObserving() {
+        guard !listenerInstalled else { return }
+        listenerInstalled = true
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &addr,
+            DispatchQueue.main
+        ) { _, _ in
+            NotificationCenter.default.post(name: devicesDidChangeNotification, object: nil)
+        }
     }
 
     private static func stringProperty(_ deviceID: AudioDeviceID, selector: AudioObjectPropertySelector) -> String? {

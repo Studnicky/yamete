@@ -7,7 +7,8 @@ struct RangeSlider: View {
     var labelWidth: CGFloat = 40
     let format: (Double) -> String
 
-    private let thumbD: CGFloat = 20
+    private let thumbW: CGFloat = 22
+    private let thumbH: CGFloat = 17
     private let trackH: CGFloat = 4
     private static let coordSpace = "rangeSlider"
 
@@ -20,7 +21,7 @@ struct RangeSlider: View {
             GeometryReader { geo in
                 sliderBody(width: geo.size.width, height: geo.size.height)
             }
-            .frame(height: thumbD)
+            .frame(height: thumbH)
 
             Text(format(high))
                 .font(.caption).monospacedDigit().foregroundStyle(.secondary)
@@ -68,10 +69,10 @@ struct RangeSlider: View {
 
     @ViewBuilder
     private func thumb() -> some View {
-        Circle()
+        Capsule()
             .fill(Color.white)
             .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 1)
-            .frame(width: thumbD, height: thumbD)
+            .frame(width: thumbW, height: thumbH)
             .contentShape(Rectangle())
     }
 }

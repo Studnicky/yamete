@@ -1,0 +1,205 @@
+/* Yamete — Română (Romanian) Localizable Strings */
+
+/* Header Section */
+
+/* Daily impact counter */
+"impacts_today" = "%lld impacturi azi";
+
+/* Last impact tier label */
+"last_impact" = "ultimul: %@";
+
+/* Detection paused indicator */
+"status_paused" = "Pauză";
+
+/* Basic Settings Section */
+
+/* Reactivity setting title */
+"setting_reactivity" = "Reactivitate";
+
+/* Reactivity setting help text */
+"help_reactivity" = "Fereastra de răspuns la forța impactului. Cursorul jos = cea mai slabă forță care declanșează. Cursorul sus = forța pentru răspuns maxim. Valori mai mari răspund la impacturi mai ușoare.";
+
+/* Volume setting title */
+"setting_volume" = "Volum";
+
+/* Volume setting help text */
+"help_volume" = "Fereastra nivelului de redare audio. Intensitatea se mapează liniar între minim și maxim. Selecția clipului urmează și ea intensitatea — impacturile mai ușoare redau clipuri mai scurte.";
+
+/* Flash opacity setting title */
+"setting_flash_opacity" = "Opacitate Flash";
+
+/* Flash opacity setting help text */
+"help_flash_opacity" = "Fereastra luminozității flash-ului pe ecran. Temporizarea anvelopei modelată de intensitate. Limitată la durata clipului sonor.";
+
+/* Sensitivity Ruler Labels */
+
+/* Ruler label: hardest impact */
+"tier_hard" = "Puternic";
+
+/* Ruler label: firm impact */
+"tier_firm" = "Ferm";
+
+/* Ruler label: medium impact (abbreviated) */
+"tier_medium" = "Med";
+
+/* Ruler label: light impact */
+"tier_light" = "Ușor";
+
+/* Ruler label: lightest impact */
+"tier_tap" = "Atingere";
+
+/* Sensitivity & Sensors Section */
+
+/* Sensitivity & Sensors accordion title */
+"section_sensitivity_sensors" = "Sensibilitate & Senzori";
+
+/* Sensor consensus setting title */
+"setting_consensus" = "Consens Senzori";
+
+/* Sensor consensus setting help text */
+"help_consensus" = "Numărul de senzori care trebuie să detecteze independent un impact înainte de declanșare. Limitat la numărul de senzori care furnizează date.";
+
+/* Sensor consensus count */
+"consensus_format" = "%lld senzori";
+
+/* Cooldown setting title */
+"setting_cooldown" = "Cooldown";
+
+/* Cooldown setting help text */
+"help_cooldown" = "Timp minim între reacții. 0 = limitat doar de durata clipului redat.";
+
+/* Accelerometer tuning section header */
+"section_accel_tuning" = "Reglaj Accelerometru";
+
+/* Frequency band setting title */
+"setting_frequency_band" = "Bandă de Frecvență";
+
+/* Frequency band setting help text */
+"help_frequency_band" = "Filtru bandpass pe datele brute ale accelerometrului. Jos = prag high-pass (respinge vibrațiile de fond). Sus = prag low-pass (respinge zgomotul electronic).";
+
+/* Spike threshold setting title */
+"setting_spike_threshold" = "Prag de Vârf";
+
+/* Spike threshold setting help text */
+"help_spike_threshold" = "Magnitudinea filtrată minimă (forță g) considerată ca potențial impact. Aplicată după filtrarea bandpass. Valori mai mari necesită forță mai mare.";
+
+/* Crest factor setting title */
+"setting_crest_factor" = "Crest Factor";
+
+/* Crest factor setting help text */
+"help_crest_factor" = "Semnalul de vârf trebuie să depășească RMS-ul de fundal cu acest multiplu. Loviturile bruște pe birou depășesc mult fundalul. Pașii ridică fundalul împreună cu vârful. Valori mai mari resping mai mult zgomotul ambiant.";
+
+/* Rise rate setting title */
+"setting_rise_rate" = "Rată de Creștere";
+
+/* Rise rate setting help text */
+"help_rise_rate" = "Creșterea minimă a magnitudinii între eșantioane consecutive. Impacturile directe cresc în 1-2 eșantioane. Vibrațiile transmise cresc treptat. Valori mai mari resping vibrațiile indirecte.";
+
+/* Confirmations setting title */
+"setting_confirmations" = "Confirmări";
+
+/* Confirmations setting help text */
+"help_confirmations" = "Eșantioane peste prag necesare în fereastra de detecție de 120ms. Loviturile directe produc 3-5 eșantioane înalte. Șocurile unice produc 1-2.";
+
+/* Confirmation hit count */
+"confirmations_format" = "%lld lovituri";
+
+/* Warmup setting title */
+"setting_warmup" = "Încălzire";
+
+/* Warmup setting help text */
+"help_warmup" = "Eșantioane înainte de activarea detecției. Filtrele au nevoie de timp pentru stabilizare. La 50 Hz, 50 eșantioane = 1 secundă.";
+
+/* Report interval setting title */
+"setting_report_interval" = "Interval Raportare";
+
+/* Report interval setting help text */
+"help_report_interval" = "Intervalul de interogare al accelerometrului. 10ms = 100 Hz (implicit), 5ms = 200 Hz, 20ms = 50 Hz.";
+
+/* Unit Formats */
+
+/* Percentage format */
+"unit_percent" = "%lld%%";
+
+/* Hertz format */
+"unit_hz" = "%lld Hz";
+
+/* G-force format */
+"unit_gforce" = "%.3fg";
+
+/* Multiplier format */
+"unit_multiplier" = "%.1f\u00D7";
+
+/* Seconds format */
+"unit_seconds" = "%.1fs";
+
+/* Milliseconds format */
+"unit_milliseconds" = "%.0fms";
+
+/* Devices Section */
+
+/* Devices accordion title */
+"section_devices" = "Dispozitive";
+
+/* Devices section subtitle: display and audio count */
+"devices_subtitle" = "%lld afișaje, %lld audio";
+
+/* Flash displays setting title */
+"setting_flash_displays" = "Flash Afișaje";
+
+/* Flash displays setting help text */
+"help_flash_displays" = "Selectați care monitoare afișează suprapunerea flash la impact.";
+
+/* Audio output setting title */
+"setting_audio_output" = "Ieșire Audio";
+
+/* Audio output setting help text */
+"help_audio_output" = "Selectați care dispozitive audio redau sunetele de impact. Niciuna selectată = fără audio.";
+
+/* No audio output devices found message */
+"no_output_devices" = "Nu s-au găsit dispozitive de ieșire";
+
+/* Footer Section */
+
+/* Launch at login toggle label */
+"label_launch_at_login" = "Lansare la Autentificare";
+
+/* Debug logging toggle label */
+"label_debug_logging" = "Jurnal Debug";
+
+/* App version label */
+"version_format" = "v%@";
+
+/* Quit application button */
+"button_quit" = "Ieșire";
+
+/* Impact Tier Full Names (used in ImpactTier.description) */
+
+/* Impact tier name: lightest */
+"tier_tap_full" = "Atingere";
+
+/* Impact tier name: light */
+"tier_light_full" = "Ușor";
+
+/* Impact tier name: medium */
+"tier_medium_full" = "Mediu";
+
+/* Impact tier name: firm */
+"tier_firm_full" = "Ferm";
+
+/* Impact tier name: hardest */
+"tier_hard_full" = "Puternic";
+
+/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+
+/* Sensor permission error */
+"Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "Acces la senzorul de mișcare refuzat — acordați permisiunea Input Monitoring în Setări sistem > Confidențialitate și securitate.";
+
+/* Sensor not found error */
+"No accelerometer found — this Mac may not have a compatible motion sensor." = "Nu s-a găsit niciun accelerometru — acest Mac poate să nu aibă un senzor de mișcare compatibil.";
+
+/* IOKit error with code */
+"Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor." = "Accelerometru indisponibil (eroare IOKit %@). Acest Mac poate să nu aibă un senzor de mișcare compatibil.";
+
+/* No adapters error */
+"No compatible motion sensor found on this Mac." = "Nu s-a găsit niciun senzor de mișcare compatibil pe acest Mac.";

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <!-- Daily impact counter -->
+    <!-- Russian CLDR: one (n%10=1, n%100≠11), few (n%10=2-4, n%100∉12-14), many (n%10=0 or 5-9 or n%100=11-14), other -->
+    <key>impacts_today</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@ сегодня</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>one</key>
+            <string>%lld удар сегодня</string>
+            <key>few</key>
+            <string>%lld удара сегодня</string>
+            <key>many</key>
+            <string>%lld ударов сегодня</string>
+            <key>other</key>
+            <string>%lld удара сегодня</string>
+        </dict>
+    </dict>
+
+    <!-- Sensor consensus count -->
+    <key>consensus_format</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>one</key>
+            <string>%lld датчик</string>
+            <key>few</key>
+            <string>%lld датчика</string>
+            <key>many</key>
+            <string>%lld датчиков</string>
+            <key>other</key>
+            <string>%lld датчика</string>
+        </dict>
+    </dict>
+
+    <!-- Confirmation hit count -->
+    <key>confirmations_format</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>lld</string>
+            <key>one</key>
+            <string>%lld попадание</string>
+            <key>few</key>
+            <string>%lld попадания</string>
+            <key>many</key>
+            <string>%lld попаданий</string>
+            <key>other</key>
+            <string>%lld попадания</string>
+        </dict>
+    </dict>
+
+</dict>
+</plist>

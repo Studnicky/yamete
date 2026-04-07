@@ -30,11 +30,11 @@ public enum ImpactTier: Int, CaseIterable, Sendable, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .tap:    "Tap"
-        case .light:  "Light"
-        case .medium: "Medium"
-        case .firm:   "Firm"
-        case .hard:   "Hard"
+        case .tap:    NSLocalizedString("tier_tap_full", comment: "Impact tier name: lightest")
+        case .light:  NSLocalizedString("tier_light_full", comment: "Impact tier name: light")
+        case .medium: NSLocalizedString("tier_medium_full", comment: "Impact tier name: medium")
+        case .firm:   NSLocalizedString("tier_firm_full", comment: "Impact tier name: firm")
+        case .hard:   NSLocalizedString("tier_hard_full", comment: "Impact tier name: hardest")
         }
     }
 
@@ -71,14 +71,6 @@ public protocol FlashResponder {
 
 /// Uniquely identifies a sensor adapter. Prevents accidental use of display names as dictionary keys.
 public struct SensorID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
-    public let rawValue: String
-    public init(rawValue: String) { self.rawValue = rawValue }
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-    public var description: String { rawValue }
-}
-
-/// Core Audio device UID. Prevents mixing with arbitrary strings.
-public struct AudioDeviceUID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }
     public init(_ rawValue: String) { self.rawValue = rawValue }

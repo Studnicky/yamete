@@ -26,9 +26,10 @@ BUNDLE_SRC := Bundle/Contents
 SOURCES := $(shell find Sources -name '*.swift' | sort)
 BUNDLE_RESOURCES := $(shell find $(BUNDLE_SRC)/Resources -type f 2>/dev/null)
 
-FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio ServiceManagement
+FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio CoreMotion ServiceManagement
 SWIFTFLAGS := -O -module-name $(APP) -target arm64-apple-macosx14.0 -parse-as-library \
-              $(addprefix -framework ,$(FRAMEWORKS))
+              $(addprefix -framework ,$(FRAMEWORKS)) \
+              -I Sources/IOHIDPublic/include
 
 ENTITLE   := Yamete.entitlements
 SIGNING_ID ?= -
@@ -63,6 +64,7 @@ build: $(BUILD)/yamete $(BUILD)/.minified
 	@mkdir -p $(TARGET)/Contents/MacOS $(RES_DIR)
 	@cp $(BUILD)/yamete $(BINARY)
 	@cp $(BUNDLE_SRC)/Info.plist $(TARGET)/Contents/
+	@cp $(BUNDLE_SRC)/PkgInfo $(TARGET)/Contents/
 	@cp -R $(BUILD)/resources/ $(RES_DIR)/
 	@# ── Stage 4: Sign ──
 	@printf "  sign      $(if $(filter -,$(SIGNING_ID)),ad-hoc,$(SIGNING_ID))\n"

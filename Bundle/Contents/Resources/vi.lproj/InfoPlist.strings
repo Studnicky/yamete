@@ -1,0 +1,7 @@
+/* Info.plist localized strings — Tiếng Việt */
+
+/* System permission dialog: motion sensor access */
+"NSMotionUsageDescription" = "Yamete sử dụng gia tốc kế để phát hiện các va chạm vật lý trên MacBook của bạn.";
+
+/* System permission dialog: microphone access */
+"NSMicrophoneUsageDescription" = "Yamete có thể sử dụng micrô để phát hiện âm thanh va chạm trên bàn của bạn.";
