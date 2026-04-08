@@ -22,7 +22,7 @@ Desktop Macs (iMac, Mac Mini, Mac Studio, Mac Pro) can use microphone and headph
 
 ### From DMG
 
-Download the latest `.dmg` from [Releases](../../releases), open it, and drag **Yamete.app** to Applications.
+Download the latest direct-distribution `.dmg` from [Releases](../../releases), open it, and drag **Yamete Direct.app** to Applications. The Mac App Store build ships separately as **Yamete**.
 
 ### From source
 
@@ -35,8 +35,8 @@ make install
 ### Build only
 
 ```sh
-make build        # dist/Yamete.app
-make dmg          # dist/Yamete.dmg
+make build        # dist/Yamete Direct.app
+make dmg          # dist/Yamete Direct.dmg
 make test         # run test suite
 ```
 
@@ -88,7 +88,12 @@ All settings are in the menu bar dropdown. Main controls use range sliders where
 
 ## Distribution
 
-Yamete runs under App Sandbox with the `device.usb` entitlement for accelerometer access via IOKit public APIs. Sensor activation uses `IOHIDEventSystemClientCreateSimpleClient` + `IOHIDServiceClientSetProperty` to set the SPU report interval. Report reading uses `IOHIDManager` with input report callbacks.
+The repo now ships two distinct products:
+
+- **Yamete**: Mac App Store build, bundle id `com.studnicky.yamete`, sandboxed with `device.usb` and `device.audio-input` entitlements.
+- **Yamete Direct**: direct-download build, bundle id `com.studnicky.yamete.direct`, unsandboxed, signed and notarized separately.
+
+Both products use the same public IOKit accelerometer path: `IOHIDEventSystemClientCreateSimpleClient` + `IOHIDServiceClientSetProperty` for activation, and `IOHIDManager` input report callbacks for reading.
 
 ## Project structure
 
@@ -129,7 +134,7 @@ App/
   Config/
     Info.plist                Shared app metadata for Xcode and direct builds
     AppStore.entitlements     Mac App Store signing entitlements
-    Direct.entitlements       Direct-distribution signing entitlements
+    Direct.entitlements       Direct-distribution signing entitlements (empty: unsandboxed)
 
   Resources/
     Assets.xcassets/          App Store app icon catalog

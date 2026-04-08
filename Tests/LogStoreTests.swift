@@ -10,7 +10,6 @@ final class LogStoreTests: XCTestCase {
         struct Case { let name: String; let level: String; let write: (AppLog) -> Void }
         let cases: [Case] = [
             .init(name: "info",    level: "INFO")  { $0.info("test-info") },
-            .init(name: "debug",   level: "DEBUG") { $0.debug("test-debug") },
             .init(name: "warning", level: "WARN")  { $0.warning("test-warn") },
             .init(name: "error",   level: "ERROR") { $0.error("test-error") },
         ]
@@ -20,6 +19,7 @@ final class LogStoreTests: XCTestCase {
         for c in cases {
             c.write(log)
         }
+        log.debug("test-debug")
         AppLog.debugEnabled = previousDebug
 
         // Wait for async log writes.
@@ -31,11 +31,17 @@ final class LogStoreTests: XCTestCase {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
         let logFile = support
-            .appendingPathComponent("Yamete/logs/yamete-\(fmt.string(from: Date())).log")
+            .appendingPathComponent("\(LogStore.supportDirectoryName)/logs/yamete-\(fmt.string(from: Date())).log")
         let content = (try? String(contentsOf: logFile)) ?? ""
 
         for c in cases {
             XCTAssertTrue(content.contains("[\(c.level)] LogTest:"), "\(c.name): expected [\(c.level)] in log file")
+        }
+
+        if AppLog.supportsDebugLogging {
+            XCTAssertTrue(content.contains("[DEBUG] LogTest:"), "debug: expected [DEBUG] in direct-build log file")
+        } else {
+            XCTAssertFalse(content.contains("[DEBUG] LogTest:"), "debug: App Store builds should not persist debug logs")
         }
     }
 }

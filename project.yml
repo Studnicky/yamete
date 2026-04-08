@@ -9,6 +9,7 @@ options:
 
 configs:
   Debug: debug
+  DebugDirect: debug
   ReleaseAppStore: release
   ReleaseDirect: release
 
@@ -17,6 +18,7 @@ settings:
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ARCHS: arm64
+    DEVELOPMENT_LANGUAGE: en
     PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
@@ -55,6 +57,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Yamete
+        EXECUTABLE_NAME: yamete
         PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete
         INFOPLIST_FILE: App/Config/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -66,6 +69,13 @@ targets:
         Debug:
           SWIFT_OPTIMIZATION_LEVEL: "-Onone"
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        DebugDirect:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG DIRECT_BUILD"
+          PRODUCT_NAME: Yamete Direct
+          EXECUTABLE_NAME: yamete-direct
+          PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete.direct
+          CODE_SIGN_ENTITLEMENTS: App/Config/Direct.entitlements
         ReleaseAppStore:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
           SWIFT_COMPILATION_MODE: wholemodule
@@ -76,9 +86,13 @@ targets:
         ReleaseDirect:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
           SWIFT_COMPILATION_MODE: wholemodule
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DIRECT_BUILD
           DEAD_CODE_STRIPPING: true
           STRIP_INSTALLED_PRODUCT: true
           STRIP_SWIFT_SYMBOLS: true
+          PRODUCT_NAME: Yamete Direct
+          EXECUTABLE_NAME: yamete-direct
+          PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete.direct
           CODE_SIGN_ENTITLEMENTS: App/Config/Direct.entitlements
 
   YameteTests:
@@ -123,15 +137,15 @@ schemes:
       targets:
         Yamete: all
     run:
-      config: Debug
+      config: DebugDirect
     test:
-      config: Debug
+      config: DebugDirect
       targets:
         - YameteTests
     profile:
       config: ReleaseDirect
     analyze:
-      config: Debug
+      config: DebugDirect
     archive:
       config: ReleaseDirect
 

@@ -128,7 +128,7 @@
 "unit_gforce" = "%.3fg";
 
 /* Multiplier format */
-"unit_multiplier" = "%.1f\u00D7";
+"unit_multiplier" = "%.1f\U00D7";
 
 /* Seconds format */
 "unit_seconds" = "%.1fs";

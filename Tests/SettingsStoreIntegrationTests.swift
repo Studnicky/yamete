@@ -114,7 +114,7 @@ final class SettingsStoreIntegrationTests: XCTestCase {
         let cases: [Case] = [
             .init(name: "soundEnabled off",  key: .soundEnabled,  write: { $0.soundEnabled = false },  value: false),
             .init(name: "soundEnabled on",   key: .soundEnabled,  write: { $0.soundEnabled = true },   value: true),
-            .init(name: "debugLogging on",   key: .debugLogging,  write: { $0.debugLogging = true },   value: true),
+            .init(name: "debugLogging on",   key: .debugLogging,  write: { $0.debugLogging = true },   value: AppLog.supportsDebugLogging),
             .init(name: "screenFlash off",   key: .screenFlash,   write: { $0.screenFlash = false },   value: false),
         ]
         for c in cases {

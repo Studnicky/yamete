@@ -39,7 +39,7 @@ public final class ImpactController {
     private var countDate: Date = Calendar.current.startOfDay(for: Date())
     private var activeSensorIDs: Set<SensorID> = []
 
-    init(settings: SettingsStore,
+    public init(settings: SettingsStore,
          audioPlayer: (any AudioResponder)? = nil,
          flashResponder: (any FlashResponder)? = nil,
          adapters: [any SensorAdapter]? = nil) {
@@ -61,8 +61,8 @@ public final class ImpactController {
 
     /// Called once at app launch. Starts the settings observation loop
     /// which manages the pipeline lifecycle based on response toggles.
-    func bootstrap() {
-        AppLog.debugEnabled = settings.debugLogging
+    public func bootstrap() {
+        AppLog.debugEnabled = AppLog.supportsDebugLogging && settings.debugLogging
         syncPipelineState()
         startSettingsObservation()
     }
@@ -76,7 +76,7 @@ public final class ImpactController {
     }
 
     private func rebuildPipeline() {
-        AppLog.debugEnabled = settings.debugLogging
+        AppLog.debugEnabled = AppLog.supportsDebugLogging && settings.debugLogging
         if isEnabled { stopPipeline() }
         if shouldBeEnabled { startPipeline() }
     }
@@ -153,7 +153,7 @@ public final class ImpactController {
         }
     }
 
-    func playWelcomeSound() {
+    public func playWelcomeSound() {
         guard let url = audioPlayer.longestSoundURL else { return }
         audioPlayer.playOnAllDevices(url: url, volume: 1.0)
     }

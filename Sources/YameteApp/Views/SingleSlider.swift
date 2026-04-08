@@ -49,7 +49,7 @@ struct SingleSlider: View {
 
             // Filled track
             Path { p in
-                p.move(to: .init(x: half, y: yC))
+                p.move(to: .init(x: 0, y: yC))
                 p.addLine(to: .init(x: posX, y: yC))
             }
             .stroke(Theme.pink, lineWidth: trackH)
