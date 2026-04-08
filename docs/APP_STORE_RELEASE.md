@@ -74,23 +74,23 @@ The repo now has one app layout shared by both distribution paths:
 
 **Preserve dual build paths**:
 ```
-make build              # Direct distribution (full sensors, ad-hoc sign)
-make release            # Direct distribution (full sensors, Developer ID sign)
-make notarize           # Direct distribution (notarized DMG)
+make build              # Direct distribution (Yamete Direct.app, ad-hoc sign)
+make release            # Direct distribution (Yamete Direct.app, Developer ID sign)
+make notarize           # Direct distribution (Yamete Direct.dmg, notarized)
 open Yamete.xcodeproj   # App Store project generated from project.yml
-xcodebuild archive ...  # App Store (no SPU, App Store signing)
+xcodebuild archive ...  # App Store (Yamete.app, App Store signing)
 ```
 
 ---
 
 ### BLOCKER-3: Internationalization (i18n)
 
-**Status**: Must address
-**Risk**: Incomplete localization limits market reach; CHANGELOG claims localization that doesn't exist
+**Status**: RESOLVED IN REPO
+**Risk**: Remaining work is translation QA and copy review across 40 locales
 
-The app has ~75 user-facing strings. Only 4 error messages in `SensorAdapter.swift` use
-`NSLocalizedString`. All UI text (setting names, help text, labels, status messages) is
-hardcoded English.
+The app now resolves its menu UI, footer controls, onboarding copy, and status labels
+through `Localizable.strings` resources under `App/Resources/*.lproj`. Remaining release
+risk is translation completeness rather than missing localization infrastructure.
 
 #### Supported Locales
 

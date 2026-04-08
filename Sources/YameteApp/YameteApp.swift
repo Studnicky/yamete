@@ -9,6 +9,9 @@ import SensorKit
 #if canImport(ResponseKit)
 import ResponseKit
 #endif
+#if canImport(YameteApp)
+import YameteApp
+#endif
 
 @main
 struct YameteApp: App {

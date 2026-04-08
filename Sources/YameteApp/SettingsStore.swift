@@ -136,6 +136,10 @@ public final class SettingsStore {
 
     var debugLogging: Bool {
         didSet {
+            if !AppLog.supportsDebugLogging && debugLogging {
+                debugLogging = false
+                return
+            }
             guard debugLogging != oldValue else { return }
             persist(debugLogging, .debugLogging)
         }
@@ -195,7 +199,7 @@ public final class SettingsStore {
     // MARK: - Display + audio device selection
 
     /// CGDirectDisplayID values of enabled displays. Empty = all displays.
-    var enabledDisplays: [Int] {
+    public var enabledDisplays: [Int] {
         didSet {
             guard enabledDisplays != oldValue else { return }
             persist(enabledDisplays, .enabledDisplays)
@@ -203,7 +207,7 @@ public final class SettingsStore {
     }
 
     /// Core Audio device UIDs for audio output. Empty = system default only.
-    var enabledAudioDevices: [String] {
+    public var enabledAudioDevices: [String] {
         didSet {
             guard enabledAudioDevices != oldValue else { return }
             persist(enabledAudioDevices, .enabledAudioDevices)
@@ -211,7 +215,7 @@ public final class SettingsStore {
     }
 
     /// SensorAdapter IDs to enable. Empty = all available adapters.
-    var enabledSensorIDs: [String] {
+    public var enabledSensorIDs: [String] {
         didSet {
             guard enabledSensorIDs != oldValue else { return }
             persist(enabledSensorIDs, .enabledSensorIDs)
@@ -381,7 +385,7 @@ public final class SettingsStore {
 
     // MARK: - Init
 
-    init() {
+    public init() {
         let d = UserDefaults.standard
         d.register(defaults: Self.defaults)
 
@@ -422,6 +426,11 @@ public final class SettingsStore {
         hpRiseRate        = d.double(forKey: Key.hpRiseRate.rawValue)
         hpConfirmations   = d.integer(forKey: Key.hpConfirmations.rawValue)
         hpWarmupSamples   = d.integer(forKey: Key.hpWarmupSamples.rawValue)
+
+        if !AppLog.supportsDebugLogging {
+            debugLogging = false
+            d.set(false, forKey: Key.debugLogging.rawValue)
+        }
     }
 
     // MARK: - Reset
@@ -435,7 +444,7 @@ public final class SettingsStore {
         accelBandpassHighHz    = d[Key.accelBandpassHighHz.rawValue]   as! Double
         debounce          = d[Key.debounce.rawValue]         as! Double
         soundEnabled      = d[Key.soundEnabled.rawValue]     as! Bool
-        debugLogging      = d[Key.debugLogging.rawValue]     as! Bool
+        debugLogging      = AppLog.supportsDebugLogging ? d[Key.debugLogging.rawValue] as! Bool : false
         screenFlash       = d[Key.screenFlash.rawValue]      as! Bool
         flashOpacityMin   = d[Key.flashOpacityMin.rawValue]  as! Double
         flashOpacityMax   = d[Key.flashOpacityMax.rawValue]  as! Double

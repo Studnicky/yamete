@@ -616,7 +616,6 @@ private struct FooterSection: View {
     @Environment(SettingsStore.self) var settings
     @Environment(Updater.self) var updater
     @State private var launchAtLogin = (SMAppService.mainApp.status == .enabled)
-    @State private var showResetConfirmation = false
 
     public var body: some View {
         @Bindable var s = settings
@@ -640,39 +639,41 @@ private struct FooterSection: View {
             .font(.caption)
             .padding(Theme.footerPadding)
 
-            HStack(spacing: 5) {
-                Image(systemName: "ladybug")
-                    .themeFooterIcon()
-                Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label"))
-                Spacer()
-                Toggle("", isOn: $s.debugLogging)
-                    .toggleStyle(.switch).tint(Theme.pink)
-                    .labelsHidden().controlSize(.mini)
+            if AppLog.supportsDebugLogging {
+                HStack(spacing: 5) {
+                    Image(systemName: "ladybug")
+                        .themeFooterIcon()
+                    Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label"))
+                    Spacer()
+                    Toggle("", isOn: $s.debugLogging)
+                        .toggleStyle(.switch).tint(Theme.pink)
+                        .labelsHidden().controlSize(.mini)
+                }
+                .font(.caption)
+                .padding(Theme.footerPadding)
             }
-            .font(.caption)
-            .padding(Theme.footerPadding)
 
             HStack(spacing: 5) {
                 Image(systemName: "link")
                     .themeFooterIcon()
-                Text(verbatim: "Links")
+                Text(NSLocalizedString("label_links", comment: "Footer links section label"))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button(action: { open(Self.privacyPolicyURL) }) {
-                    Text(verbatim: "Privacy")
+                    Text(NSLocalizedString("button_privacy", comment: "Privacy policy button"))
                         .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
                 }
                 .buttonStyle(.plain)
-                .help("Open Privacy Policy")
-                .accessibilityLabel(Text(verbatim: "Open Privacy Policy"))
+                .help(NSLocalizedString("action_open_privacy_policy", comment: "Open privacy policy accessibility label"))
+                .accessibilityLabel(Text(NSLocalizedString("action_open_privacy_policy", comment: "Open privacy policy accessibility label")))
 
                 Button(action: { open(Self.supportURL) }) {
-                    Text(verbatim: "Support")
+                    Text(NSLocalizedString("button_support", comment: "Support button"))
                         .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
                 }
                 .buttonStyle(.plain)
-                .help("Open Support")
-                .accessibilityLabel(Text(verbatim: "Open Support"))
+                .help(NSLocalizedString("action_open_support", comment: "Open support accessibility label"))
+                .accessibilityLabel(Text(NSLocalizedString("action_open_support", comment: "Open support accessibility label")))
             }
             .font(.caption)
             .padding(Theme.footerPadding)
@@ -683,7 +684,7 @@ private struct FooterSection: View {
                 Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
                     .font(.caption).foregroundStyle(.tertiary)
                 Spacer()
-                Button(action: { showResetConfirmation = true }) {
+                Button(action: { confirmAndReset() }) {
                     Text(NSLocalizedString("button_reset", comment: "Reset to defaults button"))
                         .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
                 }
@@ -697,16 +698,17 @@ private struct FooterSection: View {
             }
             .padding(Theme.footerPadding).padding(.bottom, 4)
         }
-        .alert(
-            NSLocalizedString("reset_confirm_title", comment: "Reset confirmation dialog title"),
-            isPresented: $showResetConfirmation
-        ) {
-            Button(NSLocalizedString("reset_confirm_cancel", comment: "Reset confirmation cancel button"), role: .cancel) {}
-            Button(NSLocalizedString("reset_confirm_reset", comment: "Reset confirmation reset button"), role: .destructive) {
-                settings.resetToDefaults()
-            }
-        } message: {
-            Text(NSLocalizedString("reset_confirm_message", comment: "Reset confirmation dialog message"))
+    }
+
+    private func confirmAndReset() {
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("reset_confirm_title", comment: "Reset confirmation dialog title")
+        alert.informativeText = NSLocalizedString("reset_confirm_message", comment: "Reset confirmation dialog message")
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: NSLocalizedString("reset_confirm_reset", comment: "Reset confirmation reset button"))
+        alert.addButton(withTitle: NSLocalizedString("reset_confirm_cancel", comment: "Reset confirmation cancel button"))
+        if alert.runModal() == .alertFirstButtonReturn {
+            settings.resetToDefaults()
         }
     }
 

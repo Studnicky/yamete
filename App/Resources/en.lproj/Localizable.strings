@@ -128,7 +128,7 @@
 "unit_gforce" = "%.3fg";
 
 /* Multiplier format */
-"unit_multiplier" = "%.1f\u00D7";
+"unit_multiplier" = "%.1f\U00D7";
 
 /* Seconds format */
 "unit_seconds" = "%.1fs";
@@ -194,6 +194,21 @@
 
 /* Debug logging toggle label */
 "label_debug_logging" = "Debug Logging";
+
+/* Footer links section label */
+"label_links" = "Links";
+
+/* Privacy policy button */
+"button_privacy" = "Privacy";
+
+/* Support button */
+"button_support" = "Support";
+
+/* Privacy policy accessibility label */
+"action_open_privacy_policy" = "Open Privacy Policy";
+
+/* Support accessibility label */
+"action_open_support" = "Open Support";
 
 /* App version label */
 "version_format" = "v%@";

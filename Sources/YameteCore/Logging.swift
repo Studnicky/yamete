@@ -10,14 +10,19 @@ public struct AppLog: Sendable {
     private let category: String
 
     private static let subsystem = Bundle.main.bundleIdentifier ?? "com.studnicky.yamete"
+    #if DIRECT_BUILD
+    public static let supportsDebugLogging = true
+    #else
+    public static let supportsDebugLogging = false
+    #endif
 
-    /// Controls whether debug-level messages are written to the file log.
-    /// Info, warning, and error always log. Set from the UI debug logging toggle.
+    /// Controls whether debug-level messages are emitted.
+    /// Direct builds wire this to the UI debug logging toggle; App Store builds force it off.
     /// Atomic: read from background sensor threads, written from @MainActor.
     private static let _debugEnabled = OSAllocatedUnfairLock(initialState: false)
     public static var debugEnabled: Bool {
-        get { _debugEnabled.withLock { $0 } }
-        set { _debugEnabled.withLock { $0 = newValue } }
+        get { supportsDebugLogging && _debugEnabled.withLock { $0 } }
+        set { _debugEnabled.withLock { $0 = supportsDebugLogging && newValue } }
     }
 
     public init(category: String) {
@@ -31,8 +36,8 @@ public struct AppLog: Sendable {
     }
 
     public func debug(_ message: String) {
-        osLog.debug("\(message, privacy: .private)")
         guard Self.debugEnabled else { return }
+        osLog.debug("\(message, privacy: .private)")
         LogStore.shared.append("DEBUG", category, message)
     }
 
@@ -51,14 +56,30 @@ public struct AppLog: Sendable {
 
 /// File-based log store with automatic 24-hour retention.
 ///
-/// Writes to `Application Support/Yamete/logs/yamete-YYYY-MM-DD.log`
-/// (sandbox-redirected to the app container when running under App Sandbox).
+/// Writes to `Application Support/<Product>/logs/yamete-YYYY-MM-DD.log`.
+/// The direct build uses `Yamete Direct/logs`; the App Store build is
+/// sandbox-redirected to its app container and keeps `Yamete/logs`.
 /// On startup and at each day boundary, log files older than 24 hours are deleted.
 ///
 /// Thread safety: all mutable state lives in a lock-protected `State` struct.
 /// Formatters are created inside the lock closure (they are not thread-safe).
 public final class LogStore: Sendable {
     public static let shared = LogStore()
+    public static let supportDirectoryName: String = {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return "Yamete"
+        }
+
+        let keys = ["CFBundleDisplayName", "CFBundleName"]
+        for key in keys {
+            guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String else { continue }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+        return "Yamete"
+    }()
 
     private let directory: URL
     private let maxAge: TimeInterval = 24 * 60 * 60
@@ -85,7 +106,9 @@ public final class LogStore: Sendable {
         let fm = FileManager.default
         let support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fm.temporaryDirectory
-        directory = support.appendingPathComponent("Yamete/logs", isDirectory: true)
+        directory = support
+            .appendingPathComponent(Self.supportDirectoryName, isDirectory: true)
+            .appendingPathComponent("logs", isDirectory: true)
         try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
         state = OSAllocatedUnfairLock(initialState: State())
         state.withLock { s in
