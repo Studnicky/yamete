@@ -218,11 +218,11 @@ final class LocalizationE2ETests: XCTestCase {
 
         let singular = String(format: NSLocalizedString("confirmations_format", tableName: "Localizable", bundle: enBundle, comment: ""), 1)
         XCTAssertTrue(singular.contains("1"), "Confirmations singular should contain count")
-        XCTAssertTrue(singular.lowercased().contains("hit"), "Confirmations singular should contain 'hit'")
+        XCTAssertTrue(singular.lowercased().contains("sample"), "Confirmations singular should contain 'sample'")
 
         let plural = String(format: NSLocalizedString("confirmations_format", tableName: "Localizable", bundle: enBundle, comment: ""), 5)
         XCTAssertTrue(plural.contains("5"), "Confirmations plural should contain count")
-        XCTAssertTrue(plural.lowercased().contains("hit"), "Confirmations plural should contain 'hit'")
+        XCTAssertTrue(plural.lowercased().contains("sample"), "Confirmations plural should contain 'sample'")
     }
 
     // MARK: - Multiple locale .lproj directories exist

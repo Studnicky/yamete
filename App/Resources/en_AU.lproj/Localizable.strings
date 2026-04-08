@@ -87,7 +87,7 @@
 "setting_crest_factor" = "Crest Factor";
 
 /* Crest factor setting help text */
-"help_crest_factor" = "Peak signal must exceed background RMS by this multiple. Sharp desk hits spike well above background. Footsteps raise background along with peak. Higher values reject more ambient vibration.";
+"help_crest_factor" = "Peak signal must exceed background RMS by this multiple. Sharp desk impacts spike well above background. Footsteps raise background along with peak. Higher values reject more ambient vibration.";
 
 /* Rise rate setting title */
 "setting_rise_rate" = "Rise Rate";
@@ -99,7 +99,7 @@
 "setting_confirmations" = "Confirmations";
 
 /* Confirmations setting help text */
-"help_confirmations" = "Above-threshold samples required in the 120ms detection window. Direct hits produce 3-5 high samples. Single jolts produce 1-2.";
+"help_confirmations" = "Above-threshold samples required in the 120ms detection window. Direct impacts produce 3-5 high samples. Single jolts produce 1-2.";
 
 /* Confirmation hit count */
 "confirmations_format" = "%lld hits";
