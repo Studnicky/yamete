@@ -9,9 +9,9 @@ struct SingleSlider: View {
     var labelWidth: CGFloat = 50
     let format: (Double) -> String
 
-    private let thumbW: CGFloat = 22
-    private let thumbH: CGFloat = 17
-    private let trackH: CGFloat = 4
+    private let thumbW = Theme.sliderThumbWidth
+    private let thumbH = Theme.sliderThumbHeight
+    private let trackH = Theme.sliderTrackHeight
     private static let coordSpace = "singleSlider"
 
     var body: some View {

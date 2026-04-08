@@ -17,27 +17,29 @@ public enum AudioDeviceManager {
 
     /// Returns physical audio output devices (excludes aggregate and virtual devices).
     public static func outputDevices() -> [AudioOutputDevice] {
-        let deviceIDs = allDeviceIDs()
+        let devices = filterPhysicalOutputDevices(from: allDeviceIDs())
+        return disambiguateNames(devices)
+    }
 
-        var results: [AudioOutputDevice] = []
-        for deviceID in deviceIDs {
-            guard outputChannelCount(deviceID) > 0 else { continue }
-            guard !isAggregateDevice(deviceID) else { continue }
-            guard let uid = stringProperty(deviceID, selector: kAudioDevicePropertyDeviceUID),
+    private static func filterPhysicalOutputDevices(from deviceIDs: [AudioDeviceID]) -> [AudioOutputDevice] {
+        deviceIDs.compactMap { deviceID -> AudioOutputDevice? in
+            guard outputChannelCount(deviceID) > 0,
+                  !isAggregateDevice(deviceID),
+                  let uid = stringProperty(deviceID, selector: kAudioDevicePropertyDeviceUID),
                   let name = stringProperty(deviceID, selector: kAudioObjectPropertyName)
-            else { continue }
-            results.append(AudioOutputDevice(id: deviceID, uid: uid, name: name, displayName: name))
+            else { return nil }
+            return AudioOutputDevice(id: deviceID, uid: uid, name: name, displayName: name)
         }
+    }
 
-        // Disambiguate duplicate names (e.g., two "LG UltraFine Display Audio")
-        var nameCounts: [String: Int] = [:]
-        for d in results { nameCounts[d.name, default: 0] += 1 }
-
-        var nameIndex: [String: Int] = [:]
-        return results.map { d in
-            guard nameCounts[d.name, default: 0] > 1 else { return d }
-            let idx = nameIndex[d.name, default: 0] + 1
-            nameIndex[d.name] = idx
+    private static func disambiguateNames(_ devices: [AudioOutputDevice]) -> [AudioOutputDevice] {
+        var counts: [String: Int] = [:]
+        for d in devices { counts[d.name, default: 0] += 1 }
+        var index: [String: Int] = [:]
+        return devices.map { d in
+            guard counts[d.name, default: 0] > 1 else { return d }
+            let idx = index[d.name, default: 0] + 1
+            index[d.name] = idx
             return AudioOutputDevice(id: d.id, uid: d.uid, name: d.name, displayName: "\(d.name) (\(idx))")
         }
     }

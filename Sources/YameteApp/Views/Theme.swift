@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shared app color palette.
+/// Shared app color palette and reusable style modifiers.
 enum Theme {
     static let pink      = Color(red: 0.867, green: 0.357, blue: 0.522)  // #DD5B85
     static let deepRose  = Color(red: 0.643, green: 0.165, blue: 0.357)  // #A42A5B
@@ -8,6 +8,65 @@ enum Theme {
     static let lightPink = Color(red: 0.949, green: 0.588, blue: 0.659)  // #F296A8
     static let dark      = Color(red: 0.055, green: 0.055, blue: 0.055)  // #0E0E0E
 
+    // MARK: - Layout constants
+
+    /// Standard horizontal + vertical padding for section content
+    static let sectionPadding = EdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
+    /// Compact padding for footer rows
+    static let footerPadding = EdgeInsets(top: 4, leading: 14, bottom: 4, trailing: 14)
+    /// Inner padding for accordion content
+    static let accordionInner = EdgeInsets(top: 8, leading: 6, bottom: 8, trailing: 6)
+    /// Padding for toggle rows in device/sensor lists
+    static let toggleRowPadding = EdgeInsets(top: 3, leading: 6, bottom: 3, trailing: 6)
+
+    // MARK: - Slider geometry (shared by RangeSlider and SingleSlider)
+
+    static let sliderThumbWidth: CGFloat = 22
+    static let sliderThumbHeight: CGFloat = 17
+    static let sliderTrackHeight: CGFloat = 4
+
+    // MARK: - Layout dimensions
+
+    static let menuWidth: CGFloat = 290
+    static let listCornerRadius: CGFloat = 6
+    static let buttonCornerRadius: CGFloat = 5
+    static let listBackground = Color.secondary.opacity(0.08)
+    static let listDividerInset: CGFloat = 22
+}
+
+// MARK: - Reusable toggle style modifier
+
+extension Toggle {
+    /// Standard pink mini switch used throughout the app.
+    func themeMiniSwitch() -> some View {
+        self.toggleStyle(.switch).tint(Theme.pink)
+            .labelsHidden().controlSize(.mini)
+    }
+}
+
+// MARK: - Reusable footer icon style
+
+extension Image {
+    /// Small pink icon used in footer rows.
+    func themeFooterIcon() -> some View {
+        self.font(.system(size: 10)).foregroundStyle(Theme.pink)
+    }
+}
+
+// MARK: - Pill button modifier
+
+extension View {
+    /// Small pill-shaped button used in the footer.
+    func themePillButton(background: Color = Theme.deepRose, foreground: Color = .white, bold: Bool = false) -> some View {
+        self.font(bold ? .caption.bold() : .caption)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, bold ? 10 : 8).padding(.vertical, 3)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.buttonCornerRadius))
+    }
+}
+
+extension Theme {
     /// Section header label style (no icon)
     static func sectionHeader(_ text: String, help: String = "") -> some View {
         Text(text)

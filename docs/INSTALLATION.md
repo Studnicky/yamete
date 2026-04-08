@@ -3,9 +3,16 @@
 ## Requirements
 
 - macOS 14.0+ (Sonoma)
-- Apple Silicon Mac (M1/M2/M3/M4) for accelerometer detection
-- Any Mac for microphone-only detection
-- AirPods Pro / Beats Fit Pro for headphone motion detection (optional)
+
+### Sensor compatibility by Mac model
+
+| Sensor | MacBook Air/Pro (Apple Silicon) | iMac, Mac Mini, Studio, Pro | Intel Macs |
+|--------|------|------|------|
+| Accelerometer (BMI286) | Yes | No | No |
+| Microphone | Yes | Yes | Yes |
+| Headphone Motion | Yes (with compatible headphones) | Yes (with compatible headphones) | Yes (with compatible headphones) |
+
+Compatible headphones for motion detection: AirPods Pro, AirPods Max, AirPods (3rd gen+), Beats Fit Pro.
 
 ## Install from DMG
 

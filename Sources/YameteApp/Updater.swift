@@ -9,7 +9,7 @@ import Observation
 public final class Updater {
     let currentVersion: String
 
-    public init() {
+    init() {
         currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
     }
 }

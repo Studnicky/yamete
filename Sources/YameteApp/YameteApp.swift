@@ -9,9 +9,6 @@ import SensorKit
 #if canImport(ResponseKit)
 import ResponseKit
 #endif
-#if canImport(YameteApp)
-import YameteApp
-#endif
 
 @main
 struct YameteApp: App {
@@ -32,35 +29,45 @@ struct YameteApp: App {
     }
 }
 
+// MARK: - App delegate (NSApplicationDelegate protocol requirement)
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let settings = SettingsStore()
     lazy var controller = ImpactController(settings: settings)
     let updater = Updater()
 
-    private static let firstLaunchKey = "hasCompletedFirstLaunch"
-    private static let microphonePromptKey = "hasShownMicrophonePrompt"
-
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
-        migrateDeviceDefaults()
-        showMicrophoneOnboardingIfNeeded()
+        AppWindow.configureAsMenuBarApp()
+        Migration.applyDeviceDefaults(settings: settings, adapters: controller.allAdapters)
+        Onboarding.promptMicrophoneIfNeeded(settings: settings)
         controller.bootstrap()
+        Onboarding.playWelcomeSoundIfFirstLaunch(controller: controller)
+    }
+}
 
-        if !UserDefaults.standard.bool(forKey: Self.firstLaunchKey) {
-            UserDefaults.standard.set(true, forKey: Self.firstLaunchKey)
-            controller.playWelcomeSound()
+// MARK: - Window configuration
+
+@MainActor private enum AppWindow {
+    static func configureAsMenuBarApp() {
+        NSApp.setActivationPolicy(.accessory)
+        if let path = Bundle.main.path(forResource: "AppIcon", ofType: "icns"),
+           let icon = NSImage(contentsOfFile: path) {
+            NSApp.applicationIconImage = icon
         }
     }
+}
 
-    /// On first launch, explain microphone usage before the pipeline starts.
-    /// "Allow" proceeds normally (macOS shows its own permission dialog when
-    /// AVAudioEngine starts). "Skip" removes the microphone adapter from the
-    /// enabled sensor list so it never requests permission.
-    private func showMicrophoneOnboardingIfNeeded() {
+// MARK: - First-run onboarding
+
+@MainActor private enum Onboarding {
+    private static let micPromptKey = "hasShownMicrophonePrompt"
+    private static let firstLaunchKey = "hasCompletedFirstLaunch"
+
+    static func promptMicrophoneIfNeeded(settings: SettingsStore) {
         let d = UserDefaults.standard
-        guard !d.bool(forKey: Self.microphonePromptKey) else { return }
-        d.set(true, forKey: Self.microphonePromptKey)
+        guard !d.bool(forKey: micPromptKey) else { return }
+        d.set(true, forKey: micPromptKey)
 
         let alert = NSAlert()
         alert.messageText = NSLocalizedString("mic_onboarding_title", comment: "Microphone onboarding dialog title")
@@ -69,21 +76,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: NSLocalizedString("mic_onboarding_allow", comment: "Microphone onboarding allow button"))
         alert.addButton(withTitle: NSLocalizedString("mic_onboarding_skip", comment: "Microphone onboarding skip button"))
 
-        let response = alert.runModal()
-        if response == .alertSecondButtonReturn {
-            // User chose Skip — disable microphone adapter
-            settings.enabledSensorIDs = settings.enabledSensorIDs.filter { $0 != "microphone" }
+        if alert.runModal() == .alertSecondButtonReturn {
+            settings.enabledSensorIDs = settings.enabledSensorIDs.filter { $0 != SensorID.microphone.rawValue }
         }
     }
 
-    /// Migrate from "empty = all" to "empty = none" by populating device arrays.
-    private func migrateDeviceDefaults() {
+    static func playWelcomeSoundIfFirstLaunch(controller: ImpactController) {
         let d = UserDefaults.standard
-        let key = "deviceSettingsVersion"
-        guard d.integer(forKey: key) < 1 else { return }
+        guard !d.bool(forKey: firstLaunchKey) else { return }
+        d.set(true, forKey: firstLaunchKey)
+        controller.playWelcomeSound()
+    }
+}
+
+// MARK: - Settings migration
+
+@MainActor private enum Migration {
+    private static let versionKey = "deviceSettingsVersion"
+
+    static func applyDeviceDefaults(settings: SettingsStore, adapters: [any SensorAdapter]) {
+        let d = UserDefaults.standard
+        guard d.integer(forKey: versionKey) < 1 else { return }
 
         if settings.enabledSensorIDs.isEmpty {
-            settings.enabledSensorIDs = controller.allAdapters
+            settings.enabledSensorIDs = adapters
                 .filter { $0.isAvailable }
                 .map(\.id.rawValue)
         }
@@ -95,6 +111,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 settings.enabledAudioDevices = [uid]
             }
         }
-        d.set(1, forKey: key)
+        d.set(1, forKey: versionKey)
     }
 }

@@ -27,15 +27,15 @@ public struct MenuBarView: View {
             BasicSection()
             Divider()
             SensorSection(availableSensors: availableSensors)
-            if settings.enabledSensorIDs.contains("accelerometer") {
+            if settings.enabledSensorIDs.contains(SensorID.accelerometer.rawValue) {
                 Divider()
                 AccelTuningSection()
             }
-            if settings.enabledSensorIDs.contains("microphone") {
+            if settings.enabledSensorIDs.contains(SensorID.microphone.rawValue) {
                 Divider()
                 MicTuningSection()
             }
-            if settings.enabledSensorIDs.contains("headphone-motion") {
+            if settings.enabledSensorIDs.contains(SensorID.headphoneMotion.rawValue) {
                 Divider()
                 HeadphoneTuningSection()
             }
@@ -46,13 +46,13 @@ public struct MenuBarView: View {
                 Divider()
                 Text(error)
                     .font(.caption).foregroundStyle(.red)
-                    .padding(.horizontal, 14).padding(.vertical, 4)
+                    .padding(Theme.footerPadding)
             }
 
             Divider()
             FooterSection()
         }
-        .frame(width: 290)
+        .frame(width: Theme.menuWidth)
         .onAppear {
             AudioDeviceManager.startObserving()
             refreshAll()
@@ -97,12 +97,48 @@ public struct MenuBarView: View {
     }
 }
 
+// MARK: - Shared formatters
+
+private enum Fmt {
+    static let percent: (Double) -> String = { String(format: NSLocalizedString("unit_percent", comment: "Percentage format"), Int($0 * 100)) }
+    static let gforce: (Double) -> String = { String(format: NSLocalizedString("unit_gforce", comment: "G-force format"), $0) }
+    static let multiplier: (Double) -> String = { String(format: NSLocalizedString("unit_multiplier", comment: "Multiplier format"), $0) }
+    static let seconds: (Double) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), $0) }
+    static let hz: (Double) -> String = { String(format: NSLocalizedString("unit_hz", comment: "Hertz format"), Int($0)) }
+    static let ms: (Double) -> String = { String(format: NSLocalizedString("unit_milliseconds", comment: "Milliseconds format"), $0 / 1000) }
+    static let amplitude: (Double) -> String = { String(format: "%.3f", $0) }
+    static let warmup: (Double) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), $0 / 50.0) }
+    static let warmupInt: (Int) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), Double($0) / 50.0) }
+    static let confirmations: (Int) -> String = { String(format: NSLocalizedString("confirmations_format", comment: "Confirmation hit count"), $0) }
+    static let consensus: (Int) -> String = { String(format: NSLocalizedString("consensus_format", comment: "Sensor consensus count"), $0) }
+}
+
+// MARK: - Generic toggle binding for array-backed selections
+
+private func arrayToggleBinding<T: Equatable>(
+    _ array: Binding<[T]>, element: T
+) -> Binding<Bool> {
+    Binding(
+        get: { array.wrappedValue.contains(element) },
+        set: { enabled in
+            var items = array.wrappedValue
+            if enabled { if !items.contains(element) { items.append(element) } }
+            else { items.removeAll { $0 == element } }
+            array.wrappedValue = items
+        }
+    )
+}
+
+// MARK: - Shared label width for tuning sliders
+
+private let tuningLabelWidth: CGFloat = 50
+
 // MARK: - Header (impact counter)
 
 private struct HeaderSection: View {
     @Environment(ImpactController.self) var controller
 
-    var body: some View {
+    public var body: some View {
         HStack {
             Text(String(format: NSLocalizedString("impacts_today", comment: "Daily impact counter"), controller.impactCount))
             Spacer()
@@ -124,7 +160,7 @@ private struct HeaderSection: View {
 private struct BasicSection: View {
     @Environment(SettingsStore.self) var settings
 
-    var body: some View {
+    public var body: some View {
         @Bindable var s = settings
 
         Group {
@@ -133,9 +169,9 @@ private struct BasicSection: View {
                               help: NSLocalizedString("help_reactivity", comment: "Reactivity setting help text"))
                 SensitivityRuler()
                 RangeSlider(low: $s.sensitivityMin, high: $s.sensitivityMax,
-                            bounds: 0...1, labelWidth: 50, format: { String(format: NSLocalizedString("unit_percent", comment: "Percentage format"), Int($0 * 100)) })
+                            bounds: Detection.unitRange, labelWidth: tuningLabelWidth, format: Fmt.percent)
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
+            .padding(Theme.sectionPadding)
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
@@ -144,15 +180,14 @@ private struct BasicSection: View {
                                   help: NSLocalizedString("help_volume", comment: "Volume setting help text"))
                     Spacer()
                     Toggle("", isOn: $s.soundEnabled)
-                        .toggleStyle(.switch).tint(Theme.pink)
-                        .labelsHidden().controlSize(.mini)
+                        .themeMiniSwitch()
                 }
                 if s.soundEnabled {
                     RangeSlider(low: $s.volumeMin, high: $s.volumeMax,
-                                bounds: 0...1, labelWidth: 50, format: { String(format: NSLocalizedString("unit_percent", comment: "Percentage format"), Int($0 * 100)) })
+                                bounds: Detection.unitRange, labelWidth: tuningLabelWidth, format: Fmt.percent)
                 }
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
+            .padding(Theme.sectionPadding)
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
@@ -161,15 +196,14 @@ private struct BasicSection: View {
                                   help: NSLocalizedString("help_flash_opacity", comment: "Flash opacity setting help text"))
                     Spacer()
                     Toggle("", isOn: $s.screenFlash)
-                        .toggleStyle(.switch).tint(Theme.pink)
-                        .labelsHidden().controlSize(.mini)
+                        .themeMiniSwitch()
                 }
                 if s.screenFlash {
                     RangeSlider(low: $s.flashOpacityMin, high: $s.flashOpacityMax,
-                                bounds: 0...1, labelWidth: 50, format: { String(format: NSLocalizedString("unit_percent", comment: "Percentage format"), Int($0 * 100)) })
+                                bounds: Detection.unitRange, labelWidth: tuningLabelWidth, format: Fmt.percent)
                 }
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
+            .padding(Theme.sectionPadding)
         }
     }
 }
@@ -185,7 +219,7 @@ private struct SensitivityRuler: View {
         (1.0, NSLocalizedString("tier_tap", comment: "Ruler label: lightest impact")),
     ]
 
-    var body: some View {
+    public var body: some View {
         HStack(spacing: 8) {
             Spacer().frame(width: 50)
             GeometryReader { geo in
@@ -212,12 +246,11 @@ private struct SensorSection: View {
     let availableSensors: [String]
     @State private var isExpanded = false
 
-    var body: some View {
+    public var body: some View {
         @Bindable var s = settings
 
         AccordionCard(title: NSLocalizedString("section_sensitivity_sensors", comment: "Sensitivity & Sensors accordion title"), isExpanded: $isExpanded) {
-            let _ = clampConsensus()
-            let lw: CGFloat = 50
+            let lw = tuningLabelWidth
 
             sensorList()
 
@@ -226,23 +259,27 @@ private struct SensorSection: View {
             VStack(spacing: 10) {
                 if enabledCount >= 2 {
                     Divider()
-                    settingRow(icon: "person.3", title: NSLocalizedString("setting_consensus", comment: "Sensor consensus setting title"),
+                    SettingRow(icon: "person.3",
+                               title: NSLocalizedString("setting_consensus", comment: "Sensor consensus setting title"),
                                help: NSLocalizedString("help_consensus", comment: "Sensor consensus setting help text")) {
                         SingleSliderInt(value: $s.consensusRequired, bounds: 1...enabledCount,
-                                        labelWidth: lw, format: { String(format: NSLocalizedString("consensus_format", comment: "Sensor consensus count"), $0) })
+                                        labelWidth: lw, format: Fmt.consensus)
                     }
                 }
 
                 Divider()
 
-                settingRow(icon: "timer", title: NSLocalizedString("setting_cooldown", comment: "Cooldown setting title"),
+                SettingRow(icon: "timer",
+                           title: NSLocalizedString("setting_cooldown", comment: "Cooldown setting title"),
                            help: NSLocalizedString("help_cooldown", comment: "Cooldown setting help text")) {
-                    SingleSlider(value: $s.debounce, bounds: 0...2,
-                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), $0) })
+                    SingleSlider(value: $s.debounce, bounds: Detection.debounceRange,
+                                 labelWidth: lw, format: Fmt.seconds)
                 }
             }
-            .padding(.horizontal, 6).padding(.vertical, 8)
+            .padding(Theme.accordionInner)
         }
+        .onAppear { clampConsensus() }
+        .onChange(of: settings.enabledSensorIDs) { _, _ in clampConsensus() }
     }
 
     @ViewBuilder
@@ -257,8 +294,8 @@ private struct SensorSection: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .toggleStyle(.switch).tint(Theme.pink).controlSize(.mini)
-                .padding(.vertical, 3).padding(.horizontal, 6)
-                if i < adapters.count - 1 { Divider().padding(.leading, 22) }
+                .padding(Theme.toggleRowPadding)
+                if i < adapters.count - 1 { Divider().padding(.leading, Theme.listDividerInset) }
             }
         }
         .padding(.vertical, 4)
@@ -273,23 +310,62 @@ private struct SensorSection: View {
 
     private func sensorBinding(id: String) -> Binding<Bool> {
         @Bindable var s = settings
-        return Binding(
-            get: { s.enabledSensorIDs.contains(id) },
-            set: { enabled in
-                var ids = s.enabledSensorIDs
-                if enabled { if !ids.contains(id) { ids.append(id) } }
-                else { ids.removeAll { $0 == id } }
-                s.enabledSensorIDs = ids
-            }
-        )
+        return arrayToggleBinding($s.enabledSensorIDs, element: id)
     }
 
-    @ViewBuilder
-    private func settingRow<Content: View>(icon: String, title: String, help: String,
-                                           @ViewBuilder content: () -> Content) -> some View {
+}
+
+// MARK: - Reusable setting row
+
+private struct SettingRow<Content: View>: View {
+    let icon: String
+    let title: String
+    let help: String
+    @ViewBuilder let content: Content
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             SettingHeader(icon: icon, title: title, help: help)
-            content()
+            content
+        }
+    }
+}
+
+// MARK: - Shared detection gate parameters (crest factor, confirmations, warmup)
+
+private struct DetectionGatesView: View {
+    @Binding var crestFactor: Double
+    @Binding var confirmations: Int
+    @Binding var warmupSamples: Int
+    let crestBounds: ClosedRange<Double>
+    let confirmationsBounds: ClosedRange<Int>
+    let warmupBounds: ClosedRange<Int>
+    let labelWidth: CGFloat
+
+    public var body: some View {
+        SettingRow(icon: "chart.line.uptrend.xyaxis",
+                   title: NSLocalizedString("setting_crest_factor", comment: "Crest factor setting title"),
+                   help: NSLocalizedString("help_crest_factor", comment: "Crest factor setting help text")) {
+            SingleSlider(value: $crestFactor, bounds: crestBounds,
+                         labelWidth: labelWidth, format: Fmt.multiplier)
+        }
+
+        Divider()
+
+        SettingRow(icon: "checkmark.circle",
+                   title: NSLocalizedString("setting_confirmations", comment: "Confirmations setting title"),
+                   help: NSLocalizedString("help_confirmations", comment: "Confirmations setting help text")) {
+            SingleSliderInt(value: $confirmations, bounds: confirmationsBounds,
+                            labelWidth: labelWidth, format: Fmt.confirmations)
+        }
+
+        Divider()
+
+        SettingRow(icon: "flame",
+                   title: NSLocalizedString("setting_warmup", comment: "Warmup setting title"),
+                   help: NSLocalizedString("help_warmup", comment: "Warmup setting help text")) {
+            SingleSliderInt(value: $warmupSamples, bounds: warmupBounds,
+                            labelWidth: labelWidth, format: Fmt.warmupInt)
         }
     }
 }
@@ -300,76 +376,53 @@ private struct AccelTuningSection: View {
     @Environment(SettingsStore.self) var settings
     @State private var isExpanded = false
 
-    var body: some View {
+    public var body: some View {
         @Bindable var s = settings
-        let lw: CGFloat = 50
+        let lw = tuningLabelWidth
 
         AccordionCard(title: NSLocalizedString("section_accel_tuning", comment: "Accelerometer tuning section header"), isExpanded: $isExpanded) {
             VStack(spacing: 10) {
-                settingRow(icon: "waveform.path", title: NSLocalizedString("setting_frequency_band", comment: "Frequency band setting title"),
+                SettingRow(icon: "waveform.path",
+                           title: NSLocalizedString("setting_frequency_band", comment: "Frequency band setting title"),
                            help: NSLocalizedString("help_frequency_band", comment: "Frequency band setting help text")) {
                     RangeSlider(low: $s.accelBandpassLowHz, high: $s.accelBandpassHighHz,
-                                bounds: 10...25, labelWidth: lw, format: { String(format: NSLocalizedString("unit_hz", comment: "Hertz format"), Int($0)) })
+                                bounds: Detection.Accel.bandpassRange, labelWidth: lw, format: Fmt.hz)
                 }
 
                 Divider()
 
-                settingRow(icon: "arrow.up.to.line", title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
+                SettingRow(icon: "arrow.up.to.line",
+                           title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
                            help: NSLocalizedString("help_spike_threshold", comment: "Spike threshold setting help text")) {
-                    SingleSlider(value: $s.accelSpikeThreshold, bounds: 0.010...0.040,
-                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_gforce", comment: "G-force format"), $0) })
+                    SingleSlider(value: $s.accelSpikeThreshold, bounds: Detection.Accel.spikeThresholdRange,
+                                 labelWidth: lw, format: Fmt.gforce)
                 }
 
                 Divider()
 
-                settingRow(icon: "chart.line.uptrend.xyaxis", title: NSLocalizedString("setting_crest_factor", comment: "Crest factor setting title"),
-                           help: NSLocalizedString("help_crest_factor", comment: "Crest factor setting help text")) {
-                    SingleSlider(value: $s.accelCrestFactor, bounds: 1.0...5.0,
-                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_multiplier", comment: "Multiplier format"), $0) })
-                }
-
-                Divider()
-
-                settingRow(icon: "bolt", title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
+                SettingRow(icon: "bolt",
+                           title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
                            help: NSLocalizedString("help_rise_rate", comment: "Rise rate setting help text")) {
-                    SingleSlider(value: $s.accelRiseRate, bounds: 0.005...0.020,
-                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_gforce", comment: "G-force format"), $0) })
+                    SingleSlider(value: $s.accelRiseRate, bounds: Detection.Accel.riseRateRange,
+                                 labelWidth: lw, format: Fmt.gforce)
                 }
 
                 Divider()
 
-                settingRow(icon: "checkmark.circle", title: NSLocalizedString("setting_confirmations", comment: "Confirmations setting title"),
-                           help: NSLocalizedString("help_confirmations", comment: "Confirmations setting help text")) {
-                    SingleSliderInt(value: $s.accelConfirmations, bounds: 1...5,
-                                    labelWidth: lw, format: { String(format: NSLocalizedString("confirmations_format", comment: "Confirmation hit count"), $0) })
-                }
+                DetectionGatesView(crestFactor: $s.accelCrestFactor, confirmations: $s.accelConfirmations,
+                                   warmupSamples: $s.accelWarmupSamples, crestBounds: Detection.Accel.crestFactorRange,
+                                   confirmationsBounds: Detection.Accel.confirmationsRange, warmupBounds: Detection.Accel.warmupRange, labelWidth: lw)
 
                 Divider()
 
-                settingRow(icon: "flame", title: NSLocalizedString("setting_warmup", comment: "Warmup setting title"),
-                           help: NSLocalizedString("help_warmup", comment: "Warmup setting help text")) {
-                    SingleSliderInt(value: $s.accelWarmupSamples, bounds: 10...100,
-                                    labelWidth: lw, format: { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), Double($0) / 50.0) })
-                }
-
-                Divider()
-
-                settingRow(icon: "clock.arrow.2.circlepath", title: NSLocalizedString("setting_report_interval", comment: "Report interval setting title"),
+                SettingRow(icon: "clock.arrow.2.circlepath",
+                           title: NSLocalizedString("setting_report_interval", comment: "Report interval setting title"),
                            help: NSLocalizedString("help_report_interval", comment: "Report interval setting help text")) {
-                    SingleSlider(value: $s.accelReportInterval, bounds: 5000...50000, step: 1000,
-                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_milliseconds", comment: "Milliseconds format"), $0 / 1000) })
+                    SingleSlider(value: $s.accelReportInterval, bounds: Detection.Accel.reportIntervalRange, step: Detection.Accel.reportIntervalStep,
+                                 labelWidth: lw, format: Fmt.ms)
                 }
             }
-            .padding(.horizontal, 6).padding(.vertical, 8)
-        }
-    }
-
-    @ViewBuilder
-    private func settingRow<Content: View>(icon: String, title: String, help: String,
-                                           @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            SettingHeader(icon: icon, title: title, help: help)
-            content()
+            .padding(Theme.accordionInner)
         }
     }
 }
@@ -380,60 +433,35 @@ private struct MicTuningSection: View {
     @Environment(SettingsStore.self) var settings
     @State private var isExpanded = false
 
-    var body: some View {
+    public var body: some View {
         @Bindable var s = settings
-        let lw: CGFloat = 50
+        let lw = tuningLabelWidth
 
         AccordionCard(title: NSLocalizedString("section_mic_tuning", comment: "Microphone tuning section header"), isExpanded: $isExpanded) {
             VStack(spacing: 10) {
-                settingRow(icon: "arrow.up.to.line", title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
+                SettingRow(icon: "arrow.up.to.line",
+                           title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
                            help: NSLocalizedString("help_mic_spike_threshold", comment: "Mic spike threshold help text")) {
-                    SingleSlider(value: $s.micSpikeThreshold, bounds: 0.005...0.100,
-                                 labelWidth: lw, format: { String(format: "%.3f", $0) })
+                    SingleSlider(value: $s.micSpikeThreshold, bounds: Detection.Mic.spikeThresholdRange,
+                                 labelWidth: lw, format: Fmt.amplitude)
                 }
 
                 Divider()
 
-                settingRow(icon: "chart.line.uptrend.xyaxis", title: NSLocalizedString("setting_crest_factor", comment: "Crest factor setting title"),
-                           help: NSLocalizedString("help_crest_factor", comment: "Crest factor setting help text")) {
-                    SingleSlider(value: $s.micCrestFactor, bounds: 1.0...5.0,
-                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_multiplier", comment: "Multiplier format"), $0) })
-                }
-
-                Divider()
-
-                settingRow(icon: "bolt", title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
+                SettingRow(icon: "bolt",
+                           title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
                            help: NSLocalizedString("help_mic_rise_rate", comment: "Mic rise rate help text")) {
-                    SingleSlider(value: $s.micRiseRate, bounds: 0.002...0.050,
-                                 labelWidth: lw, format: { String(format: "%.3f", $0) })
+                    SingleSlider(value: $s.micRiseRate, bounds: Detection.Mic.riseRateRange,
+                                 labelWidth: lw, format: Fmt.amplitude)
                 }
 
                 Divider()
 
-                settingRow(icon: "checkmark.circle", title: NSLocalizedString("setting_confirmations", comment: "Confirmations setting title"),
-                           help: NSLocalizedString("help_confirmations", comment: "Confirmations setting help text")) {
-                    SingleSliderInt(value: $s.micConfirmations, bounds: 1...5,
-                                    labelWidth: lw, format: { String(format: NSLocalizedString("confirmations_format", comment: "Confirmation hit count"), $0) })
-                }
-
-                Divider()
-
-                settingRow(icon: "flame", title: NSLocalizedString("setting_warmup", comment: "Warmup setting title"),
-                           help: NSLocalizedString("help_warmup", comment: "Warmup setting help text")) {
-                    SingleSliderInt(value: $s.micWarmupSamples, bounds: 10...100,
-                                    labelWidth: lw, format: { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), Double($0) / 50.0) })
-                }
+                DetectionGatesView(crestFactor: $s.micCrestFactor, confirmations: $s.micConfirmations,
+                                   warmupSamples: $s.micWarmupSamples, crestBounds: Detection.Mic.crestFactorRange,
+                                   confirmationsBounds: Detection.Mic.confirmationsRange, warmupBounds: Detection.Mic.warmupRange, labelWidth: lw)
             }
-            .padding(.horizontal, 6).padding(.vertical, 8)
-        }
-    }
-
-    @ViewBuilder
-    private func settingRow<Content: View>(icon: String, title: String, help: String,
-                                           @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            SettingHeader(icon: icon, title: title, help: help)
-            content()
+            .padding(Theme.accordionInner)
         }
     }
 }
@@ -444,61 +472,78 @@ private struct HeadphoneTuningSection: View {
     @Environment(SettingsStore.self) var settings
     @State private var isExpanded = false
 
-    var body: some View {
+    public var body: some View {
         @Bindable var s = settings
-        let lw: CGFloat = 50
+        let lw = tuningLabelWidth
 
         AccordionCard(title: NSLocalizedString("section_hp_tuning", comment: "Headphone tuning section header"), isExpanded: $isExpanded) {
             VStack(spacing: 10) {
-                settingRow(icon: "arrow.up.to.line", title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
+                SettingRow(icon: "arrow.up.to.line",
+                           title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
                            help: NSLocalizedString("help_hp_spike_threshold", comment: "Headphone spike threshold help text")) {
-                    SingleSlider(value: $s.hpSpikeThreshold, bounds: 0.02...0.50,
-                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_gforce", comment: "G-force format"), $0) })
+                    SingleSlider(value: $s.hpSpikeThreshold, bounds: Detection.Headphone.spikeThresholdRange,
+                                 labelWidth: lw, format: Fmt.gforce)
                 }
 
                 Divider()
 
-                settingRow(icon: "chart.line.uptrend.xyaxis", title: NSLocalizedString("setting_crest_factor", comment: "Crest factor setting title"),
-                           help: NSLocalizedString("help_crest_factor", comment: "Crest factor setting help text")) {
-                    SingleSlider(value: $s.hpCrestFactor, bounds: 1.0...5.0,
-                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_multiplier", comment: "Multiplier format"), $0) })
-                }
-
-                Divider()
-
-                settingRow(icon: "bolt", title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
+                SettingRow(icon: "bolt",
+                           title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
                            help: NSLocalizedString("help_hp_rise_rate", comment: "Headphone rise rate help text")) {
-                    SingleSlider(value: $s.hpRiseRate, bounds: 0.010...0.200,
-                                 labelWidth: lw, format: { String(format: NSLocalizedString("unit_gforce", comment: "G-force format"), $0) })
+                    SingleSlider(value: $s.hpRiseRate, bounds: Detection.Headphone.riseRateRange,
+                                 labelWidth: lw, format: Fmt.gforce)
                 }
 
                 Divider()
 
-                settingRow(icon: "checkmark.circle", title: NSLocalizedString("setting_confirmations", comment: "Confirmations setting title"),
-                           help: NSLocalizedString("help_confirmations", comment: "Confirmations setting help text")) {
-                    SingleSliderInt(value: $s.hpConfirmations, bounds: 1...5,
-                                    labelWidth: lw, format: { String(format: NSLocalizedString("confirmations_format", comment: "Confirmation hit count"), $0) })
-                }
-
-                Divider()
-
-                settingRow(icon: "flame", title: NSLocalizedString("setting_warmup", comment: "Warmup setting title"),
-                           help: NSLocalizedString("help_warmup", comment: "Warmup setting help text")) {
-                    SingleSliderInt(value: $s.hpWarmupSamples, bounds: 10...100,
-                                    labelWidth: lw, format: { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), Double($0) / 50.0) })
-                }
+                DetectionGatesView(crestFactor: $s.hpCrestFactor, confirmations: $s.hpConfirmations,
+                                   warmupSamples: $s.hpWarmupSamples, crestBounds: Detection.Headphone.crestFactorRange,
+                                   confirmationsBounds: Detection.Headphone.confirmationsRange, warmupBounds: Detection.Headphone.warmupRange, labelWidth: lw)
             }
-            .padding(.horizontal, 6).padding(.vertical, 8)
+            .padding(Theme.accordionInner)
         }
     }
+}
 
-    @ViewBuilder
-    private func settingRow<Content: View>(icon: String, title: String, help: String,
-                                           @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            SettingHeader(icon: icon, title: title, help: help)
-            content()
+// MARK: - Reusable device toggle list
+
+private struct DeviceToggleList<ID: Hashable>: View {
+    let items: [(name: String, id: ID)]
+    let emptyMessage: String?
+    let noneSelectedMessage: String?
+    let selectedIDs: [ID]
+    let binding: (ID) -> Binding<Bool>
+
+    init(items: [(name: String, id: ID)], emptyMessage: String? = nil,
+         noneSelectedMessage: String? = nil, selectedIDs: [ID] = [],
+         binding: @escaping (ID) -> Binding<Bool>) {
+        self.items = items; self.emptyMessage = emptyMessage
+        self.noneSelectedMessage = noneSelectedMessage
+        self.selectedIDs = selectedIDs; self.binding = binding
+    }
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.offset) { i, item in
+                Toggle(isOn: binding(item.id)) {
+                    Text(item.name).font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .toggleStyle(.switch).tint(Theme.pink).controlSize(.mini)
+                .padding(Theme.toggleRowPadding)
+                if i < items.count - 1 { Divider().padding(.leading, Theme.listDividerInset) }
+            }
+            if items.isEmpty, let msg = emptyMessage {
+                Text(msg).font(.caption).foregroundStyle(.secondary)
+                    .padding(Theme.toggleRowPadding)
+            } else if !items.isEmpty && selectedIDs.isEmpty, let msg = noneSelectedMessage {
+                Divider()
+                Text(msg).font(.caption).foregroundStyle(Theme.mauve)
+                    .padding(Theme.toggleRowPadding)
+            }
         }
+        .background(Theme.listBackground)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.listCornerRadius))
     }
 }
 
@@ -510,105 +555,54 @@ private struct DeviceSection: View {
     let displays: [NSScreen]
     @State private var isExpanded = false
 
-    var body: some View {
+    public var body: some View {
         @Bindable var s = settings
 
         AccordionCard(title: NSLocalizedString("section_devices", comment: "Devices accordion title"),
                       subtitle: String(format: NSLocalizedString("devices_subtitle", comment: "Devices section subtitle: display and audio count"), displays.count, audioDevices.count),
                       isExpanded: $isExpanded) {
-            displayList()
+            VStack(alignment: .leading, spacing: 6) {
+                SettingHeader(icon: "display", title: NSLocalizedString("setting_flash_displays", comment: "Flash displays setting title"),
+                             help: NSLocalizedString("help_flash_displays", comment: "Flash displays setting help text"))
+                DeviceToggleList(
+                    items: sortedDisplays.map { (name: $0.localizedName, id: $0.displayID) },
+                    noneSelectedMessage: NSLocalizedString("no_displays_selected", comment: "No displays selected hint"),
+                    selectedIDs: s.enabledDisplays,
+                    binding: { id in arrayToggleBinding($s.enabledDisplays, element: id) })
+            }
+            .padding(Theme.sectionPadding)
+
             Divider()
-            audioList()
+
+            VStack(alignment: .leading, spacing: 6) {
+                SettingHeader(icon: "hifispeaker", title: NSLocalizedString("setting_audio_output", comment: "Audio output setting title"),
+                             help: NSLocalizedString("help_audio_output", comment: "Audio output setting help text"))
+                DeviceToggleList(
+                    items: sortedAudioDevices.map { (name: $0.displayName, id: $0.uid) },
+                    emptyMessage: NSLocalizedString("no_output_devices", comment: "No audio output hardware detected"),
+                    noneSelectedMessage: NSLocalizedString("no_audio_selected", comment: "No audio devices selected hint"),
+                    selectedIDs: s.enabledAudioDevices,
+                    binding: { uid in arrayToggleBinding($s.enabledAudioDevices, element: uid) })
+            }
+            .padding(Theme.sectionPadding)
         }
     }
 
-    @ViewBuilder
-    private func displayList() -> some View {
-        let screens = displays.sorted { a, b in
+    private var sortedDisplays: [NSScreen] {
+        displays.sorted { a, b in
             if a == NSScreen.main && b != NSScreen.main { return true }
             if b == NSScreen.main && a != NSScreen.main { return false }
             return a.localizedName.localizedStandardCompare(b.localizedName) == .orderedAscending
         }
-        VStack(alignment: .leading, spacing: 6) {
-            SettingHeader(icon: "display", title: NSLocalizedString("setting_flash_displays", comment: "Flash displays setting title"),
-                         help: NSLocalizedString("help_flash_displays", comment: "Flash displays setting help text"))
-            VStack(spacing: 0) {
-                ForEach(0..<screens.count, id: \.self) { i in
-                    let screen = screens[i]
-                    Toggle(isOn: displayBinding(dispID: screen.displayID)) {
-                        Text(screen.localizedName).font(.caption)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .toggleStyle(.switch).tint(Theme.pink).controlSize(.mini)
-                    .padding(.vertical, 3).padding(.horizontal, 6)
-                    if i < screens.count - 1 { Divider().padding(.leading, 22) }
-                }
-            }
-            .background(Color.secondary.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
-        .padding(.horizontal, 14).padding(.vertical, 8)
     }
 
-    @ViewBuilder
-    private func audioList() -> some View {
+    private var sortedAudioDevices: [AudioOutputDevice] {
         let defaultUID = AudioDeviceManager.defaultDeviceUID
-        let sorted = audioDevices.sorted { a, b in
+        return audioDevices.sorted { a, b in
             if a.uid == defaultUID && b.uid != defaultUID { return true }
             if b.uid == defaultUID && a.uid != defaultUID { return false }
             return a.displayName.localizedStandardCompare(b.displayName) == .orderedAscending
         }
-        VStack(alignment: .leading, spacing: 6) {
-            SettingHeader(icon: "hifispeaker", title: NSLocalizedString("setting_audio_output", comment: "Audio output setting title"),
-                         help: NSLocalizedString("help_audio_output", comment: "Audio output setting help text"))
-            VStack(spacing: 0) {
-                ForEach(Array(sorted.enumerated()), id: \.offset) { i, device in
-                    Toggle(isOn: audioBinding(uid: device.uid)) {
-                        Text(device.displayName).font(.caption)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .toggleStyle(.switch).tint(Theme.pink).controlSize(.mini)
-                    .padding(.vertical, 3).padding(.horizontal, 6)
-                    if i < sorted.count - 1 { Divider().padding(.leading, 22) }
-                }
-                if audioDevices.isEmpty {
-                    Text(NSLocalizedString("no_output_devices", comment: "No audio output devices found message"))
-                        .font(.caption).foregroundStyle(.secondary)
-                        .padding(.vertical, 3).padding(.horizontal, 4)
-                }
-            }
-            .background(Color.secondary.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
-        .padding(.horizontal, 14).padding(.vertical, 8)
-    }
-
-    // MARK: - Bindings
-
-    private func audioBinding(uid: String) -> Binding<Bool> {
-        @Bindable var s = settings
-        return Binding(
-            get: { s.enabledAudioDevices.contains(uid) },
-            set: { enabled in
-                var uids = s.enabledAudioDevices
-                if enabled { if !uids.contains(uid) { uids.append(uid) } }
-                else { uids.removeAll { $0 == uid } }
-                s.enabledAudioDevices = uids
-            }
-        )
-    }
-
-    private func displayBinding(dispID: Int) -> Binding<Bool> {
-        @Bindable var s = settings
-        return Binding(
-            get: { s.enabledDisplays.contains(dispID) },
-            set: { enabled in
-                var ids = s.enabledDisplays
-                if enabled { if !ids.contains(dispID) { ids.append(dispID) } }
-                else { ids.removeAll { $0 == dispID } }
-                s.enabledDisplays = ids
-            }
-        )
     }
 }
 
@@ -621,13 +615,13 @@ private struct FooterSection: View {
     @State private var launchAtLogin = (SMAppService.mainApp.status == .enabled)
     @State private var showResetConfirmation = false
 
-    var body: some View {
+    public var body: some View {
         @Bindable var s = settings
 
         VStack(spacing: 0) {
             HStack(spacing: 5) {
                 Image(systemName: "power")
-                    .font(.system(size: 10)).foregroundStyle(Theme.pink)
+                    .themeFooterIcon()
                 Text(NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label"))
                 Spacer()
                 Toggle("", isOn: $launchAtLogin)
@@ -641,11 +635,11 @@ private struct FooterSection: View {
                     }
             }
             .font(.caption)
-            .padding(.horizontal, 14).padding(.vertical, 4)
+            .padding(Theme.footerPadding)
 
             HStack(spacing: 5) {
                 Image(systemName: "ladybug")
-                    .font(.system(size: 10)).foregroundStyle(Theme.pink)
+                    .themeFooterIcon()
                 Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label"))
                 Spacer()
                 Toggle("", isOn: $s.debugLogging)
@@ -653,35 +647,27 @@ private struct FooterSection: View {
                     .labelsHidden().controlSize(.mini)
             }
             .font(.caption)
-            .padding(.horizontal, 14).padding(.vertical, 4)
+            .padding(Theme.footerPadding)
 
             HStack(spacing: 5) {
                 Image(systemName: "info.circle")
-                    .font(.system(size: 10)).foregroundStyle(Theme.pink)
+                    .themeFooterIcon()
                 Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
                     .font(.caption).foregroundStyle(.tertiary)
                 Spacer()
                 Button(action: { showResetConfirmation = true }) {
                     Text(NSLocalizedString("button_reset", comment: "Reset to defaults button"))
-                        .font(.caption)
-                        .foregroundStyle(Theme.pink)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Theme.deepRose.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
                 }
                 .buttonStyle(.plain)
                 Button(action: { NSApp.terminate(nil) }) {
                     Text(NSLocalizedString("button_quit", comment: "Quit application button"))
-                        .font(.caption.bold())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10).padding(.vertical, 3)
-                        .background(Theme.deepRose)
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .themePillButton(bold: true)
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut("q")
             }
-            .padding(.horizontal, 14).padding(.vertical, 4).padding(.bottom, 4)
+            .padding(Theme.footerPadding).padding(.bottom, 4)
         }
         .alert(
             NSLocalizedString("reset_confirm_title", comment: "Reset confirmation dialog title"),

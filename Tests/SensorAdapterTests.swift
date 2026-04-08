@@ -141,10 +141,10 @@ final class SensorErrorTests: XCTestCase {
     func testErrorDescriptions() {
         struct Case { let error: SensorError; let substring: String }
         let cases: [Case] = [
-            .init(error: .permissionDenied, substring: "Input Monitoring"),
-            .init(error: .deviceNotFound, substring: "No accelerometer"),
+            .init(error: .permissionDenied, substring: "Microphone access denied"),
+            .init(error: .deviceNotFound, substring: "Accelerometer not found"),
             .init(error: .ioKitError("0xDEAD"), substring: "0xDEAD"),
-            .init(error: .noAdaptersAvailable, substring: "No compatible"),
+            .init(error: .noAdaptersAvailable, substring: "No sensors available"),
         ]
         for c in cases {
             let desc = c.error.localizedDescription

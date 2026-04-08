@@ -28,7 +28,7 @@ BUNDLE_RESOURCES := $(shell find $(BUNDLE_SRC)/Resources -type f 2>/dev/null)
 LPROJ_DIRS := $(wildcard $(BUNDLE_SRC)/Resources/*.lproj)
 
 FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio CoreMotion ServiceManagement
-SWIFTFLAGS := -O -module-name $(APP) -target arm64-apple-macosx14.0 -parse-as-library \
+SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as-library \
               $(addprefix -framework ,$(FRAMEWORKS)) \
               -I Sources/IOHIDPublic/include
 

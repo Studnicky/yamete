@@ -31,41 +31,41 @@ public final class SettingsStore {
     // MARK: - Defaults
 
     static let defaults: [String: Any] = [
-        Key.sensitivityMin.rawValue:  0.10,
-        Key.sensitivityMax.rawValue:  0.90,
-        Key.debounce.rawValue:        0.5,
+        Key.sensitivityMin.rawValue:  Defaults.sensitivityMin,
+        Key.sensitivityMax.rawValue:  Defaults.sensitivityMax,
+        Key.debounce.rawValue:        Defaults.debounce,
         Key.soundEnabled.rawValue:    true,
         Key.debugLogging.rawValue:    false,
         Key.screenFlash.rawValue:     true,
-        Key.flashOpacityMin.rawValue: 0.50,
-        Key.flashOpacityMax.rawValue: 0.9,
-        Key.volumeMin.rawValue:       0.50,
-        Key.volumeMax.rawValue:       0.9,
+        Key.flashOpacityMin.rawValue: Defaults.flashOpacityMin,
+        Key.flashOpacityMax.rawValue: Defaults.flashOpacityMax,
+        Key.volumeMin.rawValue:       Defaults.volumeMin,
+        Key.volumeMax.rawValue:       Defaults.volumeMax,
         Key.enabledDisplays.rawValue: [Int](),
         Key.enabledAudioDevices.rawValue: [String](),
         Key.enabledSensorIDs.rawValue: [String](),
-        Key.consensusRequired.rawValue: 1,
+        Key.consensusRequired.rawValue: Defaults.consensus,
         // Accelerometer detection
-        Key.accelSpikeThreshold.rawValue:  0.020,
-        Key.accelCrestFactor.rawValue:     1.5,
-        Key.accelRiseRate.rawValue:        0.010,
-        Key.accelConfirmations.rawValue:   3,
-        Key.accelWarmupSamples.rawValue:   50,
-        Key.accelReportInterval.rawValue:  10000.0,
-        Key.accelBandpassLowHz.rawValue:   20.0,
-        Key.accelBandpassHighHz.rawValue:  25.0,
+        Key.accelSpikeThreshold.rawValue:  Defaults.accelSpikeThreshold,
+        Key.accelCrestFactor.rawValue:     Defaults.accelCrestFactor,
+        Key.accelRiseRate.rawValue:        Defaults.accelRiseRate,
+        Key.accelConfirmations.rawValue:   Defaults.accelConfirmations,
+        Key.accelWarmupSamples.rawValue:   Defaults.accelWarmup,
+        Key.accelReportInterval.rawValue:  Defaults.accelReportInterval,
+        Key.accelBandpassLowHz.rawValue:   Defaults.accelBandpassLow,
+        Key.accelBandpassHighHz.rawValue:  Defaults.accelBandpassHigh,
         // Microphone detection
-        Key.micSpikeThreshold.rawValue: 0.020,
-        Key.micCrestFactor.rawValue:    1.5,
-        Key.micRiseRate.rawValue:       0.010,
-        Key.micConfirmations.rawValue:  2,
-        Key.micWarmupSamples.rawValue:  50,
+        Key.micSpikeThreshold.rawValue: Defaults.micSpikeThreshold,
+        Key.micCrestFactor.rawValue:    Defaults.micCrestFactor,
+        Key.micRiseRate.rawValue:       Defaults.micRiseRate,
+        Key.micConfirmations.rawValue:  Defaults.micConfirmations,
+        Key.micWarmupSamples.rawValue:  Defaults.micWarmup,
         // Headphone motion detection
-        Key.hpSpikeThreshold.rawValue:  0.10,
-        Key.hpCrestFactor.rawValue:     1.5,
-        Key.hpRiseRate.rawValue:        0.05,
-        Key.hpConfirmations.rawValue:   2,
-        Key.hpWarmupSamples.rawValue:   50,
+        Key.hpSpikeThreshold.rawValue:  Defaults.hpSpikeThreshold,
+        Key.hpCrestFactor.rawValue:     Defaults.hpCrestFactor,
+        Key.hpRiseRate.rawValue:        Defaults.hpRiseRate,
+        Key.hpConfirmations.rawValue:   Defaults.hpConfirmations,
+        Key.hpWarmupSamples.rawValue:   Defaults.hpWarmup,
     ]
 
     // MARK: - Reactivity (inverted sensitivity: higher value = lower force threshold)
@@ -73,7 +73,7 @@ public final class SettingsStore {
     var sensitivityMin: Double {
         didSet {
             guard sensitivityMin != oldValue else { return }
-            let c = sensitivityMin.clamped(to: 0...1)
+            let c = sensitivityMin.clamped(to: Detection.unitRange)
             if c != sensitivityMin { sensitivityMin = c; return }
             persist(sensitivityMin, .sensitivityMin)
             if sensitivityMin > sensitivityMax { sensitivityMax = sensitivityMin }
@@ -83,7 +83,7 @@ public final class SettingsStore {
     var sensitivityMax: Double {
         didSet {
             guard sensitivityMax != oldValue else { return }
-            let c = sensitivityMax.clamped(to: 0...1)
+            let c = sensitivityMax.clamped(to: Detection.unitRange)
             if c != sensitivityMax { sensitivityMax = c; return }
             persist(sensitivityMax, .sensitivityMax)
             if sensitivityMax < sensitivityMin { sensitivityMin = sensitivityMax }
@@ -96,7 +96,7 @@ public final class SettingsStore {
     var accelBandpassLowHz: Double {
         didSet {
             guard accelBandpassLowHz != oldValue else { return }
-            let c = accelBandpassLowHz.clamped(to: 10...25)
+            let c = accelBandpassLowHz.clamped(to: Detection.Accel.bandpassRange)
             if c != accelBandpassLowHz { accelBandpassLowHz = c; return }
             persist(accelBandpassLowHz, .accelBandpassLowHz)
             if accelBandpassLowHz > accelBandpassHighHz { accelBandpassHighHz = accelBandpassLowHz }
@@ -107,7 +107,7 @@ public final class SettingsStore {
     var accelBandpassHighHz: Double {
         didSet {
             guard accelBandpassHighHz != oldValue else { return }
-            let c = accelBandpassHighHz.clamped(to: 10...25)
+            let c = accelBandpassHighHz.clamped(to: Detection.Accel.bandpassRange)
             if c != accelBandpassHighHz { accelBandpassHighHz = c; return }
             persist(accelBandpassHighHz, .accelBandpassHighHz)
             if accelBandpassHighHz < accelBandpassLowHz { accelBandpassLowHz = accelBandpassHighHz }
@@ -119,7 +119,7 @@ public final class SettingsStore {
     var debounce: Double {
         didSet {
             guard debounce != oldValue else { return }
-            let c = debounce.clamped(to: 0...2)
+            let c = debounce.clamped(to: Detection.debounceRange)
             if c != debounce { debounce = c; return }
             persist(debounce, .debounce)
         }
@@ -153,7 +153,7 @@ public final class SettingsStore {
     var flashOpacityMin: Double {
         didSet {
             guard flashOpacityMin != oldValue else { return }
-            let c = flashOpacityMin.clamped(to: 0...1)
+            let c = flashOpacityMin.clamped(to: Detection.unitRange)
             if c != flashOpacityMin { flashOpacityMin = c; return }
             persist(flashOpacityMin, .flashOpacityMin)
             if flashOpacityMin > flashOpacityMax { flashOpacityMax = flashOpacityMin }
@@ -163,7 +163,7 @@ public final class SettingsStore {
     var flashOpacityMax: Double {
         didSet {
             guard flashOpacityMax != oldValue else { return }
-            let c = flashOpacityMax.clamped(to: 0...1)
+            let c = flashOpacityMax.clamped(to: Detection.unitRange)
             if c != flashOpacityMax { flashOpacityMax = c; return }
             persist(flashOpacityMax, .flashOpacityMax)
             if flashOpacityMax < flashOpacityMin { flashOpacityMin = flashOpacityMax }
@@ -175,7 +175,7 @@ public final class SettingsStore {
     var volumeMin: Double {
         didSet {
             guard volumeMin != oldValue else { return }
-            let c = volumeMin.clamped(to: 0...1)
+            let c = volumeMin.clamped(to: Detection.unitRange)
             if c != volumeMin { volumeMin = c; return }
             persist(volumeMin, .volumeMin)
             if volumeMin > volumeMax { volumeMax = volumeMin }
@@ -185,7 +185,7 @@ public final class SettingsStore {
     var volumeMax: Double {
         didSet {
             guard volumeMax != oldValue else { return }
-            let c = volumeMax.clamped(to: 0...1)
+            let c = volumeMax.clamped(to: Detection.unitRange)
             if c != volumeMax { volumeMax = c; return }
             persist(volumeMax, .volumeMax)
             if volumeMax < volumeMin { volumeMin = volumeMax }
@@ -195,7 +195,7 @@ public final class SettingsStore {
     // MARK: - Display + audio device selection
 
     /// CGDirectDisplayID values of enabled displays. Empty = all displays.
-    public var enabledDisplays: [Int] {
+    var enabledDisplays: [Int] {
         didSet {
             guard enabledDisplays != oldValue else { return }
             persist(enabledDisplays, .enabledDisplays)
@@ -203,7 +203,7 @@ public final class SettingsStore {
     }
 
     /// Core Audio device UIDs for audio output. Empty = system default only.
-    public var enabledAudioDevices: [String] {
+    var enabledAudioDevices: [String] {
         didSet {
             guard enabledAudioDevices != oldValue else { return }
             persist(enabledAudioDevices, .enabledAudioDevices)
@@ -211,7 +211,7 @@ public final class SettingsStore {
     }
 
     /// SensorAdapter IDs to enable. Empty = all available adapters.
-    public var enabledSensorIDs: [String] {
+    var enabledSensorIDs: [String] {
         didSet {
             guard enabledSensorIDs != oldValue else { return }
             persist(enabledSensorIDs, .enabledSensorIDs)
@@ -223,7 +223,7 @@ public final class SettingsStore {
     var accelSpikeThreshold: Double {
         didSet {
             guard accelSpikeThreshold != oldValue else { return }
-            let c = accelSpikeThreshold.clamped(to: 0.010...0.040)
+            let c = accelSpikeThreshold.clamped(to: Detection.Accel.spikeThresholdRange)
             if c != accelSpikeThreshold { accelSpikeThreshold = c; return }
             persist(accelSpikeThreshold, .accelSpikeThreshold)
         }
@@ -232,7 +232,7 @@ public final class SettingsStore {
     var accelCrestFactor: Double {
         didSet {
             guard accelCrestFactor != oldValue else { return }
-            let c = accelCrestFactor.clamped(to: 1.0...5.0)
+            let c = accelCrestFactor.clamped(to: Detection.Accel.crestFactorRange)
             if c != accelCrestFactor { accelCrestFactor = c; return }
             persist(accelCrestFactor, .accelCrestFactor)
         }
@@ -241,7 +241,7 @@ public final class SettingsStore {
     var accelRiseRate: Double {
         didSet {
             guard accelRiseRate != oldValue else { return }
-            let c = accelRiseRate.clamped(to: 0.005...0.020)
+            let c = accelRiseRate.clamped(to: Detection.Accel.riseRateRange)
             if c != accelRiseRate { accelRiseRate = c; return }
             persist(accelRiseRate, .accelRiseRate)
         }
@@ -250,7 +250,7 @@ public final class SettingsStore {
     var accelConfirmations: Int {
         didSet {
             guard accelConfirmations != oldValue else { return }
-            let c = max(1, min(5, accelConfirmations))
+            let c = accelConfirmations.clamped(to: Detection.Accel.confirmationsRange)
             if c != accelConfirmations { accelConfirmations = c; return }
             persist(accelConfirmations, .accelConfirmations)
         }
@@ -259,7 +259,7 @@ public final class SettingsStore {
     var accelWarmupSamples: Int {
         didSet {
             guard accelWarmupSamples != oldValue else { return }
-            let c = max(10, min(100, accelWarmupSamples))
+            let c = accelWarmupSamples.clamped(to: Detection.Accel.warmupRange)
             if c != accelWarmupSamples { accelWarmupSamples = c; return }
             persist(accelWarmupSamples, .accelWarmupSamples)
         }
@@ -269,7 +269,7 @@ public final class SettingsStore {
     var accelReportInterval: Double {
         didSet {
             guard accelReportInterval != oldValue else { return }
-            let c = accelReportInterval.clamped(to: 5000...50000)
+            let c = accelReportInterval.clamped(to: Detection.Accel.reportIntervalRange)
             if c != accelReportInterval { accelReportInterval = c; return }
             persist(accelReportInterval, .accelReportInterval)
         }
@@ -279,7 +279,7 @@ public final class SettingsStore {
     var consensusRequired: Int {
         didSet {
             guard consensusRequired != oldValue else { return }
-            let c = max(1, min(10, consensusRequired))
+            let c = consensusRequired.clamped(to: Detection.consensusRange)
             if c != consensusRequired { consensusRequired = c; return }
             persist(consensusRequired, .consensusRequired)
         }
@@ -290,7 +290,7 @@ public final class SettingsStore {
     var micSpikeThreshold: Double {
         didSet {
             guard micSpikeThreshold != oldValue else { return }
-            let c = micSpikeThreshold.clamped(to: 0.005...0.100)
+            let c = micSpikeThreshold.clamped(to: Detection.Mic.spikeThresholdRange)
             if c != micSpikeThreshold { micSpikeThreshold = c; return }
             persist(micSpikeThreshold, .micSpikeThreshold)
         }
@@ -299,7 +299,7 @@ public final class SettingsStore {
     var micCrestFactor: Double {
         didSet {
             guard micCrestFactor != oldValue else { return }
-            let c = micCrestFactor.clamped(to: 1.0...5.0)
+            let c = micCrestFactor.clamped(to: Detection.Mic.crestFactorRange)
             if c != micCrestFactor { micCrestFactor = c; return }
             persist(micCrestFactor, .micCrestFactor)
         }
@@ -308,7 +308,7 @@ public final class SettingsStore {
     var micRiseRate: Double {
         didSet {
             guard micRiseRate != oldValue else { return }
-            let c = micRiseRate.clamped(to: 0.002...0.050)
+            let c = micRiseRate.clamped(to: Detection.Mic.riseRateRange)
             if c != micRiseRate { micRiseRate = c; return }
             persist(micRiseRate, .micRiseRate)
         }
@@ -317,7 +317,7 @@ public final class SettingsStore {
     var micConfirmations: Int {
         didSet {
             guard micConfirmations != oldValue else { return }
-            let c = max(1, min(5, micConfirmations))
+            let c = micConfirmations.clamped(to: Detection.Mic.confirmationsRange)
             if c != micConfirmations { micConfirmations = c; return }
             persist(micConfirmations, .micConfirmations)
         }
@@ -326,7 +326,7 @@ public final class SettingsStore {
     var micWarmupSamples: Int {
         didSet {
             guard micWarmupSamples != oldValue else { return }
-            let c = max(10, min(100, micWarmupSamples))
+            let c = micWarmupSamples.clamped(to: Detection.Mic.warmupRange)
             if c != micWarmupSamples { micWarmupSamples = c; return }
             persist(micWarmupSamples, .micWarmupSamples)
         }
@@ -337,7 +337,7 @@ public final class SettingsStore {
     var hpSpikeThreshold: Double {
         didSet {
             guard hpSpikeThreshold != oldValue else { return }
-            let c = hpSpikeThreshold.clamped(to: 0.02...0.50)
+            let c = hpSpikeThreshold.clamped(to: Detection.Headphone.spikeThresholdRange)
             if c != hpSpikeThreshold { hpSpikeThreshold = c; return }
             persist(hpSpikeThreshold, .hpSpikeThreshold)
         }
@@ -346,7 +346,7 @@ public final class SettingsStore {
     var hpCrestFactor: Double {
         didSet {
             guard hpCrestFactor != oldValue else { return }
-            let c = hpCrestFactor.clamped(to: 1.0...5.0)
+            let c = hpCrestFactor.clamped(to: Detection.Headphone.crestFactorRange)
             if c != hpCrestFactor { hpCrestFactor = c; return }
             persist(hpCrestFactor, .hpCrestFactor)
         }
@@ -355,7 +355,7 @@ public final class SettingsStore {
     var hpRiseRate: Double {
         didSet {
             guard hpRiseRate != oldValue else { return }
-            let c = hpRiseRate.clamped(to: 0.010...0.200)
+            let c = hpRiseRate.clamped(to: Detection.Headphone.riseRateRange)
             if c != hpRiseRate { hpRiseRate = c; return }
             persist(hpRiseRate, .hpRiseRate)
         }
@@ -364,7 +364,7 @@ public final class SettingsStore {
     var hpConfirmations: Int {
         didSet {
             guard hpConfirmations != oldValue else { return }
-            let c = max(1, min(5, hpConfirmations))
+            let c = hpConfirmations.clamped(to: Detection.Headphone.confirmationsRange)
             if c != hpConfirmations { hpConfirmations = c; return }
             persist(hpConfirmations, .hpConfirmations)
         }
@@ -373,7 +373,7 @@ public final class SettingsStore {
     var hpWarmupSamples: Int {
         didSet {
             guard hpWarmupSamples != oldValue else { return }
-            let c = max(10, min(100, hpWarmupSamples))
+            let c = hpWarmupSamples.clamped(to: Detection.Headphone.warmupRange)
             if c != hpWarmupSamples { hpWarmupSamples = c; return }
             persist(hpWarmupSamples, .hpWarmupSamples)
         }
@@ -381,7 +381,7 @@ public final class SettingsStore {
 
     // MARK: - Init
 
-    public init() {
+    init() {
         let d = UserDefaults.standard
         d.register(defaults: Self.defaults)
 
