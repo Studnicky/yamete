@@ -20,62 +20,64 @@ These must be resolved before submission. No exceptions.
 
 The accelerometer adapter uses IOKit public APIs for both activation and reading:
 
-- **Activation**: `IOHIDEventSystemClientCreate` + `IOHIDServiceClientSetProperty("ReportInterval")`
+- **Activation**: `IOHIDEventSystemClientCreateSimpleClient` + `IOHIDServiceClientSetProperty("ReportInterval")`
 - **Reading**: `IOHIDManager` + `IOHIDDeviceRegisterInputReportCallback`
 
 Service-level functions (`IOHIDServiceClientSetProperty`, `CopyProperty`, `ConformsTo`,
 `GetRegistryID`) are declared in Apple's public SDK header `IOHIDServiceClient.h`.
-System client functions (`IOHIDEventSystemClientCreate`, `CopyServices`, `Activate`,
-`SetMatching`) are exported from IOKit.framework and declared via a C bridging header
-at `Sources/IOHIDPublic/include/IOHIDPublic.h`.
+The app bridges Apple's public `IOHIDEventSystemClient.h` and `IOHIDServiceClient.h`
+headers via `Sources/IOHIDPublic/include/IOHIDPublic.h`.
 
 No `@_silgen_name` bindings. No `#if !APP_STORE` guards. One adapter, one build.
 Verified: works under App Sandbox with `device.usb` entitlement. 100Hz data on Apple Silicon.
 
 #### Files
-- [x] `Sources/IOHIDPublic/include/IOHIDPublic.h` — C bridging header (public SDK includes + extern declarations)
+- [x] `Sources/IOHIDPublic/include/IOHIDPublic.h` — C bridging header for public SDK headers
 - [x] `Sources/SensorKit/AccelerometerReader.swift` — single accelerometer adapter using public API
 - [x] `Sources/YameteApp/ImpactController.swift` — adapter list: Accelerometer, Microphone, Headphone Motion
 - [x] `Package.swift` — IOHIDPublic C target, SensorKit depends on it
 - [x] `Makefile` — includes IOHIDPublic headers
-- [x] Verified: `make lint` passes, `swift test` passes (37/37), `make build` succeeds (4.7M)
+- [x] Verified: the public-header accelerometer path type-checks cleanly, and both the generated Xcode project and direct bundle build succeed in an unsandboxed environment
 
 ---
 
 ### BLOCKER-2: Build Pipeline — Xcode Project & Signing
 
-**Status**: Must address
-**Risk**: Cannot submit to App Store without proper archive/signing
+**Status**: RESOLVED IN REPO
+**Risk**: Remaining manual work is signing/provisioning only
 
-The current build uses `swiftc` via Makefile with ad-hoc signing (`SIGNING_ID ?= -`).
-App Store submission requires Xcode archive with provisioning profiles.
+The repo now has one app layout shared by both distribution paths:
+
+- `App/Config/Info.plist` is the single source of truth for app metadata
+- `App/Resources/` is the single source of truth for privacy manifest, localizations, sounds, faces, and icons
+- `project.yml` defines the Xcode target with explicit resources and no post-build copy script
+- `Makefile` builds the direct-download app from the same `App/` tree
 
 **Implementation**:
-- [ ] Create Xcode project wrapping the existing SPM package
-  - File > New > Project > macOS App (SwiftUI lifecycle)
-  - Add local SPM package dependency pointing to `Package.swift`
-  - Set `YameteApp.swift` as app entry point (currently excluded from SPM target)
-  - Configure signing: Team, Bundle ID `com.studnicky.yamete`, Provisioning Profile
-- [ ] Or generate project with `swift package generate-xcodeproj` (deprecated) / `xcodegen`
-- [ ] Register App ID `com.studnicky.yamete` in Apple Developer portal
-- [ ] Create Mac App Store provisioning profile
-- [ ] Configure Xcode project settings:
-  - [ ] Deployment target: macOS 14.0
-  - [ ] Architectures: arm64 only
-  - [ ] Signing: Automatic or manual with App Store distribution profile
-  - [ ] Entitlements: point to `Yamete.entitlements`
-  - [ ] Info.plist: point to `Bundle/Contents/Info.plist` (or merge values)
-  - [ ] Copy bundle resources: sounds/, faces/, menubar_icon.png, AppIcon.icns, PrivacyInfo.xcprivacy
-  - [ ] Build settings: include `Sources/IOHIDPublic/include` in header search paths
+- [x] Generate the Xcode project from `project.yml` via `xcodegen`
+- [x] Keep `YameteApp.swift` as the app entry point while leaving the shared modules in SwiftPM
+- [x] Point the app target to `App/Config/AppStore.entitlements`
+- [x] Point the app target to `App/Config/Info.plist`
+- [x] Add `App/Resources` as target-owned resources, including:
+  - [x] `Assets.xcassets/AppIcon.appiconset`
+  - [x] `PrivacyInfo.xcprivacy`
+  - [x] `*.lproj`
+  - [x] `sounds/`
+  - [x] `faces/`
+- [x] Keep `Sources/IOHIDPublic/include` in the target header search paths
+- [x] Split Xcode release configs into `ReleaseAppStore` and `ReleaseDirect`
+- [x] Keep the Makefile working for direct distribution from the same app layout
+- [ ] Set `DEVELOPMENT_TEAM` in Xcode / `project.yml`
+- [ ] Archive with the `Yamete-AppStore` scheme
 - [ ] Verify archive builds and validates in Xcode Organizer
 - [ ] Test Transporter upload to App Store Connect (can upload without publishing)
-- [ ] Keep Makefile working for direct-distribution builds (non-App Store)
 
 **Preserve dual build paths**:
 ```
 make build              # Direct distribution (full sensors, ad-hoc sign)
 make release            # Direct distribution (full sensors, Developer ID sign)
 make notarize           # Direct distribution (notarized DMG)
+open Yamete.xcodeproj   # App Store project generated from project.yml
 xcodebuild archive ...  # App Store (no SPU, App Store signing)
 ```
 
@@ -145,7 +147,7 @@ language settings. This is the standard, expected approach for Mac App Store app
 
 **Bundle structure**:
 ```
-Bundle/Contents/Resources/
+App/Resources/
   en.lproj/
     Localizable.strings        # Base English translations
     InfoPlist.strings           # Info.plist display strings
@@ -254,7 +256,7 @@ Already wrapped in `NSLocalizedString`. Verify `.strings` files provide translat
 |-----|---------------|-------|
 | `icon_fallback` | `(≧▽≦)` | Kaomoji fallback — keep universal, do not translate |
 
-**File: `Bundle/Contents/Info.plist`** (2 strings — via `InfoPlist.strings`)
+**File: `App/Config/Info.plist`** (2 strings — via `InfoPlist.strings`)
 
 | Key | English Value | Notes |
 |-----|---------------|-------|

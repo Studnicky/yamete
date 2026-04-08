@@ -1,38 +1,45 @@
 # Yamete — Build Pipeline
 #
 # Source layout mirrors the final .app bundle:
-#   Bundle/Contents/Info.plist          → Yamete.app/Contents/Info.plist
-#   Bundle/Contents/Resources/*         → Yamete.app/Contents/Resources/*
+#   App/Config/Info.plist               → Yamete.app/Contents/Info.plist
+#   App/Config/PkgInfo                  → Yamete.app/Contents/PkgInfo
+#   App/Resources/*                     → Yamete.app/Contents/Resources/*
 #   Sources/**/*.swift                  → compiled into Contents/MacOS/yamete
 #
 # Build stages:
 #   1. compile    swiftc -O → binary
 #   2. minify     strip symbols, optimize SVGs (if svgo installed)
-#   3. bundle     copy Bundle/ mirror + binary → dist/Yamete.app
+#   3. bundle     copy App/ layout + binary → dist/Yamete.app
 #   4. sign       codesign with entitlements + hardened runtime
 #   5. verify     validate structure, signature, asset counts
 
 APP       := Yamete
+EXECUTABLE := yamete
 BUNDLE_ID := com.studnicky.yamete
+DEVELOPMENT_LANGUAGE := en
+MARKETING_VERSION := $(shell sed -n 's/^[[:space:]]*MARKETING_VERSION: "\([^"]*\)"/\1/p' project.yml | head -n 1)
+CURRENT_PROJECT_VERSION := $(shell sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION: "\([^"]*\)"/\1/p' project.yml | head -n 1)
 DIST      := dist
 BUILD     := .build-stage
 TARGET    := $(DIST)/$(APP).app
-BINARY    := $(TARGET)/Contents/MacOS/yamete
+BINARY    := $(TARGET)/Contents/MacOS/$(EXECUTABLE)
 RES_DIR   := $(TARGET)/Contents/Resources
 
-# Source of truth for bundle contents
-BUNDLE_SRC := Bundle/Contents
+APP_LAYOUT   := App
+CONFIG_DIR   := $(APP_LAYOUT)/Config
+RESOURCE_SRC := $(APP_LAYOUT)/Resources
+INFO_PLIST   := $(CONFIG_DIR)/Info.plist
+PKGINFO      := $(CONFIG_DIR)/PkgInfo
 
 SOURCES := $(shell find Sources -name '*.swift' | sort)
-BUNDLE_RESOURCES := $(shell find $(BUNDLE_SRC)/Resources -type f 2>/dev/null)
-LPROJ_DIRS := $(wildcard $(BUNDLE_SRC)/Resources/*.lproj)
+BUNDLE_RESOURCES := $(shell find $(RESOURCE_SRC) -type f 2>/dev/null)
 
 FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio CoreMotion ServiceManagement
 SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as-library \
               $(addprefix -framework ,$(FRAMEWORKS)) \
               -I Sources/IOHIDPublic/include
 
-ENTITLE   := Yamete.entitlements
+ENTITLE   := $(CONFIG_DIR)/Direct.entitlements
 SIGNING_ID ?= -
 
 .PHONY: all build test install uninstall clean dmg lint verify release notarize
@@ -51,8 +58,9 @@ $(BUILD)/.minified: $(BUILD)/yamete $(BUNDLE_RESOURCES)
 	@strip -x $(BUILD)/yamete -o $(BUILD)/yamete.stripped
 	@mv $(BUILD)/yamete.stripped $(BUILD)/yamete
 	@# Copy resources (preserving subdirectory structure)
+	@rm -rf $(BUILD)/resources
 	@mkdir -p $(BUILD)/resources
-	@cp -R $(BUNDLE_SRC)/Resources/ $(BUILD)/resources/
+	@rsync -a --exclude '*.xcassets' $(RESOURCE_SRC)/ $(BUILD)/resources/
 	@# SVG minification (if svgo installed)
 	@which svgo > /dev/null 2>&1 && { \
 		printf "  minify    SVGs\n"; \
@@ -62,15 +70,18 @@ $(BUILD)/.minified: $(BUILD)/yamete $(BUNDLE_RESOURCES)
 
 # ── Stage 3: Bundle ───────────────────────────────────────────
 build: $(BUILD)/yamete $(BUILD)/.minified
+	@rm -rf $(TARGET)
 	@mkdir -p $(TARGET)/Contents/MacOS $(RES_DIR)
 	@cp $(BUILD)/yamete $(BINARY)
-	@cp $(BUNDLE_SRC)/Info.plist $(TARGET)/Contents/
-	@cp $(BUNDLE_SRC)/PkgInfo $(TARGET)/Contents/
-	@cp -R $(BUILD)/resources/ $(RES_DIR)/
-	@# ── Localizations ──
-	@for lproj in $(LPROJ_DIRS); do \
-		cp -R "$$lproj" $(RES_DIR)/; \
-	done
+	@cp $(INFO_PLIST) $(TARGET)/Contents/Info.plist
+	@cp $(PKGINFO) $(TARGET)/Contents/PkgInfo
+	@plutil -replace CFBundleDevelopmentRegion -string "$(DEVELOPMENT_LANGUAGE)" $(TARGET)/Contents/Info.plist
+	@plutil -replace CFBundleExecutable -string "$(EXECUTABLE)" $(TARGET)/Contents/Info.plist
+	@plutil -replace CFBundleIdentifier -string "$(BUNDLE_ID)" $(TARGET)/Contents/Info.plist
+	@plutil -replace CFBundleName -string "$(APP)" $(TARGET)/Contents/Info.plist
+	@plutil -replace CFBundleShortVersionString -string "$(MARKETING_VERSION)" $(TARGET)/Contents/Info.plist
+	@plutil -replace CFBundleVersion -string "$(CURRENT_PROJECT_VERSION)" $(TARGET)/Contents/Info.plist
+	@cp -R $(BUILD)/resources/. $(RES_DIR)/
 	@LCOUNT=$$(find $(RES_DIR) -maxdepth 1 -name '*.lproj' -type d | wc -l | tr -d ' '); \
 	 printf "  l10n      $$LCOUNT locales\n"
 	@# ── Stage 4: Sign ──

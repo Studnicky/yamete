@@ -88,7 +88,7 @@ All settings are in the menu bar dropdown. Main controls use range sliders where
 
 ## Distribution
 
-Yamete runs under App Sandbox with the `device.usb` entitlement for accelerometer access via IOKit public APIs. Sensor activation uses `IOHIDEventSystemClientCreate` + `IOHIDServiceClientSetProperty` to set the SPU report interval. Report reading uses `IOHIDManager` with input report callbacks.
+Yamete runs under App Sandbox with the `device.usb` entitlement for accelerometer access via IOKit public APIs. Sensor activation uses `IOHIDEventSystemClientCreateSimpleClient` + `IOHIDServiceClientSetProperty` to set the SPU report interval. Report reading uses `IOHIDManager` with input report callbacks.
 
 ## Project structure
 
@@ -125,9 +125,16 @@ Sources/
       Theme.swift             Color palette, AccordionCard, SettingHeader
       RangeSlider.swift       Dual-thumb range slider component
 
-Bundle/Contents/Resources/
-  faces/                      Face images (any SVG/PNG/JPG, loaded recursively)
-  sounds/                     Sound clips (any MP3/WAV/M4A, sorted by duration at startup)
+App/
+  Config/
+    Info.plist                Shared app metadata for Xcode and direct builds
+    AppStore.entitlements     Mac App Store signing entitlements
+    Direct.entitlements       Direct-distribution signing entitlements
+
+  Resources/
+    Assets.xcassets/          App Store app icon catalog
+    faces/                    Face images (any SVG/PNG/JPG, loaded recursively)
+    sounds/                   Sound clips (any MP3/WAV/M4A, sorted by duration at startup)
 
 Tests/                        37 tests (unit, integration, E2E)
 ```

@@ -609,6 +609,9 @@ private struct DeviceSection: View {
 // MARK: - Footer
 
 private struct FooterSection: View {
+    private static let privacyPolicyURL = URL(string: "https://studnicky.github.io/yamete/privacy.html")!
+    private static let supportURL = URL(string: "https://studnicky.github.io/yamete/support.html")!
+
     @Environment(ImpactController.self) var controller
     @Environment(SettingsStore.self) var settings
     @Environment(Updater.self) var updater
@@ -650,6 +653,31 @@ private struct FooterSection: View {
             .padding(Theme.footerPadding)
 
             HStack(spacing: 5) {
+                Image(systemName: "link")
+                    .themeFooterIcon()
+                Text(verbatim: "Links")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(action: { open(Self.privacyPolicyURL) }) {
+                    Text(verbatim: "Privacy")
+                        .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
+                }
+                .buttonStyle(.plain)
+                .help("Open Privacy Policy")
+                .accessibilityLabel(Text(verbatim: "Open Privacy Policy"))
+
+                Button(action: { open(Self.supportURL) }) {
+                    Text(verbatim: "Support")
+                        .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
+                }
+                .buttonStyle(.plain)
+                .help("Open Support")
+                .accessibilityLabel(Text(verbatim: "Open Support"))
+            }
+            .font(.caption)
+            .padding(Theme.footerPadding)
+
+            HStack(spacing: 5) {
                 Image(systemName: "info.circle")
                     .themeFooterIcon()
                 Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
@@ -680,5 +708,9 @@ private struct FooterSection: View {
         } message: {
             Text(NSLocalizedString("reset_confirm_message", comment: "Reset confirmation dialog message"))
         }
+    }
+
+    private func open(_ url: URL) {
+        NSWorkspace.shared.open(url)
     }
 }

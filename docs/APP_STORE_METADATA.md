@@ -98,7 +98,7 @@ What the app does:
 Why USB entitlement is needed:
   The com.apple.security.device.usb entitlement enables IOHIDManager access to
   read the built-in BMI286 accelerometer via public IOKit APIs. The app uses
-  IOHIDEventSystemClientCreate and IOHIDServiceClientSetProperty (public SDK
+  IOHIDEventSystemClientCreateSimpleClient and IOHIDServiceClientSetProperty (public SDK
   headers) to activate the sensor, and IOHIDManager with
   IOHIDDeviceRegisterInputReportCallback to read motion data. No private APIs
   are used. The accelerometer detects physical impacts on the device.
