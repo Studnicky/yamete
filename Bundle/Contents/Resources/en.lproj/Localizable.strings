@@ -159,6 +159,28 @@
 /* No audio output devices found message */
 "no_output_devices" = "No output devices found";
 
+/* Microphone Tuning Section */
+
+/* Microphone tuning section header */
+"section_mic_tuning" = "Microphone Tuning";
+
+/* Mic spike threshold help text */
+"help_mic_spike_threshold" = "Minimum HP-filtered audio amplitude to consider as impact. Higher values require louder desk sounds.";
+
+/* Mic rise rate help text */
+"help_mic_rise_rate" = "Minimum amplitude increase between audio buffers. Sharp transients rise fast. Gradual ambient changes rise slowly.";
+
+/* Headphone Tuning Section */
+
+/* Headphone tuning section header */
+"section_hp_tuning" = "Headphone Tuning";
+
+/* Headphone spike threshold help text */
+"help_hp_spike_threshold" = "Minimum userAcceleration magnitude (g-force) to consider as impact. Normal head movement is below 0.05g.";
+
+/* Headphone rise rate help text */
+"help_hp_rise_rate" = "Minimum magnitude increase between motion samples. Sharp head jolts rise fast. Gradual movement rises slowly.";
+
 /* Footer Section */
 
 /* Launch at login toggle label */

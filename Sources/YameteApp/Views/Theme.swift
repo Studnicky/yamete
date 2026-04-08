@@ -96,11 +96,14 @@ struct SettingHeader: View {
             if showHelp {
                 Theme.deepRose.opacity(0.3)
                     .frame(height: 1)
-                    .padding(.leading, 19).padding(.top, 2)
+                    .padding(.leading, 19).padding(.top, 4)
                 Text(help)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 19).padding(.vertical, 4)
+                Theme.deepRose.opacity(0.3)
+                    .frame(height: 1)
                     .padding(.leading, 19).padding(.bottom, 4)
             }
         }

@@ -30,7 +30,9 @@ public final class MicrophoneAdapter: SensorAdapter, @unchecked Sendable {
 
     /// Microphone detection config: thresholds in HP-filtered PCM amplitude units.
     /// Floor: quiet ambient (~0.005). Ceiling: firm desk slap (~0.300).
-    private let detectorConfig = ImpactDetectorConfig(
+    public let detectorConfig: ImpactDetectorConfig
+
+    public init(detectorConfig: ImpactDetectorConfig = ImpactDetectorConfig(
         spikeThreshold: 0.02,
         minRiseRate: 0.01,
         minCrestFactor: 1.5,
@@ -38,9 +40,9 @@ public final class MicrophoneAdapter: SensorAdapter, @unchecked Sendable {
         warmupSamples: 50,
         intensityFloor: 0.005,
         intensityCeiling: 0.300
-    )
-
-    public init() {}
+    )) {
+        self.detectorConfig = detectorConfig
+    }
 
     public var isAvailable: Bool {
         AVCaptureDevice.default(for: .audio) != nil

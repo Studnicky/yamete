@@ -126,14 +126,24 @@ public final class ImpactController {
                         _ = self.settings.soundEnabled
                         _ = self.settings.screenFlash
                         _ = self.settings.debugLogging
-                        _ = self.settings.spikeThreshold
-                        _ = self.settings.riseRate
-                        _ = self.settings.crestFactor
-                        _ = self.settings.confirmations
-                        _ = self.settings.warmupSamples
-                        _ = self.settings.bandpassLowHz
-                        _ = self.settings.bandpassHighHz
-                        _ = self.settings.reportInterval
+                        _ = self.settings.accelSpikeThreshold
+                        _ = self.settings.accelRiseRate
+                        _ = self.settings.accelCrestFactor
+                        _ = self.settings.accelConfirmations
+                        _ = self.settings.accelWarmupSamples
+                        _ = self.settings.accelBandpassLowHz
+                        _ = self.settings.accelBandpassHighHz
+                        _ = self.settings.accelReportInterval
+                        _ = self.settings.micSpikeThreshold
+                        _ = self.settings.micRiseRate
+                        _ = self.settings.micCrestFactor
+                        _ = self.settings.micConfirmations
+                        _ = self.settings.micWarmupSamples
+                        _ = self.settings.hpSpikeThreshold
+                        _ = self.settings.hpRiseRate
+                        _ = self.settings.hpCrestFactor
+                        _ = self.settings.hpConfirmations
+                        _ = self.settings.hpWarmupSamples
                         _ = self.settings.enabledSensorIDs
                     } onChange: {
                         continuation.resume(returning: true)
@@ -203,15 +213,34 @@ public final class ImpactController {
     /// Adapters are immutable after creation — config is baked in at init.
     private func buildAdapters() -> [any SensorAdapter] {
         let enabled = Set(settings.enabledSensorIDs)
-        let interval = Int(settings.reportInterval)
-        let bpLow = Float(settings.bandpassLowHz)
-        let bpHigh = Float(settings.bandpassHighHz)
+        let interval = Int(settings.accelReportInterval)
+        let bpLow = Float(settings.accelBandpassLowHz)
+        let bpHigh = Float(settings.accelBandpassHighHz)
         let accelConfig = defaultAccelDetectorConfig(
-            spikeThreshold: Float(settings.spikeThreshold),
-            riseRate: Float(settings.riseRate),
-            crestFactor: Float(settings.crestFactor),
-            confirmations: settings.confirmations,
-            warmupSamples: settings.warmupSamples
+            spikeThreshold: Float(settings.accelSpikeThreshold),
+            riseRate: Float(settings.accelRiseRate),
+            crestFactor: Float(settings.accelCrestFactor),
+            confirmations: settings.accelConfirmations,
+            warmupSamples: settings.accelWarmupSamples
+        )
+
+        let micConfig = ImpactDetectorConfig(
+            spikeThreshold: Float(settings.micSpikeThreshold),
+            minRiseRate: Float(settings.micRiseRate),
+            minCrestFactor: Float(settings.micCrestFactor),
+            minConfirmations: settings.micConfirmations,
+            warmupSamples: settings.micWarmupSamples,
+            intensityFloor: 0.005,
+            intensityCeiling: 0.300
+        )
+        let hpConfig = ImpactDetectorConfig(
+            spikeThreshold: Float(settings.hpSpikeThreshold),
+            minRiseRate: Float(settings.hpRiseRate),
+            minCrestFactor: Float(settings.hpCrestFactor),
+            minConfirmations: settings.hpConfirmations,
+            warmupSamples: settings.hpWarmupSamples,
+            intensityFloor: 0.05,
+            intensityCeiling: 2.0
         )
 
         var adapters: [any SensorAdapter] = []
@@ -222,6 +251,10 @@ public final class ImpactController {
                 adapters.append(SPUAccelerometerAdapter(
                     reportIntervalUS: interval, bandpassLowHz: bpLow,
                     bandpassHighHz: bpHigh, detectorConfig: accelConfig))
+            case "microphone":
+                adapters.append(MicrophoneAdapter(detectorConfig: micConfig))
+            case "headphone-motion":
+                adapters.append(HeadphoneMotionAdapter(detectorConfig: hpConfig))
             default:
                 adapters.append(template)
             }

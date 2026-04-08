@@ -29,7 +29,9 @@ public final class HeadphoneMotionAdapter: SensorAdapter, @unchecked Sendable {
 
     /// Headphone detection config: thresholds in g-force (userAcceleration).
     /// Floor: 0.05g (normal head movement). Ceiling: 2.0g (sharp jolt).
-    private let detectorConfig = ImpactDetectorConfig(
+    public let detectorConfig: ImpactDetectorConfig
+
+    public init(detectorConfig: ImpactDetectorConfig = ImpactDetectorConfig(
         spikeThreshold: 0.10,
         minRiseRate: 0.05,
         minCrestFactor: 1.5,
@@ -37,9 +39,9 @@ public final class HeadphoneMotionAdapter: SensorAdapter, @unchecked Sendable {
         warmupSamples: 50,
         intensityFloor: 0.05,
         intensityCeiling: 2.0
-    )
-
-    public init() {}
+    )) {
+        self.detectorConfig = detectorConfig
+    }
 
     public var isAvailable: Bool { manager.isDeviceMotionAvailable }
 
