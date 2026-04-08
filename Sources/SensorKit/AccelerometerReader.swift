@@ -16,7 +16,7 @@ import os
 //   PrimaryUsagePage = 0xFF00, PrimaryUsage = 3, Transport = "SPU"
 //
 // Activation (IOHIDEventSystemClient API):
-//   IOHIDEventSystemClientCreateSimpleClient → create event system client
+//   IOHIDEventSystemClientCreate → create event system client
 //   IOHIDEventSystemClientCopyServices       → enumerate HID services
 //   IOHIDServiceClientConformsTo             → identify the accelerometer service
 //   IOHIDServiceClientSetProperty            → set ReportInterval on SPU service
@@ -56,7 +56,7 @@ private let rawScale = AccelHardwareConstants.rawScale
 
 /// Reads BMI286 accelerometer via IOKit public APIs and streams impact events.
 ///
-/// Activation: IOHIDEventSystemClientCreateSimpleClient → IOHIDServiceClientSetProperty("ReportInterval")
+/// Activation: IOHIDEventSystemClientCreate → IOHIDServiceClientSetProperty("ReportInterval")
 /// Reading: IOHIDManager → IOHIDDeviceRegisterInputReportCallback → bandpass → ImpactDetector
 public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
 
@@ -82,7 +82,10 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
         let intervalUS = reportIntervalUS
 
-        let svcClient = IOHIDEventSystemClientCreateSimpleClient(kCFAllocatorDefault)
+        guard let svcClient = IOHIDEventSystemClientCreate(kCFAllocatorDefault)?.takeRetainedValue() else {
+            continuation.finish(throwing: SensorError.deviceNotFound)
+            return stream
+        }
 
         guard let services = IOHIDEventSystemClientCopyServices(svcClient) else {
             continuation.finish(throwing: SensorError.deviceNotFound)

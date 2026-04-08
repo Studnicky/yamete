@@ -333,39 +333,29 @@ private struct SettingRow<Content: View>: View {
 
 // MARK: - Shared detection gate parameters (crest factor, confirmations, warmup)
 
-private struct DetectionGatesView: View {
-    @Binding var crestFactor: Double
-    @Binding var confirmations: Int
-    @Binding var warmupSamples: Int
-    let crestBounds: ClosedRange<Double>
-    let confirmationsBounds: ClosedRange<Int>
-    let warmupBounds: ClosedRange<Int>
-    let labelWidth: CGFloat
-
-    public var body: some View {
-        SettingRow(icon: "chart.line.uptrend.xyaxis",
-                   title: NSLocalizedString("setting_crest_factor", comment: "Crest factor setting title"),
-                   help: NSLocalizedString("help_crest_factor", comment: "Crest factor setting help text")) {
-            SingleSlider(value: $crestFactor, bounds: crestBounds,
-                         labelWidth: labelWidth, format: Fmt.multiplier)
-        }
-
-        Divider()
-
+// Shared setting row builders for parameters common to all sensors.
+private enum GateRows {
+    @ViewBuilder static func confirmations(_ binding: Binding<Int>, bounds: ClosedRange<Int>, lw: CGFloat) -> some View {
         SettingRow(icon: "checkmark.circle",
                    title: NSLocalizedString("setting_confirmations", comment: "Confirmations setting title"),
                    help: NSLocalizedString("help_confirmations", comment: "Confirmations setting help text")) {
-            SingleSliderInt(value: $confirmations, bounds: confirmationsBounds,
-                            labelWidth: labelWidth, format: Fmt.confirmations)
+            SingleSliderInt(value: binding, bounds: bounds, labelWidth: lw, format: Fmt.confirmations)
         }
+    }
 
-        Divider()
+    @ViewBuilder static func crestFactor(_ binding: Binding<Double>, bounds: ClosedRange<Double>, lw: CGFloat) -> some View {
+        SettingRow(icon: "chart.line.uptrend.xyaxis",
+                   title: NSLocalizedString("setting_crest_factor", comment: "Crest factor setting title"),
+                   help: NSLocalizedString("help_crest_factor", comment: "Crest factor setting help text")) {
+            SingleSlider(value: binding, bounds: bounds, labelWidth: lw, format: Fmt.multiplier)
+        }
+    }
 
+    @ViewBuilder static func warmup(_ binding: Binding<Int>, bounds: ClosedRange<Int>, lw: CGFloat) -> some View {
         SettingRow(icon: "flame",
                    title: NSLocalizedString("setting_warmup", comment: "Warmup setting title"),
                    help: NSLocalizedString("help_warmup", comment: "Warmup setting help text")) {
-            SingleSliderInt(value: $warmupSamples, bounds: warmupBounds,
-                            labelWidth: labelWidth, format: Fmt.warmupInt)
+            SingleSliderInt(value: binding, bounds: bounds, labelWidth: lw, format: Fmt.warmupInt)
         }
     }
 }
@@ -382,45 +372,41 @@ private struct AccelTuningSection: View {
 
         AccordionCard(title: NSLocalizedString("section_accel_tuning", comment: "Accelerometer tuning section header"), isExpanded: $isExpanded) {
             VStack(spacing: 10) {
+                // Range sliders first
                 SettingRow(icon: "waveform.path",
                            title: NSLocalizedString("setting_frequency_band", comment: "Frequency band setting title"),
                            help: NSLocalizedString("help_frequency_band", comment: "Frequency band setting help text")) {
                     RangeSlider(low: $s.accelBandpassLowHz, high: $s.accelBandpassHighHz,
                                 bounds: Detection.Accel.bandpassRange, labelWidth: lw, format: Fmt.hz)
                 }
-
                 Divider()
-
-                SettingRow(icon: "arrow.up.to.line",
-                           title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
-                           help: NSLocalizedString("help_spike_threshold", comment: "Spike threshold setting help text")) {
-                    SingleSlider(value: $s.accelSpikeThreshold, bounds: Detection.Accel.spikeThresholdRange,
-                                 labelWidth: lw, format: Fmt.gforce)
-                }
-
+                // Single sliders alphabetical
+                GateRows.confirmations($s.accelConfirmations, bounds: Detection.Accel.confirmationsRange, lw: lw)
                 Divider()
-
-                SettingRow(icon: "bolt",
-                           title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
-                           help: NSLocalizedString("help_rise_rate", comment: "Rise rate setting help text")) {
-                    SingleSlider(value: $s.accelRiseRate, bounds: Detection.Accel.riseRateRange,
-                                 labelWidth: lw, format: Fmt.gforce)
-                }
-
+                GateRows.crestFactor($s.accelCrestFactor, bounds: Detection.Accel.crestFactorRange, lw: lw)
                 Divider()
-
-                DetectionGatesView(crestFactor: $s.accelCrestFactor, confirmations: $s.accelConfirmations,
-                                   warmupSamples: $s.accelWarmupSamples, crestBounds: Detection.Accel.crestFactorRange,
-                                   confirmationsBounds: Detection.Accel.confirmationsRange, warmupBounds: Detection.Accel.warmupRange, labelWidth: lw)
-
-                Divider()
-
                 SettingRow(icon: "clock.arrow.2.circlepath",
                            title: NSLocalizedString("setting_report_interval", comment: "Report interval setting title"),
                            help: NSLocalizedString("help_report_interval", comment: "Report interval setting help text")) {
                     SingleSlider(value: $s.accelReportInterval, bounds: Detection.Accel.reportIntervalRange, step: Detection.Accel.reportIntervalStep,
                                  labelWidth: lw, format: Fmt.ms)
                 }
+                Divider()
+                SettingRow(icon: "bolt",
+                           title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
+                           help: NSLocalizedString("help_rise_rate", comment: "Rise rate setting help text")) {
+                    SingleSlider(value: $s.accelRiseRate, bounds: Detection.Accel.riseRateRange,
+                                 labelWidth: lw, format: Fmt.gforce)
+                }
+                Divider()
+                SettingRow(icon: "arrow.up.to.line",
+                           title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
+                           help: NSLocalizedString("help_spike_threshold", comment: "Spike threshold setting help text")) {
+                    SingleSlider(value: $s.accelSpikeThreshold, bounds: Detection.Accel.spikeThresholdRange,
+                                 labelWidth: lw, format: Fmt.gforce)
+                }
+                Divider()
+                GateRows.warmup($s.accelWarmupSamples, bounds: Detection.Accel.warmupRange, lw: lw)
             }
             .padding(Theme.accordionInner)
         }
@@ -439,27 +425,25 @@ private struct MicTuningSection: View {
 
         AccordionCard(title: NSLocalizedString("section_mic_tuning", comment: "Microphone tuning section header"), isExpanded: $isExpanded) {
             VStack(spacing: 10) {
-                SettingRow(icon: "arrow.up.to.line",
-                           title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
-                           help: NSLocalizedString("help_mic_spike_threshold", comment: "Mic spike threshold help text")) {
-                    SingleSlider(value: $s.micSpikeThreshold, bounds: Detection.Mic.spikeThresholdRange,
-                                 labelWidth: lw, format: Fmt.amplitude)
-                }
-
+                GateRows.confirmations($s.micConfirmations, bounds: Detection.Mic.confirmationsRange, lw: lw)
                 Divider()
-
+                GateRows.crestFactor($s.micCrestFactor, bounds: Detection.Mic.crestFactorRange, lw: lw)
+                Divider()
                 SettingRow(icon: "bolt",
                            title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
                            help: NSLocalizedString("help_mic_rise_rate", comment: "Mic rise rate help text")) {
                     SingleSlider(value: $s.micRiseRate, bounds: Detection.Mic.riseRateRange,
                                  labelWidth: lw, format: Fmt.amplitude)
                 }
-
                 Divider()
-
-                DetectionGatesView(crestFactor: $s.micCrestFactor, confirmations: $s.micConfirmations,
-                                   warmupSamples: $s.micWarmupSamples, crestBounds: Detection.Mic.crestFactorRange,
-                                   confirmationsBounds: Detection.Mic.confirmationsRange, warmupBounds: Detection.Mic.warmupRange, labelWidth: lw)
+                SettingRow(icon: "arrow.up.to.line",
+                           title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
+                           help: NSLocalizedString("help_mic_spike_threshold", comment: "Mic spike threshold help text")) {
+                    SingleSlider(value: $s.micSpikeThreshold, bounds: Detection.Mic.spikeThresholdRange,
+                                 labelWidth: lw, format: Fmt.amplitude)
+                }
+                Divider()
+                GateRows.warmup($s.micWarmupSamples, bounds: Detection.Mic.warmupRange, lw: lw)
             }
             .padding(Theme.accordionInner)
         }
@@ -478,27 +462,25 @@ private struct HeadphoneTuningSection: View {
 
         AccordionCard(title: NSLocalizedString("section_hp_tuning", comment: "Headphone tuning section header"), isExpanded: $isExpanded) {
             VStack(spacing: 10) {
-                SettingRow(icon: "arrow.up.to.line",
-                           title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
-                           help: NSLocalizedString("help_hp_spike_threshold", comment: "Headphone spike threshold help text")) {
-                    SingleSlider(value: $s.hpSpikeThreshold, bounds: Detection.Headphone.spikeThresholdRange,
-                                 labelWidth: lw, format: Fmt.gforce)
-                }
-
+                GateRows.confirmations($s.hpConfirmations, bounds: Detection.Headphone.confirmationsRange, lw: lw)
                 Divider()
-
+                GateRows.crestFactor($s.hpCrestFactor, bounds: Detection.Headphone.crestFactorRange, lw: lw)
+                Divider()
                 SettingRow(icon: "bolt",
                            title: NSLocalizedString("setting_rise_rate", comment: "Rise rate setting title"),
                            help: NSLocalizedString("help_hp_rise_rate", comment: "Headphone rise rate help text")) {
                     SingleSlider(value: $s.hpRiseRate, bounds: Detection.Headphone.riseRateRange,
                                  labelWidth: lw, format: Fmt.gforce)
                 }
-
                 Divider()
-
-                DetectionGatesView(crestFactor: $s.hpCrestFactor, confirmations: $s.hpConfirmations,
-                                   warmupSamples: $s.hpWarmupSamples, crestBounds: Detection.Headphone.crestFactorRange,
-                                   confirmationsBounds: Detection.Headphone.confirmationsRange, warmupBounds: Detection.Headphone.warmupRange, labelWidth: lw)
+                SettingRow(icon: "arrow.up.to.line",
+                           title: NSLocalizedString("setting_spike_threshold", comment: "Spike threshold setting title"),
+                           help: NSLocalizedString("help_hp_spike_threshold", comment: "Headphone spike threshold help text")) {
+                    SingleSlider(value: $s.hpSpikeThreshold, bounds: Detection.Headphone.spikeThresholdRange,
+                                 labelWidth: lw, format: Fmt.gforce)
+                }
+                Divider()
+                GateRows.warmup($s.hpWarmupSamples, bounds: Detection.Headphone.warmupRange, lw: lw)
             }
             .padding(Theme.accordionInner)
         }
