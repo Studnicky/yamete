@@ -6,7 +6,7 @@ import XCTest
 // Validates that localization resources are loadable, keys resolve to non-empty strings,
 // and plural forms via .stringsdict work correctly.
 //
-// The app bundle resources live in Bundle/Contents/Resources/*.lproj.
+// The app bundle resources live in App/Resources/*.lproj.
 // In the test environment, Bundle.main points to the test runner, not the app bundle.
 // These tests load the resources bundle directly from the project layout.
 
@@ -23,12 +23,12 @@ final class LocalizationE2ETests: XCTestCase {
         let candidates = [
             // From repo root (swift test runs from repo root)
             URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-                .appendingPathComponent("Bundle/Contents/Resources"),
+                .appendingPathComponent("App/Resources"),
             // Worktree variant
             URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()  // Tests/
                 .deletingLastPathComponent()  // project root
-                .appendingPathComponent("Bundle/Contents/Resources"),
+                .appendingPathComponent("App/Resources"),
         ]
 
         for candidate in candidates {
@@ -59,7 +59,7 @@ final class LocalizationE2ETests: XCTestCase {
 
     func testResourceBundleDiscoverable() {
         let bundle = resourceBundle()
-        XCTAssertNotNil(bundle, "Should find the app resource bundle at Bundle/Contents/Resources")
+        XCTAssertNotNil(bundle, "Should find the app resource bundle at App/Resources")
     }
 
     func testEnglishLocalizationExists() {

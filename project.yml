@@ -5,11 +5,12 @@ options:
     macOS: "14.0"
   xcodeVersion: "16.4"
   createIntermediateGroups: true
-  defaultConfig: Release
+  defaultConfig: Debug
 
 configs:
   Debug: debug
-  Release: release
+  ReleaseAppStore: release
+  ReleaseDirect: release
 
 settings:
   base:
@@ -17,7 +18,7 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ARCHS: arm64
     PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete
-    MARKETING_VERSION: "0.0.0"
+    MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     ENABLE_HARDENED_RUNTIME: true
     CODE_SIGN_STYLE: Automatic
@@ -33,6 +34,8 @@ targets:
     platform: macOS
     sources:
       - path: Sources/YameteApp/YameteApp.swift
+      - path: App/Resources
+        buildPhase: resources
     dependencies:
       - package: Yamete
         product: YameteApp
@@ -49,31 +52,13 @@ targets:
       - sdk: ServiceManagement.framework
       - sdk: SwiftUI.framework
       - sdk: AppKit.framework
-    info:
-      path: Yamete-Info.plist
-      properties:
-        CFBundleDisplayName: Yamete
-        CFBundleIconFile: AppIcon
-        CFBundleIconName: AppIcon
-        CFBundleIdentifier: com.studnicky.yamete
-        CFBundleName: Yamete
-        CFBundlePackageType: APPL
-        CFBundleShortVersionString: "0.0.0"
-        CFBundleVersion: "1"
-        LSApplicationCategoryType: public.app-category.entertainment
-        LSMinimumSystemVersion: "14.0"
-        LSUIElement: true
-        NSHumanReadableCopyright: "© 2026 Studnicky"
-        NSPrincipalClass: NSApplication
-        NSHighResolutionCapable: true
-        ITSAppUsesNonExemptEncryption: false
-        NSMotionUsageDescription: "Yamete uses the accelerometer to detect physical impacts on your MacBook."
-        NSMicrophoneUsageDescription: "Yamete can use the microphone to detect impact sounds on your desk."
     settings:
       base:
         PRODUCT_NAME: Yamete
         PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete
-        CODE_SIGN_ENTITLEMENTS: Yamete.entitlements
+        INFOPLIST_FILE: App/Config/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: App/Config/AppStore.entitlements
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
         SWIFT_INCLUDE_PATHS: "$(SRCROOT)/Sources/IOHIDPublic/include"
         HEADER_SEARCH_PATHS: "$(SRCROOT)/Sources/IOHIDPublic/include"
@@ -81,16 +66,20 @@ targets:
         Debug:
           SWIFT_OPTIMIZATION_LEVEL: "-Onone"
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
-        Release:
+        ReleaseAppStore:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
           SWIFT_COMPILATION_MODE: wholemodule
           DEAD_CODE_STRIPPING: true
           STRIP_INSTALLED_PRODUCT: true
           STRIP_SWIFT_SYMBOLS: true
-    preBuildScripts: []
-    postBuildScripts: []
-    entitlements:
-      path: Yamete.entitlements
+          CODE_SIGN_ENTITLEMENTS: App/Config/AppStore.entitlements
+        ReleaseDirect:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+          SWIFT_COMPILATION_MODE: wholemodule
+          DEAD_CODE_STRIPPING: true
+          STRIP_INSTALLED_PRODUCT: true
+          STRIP_SWIFT_SYMBOLS: true
+          CODE_SIGN_ENTITLEMENTS: App/Config/Direct.entitlements
 
   YameteTests:
     type: bundle.unit-test
@@ -111,8 +100,43 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete.tests
 
+schemes:
+  Yamete-AppStore:
+    build:
+      targets:
+        Yamete: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - YameteTests
+    profile:
+      config: ReleaseAppStore
+    analyze:
+      config: Debug
+    archive:
+      config: ReleaseAppStore
+
+  Yamete-Direct:
+    build:
+      targets:
+        Yamete: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - YameteTests
+    profile:
+      config: ReleaseDirect
+    analyze:
+      config: Debug
+    archive:
+      config: ReleaseDirect
+
 fileGroups:
-  - Bundle
+  - App
   - Assets
   - docs
   - site

@@ -1,7 +1,7 @@
 #if canImport(YameteCore)
 import YameteCore
 #endif
-import Foundation
+@preconcurrency import Foundation
 import IOKit.hid
 import IOHIDPublic
 import os
@@ -16,10 +16,11 @@ import os
 //   PrimaryUsagePage = 0xFF00, PrimaryUsage = 3, Transport = "SPU"
 //
 // Activation (IOHIDEventSystemClient API):
-//   IOHIDEventSystemClientCreate          → create event system client
-//   IOHIDEventSystemClientCopyServices    → enumerate HID services
-//   IOHIDServiceClientSetProperty         → set ReportInterval on SPU service
-//   IOHIDServiceClientCopyProperty        → read service properties (Transport, etc.)
+//   IOHIDEventSystemClientCreateSimpleClient → create event system client
+//   IOHIDEventSystemClientCopyServices       → enumerate HID services
+//   IOHIDServiceClientConformsTo             → identify the accelerometer service
+//   IOHIDServiceClientSetProperty            → set ReportInterval on SPU service
+//   IOHIDServiceClientCopyProperty           → read service properties (Transport, etc.)
 //
 // Reading (IOHIDManager API):
 //   IOHIDManagerCreate / Open / SetDeviceMatching / CopyDevices
@@ -55,7 +56,7 @@ private let rawScale = AccelHardwareConstants.rawScale
 
 /// Reads BMI286 accelerometer via IOKit public APIs and streams impact events.
 ///
-/// Activation: IOHIDEventSystemClientCreate → IOHIDServiceClientSetProperty("ReportInterval")
+/// Activation: IOHIDEventSystemClientCreateSimpleClient → IOHIDServiceClientSetProperty("ReportInterval")
 /// Reading: IOHIDManager → IOHIDDeviceRegisterInputReportCallback → bandpass → ImpactDetector
 public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
 
@@ -81,13 +82,7 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
         let intervalUS = reportIntervalUS
 
-        guard let svcClientUnmanaged = IOHIDEventSystemClientCreate(kCFAllocatorDefault) else {
-            continuation.finish(throwing: SensorError.deviceNotFound)
-            return stream
-        }
-        let svcClient = svcClientUnmanaged.takeRetainedValue()
-        let svcMatching: [String: Any] = ["PrimaryUsagePage": pageAccel, "PrimaryUsage": usageAccel]
-        IOHIDEventSystemClientSetMatching(svcClient, svcMatching as CFDictionary)
+        let svcClient = IOHIDEventSystemClientCreateSimpleClient(kCFAllocatorDefault)
 
         guard let services = IOHIDEventSystemClientCopyServices(svcClient) else {
             continuation.finish(throwing: SensorError.deviceNotFound)
@@ -100,8 +95,9 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
                 CFArrayGetValueAtIndex(services, i),
                 to: IOHIDServiceClient.self
             )
+            let matchesUsage = IOHIDServiceClientConformsTo(svc, UInt32(pageAccel), UInt32(usageAccel)) != 0
             let transport = IOHIDServiceClientCopyProperty(svc, "Transport" as CFString)
-            if "\(transport ?? ("" as CFString))" == requiredTransport {
+            if matchesUsage && "\(transport ?? ("" as CFString))" == requiredTransport {
                 IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, intervalUS as CFNumber)
                 activated = true
             }
@@ -224,7 +220,11 @@ private enum AccelHardware {
                 if let services = r.services {
                     for i in 0..<CFArrayGetCount(services) {
                         let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClient.self)
-                        IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, 0 as CFNumber)
+                        let matchesUsage = IOHIDServiceClientConformsTo(svc, UInt32(pageAccel), UInt32(usageAccel)) != 0
+                        let transport = IOHIDServiceClientCopyProperty(svc, "Transport" as CFString)
+                        if matchesUsage && "\(transport ?? ("" as CFString))" == requiredTransport {
+                            IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, 0 as CFNumber)
+                        }
                     }
                 }
                 IOHIDDeviceRegisterInputReportCallback(r.device, r.buffer, r.maxSize, nil, nil)
@@ -284,7 +284,7 @@ private struct AccelResources {
 private final class ReportContext: Sendable {
     let adapterID: SensorID
 
-    private struct State {
+    private struct State: @unchecked Sendable {
         var running = true
         var sampleCounter = 0
         let continuation: AsyncThrowingStream<SensorImpact, Error>.Continuation
@@ -338,7 +338,7 @@ private final class ReportContext: Sendable {
 /// Manages a dedicated thread hosting a CFRunLoop for HID report callbacks.
 /// Lock-protected state; the underlying Thread is not exposed.
 private struct HIDRunLoopThread: Sendable {
-    private struct State {
+    private struct State: @unchecked Sendable {
         var runLoop: CFRunLoop?
         var thread: Thread?
     }
