@@ -29,7 +29,6 @@ public final class ImpactController {
     var impactCount: Int = 0
     var isEnabled = false
     var sensorError: String?
-    var sensorName: String?
     var lastImpactMagnitude: Float = 0
     var lastImpactTier: ImpactTier?
 
@@ -40,7 +39,7 @@ public final class ImpactController {
     private var countDate: Date = Calendar.current.startOfDay(for: Date())
     private var activeSensorIDs: Set<SensorID> = []
 
-    public init(settings: SettingsStore,
+    init(settings: SettingsStore,
          audioPlayer: (any AudioResponder)? = nil,
          flashResponder: (any FlashResponder)? = nil,
          adapters: [any SensorAdapter]? = nil) {
@@ -62,7 +61,7 @@ public final class ImpactController {
 
     /// Called once at app launch. Starts the settings observation loop
     /// which manages the pipeline lifecycle based on response toggles.
-    public func bootstrap() {
+    func bootstrap() {
         AppLog.debugEnabled = settings.debugLogging
         syncPipelineState()
         startSettingsObservation()
@@ -98,9 +97,8 @@ public final class ImpactController {
                     handleImpact(impact)
                 case .error(let msg):
                     sensorError = msg
-                case .adaptersChanged(let ids, let names):
+                case .adaptersChanged(let ids, _):
                     activeSensorIDs = ids
-                    sensorName = names.isEmpty ? nil : names.sorted().joined(separator: ", ")
                 }
             }
         }
@@ -110,7 +108,6 @@ public final class ImpactController {
         sensorTask?.cancel()
         sensorTask = nil
         isEnabled = false
-        sensorName = nil
         activeSensorIDs = []
         fusion.reset()
         lastPushedConfig = nil
@@ -156,7 +153,7 @@ public final class ImpactController {
         }
     }
 
-    public func playWelcomeSound() {
+    func playWelcomeSound() {
         guard let url = audioPlayer.longestSoundURL else { return }
         audioPlayer.playOnAllDevices(url: url, volume: 1.0)
     }
@@ -180,28 +177,13 @@ public final class ImpactController {
         lastImpactMagnitude = intensity
         lastImpactTier = tier
 
-        var clipDuration: Double = 0
-        if settings.soundEnabled {
-            clipDuration = audioPlayer.play(
-                intensity: intensity,
-                volumeMin: Float(settings.volumeMin),
-                volumeMax: Float(settings.volumeMax),
-                deviceUIDs: settings.enabledAudioDevices
-            )
-        }
-
-        rearmUntil = timestamp.addingTimeInterval(max(clipDuration, settings.debounce))
-
-        if settings.screenFlash {
-            let flashDuration = clipDuration > 0 ? clipDuration : 0.5
-            screenFlash.flash(
-                intensity: intensity,
-                opacityMin: Float(settings.flashOpacityMin),
-                opacityMax: Float(settings.flashOpacityMax),
-                clipDuration: flashDuration,
-                enabledDisplayIDs: settings.enabledDisplays
-            )
-        }
+        let clipDuration = ImpactResponse.playSound(
+            audioPlayer: audioPlayer, settings: settings, intensity: intensity)
+        rearmUntil = ImpactResponse.rearmDeadline(
+            from: timestamp, clipDuration: clipDuration, debounce: settings.debounce)
+        ImpactResponse.triggerFlash(
+            flashResponder: screenFlash, settings: settings,
+            intensity: intensity, clipDuration: clipDuration)
 
         log.debug("entity:Impact tier=\(tier) intensity=\(String(format: "%.2f", intensity)) confidence=\(String(format: "%.2f", confidence))")
         incrementDailyCount(now: timestamp)
@@ -213,53 +195,15 @@ public final class ImpactController {
     /// Adapters are immutable after creation — config is baked in at init.
     private func buildAdapters() -> [any SensorAdapter] {
         let enabled = Set(settings.enabledSensorIDs)
-        let interval = Int(settings.accelReportInterval)
-        let bpLow = Float(settings.accelBandpassLowHz)
-        let bpHigh = Float(settings.accelBandpassHighHz)
-        let accelConfig = defaultAccelDetectorConfig(
-            spikeThreshold: Float(settings.accelSpikeThreshold),
-            riseRate: Float(settings.accelRiseRate),
-            crestFactor: Float(settings.accelCrestFactor),
-            confirmations: settings.accelConfirmations,
-            warmupSamples: settings.accelWarmupSamples
-        )
-
-        let micConfig = ImpactDetectorConfig(
-            spikeThreshold: Float(settings.micSpikeThreshold),
-            minRiseRate: Float(settings.micRiseRate),
-            minCrestFactor: Float(settings.micCrestFactor),
-            minConfirmations: settings.micConfirmations,
-            warmupSamples: settings.micWarmupSamples,
-            intensityFloor: 0.005,
-            intensityCeiling: 0.300
-        )
-        let hpConfig = ImpactDetectorConfig(
-            spikeThreshold: Float(settings.hpSpikeThreshold),
-            minRiseRate: Float(settings.hpRiseRate),
-            minCrestFactor: Float(settings.hpCrestFactor),
-            minConfirmations: settings.hpConfirmations,
-            warmupSamples: settings.hpWarmupSamples,
-            intensityFloor: 0.05,
-            intensityCeiling: 2.0
-        )
-
-        var adapters: [any SensorAdapter] = []
-        for template in allAdapters {
-            guard enabled.contains(template.id.rawValue) else { continue }
-            switch template.id.rawValue {
-            case "accelerometer":
-                adapters.append(SPUAccelerometerAdapter(
-                    reportIntervalUS: interval, bandpassLowHz: bpLow,
-                    bandpassHighHz: bpHigh, detectorConfig: accelConfig))
-            case "microphone":
-                adapters.append(MicrophoneAdapter(detectorConfig: micConfig))
-            case "headphone-motion":
-                adapters.append(HeadphoneMotionAdapter(detectorConfig: hpConfig))
-            default:
-                adapters.append(template)
+        return allAdapters.compactMap { template -> (any SensorAdapter)? in
+            guard enabled.contains(template.id.rawValue) else { return nil }
+            switch template.id {
+            case .accelerometer: return AdapterFactory.accelerometer(from: settings)
+            case .microphone:    return AdapterFactory.microphone(from: settings)
+            case .headphoneMotion: return AdapterFactory.headphoneMotion(from: settings)
+            default:             return template
             }
         }
-        return adapters
     }
 
     private func pushFusionConfigIfNeeded() {
@@ -290,5 +234,70 @@ public final class ImpactController {
         let today = Calendar.current.startOfDay(for: now)
         if today > countDate { impactCount = 0; countDate = today }
         impactCount += 1
+    }
+}
+
+// MARK: - Impact response dispatch
+
+@MainActor
+private enum ImpactResponse {
+    static func playSound(audioPlayer: any AudioResponder, settings: SettingsStore, intensity: Float) -> Double {
+        guard settings.soundEnabled else { return 0 }
+        return audioPlayer.play(
+            intensity: intensity,
+            volumeMin: Float(settings.volumeMin),
+            volumeMax: Float(settings.volumeMax),
+            deviceUIDs: settings.enabledAudioDevices)
+    }
+
+    static func rearmDeadline(from timestamp: Date, clipDuration: Double, debounce: Double) -> Date {
+        timestamp.addingTimeInterval(max(clipDuration, debounce))
+    }
+
+    static func triggerFlash(flashResponder: any FlashResponder, settings: SettingsStore,
+                             intensity: Float, clipDuration: Double) {
+        guard settings.screenFlash else { return }
+        flashResponder.flash(
+            intensity: intensity,
+            opacityMin: Float(settings.flashOpacityMin),
+            opacityMax: Float(settings.flashOpacityMax),
+            clipDuration: clipDuration > 0 ? clipDuration : 0.5,
+            enabledDisplayIDs: settings.enabledDisplays)
+    }
+}
+
+// MARK: - Adapter construction from current settings
+
+@MainActor
+private enum AdapterFactory {
+    static func accelerometer(from s: SettingsStore) -> SPUAccelerometerAdapter {
+        SPUAccelerometerAdapter(
+            reportIntervalUS: Int(s.accelReportInterval),
+            bandpassLowHz: Float(s.accelBandpassLowHz),
+            bandpassHighHz: Float(s.accelBandpassHighHz),
+            detectorConfig: .accelerometer(
+                spikeThreshold: Float(s.accelSpikeThreshold),
+                riseRate: Float(s.accelRiseRate),
+                crestFactor: Float(s.accelCrestFactor),
+                confirmations: s.accelConfirmations,
+                warmupSamples: s.accelWarmupSamples))
+    }
+
+    static func microphone(from s: SettingsStore) -> MicrophoneAdapter {
+        MicrophoneAdapter(detectorConfig: .microphone(
+            spikeThreshold: Float(s.micSpikeThreshold),
+            riseRate: Float(s.micRiseRate),
+            crestFactor: Float(s.micCrestFactor),
+            confirmations: s.micConfirmations,
+            warmupSamples: s.micWarmupSamples))
+    }
+
+    static func headphoneMotion(from s: SettingsStore) -> HeadphoneMotionAdapter {
+        HeadphoneMotionAdapter(detectorConfig: .headphoneMotion(
+            spikeThreshold: Float(s.hpSpikeThreshold),
+            riseRate: Float(s.hpRiseRate),
+            crestFactor: Float(s.hpCrestFactor),
+            confirmations: s.hpConfirmations,
+            warmupSamples: s.hpWarmupSamples))
     }
 }

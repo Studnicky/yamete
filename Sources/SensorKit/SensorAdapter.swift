@@ -54,13 +54,13 @@ public enum SensorError: Error, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .permissionDenied:
-            NSLocalizedString("Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security.", comment: "Sensor permission error")
+            NSLocalizedString("Microphone access denied. Grant permission in System Settings > Privacy & Security > Microphone.", comment: "Sensor permission error")
         case .deviceNotFound:
-            NSLocalizedString("No accelerometer found — this Mac may not have a compatible motion sensor.", comment: "Sensor not found error")
+            NSLocalizedString("Accelerometer not found. The built-in accelerometer is only available on MacBook Air and MacBook Pro (Apple Silicon).", comment: "Sensor not found error")
         case .ioKitError(let code):
-            String(format: NSLocalizedString("Accelerometer unavailable (IOKit error %@). This Mac may not have a compatible motion sensor.", comment: "IOKit error with code"), code)
+            String(format: NSLocalizedString("Accelerometer unavailable (IOKit error %@). The built-in accelerometer requires a MacBook Air or MacBook Pro with Apple Silicon.", comment: "IOKit error with code"), code)
         case .noAdaptersAvailable:
-            NSLocalizedString("No compatible motion sensor found on this Mac.", comment: "No adapters error")
+            NSLocalizedString("No sensors available. Enable at least one sensor, or connect a microphone.", comment: "No adapters error")
         }
     }
 }

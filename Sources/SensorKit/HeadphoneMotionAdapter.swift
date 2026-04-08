@@ -20,9 +20,9 @@ private let log = AppLog(category: "HeadphoneMotion")
 /// Detects impact vibrations via AirPods/Beats accelerometer using CoreMotion.
 /// Requires connected headphones with motion sensors.
 /// Thresholds calibrated for userAcceleration (gravity-subtracted) in g-force.
-public final class HeadphoneMotionAdapter: SensorAdapter, @unchecked Sendable {
+public final class HeadphoneMotionAdapter: SensorAdapter, Sendable {
 
-    public let id = SensorID("headphone-motion")
+    public let id = SensorID.headphoneMotion
     public let name = "Headphone Motion"
 
     private let manager = CMHeadphoneMotionManager()
@@ -31,15 +31,7 @@ public final class HeadphoneMotionAdapter: SensorAdapter, @unchecked Sendable {
     /// Floor: 0.05g (normal head movement). Ceiling: 2.0g (sharp jolt).
     public let detectorConfig: ImpactDetectorConfig
 
-    public init(detectorConfig: ImpactDetectorConfig = ImpactDetectorConfig(
-        spikeThreshold: 0.10,
-        minRiseRate: 0.05,
-        minCrestFactor: 1.5,
-        minConfirmations: 2,
-        warmupSamples: 50,
-        intensityFloor: 0.05,
-        intensityCeiling: 2.0
-    )) {
+    public init(detectorConfig: ImpactDetectorConfig = .headphoneMotion()) {
         self.detectorConfig = detectorConfig
     }
 

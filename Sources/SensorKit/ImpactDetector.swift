@@ -2,6 +2,7 @@
 import YameteCore
 #endif
 import Foundation
+import os
 
 // MARK: - Per-adapter impact detection pipeline
 //
@@ -34,89 +35,138 @@ public struct ImpactDetectorConfig: Sendable {
 
     public init(spikeThreshold: Float, minRiseRate: Float, minCrestFactor: Float,
                 minConfirmations: Int, warmupSamples: Int,
-                windowDuration: TimeInterval = 0.12,
+                windowDuration: TimeInterval = Detection.windowDuration,
                 intensityFloor: Float, intensityCeiling: Float) {
         self.spikeThreshold = spikeThreshold; self.minRiseRate = minRiseRate
         self.minCrestFactor = minCrestFactor; self.minConfirmations = minConfirmations
         self.warmupSamples = warmupSamples; self.windowDuration = windowDuration
         self.intensityFloor = intensityFloor; self.intensityCeiling = intensityCeiling
     }
+
+    public static func accelerometer(
+        spikeThreshold: Float = Float(Defaults.accelSpikeThreshold),
+        riseRate: Float = Float(Defaults.accelRiseRate),
+        crestFactor: Float = Float(Defaults.accelCrestFactor),
+        confirmations: Int = Defaults.accelConfirmations,
+        warmupSamples: Int = Defaults.accelWarmup
+    ) -> ImpactDetectorConfig {
+        ImpactDetectorConfig(spikeThreshold: spikeThreshold, minRiseRate: riseRate,
+                             minCrestFactor: crestFactor, minConfirmations: confirmations,
+                             warmupSamples: warmupSamples,
+                             intensityFloor: Detection.Accel.intensityFloor,
+                             intensityCeiling: Detection.Accel.intensityCeiling)
+    }
+
+    public static func microphone(
+        spikeThreshold: Float = Float(Defaults.micSpikeThreshold),
+        riseRate: Float = Float(Defaults.micRiseRate),
+        crestFactor: Float = Float(Defaults.micCrestFactor),
+        confirmations: Int = Defaults.micConfirmations,
+        warmupSamples: Int = Defaults.micWarmup
+    ) -> ImpactDetectorConfig {
+        ImpactDetectorConfig(spikeThreshold: spikeThreshold, minRiseRate: riseRate,
+                             minCrestFactor: crestFactor, minConfirmations: confirmations,
+                             warmupSamples: warmupSamples,
+                             intensityFloor: Detection.Mic.intensityFloor,
+                             intensityCeiling: Detection.Mic.intensityCeiling)
+    }
+
+    public static func headphoneMotion(
+        spikeThreshold: Float = Float(Defaults.hpSpikeThreshold),
+        riseRate: Float = Float(Defaults.hpRiseRate),
+        crestFactor: Float = Float(Defaults.hpCrestFactor),
+        confirmations: Int = Defaults.hpConfirmations,
+        warmupSamples: Int = Defaults.hpWarmup
+    ) -> ImpactDetectorConfig {
+        ImpactDetectorConfig(spikeThreshold: spikeThreshold, minRiseRate: riseRate,
+                             minCrestFactor: crestFactor, minConfirmations: confirmations,
+                             warmupSamples: warmupSamples,
+                             intensityFloor: Detection.Headphone.intensityFloor,
+                             intensityCeiling: Detection.Headphone.intensityCeiling)
+    }
 }
 
 /// Runs the gate pipeline on preprocessed sensor data and emits 0–1 intensity impacts.
 /// One instance per adapter. Runs on the adapter's callback thread (not main thread).
-/// Thread safety: each adapter creates its own instance; no shared access.
-public final class ImpactDetector: @unchecked Sendable {
+/// Thread safety: mutable state protected by OSAllocatedUnfairLock.
+public final class ImpactDetector: Sendable {
     private let config: ImpactDetectorConfig
     private let adapterName: String
+    private static let rmsAlpha: Float = Detection.rmsAlpha
 
-    private var window: [(timestamp: Date, magnitude: Float)] = []
-    private var sampleCount = 0
-    private var backgroundMeanSq: Float
-    private static let rmsAlpha: Float = 0.02
+    private struct State {
+        var window: [(timestamp: Date, magnitude: Float)] = []
+        var sampleCount = 0
+        var backgroundMeanSq: Float
+    }
+    private let state: OSAllocatedUnfairLock<State>
 
     public init(config: ImpactDetectorConfig, adapterName: String) {
         self.config = config
         self.adapterName = adapterName
-        self.backgroundMeanSq = config.intensityFloor * config.intensityFloor
+        self.state = OSAllocatedUnfairLock(initialState: State(
+            backgroundMeanSq: config.intensityFloor * config.intensityFloor
+        ))
     }
 
     /// Process a preprocessed magnitude (in sensor-native units).
     /// Returns 0–1 intensity if an impact is detected, nil otherwise.
     public func process(magnitude: Float, timestamp: Date) -> Float? {
-        sampleCount += 1
+        state.withLock { s in
+            s.sampleCount += 1
 
-        // Background RMS (slow EMA)
-        let magSq = magnitude * magnitude
-        backgroundMeanSq = Self.rmsAlpha * magSq + (1 - Self.rmsAlpha) * backgroundMeanSq
-        let backgroundRMS = sqrtf(backgroundMeanSq)
+            // Background RMS (slow EMA)
+            let magSq = magnitude * magnitude
+            s.backgroundMeanSq = Self.rmsAlpha * magSq + (1 - Self.rmsAlpha) * s.backgroundMeanSq
+            let backgroundRMS = sqrtf(s.backgroundMeanSq)
 
-        // Accumulate in window and prune
-        window.append((timestamp, magnitude))
-        let cutoff = timestamp.addingTimeInterval(-config.windowDuration)
-        window.removeAll { $0.timestamp < cutoff }
+            // Accumulate in window and prune
+            s.window.append((timestamp, magnitude))
+            let cutoff = timestamp.addingTimeInterval(-config.windowDuration)
+            s.window.removeAll { $0.timestamp < cutoff }
 
-        // Warmup gate
-        guard sampleCount >= config.warmupSamples else { return nil }
+            // Warmup gate
+            guard s.sampleCount >= config.warmupSamples else { return nil }
 
-        // Spike threshold
-        guard magnitude >= config.spikeThreshold else { return nil }
+            // Spike threshold
+            guard magnitude >= config.spikeThreshold else { return nil }
 
-        // Rise rate gate — computed from the window, not accumulated globally.
-        // Peak rise rate = maximum consecutive-sample increase within the window.
-        var windowPeakRise: Float = 0
-        for i in 1..<window.count {
-            let rise = window[i].magnitude - window[i - 1].magnitude
-            if rise > windowPeakRise { windowPeakRise = rise }
-        }
-        guard windowPeakRise >= config.minRiseRate else {
-            log.debug("entity:Gate blocked=riseRate adapter=\(adapterName) rise=\(String(format: "%.4f", windowPeakRise)) required=\(config.minRiseRate)")
-            return nil
-        }
-
-        // Crest factor gate
-        if backgroundRMS > 0 {
-            let windowPeak = window.map(\.magnitude).max() ?? 0
-            let crest = windowPeak / backgroundRMS
-            guard crest >= config.minCrestFactor else {
-                log.debug("entity:Gate blocked=crestFactor adapter=\(adapterName) crest=\(String(format: "%.2f", crest)) required=\(config.minCrestFactor)")
+            // Rise rate gate — computed from the window, not accumulated globally.
+            // Peak rise rate = maximum consecutive-sample increase within the window.
+            var windowPeakRise: Float = 0
+            for i in 1..<s.window.count {
+                let rise = s.window[i].magnitude - s.window[i - 1].magnitude
+                if rise > windowPeakRise { windowPeakRise = rise }
+            }
+            guard windowPeakRise >= config.minRiseRate else {
+                log.debug("entity:Gate blocked=riseRate adapter=\(adapterName) rise=\(String(format: "%.4f", windowPeakRise)) required=\(config.minRiseRate)")
                 return nil
             }
+
+            // Crest factor gate
+            if backgroundRMS > 0 {
+                let windowPeak = s.window.map(\.magnitude).max() ?? 0
+                let crest = windowPeak / backgroundRMS
+                guard crest >= config.minCrestFactor else {
+                    log.debug("entity:Gate blocked=crestFactor adapter=\(adapterName) crest=\(String(format: "%.2f", crest)) required=\(config.minCrestFactor)")
+                    return nil
+                }
+            }
+
+            // Confirmation count
+            let confirmed = s.window.filter { $0.magnitude >= config.spikeThreshold }.count
+            guard confirmed >= config.minConfirmations else {
+                log.debug("entity:Gate blocked=confirmations adapter=\(adapterName) count=\(confirmed) required=\(config.minConfirmations)")
+                return nil
+            }
+
+            // Impact detected — compute intensity in 0–1
+            let intensityRange = max(config.intensityCeiling - config.intensityFloor, Detection.intensityEpsilon)
+            let intensity = ((magnitude - config.intensityFloor) / intensityRange).clamped(to: 0...1)
+
+            log.debug("entity:Impact adapter=\(adapterName) intensity=\(String(format: "%.2f", intensity)) mag=\(String(format: "%.4f", magnitude)) crest=\(String(format: "%.1f", backgroundRMS > 0 ? magnitude / backgroundRMS : 0))")
+
+            return intensity
         }
-
-        // Confirmation count
-        let confirmed = window.filter { $0.magnitude >= config.spikeThreshold }.count
-        guard confirmed >= config.minConfirmations else {
-            log.debug("entity:Gate blocked=confirmations adapter=\(adapterName) count=\(confirmed) required=\(config.minConfirmations)")
-            return nil
-        }
-
-        // Impact detected — compute intensity in 0–1
-        let intensityRange = max(config.intensityCeiling - config.intensityFloor, 0.001)
-        let intensity = ((magnitude - config.intensityFloor) / intensityRange).clamped(to: 0...1)
-
-        log.debug("entity:Impact adapter=\(adapterName) intensity=\(String(format: "%.2f", intensity)) mag=\(String(format: "%.4f", magnitude)) crest=\(String(format: "%.1f", backgroundRMS > 0 ? magnitude / backgroundRMS : 0))")
-
-        return intensity
     }
 }

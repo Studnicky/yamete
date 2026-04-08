@@ -84,6 +84,9 @@ targets:
         Release:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
           SWIFT_COMPILATION_MODE: wholemodule
+          DEAD_CODE_STRIPPING: true
+          STRIP_INSTALLED_PRODUCT: true
+          STRIP_SWIFT_SYMBOLS: true
     preBuildScripts: []
     postBuildScripts: []
     entitlements:

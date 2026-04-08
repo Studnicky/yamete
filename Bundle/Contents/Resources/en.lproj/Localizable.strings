@@ -156,8 +156,14 @@
 /* Audio output setting help text */
 "help_audio_output" = "Select which audio devices play impact sounds. None selected = no audio.";
 
-/* No audio output devices found message */
-"no_output_devices" = "No output devices found";
+/* No audio output hardware detected */
+"no_output_devices" = "No audio output hardware detected";
+
+/* No audio devices selected hint */
+"no_audio_selected" = "No audio devices selected — sound is muted";
+
+/* No displays selected hint */
+"no_displays_selected" = "No displays selected — flash is disabled";
 
 /* Microphone Tuning Section */
 

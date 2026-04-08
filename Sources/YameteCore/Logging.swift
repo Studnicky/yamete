@@ -13,7 +13,12 @@ public struct AppLog: Sendable {
 
     /// Controls whether debug-level messages are written to the file log.
     /// Info, warning, and error always log. Set from the UI debug logging toggle.
-    public nonisolated(unsafe) static var debugEnabled: Bool = false
+    /// Atomic: read from background sensor threads, written from @MainActor.
+    private static let _debugEnabled = OSAllocatedUnfairLock(initialState: false)
+    public static var debugEnabled: Bool {
+        get { _debugEnabled.withLock { $0 } }
+        set { _debugEnabled.withLock { $0 = newValue } }
+    }
 
     public init(category: String) {
         osLog = Logger(subsystem: Self.subsystem, category: category)
@@ -21,23 +26,23 @@ public struct AppLog: Sendable {
     }
 
     public func info(_ message: String) {
-        osLog.info("\(message, privacy: .public)")
+        osLog.info("\(message, privacy: .private)")
         LogStore.shared.append("INFO", category, message)
     }
 
     public func debug(_ message: String) {
-        osLog.debug("\(message, privacy: .public)")
+        osLog.debug("\(message, privacy: .private)")
         guard Self.debugEnabled else { return }
         LogStore.shared.append("DEBUG", category, message)
     }
 
     public func warning(_ message: String) {
-        osLog.warning("\(message, privacy: .public)")
+        osLog.warning("\(message, privacy: .private)")
         LogStore.shared.append("WARN", category, message)
     }
 
     public func error(_ message: String) {
-        osLog.error("\(message, privacy: .public)")
+        osLog.error("\(message, privacy: .private)")
         LogStore.shared.append("ERROR", category, message)
     }
 }
@@ -50,29 +55,31 @@ public struct AppLog: Sendable {
 /// (sandbox-redirected to the app container when running under App Sandbox).
 /// On startup and at each day boundary, log files older than 24 hours are deleted.
 ///
-/// Thread safety: all mutable state and formatter access is confined to `queue`.
-public final class LogStore: @unchecked Sendable {
+/// Thread safety: all mutable state lives in a lock-protected `State` struct.
+/// Formatters are created inside the lock closure (they are not thread-safe).
+public final class LogStore: Sendable {
     public static let shared = LogStore()
 
     private let directory: URL
     private let maxAge: TimeInterval = 24 * 60 * 60
-    private let queue = DispatchQueue(label: "com.studnicky.yamete.logstore", qos: .utility)
-    private var fileHandle: FileHandle?
-    private var currentDate = ""
 
-    // Formatters are not thread-safe — only access on `queue`.
-    private let dateFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
+    private struct State {
+        var fileHandle: FileHandle?
+        var currentDate = ""
+        let dateFmt: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            f.locale = Locale(identifier: "en_US_POSIX")
+            return f
+        }()
+        let tsFmt: ISO8601DateFormatter = {
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return f
+        }()
+    }
 
-    private let tsFmt: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let state: OSAllocatedUnfairLock<State>
 
     private init() {
         let fm = FileManager.default
@@ -80,23 +87,24 @@ public final class LogStore: @unchecked Sendable {
             ?? fm.temporaryDirectory
         directory = support.appendingPathComponent("Yamete/logs", isDirectory: true)
         try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
-        queue.sync {
+        state = OSAllocatedUnfairLock(initialState: State())
+        state.withLock { s in
             pruneStaleFiles()
-            rotateIfNeeded()
+            rotateIfNeeded(&s)
         }
     }
 
     public func append(_ level: String, _ category: String, _ message: String) {
         let now = Date()
-        queue.async { [self] in
-            rotateIfNeeded()
-            let ts = tsFmt.string(from: now)
+        state.withLock { s in
+            rotateIfNeeded(&s)
+            let ts = s.tsFmt.string(from: now)
             let line = "\(ts) [\(level)] \(category): \(message)\n"
-            fileHandle?.write(Data(line.utf8))
+            s.fileHandle?.write(Data(line.utf8))
         }
     }
 
-    // MARK: - Private (must be called on `queue`)
+    // MARK: - Private (called inside state.withLock)
 
     private func pruneStaleFiles() {
         let fm = FileManager.default
@@ -111,26 +119,22 @@ public final class LogStore: @unchecked Sendable {
         }
     }
 
-    private func rotateIfNeeded() {
-        let today = dateFmt.string(from: Date())
-        guard today != currentDate else { return }
+    private func rotateIfNeeded(_ s: inout State) {
+        let today = s.dateFmt.string(from: Date())
+        guard today != s.currentDate else { return }
 
-        fileHandle?.closeFile()
-        fileHandle = nil
+        s.fileHandle?.closeFile()
+        s.fileHandle = nil
 
-        if !currentDate.isEmpty { pruneStaleFiles() }
-        currentDate = today
+        if !s.currentDate.isEmpty { pruneStaleFiles() }
+        s.currentDate = today
 
         let url = directory.appendingPathComponent("yamete-\(today).log")
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
             fm.createFile(atPath: url.path, contents: nil)
         }
-        fileHandle = try? FileHandle(forWritingTo: url)
-        fileHandle?.seekToEndOfFile()
-    }
-
-    deinit {
-        fileHandle?.closeFile()
+        s.fileHandle = try? FileHandle(forWritingTo: url)
+        s.fileHandle?.seekToEndOfFile()
     }
 }

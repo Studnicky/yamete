@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import os
 
 // MARK: - Vec3
 
@@ -75,6 +76,10 @@ public struct SensorID: Hashable, Sendable, RawRepresentable, CustomStringConver
     public init(rawValue: String) { self.rawValue = rawValue }
     public init(_ rawValue: String) { self.rawValue = rawValue }
     public var description: String { rawValue }
+
+    public static let accelerometer = SensorID("accelerometer")
+    public static let microphone = SensorID("microphone")
+    public static let headphoneMotion = SensorID("headphone-motion")
 }
 
 // MARK: - Display helpers
@@ -91,6 +96,23 @@ extension NSScreen {
 extension Comparable {
     public func clamped(to range: ClosedRange<Self>) -> Self {
         min(max(self, range.lowerBound), range.upperBound)
+    }
+}
+
+// MARK: - Once-only resource cleanup
+
+/// Sendable wrapper that ensures a cleanup action runs exactly once.
+/// Resources are consumed on first `perform()` call; subsequent calls are no-ops.
+public struct OnceCleanup<T>: Sendable {
+    private let resources: OSAllocatedUnfairLock<T?>
+
+    public init(_ resources: T) {
+        self.resources = OSAllocatedUnfairLock(initialState: resources)
+    }
+
+    public func perform(_ action: (T) -> Void) {
+        guard let r = resources.withLock({ val -> T? in let v = val; val = nil; return v }) else { return }
+        action(r)
     }
 }
 

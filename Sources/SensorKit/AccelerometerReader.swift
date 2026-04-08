@@ -4,6 +4,7 @@ import YameteCore
 import Foundation
 import IOKit.hid
 import IOHIDPublic
+import os
 
 // MARK: - BMI286 Accelerometer Adapter
 //
@@ -40,30 +41,15 @@ private let log = AppLog(category: "Accelerometer")
 
 // MARK: - Shared constants
 
-private let pageAccel: Int = 0xFF00
-private let usageAccel: Int = 3
-private let requiredTransport = "SPU"
-private let decimationFactor = 2
-private let magnitudeMin: Float = 0.3
-private let magnitudeMax: Float = 4.0
-private let minReportLength = 18
-private let rawScale: Float = 65536.0
-private let reportIntervalUS: Int = 10000
+private let pageAccel = AccelHardwareConstants.hidUsagePage
+private let usageAccel = AccelHardwareConstants.hidUsage
+private let requiredTransport = AccelHardwareConstants.requiredTransport
+private let decimationFactor = AccelHardwareConstants.decimationFactor
+private let magnitudeMin = AccelHardwareConstants.magnitudeMin
+private let magnitudeMax = AccelHardwareConstants.magnitudeMax
+private let minReportLength = AccelHardwareConstants.minReportLength
+private let rawScale = AccelHardwareConstants.rawScale
 
-/// Default accelerometer detection config (bandpass-filtered g-force units).
-/// Spike threshold, rise rate, crest factor operate on filtered accelerometer magnitude.
-public func defaultAccelDetectorConfig(
-    spikeThreshold: Float = 0.020, riseRate: Float = 0.010,
-    crestFactor: Float = 1.5, confirmations: Int = 3,
-    warmupSamples: Int = 50
-) -> ImpactDetectorConfig {
-    ImpactDetectorConfig(
-        spikeThreshold: spikeThreshold, minRiseRate: riseRate,
-        minCrestFactor: crestFactor, minConfirmations: confirmations,
-        warmupSamples: warmupSamples,
-        intensityFloor: 0.002, intensityCeiling: 0.060
-    )
-}
 
 // MARK: - Accelerometer Adapter
 
@@ -71,9 +57,9 @@ public func defaultAccelDetectorConfig(
 ///
 /// Activation: IOHIDEventSystemClientCreate → IOHIDServiceClientSetProperty("ReportInterval")
 /// Reading: IOHIDManager → IOHIDDeviceRegisterInputReportCallback → bandpass → ImpactDetector
-public final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
+public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
 
-    public let id = SensorID("accelerometer")
+    public let id = SensorID.accelerometer
     public let name = "Accelerometer"
     public let reportIntervalUS: Int
     public let detectorConfig: ImpactDetectorConfig
@@ -82,7 +68,7 @@ public final class SPUAccelerometerAdapter: SensorAdapter, @unchecked Sendable {
 
     public init(reportIntervalUS: Int = 10000,
                 bandpassLowHz: Float = 20.0, bandpassHighHz: Float = 25.0,
-                detectorConfig: ImpactDetectorConfig = defaultAccelDetectorConfig()) {
+                detectorConfig: ImpactDetectorConfig = .accelerometer()) {
         self.reportIntervalUS = reportIntervalUS
         self.bandpassLowHz = bandpassLowHz
         self.bandpassHighHz = bandpassHighHz
@@ -185,8 +171,7 @@ private enum AccelHardware {
             return stream
         }
 
-        let serial = IOHIDDeviceGetProperty(device, kIOHIDSerialNumberKey as CFString) ?? ("" as CFString)
-        log.info("entity:AccelDevice wasAssociatedWith agent:\(adapterName) serial=\(serial)")
+        log.info("entity:AccelDevice wasAssociatedWith agent:\(adapterName)")
 
         let maxSize = IOHIDDeviceGetProperty(device, kIOHIDMaxInputReportSizeKey as CFString) as? Int ?? 64
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxSize)
@@ -195,8 +180,8 @@ private enum AccelHardware {
         let ctx = ReportContext(
             adapterID: adapterID,
             continuation: continuation,
-            hpFilter: HighPassFilter(cutoffHz: bandpassLowHz, sampleRate: 50.0),
-            lpFilter: LowPassFilter(cutoffHz: bandpassHighHz, sampleRate: 50.0),
+            hpFilter: HighPassFilter(cutoffHz: bandpassLowHz, sampleRate: AccelHardwareConstants.defaultSampleRate),
+            lpFilter: LowPassFilter(cutoffHz: bandpassHighHz, sampleRate: AccelHardwareConstants.defaultSampleRate),
             detector: ImpactDetector(config: detectorConfig, adapterName: adapterName)
         )
         let ctxPtr = Unmanaged.passRetained(ctx)
@@ -226,15 +211,31 @@ private enum AccelHardware {
 
         log.info("activity:SensorReading wasStartedBy agent:\(adapterName)")
 
-        let cleanup = CleanupState(
+        let cleanup = OnceCleanup(AccelResources(
             manager: manager, device: device, buffer: buffer,
             maxSize: maxSize, runLoop: runLoop, runLoopMode: rlMode,
             thread: thread, ctxPtr: ctxPtr, ctx: ctx,
             svcClient: svcClient, services: services
-        )
+        ))
 
         continuation.onTermination = { @Sendable _ in
-            cleanup.perform()
+            cleanup.perform { r in
+                r.ctx.invalidate()
+                if let services = r.services {
+                    for i in 0..<CFArrayGetCount(services) {
+                        let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClient.self)
+                        IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, 0 as CFNumber)
+                    }
+                }
+                IOHIDDeviceRegisterInputReportCallback(r.device, r.buffer, r.maxSize, nil, nil)
+                IOHIDManagerUnscheduleFromRunLoop(r.manager, r.runLoop, r.runLoopMode.rawValue)
+                CFRunLoopStop(r.runLoop)
+                r.thread.cancel()
+                IOHIDDeviceClose(r.device, IOOptionBits(kIOHIDOptionsTypeNone))
+                IOHIDManagerClose(r.manager, IOOptionBits(kIOHIDOptionsTypeNone))
+                r.buffer.deallocate()
+                r.ctxPtr.release()
+            }
             log.info("activity:SensorReading wasEndedBy agent:\(adapterName)")
         }
 
@@ -260,9 +261,9 @@ private enum AccelHardware {
     }
 }
 
-// MARK: - Cleanup state
+// MARK: - Accelerometer resource bundle (consumed by OnceCleanup on stream teardown)
 
-private struct CleanupState: @unchecked Sendable {
+private struct AccelResources {
     let manager: IOHIDManager
     let device: IOHIDDevice
     let buffer: UnsafeMutablePointer<UInt8>
@@ -274,92 +275,104 @@ private struct CleanupState: @unchecked Sendable {
     let ctx: ReportContext
     let svcClient: IOHIDEventSystemClient?
     let services: CFArray?
-
-    func perform() {
-        ctx.invalidate()
-        if let services {
-            for i in 0..<CFArrayGetCount(services) {
-                let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClient.self)
-                IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, 0 as CFNumber)
-            }
-        }
-        IOHIDDeviceRegisterInputReportCallback(device, buffer, maxSize, nil, nil)
-        IOHIDManagerUnscheduleFromRunLoop(manager, runLoop, runLoopMode.rawValue)
-        CFRunLoopStop(runLoop)
-        thread.cancel()
-        IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
-        IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
-        buffer.deallocate()
-        ctxPtr.release()
-    }
 }
 
 // MARK: - Report decode + detection context
 
 /// Decodes HID reports, applies bandpass filtering, and runs ImpactDetector.
-/// Emits SensorImpact events when impacts are detected.
-private final class ReportContext: @unchecked Sendable {
+/// All mutable and non-Sendable state is lock-protected.
+private final class ReportContext: Sendable {
     let adapterID: SensorID
-    let continuation: AsyncThrowingStream<SensorImpact, Error>.Continuation
-    let hpFilter: HighPassFilter
-    let lpFilter: LowPassFilter
-    let detector: ImpactDetector
 
-    private var running = true
-    private var sampleCounter = 0
+    private struct State {
+        var running = true
+        var sampleCounter = 0
+        let continuation: AsyncThrowingStream<SensorImpact, Error>.Continuation
+        let hpFilter: HighPassFilter
+        let lpFilter: LowPassFilter
+        let detector: ImpactDetector
+    }
+    private let state: OSAllocatedUnfairLock<State>
 
     init(adapterID: SensorID,
          continuation: AsyncThrowingStream<SensorImpact, Error>.Continuation,
          hpFilter: HighPassFilter, lpFilter: LowPassFilter,
          detector: ImpactDetector) {
         self.adapterID = adapterID
-        self.continuation = continuation
-        self.hpFilter = hpFilter
-        self.lpFilter = lpFilter
-        self.detector = detector
+        self.state = OSAllocatedUnfairLock(initialState: State(
+            continuation: continuation, hpFilter: hpFilter,
+            lpFilter: lpFilter, detector: detector))
     }
 
-    func invalidate() { running = false }
+    func invalidate() { state.withLock { $0.running = false } }
 
     func handleReport(report: UnsafeMutablePointer<UInt8>, length: Int) {
-        guard running, length >= minReportLength else { return }
-
-        sampleCounter += 1
-        guard sampleCounter % decimationFactor == 0 else { return }
+        guard length >= minReportLength else { return }
 
         let rawX = report.advanced(by: 6).withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
         let rawY = report.advanced(by: 10).withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
         let rawZ = report.advanced(by: 14).withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
 
-        let raw = Vec3(x: Float(rawX) / rawScale, y: Float(rawY) / rawScale, z: Float(rawZ) / rawScale)
-        let rawMag = raw.magnitude
-        guard rawMag > magnitudeMin && rawMag < magnitudeMax else { return }
+        state.withLock { s in
+            guard s.running else { return }
+            s.sampleCounter += 1
+            guard s.sampleCounter % decimationFactor == 0 else { return }
 
-        // Bandpass filter
-        let filtered = lpFilter.process(hpFilter.process(raw))
-        let filteredMag = filtered.magnitude
+            let raw = Vec3(x: Float(rawX) / rawScale, y: Float(rawY) / rawScale, z: Float(rawZ) / rawScale)
+            let rawMag = raw.magnitude
+            guard rawMag > magnitudeMin && rawMag < magnitudeMax else { return }
 
-        // Run detector — returns 0-1 intensity if impact detected
-        let now = Date()
-        if let intensity = detector.process(magnitude: filteredMag, timestamp: now) {
-            continuation.yield(SensorImpact(source: adapterID, timestamp: now, intensity: intensity))
+            let filtered = s.lpFilter.process(s.hpFilter.process(raw))
+            let filteredMag = filtered.magnitude
+
+            let now = Date()
+            if let intensity = s.detector.process(magnitude: filteredMag, timestamp: now) {
+                s.continuation.yield(SensorImpact(source: self.adapterID, timestamp: now, intensity: intensity))
+            }
         }
     }
 }
 
 // MARK: - HID run loop thread
 
-private final class HIDRunLoopThread: Thread, @unchecked Sendable {
-    private(set) var runLoop: CFRunLoop?
+/// Manages a dedicated thread hosting a CFRunLoop for HID report callbacks.
+/// Lock-protected state; the underlying Thread is not exposed.
+private struct HIDRunLoopThread: Sendable {
+    private struct State {
+        var runLoop: CFRunLoop?
+        var thread: Thread?
+    }
+    private let state: OSAllocatedUnfairLock<State>
     private let ready = DispatchSemaphore(value: 0)
 
-    override func main() {
-        runLoop = CFRunLoopGetCurrent()
-        ready.signal()
-        while !isCancelled {
-            CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0.25, false)
+    var runLoop: CFRunLoop? { state.withLock { $0.runLoop } }
+
+    init() {
+        state = OSAllocatedUnfairLock(initialState: State())
+    }
+
+    func start() {
+        let stateRef = state
+        let readyRef = ready
+        let thread = Thread {
+            stateRef.withLock { $0.runLoop = CFRunLoopGetCurrent() }
+            readyRef.signal()
+            var cancelled = false
+            while !cancelled {
+                CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0.25, false)
+                cancelled = stateRef.withLock { $0.thread?.isCancelled ?? true }
+            }
         }
+        state.withLockUnchecked { $0.thread = thread }
+        thread.start()
     }
 
     func waitUntilReady() { ready.wait() }
+
+    func cancel() {
+        state.withLock { s in
+            s.thread?.cancel()
+            if let rl = s.runLoop { CFRunLoopStop(rl) }
+        }
+    }
 }

@@ -7,7 +7,16 @@ Uses the built-in BMI286 accelerometer via IOKit public APIs (IOHIDEventSystemCl
 ## Requirements
 
 - macOS 14.0+ (Sonoma)
-- Apple Silicon Mac (M1/M2/M3/M4) with built-in accelerometer
+
+### Sensor compatibility
+
+| Sensor | Supported Macs | Notes |
+|--------|---------------|-------|
+| Accelerometer (BMI286) | MacBook Air (M1–M4), MacBook Pro (M1–M4) | Built-in SPU accelerometer, Apple Silicon laptops only |
+| Microphone | Any Mac with audio input | Built-in or external microphone |
+| Headphone Motion | Any Mac + AirPods Pro/Max, AirPods 3rd gen+, Beats Fit Pro | Requires connected compatible headphones |
+
+Desktop Macs (iMac, Mac Mini, Mac Studio, Mac Pro) can use microphone and headphone motion detection but do not have a built-in accelerometer.
 
 ## Install
 

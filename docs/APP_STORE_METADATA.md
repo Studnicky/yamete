@@ -55,7 +55,12 @@ PRIVACY
 - Microphone audio processed in real-time, never recorded
 - Logs auto-delete after 24 hours
 
-Yamete runs entirely in the menu bar with no Dock icon. It is designed for Apple Silicon MacBooks but also supports microphone-only detection on any Mac.
+COMPATIBILITY
+- MacBook Air / MacBook Pro (Apple Silicon): all three sensors — accelerometer, microphone, headphone motion
+- iMac, Mac Mini, Mac Studio, Mac Pro: microphone and headphone motion only (no built-in accelerometer)
+- Intel Macs: microphone and headphone motion only
+
+Yamete runs entirely in the menu bar with no Dock icon. Best experienced on Apple Silicon MacBooks with the built-in accelerometer. All Macs can use microphone-based impact detection.
 
 ## Keywords (100 chars max)
 

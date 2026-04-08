@@ -28,53 +28,56 @@ public final class ScreenFlash: FlashResponder {
     public func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, enabledDisplayIDs: [Int] = []) {
         guard clipDuration > 0 else { return }
 
-        let peak = CGFloat(opacityMin + intensity * (opacityMax - opacityMin))
-        let env  = Self.envelope(clipDuration: clipDuration, intensity: intensity)
-        let faces = faceImages
-
-        if faces.isEmpty {
-            log.warning("activity:Flash used entity:FaceLibrary — empty, pink wash only")
-        }
-
-        let allScreens = NSScreen.screens
-        let enabled = Set(enabledDisplayIDs)
-        let screens = allScreens.filter { enabled.contains($0.displayID) }
+        let screens = selectScreens(enabledIDs: enabledDisplayIDs)
         guard !screens.isEmpty else { return }
 
-        // Prune window pool entries for disconnected screens
-        if windowPool.count > screens.count {
-            for key in windowPool.keys where key >= screens.count {
-                windowPool[key]?.orderOut(nil)
-                windowPool.removeValue(forKey: key)
-            }
-        }
-
+        let peak = CGFloat(opacityMin + intensity * (opacityMax - opacityMin))
+        let env = Self.envelope(clipDuration: clipDuration, intensity: intensity)
+        let faces = faceImages
         let picks = pickFaces(count: screens.count, total: faces.count)
 
-        var activeWindows: [NSWindow] = []
-        for (i, screen) in screens.enumerated() {
+        pruneWindowPool(activeCount: screens.count)
+        let windows = renderOverlays(screens: screens, faces: faces, picks: picks, peak: peak, env: env)
+        scheduleHide(windows: windows, after: clipDuration)
+    }
+
+    private func selectScreens(enabledIDs: [Int]) -> [NSScreen] {
+        let enabled = Set(enabledIDs)
+        return NSScreen.screens.filter { enabled.contains($0.displayID) }
+    }
+
+    private func pruneWindowPool(activeCount: Int) {
+        for key in windowPool.keys where key >= activeCount {
+            windowPool[key]?.orderOut(nil)
+            windowPool.removeValue(forKey: key)
+        }
+    }
+
+    private func renderOverlays(screens: [NSScreen], faces: [NSImage], picks: [Int?],
+                                peak: CGFloat, env: (fadeIn: Double, hold: Double, fadeOut: Double)) -> [NSWindow] {
+        screens.enumerated().map { i, screen in
             let face = picks[i].map { faces[$0] }
             let win = windowForScreen(index: i, screen: screen)
             let hosting = NSHostingView(rootView:
-                FlashOverlayView(peak: peak, face: face,
-                                 fadeIn: env.fadeIn, hold: env.hold, fadeOut: env.fadeOut)
-                    .frame(width: screen.frame.width, height: screen.frame.height)
-            )
+                FlashOverlayView(peak: peak, face: face, fadeIn: env.fadeIn, hold: env.hold, fadeOut: env.fadeOut)
+                    .frame(width: screen.frame.width, height: screen.frame.height))
             hosting.frame = NSRect(origin: .zero, size: screen.frame.size)
             hosting.autoresizingMask = [.width, .height]
             win.contentView = hosting
             win.setFrame(screen.frame, display: false)
             win.orderFront(nil)
-            activeWindows.append(win)
+            return win
         }
+    }
 
+    private func scheduleHide(windows: [NSWindow], after duration: Double) {
         flashGeneration &+= 1
         let generation = flashGeneration
         hideTask?.cancel()
-        hideTask = Task { @MainActor [activeWindows] in
-            try? await Task.sleep(for: .seconds(clipDuration + 0.05))
+        hideTask = Task { @MainActor [windows] in
+            try? await Task.sleep(for: .seconds(duration + 0.05))
             guard !Task.isCancelled, generation == flashGeneration else { return }
-            activeWindows.forEach { $0.orderOut(nil) }
+            windows.forEach { $0.orderOut(nil) }
         }
     }
 
@@ -93,40 +96,22 @@ public final class ScreenFlash: FlashResponder {
     /// Picks face indices using recency scoring across monitors and events.
     private func pickFaces(count: Int, total: Int) -> [Int?] {
         guard total > 0 else { return Array(repeating: nil, count: count) }
-
-        // Ensure one history row per monitor.
         while history.count < count { history.append([]) }
 
-        // Recent faces across monitors for cross-event penalty.
         let recentGlobal = Set(history.flatMap { $0.suffix(count) })
-
         var usedThisEvent = Set<Int>()
         var picks: [Int?] = []
 
         for monitor in 0..<count {
-            let monitorHistory = history[monitor]
+            guard let best = FaceScoring.selectBest(
+                total: total, monitorHistory: history[monitor],
+                recentGlobal: recentGlobal, usedThisEvent: usedThisEvent
+            ) else { picks.append(nil); continue }
 
-            // Lower score is better: recency + cross-event + same-event penalties.
-            let scores: [(index: Int, score: Int)] = (0..<total).map { faceIdx in
-                let recency = monitorHistory.lastIndex(of: faceIdx)
-                    .map { monitorHistory.count - $0 }
-                    ?? (total + 1)
-
-                let globalPenalty = recentGlobal.contains(faceIdx) ? total : 0
-                let eventPenalty = usedThisEvent.contains(faceIdx) ? total * 2 : 0
-
-                return (faceIdx, -(recency) + globalPenalty + eventPenalty)
-            }
-
-            guard let best = scores.min(by: { $0.score < $1.score })?.index else { picks.append(nil); continue }
             picks.append(best)
             usedThisEvent.insert(best)
             history[monitor].append(best)
-
-            // Cap per-monitor history length.
-            if history[monitor].count > total * 2 {
-                history[monitor].removeFirst(history[monitor].count - total * 2)
-            }
+            FaceScoring.pruneHistory(&history[monitor], maxLength: total * 2)
         }
 
         return picks
@@ -207,6 +192,28 @@ private struct FlashOverlayView: View {
             withAnimation(.easeIn(duration: fadeIn)) { opacity = peak }
             try? await Task.sleep(for: .seconds(fadeIn + hold))
             withAnimation(.easeOut(duration: fadeOut)) { opacity = 0 }
+        }
+    }
+}
+
+// MARK: - Face scoring
+
+private enum FaceScoring {
+    static func selectBest(total: Int, monitorHistory: [Int],
+                           recentGlobal: Set<Int>, usedThisEvent: Set<Int>) -> Int? {
+        let scores = (0..<total).map { idx -> (index: Int, score: Int) in
+            let recency = monitorHistory.lastIndex(of: idx)
+                .map { monitorHistory.count - $0 } ?? (total + 1)
+            let globalPenalty = recentGlobal.contains(idx) ? total : 0
+            let eventPenalty = usedThisEvent.contains(idx) ? total * 2 : 0
+            return (idx, -(recency) + globalPenalty + eventPenalty)
+        }
+        return scores.min(by: { $0.score < $1.score })?.index
+    }
+
+    static func pruneHistory(_ history: inout [Int], maxLength: Int) {
+        if history.count > maxLength {
+            history.removeFirst(history.count - maxLength)
         }
     }
 }

@@ -3,6 +3,7 @@ import YameteCore
 #endif
 @preconcurrency import AVFoundation
 import Foundation
+import os
 
 private let log = AppLog(category: "Microphone")
 
@@ -23,24 +24,16 @@ private let log = AppLog(category: "Microphone")
 
 /// Detects impact transients via microphone audio using AVAudioEngine.
 /// Works on all Macs. Requires microphone permission (audio-input entitlement).
-public final class MicrophoneAdapter: SensorAdapter, @unchecked Sendable {
+public final class MicrophoneAdapter: SensorAdapter, Sendable {
 
-    public let id = SensorID("microphone")
+    public let id = SensorID.microphone
     public let name = "Microphone"
 
     /// Microphone detection config: thresholds in HP-filtered PCM amplitude units.
     /// Floor: quiet ambient (~0.005). Ceiling: firm desk slap (~0.300).
     public let detectorConfig: ImpactDetectorConfig
 
-    public init(detectorConfig: ImpactDetectorConfig = ImpactDetectorConfig(
-        spikeThreshold: 0.02,
-        minRiseRate: 0.01,
-        minCrestFactor: 1.5,
-        minConfirmations: 2,
-        warmupSamples: 50,
-        intensityFloor: 0.005,
-        intensityCeiling: 0.300
-    )) {
+    public init(detectorConfig: ImpactDetectorConfig = .microphone()) {
         self.detectorConfig = detectorConfig
     }
 
@@ -56,13 +49,11 @@ public final class MicrophoneAdapter: SensorAdapter, @unchecked Sendable {
         let engine = AVAudioEngine()
         let inputNode = engine.inputNode
         let format = inputNode.outputFormat(forBus: 0)
-        let targetHz: Double = 50
-        let bufferSize = AVAudioFrameCount(format.sampleRate / targetHz)
+        let bufferSize = AVAudioFrameCount(format.sampleRate / Detection.Mic.targetHz)
 
-        // DC-blocking high-pass state
         var prevRaw: Float = 0
         var prevFiltered: Float = 0
-        let hpAlpha: Float = 0.95
+        let hpAlpha = Detection.Mic.hpAlpha
 
         inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: format) { buffer, _ in
             guard let channelData = buffer.floatChannelData?[0] else { return }
@@ -91,25 +82,22 @@ public final class MicrophoneAdapter: SensorAdapter, @unchecked Sendable {
 
         do {
             try engine.start()
-            log.info("activity:SensorReading wasStartedBy agent:MicrophoneAdapter sampleRate=\(format.sampleRate) bufferSize=\(bufferSize)")
+            log.info("activity:SensorReading wasStartedBy agent:MicrophoneAdapter")
         } catch {
             log.error("activity:SensorReading wasInvalidatedBy agent:MicrophoneAdapter — \(error.localizedDescription)")
             continuation.finish(throwing: SensorError.permissionDenied)
             return stream
         }
 
-        let cleanup = AudioCleanup(engine: engine, inputNode: inputNode)
+        let cleanup = OnceCleanup((engine: engine, node: inputNode))
         continuation.onTermination = { @Sendable _ in
-            cleanup.perform()
+            cleanup.perform { r in
+                r.node.removeTap(onBus: 0)
+                r.engine.stop()
+            }
             log.info("activity:SensorReading wasEndedBy agent:MicrophoneAdapter")
         }
 
         return stream
     }
-}
-
-private struct AudioCleanup: @unchecked Sendable {
-    let engine: AVAudioEngine
-    let inputNode: AVAudioInputNode
-    func perform() { inputNode.removeTap(onBus: 0); engine.stop() }
 }

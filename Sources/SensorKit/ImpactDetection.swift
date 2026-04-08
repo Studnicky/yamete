@@ -9,14 +9,15 @@ private let log = AppLog(category: "ImpactFusion")
 public struct FusionConfig: Equatable {
     /// Number of sensors that must independently detect an impact within the fusion window.
     /// Clamped at runtime to never exceed the number of sensors reporting.
-    public var consensusRequired: Int = 1
+    public var consensusRequired: Int = Defaults.consensus
     /// Time window for collecting impacts from multiple sensors for consensus.
-    public var fusionWindow: TimeInterval = 0.15
+    public var fusionWindow: TimeInterval = Defaults.fusionWindow
     /// Minimum time between fused impact responses.
-    public var rearmDuration: TimeInterval = 0.50
+    public var rearmDuration: TimeInterval = Defaults.rearmDuration
 
-    public init(consensusRequired: Int = 1, fusionWindow: TimeInterval = 0.15,
-                rearmDuration: TimeInterval = 0.50) {
+    public init(consensusRequired: Int = Defaults.consensus,
+                fusionWindow: TimeInterval = Defaults.fusionWindow,
+                rearmDuration: TimeInterval = Defaults.rearmDuration) {
         self.consensusRequired = consensusRequired
         self.fusionWindow = fusionWindow
         self.rearmDuration = rearmDuration
