@@ -13,14 +13,19 @@ public final class SettingsStore {
 
     enum Key: String, CaseIterable, Sendable {
         case sensitivityMin, sensitivityMax
-        case bandpassLowHz, bandpassHighHz
         case debounce
         case screenFlash
         case flashOpacityMin, flashOpacityMax
         case volumeMin, volumeMax
         case soundEnabled, debugLogging, enabledDisplays, enabledAudioDevices, enabledSensorIDs
-        // Advanced detection
-        case spikeThreshold, crestFactor, riseRate, confirmations, warmupSamples, reportInterval, consensusRequired
+        case consensusRequired
+        // Accelerometer detection
+        case accelSpikeThreshold, accelCrestFactor, accelRiseRate, accelConfirmations
+        case accelWarmupSamples, accelReportInterval, accelBandpassLowHz, accelBandpassHighHz
+        // Microphone detection
+        case micSpikeThreshold, micCrestFactor, micRiseRate, micConfirmations, micWarmupSamples
+        // Headphone motion detection
+        case hpSpikeThreshold, hpCrestFactor, hpRiseRate, hpConfirmations, hpWarmupSamples
     }
 
     // MARK: - Defaults
@@ -28,8 +33,6 @@ public final class SettingsStore {
     static let defaults: [String: Any] = [
         Key.sensitivityMin.rawValue:  0.10,
         Key.sensitivityMax.rawValue:  0.90,
-        Key.bandpassLowHz.rawValue:   20.0,
-        Key.bandpassHighHz.rawValue:  25.0,
         Key.debounce.rawValue:        0.5,
         Key.soundEnabled.rawValue:    true,
         Key.debugLogging.rawValue:    false,
@@ -41,14 +44,28 @@ public final class SettingsStore {
         Key.enabledDisplays.rawValue: [Int](),
         Key.enabledAudioDevices.rawValue: [String](),
         Key.enabledSensorIDs.rawValue: [String](),
-        // Advanced detection
-        Key.spikeThreshold.rawValue:  0.020,
-        Key.crestFactor.rawValue:     1.5,
-        Key.riseRate.rawValue:        0.010,
-        Key.confirmations.rawValue:   3,
-        Key.warmupSamples.rawValue:   50,
-        Key.reportInterval.rawValue:  10000.0,
         Key.consensusRequired.rawValue: 1,
+        // Accelerometer detection
+        Key.accelSpikeThreshold.rawValue:  0.020,
+        Key.accelCrestFactor.rawValue:     1.5,
+        Key.accelRiseRate.rawValue:        0.010,
+        Key.accelConfirmations.rawValue:   3,
+        Key.accelWarmupSamples.rawValue:   50,
+        Key.accelReportInterval.rawValue:  10000.0,
+        Key.accelBandpassLowHz.rawValue:   20.0,
+        Key.accelBandpassHighHz.rawValue:  25.0,
+        // Microphone detection
+        Key.micSpikeThreshold.rawValue: 0.020,
+        Key.micCrestFactor.rawValue:    1.5,
+        Key.micRiseRate.rawValue:       0.010,
+        Key.micConfirmations.rawValue:  2,
+        Key.micWarmupSamples.rawValue:  50,
+        // Headphone motion detection
+        Key.hpSpikeThreshold.rawValue:  0.10,
+        Key.hpCrestFactor.rawValue:     1.5,
+        Key.hpRiseRate.rawValue:        0.05,
+        Key.hpConfirmations.rawValue:   2,
+        Key.hpWarmupSamples.rawValue:   50,
     ]
 
     // MARK: - Reactivity (inverted sensitivity: higher value = lower force threshold)
@@ -76,24 +93,24 @@ public final class SettingsStore {
     // MARK: - Frequency band (bandpass filter)
 
     /// High-pass cutoff: vibrations below this frequency are rejected (footsteps, HVAC).
-    var bandpassLowHz: Double {
+    var accelBandpassLowHz: Double {
         didSet {
-            guard bandpassLowHz != oldValue else { return }
-            let c = bandpassLowHz.clamped(to: 10...25)
-            if c != bandpassLowHz { bandpassLowHz = c; return }
-            persist(bandpassLowHz, .bandpassLowHz)
-            if bandpassLowHz > bandpassHighHz { bandpassHighHz = bandpassLowHz }
+            guard accelBandpassLowHz != oldValue else { return }
+            let c = accelBandpassLowHz.clamped(to: 10...25)
+            if c != accelBandpassLowHz { accelBandpassLowHz = c; return }
+            persist(accelBandpassLowHz, .accelBandpassLowHz)
+            if accelBandpassLowHz > accelBandpassHighHz { accelBandpassHighHz = accelBandpassLowHz }
         }
     }
 
     /// Low-pass cutoff: vibrations above this frequency are rejected (electronic noise, rattling).
-    var bandpassHighHz: Double {
+    var accelBandpassHighHz: Double {
         didSet {
-            guard bandpassHighHz != oldValue else { return }
-            let c = bandpassHighHz.clamped(to: 10...25)
-            if c != bandpassHighHz { bandpassHighHz = c; return }
-            persist(bandpassHighHz, .bandpassHighHz)
-            if bandpassHighHz < bandpassLowHz { bandpassLowHz = bandpassHighHz }
+            guard accelBandpassHighHz != oldValue else { return }
+            let c = accelBandpassHighHz.clamped(to: 10...25)
+            if c != accelBandpassHighHz { accelBandpassHighHz = c; return }
+            persist(accelBandpassHighHz, .accelBandpassHighHz)
+            if accelBandpassHighHz < accelBandpassLowHz { accelBandpassLowHz = accelBandpassHighHz }
         }
     }
 
@@ -201,60 +218,60 @@ public final class SettingsStore {
         }
     }
 
-    // MARK: - Advanced detection
+    // MARK: - Accelerometer detection
 
-    var spikeThreshold: Double {
+    var accelSpikeThreshold: Double {
         didSet {
-            guard spikeThreshold != oldValue else { return }
-            let c = spikeThreshold.clamped(to: 0.010...0.040)
-            if c != spikeThreshold { spikeThreshold = c; return }
-            persist(spikeThreshold, .spikeThreshold)
+            guard accelSpikeThreshold != oldValue else { return }
+            let c = accelSpikeThreshold.clamped(to: 0.010...0.040)
+            if c != accelSpikeThreshold { accelSpikeThreshold = c; return }
+            persist(accelSpikeThreshold, .accelSpikeThreshold)
         }
     }
 
-    var crestFactor: Double {
+    var accelCrestFactor: Double {
         didSet {
-            guard crestFactor != oldValue else { return }
-            let c = crestFactor.clamped(to: 1.0...5.0)
-            if c != crestFactor { crestFactor = c; return }
-            persist(crestFactor, .crestFactor)
+            guard accelCrestFactor != oldValue else { return }
+            let c = accelCrestFactor.clamped(to: 1.0...5.0)
+            if c != accelCrestFactor { accelCrestFactor = c; return }
+            persist(accelCrestFactor, .accelCrestFactor)
         }
     }
 
-    var riseRate: Double {
+    var accelRiseRate: Double {
         didSet {
-            guard riseRate != oldValue else { return }
-            let c = riseRate.clamped(to: 0.005...0.020)
-            if c != riseRate { riseRate = c; return }
-            persist(riseRate, .riseRate)
+            guard accelRiseRate != oldValue else { return }
+            let c = accelRiseRate.clamped(to: 0.005...0.020)
+            if c != accelRiseRate { accelRiseRate = c; return }
+            persist(accelRiseRate, .accelRiseRate)
         }
     }
 
-    var confirmations: Int {
+    var accelConfirmations: Int {
         didSet {
-            guard confirmations != oldValue else { return }
-            let c = max(1, min(5, confirmations))
-            if c != confirmations { confirmations = c; return }
-            persist(confirmations, .confirmations)
+            guard accelConfirmations != oldValue else { return }
+            let c = max(1, min(5, accelConfirmations))
+            if c != accelConfirmations { accelConfirmations = c; return }
+            persist(accelConfirmations, .accelConfirmations)
         }
     }
 
-    var warmupSamples: Int {
+    var accelWarmupSamples: Int {
         didSet {
-            guard warmupSamples != oldValue else { return }
-            let c = max(10, min(100, warmupSamples))
-            if c != warmupSamples { warmupSamples = c; return }
-            persist(warmupSamples, .warmupSamples)
+            guard accelWarmupSamples != oldValue else { return }
+            let c = max(10, min(100, accelWarmupSamples))
+            if c != accelWarmupSamples { accelWarmupSamples = c; return }
+            persist(accelWarmupSamples, .accelWarmupSamples)
         }
     }
 
-    /// Sensor report interval in microseconds (5000 = 200Hz, 10000 = 100Hz, 50000 = 20Hz).
-    var reportInterval: Double {
+    /// Accelerometer report interval in microseconds (5000 = 200Hz, 10000 = 100Hz, 50000 = 20Hz).
+    var accelReportInterval: Double {
         didSet {
-            guard reportInterval != oldValue else { return }
-            let c = reportInterval.clamped(to: 5000...50000)
-            if c != reportInterval { reportInterval = c; return }
-            persist(reportInterval, .reportInterval)
+            guard accelReportInterval != oldValue else { return }
+            let c = accelReportInterval.clamped(to: 5000...50000)
+            if c != accelReportInterval { accelReportInterval = c; return }
+            persist(accelReportInterval, .accelReportInterval)
         }
     }
 
@@ -268,6 +285,100 @@ public final class SettingsStore {
         }
     }
 
+    // MARK: - Microphone detection
+
+    var micSpikeThreshold: Double {
+        didSet {
+            guard micSpikeThreshold != oldValue else { return }
+            let c = micSpikeThreshold.clamped(to: 0.005...0.100)
+            if c != micSpikeThreshold { micSpikeThreshold = c; return }
+            persist(micSpikeThreshold, .micSpikeThreshold)
+        }
+    }
+
+    var micCrestFactor: Double {
+        didSet {
+            guard micCrestFactor != oldValue else { return }
+            let c = micCrestFactor.clamped(to: 1.0...5.0)
+            if c != micCrestFactor { micCrestFactor = c; return }
+            persist(micCrestFactor, .micCrestFactor)
+        }
+    }
+
+    var micRiseRate: Double {
+        didSet {
+            guard micRiseRate != oldValue else { return }
+            let c = micRiseRate.clamped(to: 0.002...0.050)
+            if c != micRiseRate { micRiseRate = c; return }
+            persist(micRiseRate, .micRiseRate)
+        }
+    }
+
+    var micConfirmations: Int {
+        didSet {
+            guard micConfirmations != oldValue else { return }
+            let c = max(1, min(5, micConfirmations))
+            if c != micConfirmations { micConfirmations = c; return }
+            persist(micConfirmations, .micConfirmations)
+        }
+    }
+
+    var micWarmupSamples: Int {
+        didSet {
+            guard micWarmupSamples != oldValue else { return }
+            let c = max(10, min(100, micWarmupSamples))
+            if c != micWarmupSamples { micWarmupSamples = c; return }
+            persist(micWarmupSamples, .micWarmupSamples)
+        }
+    }
+
+    // MARK: - Headphone motion detection
+
+    var hpSpikeThreshold: Double {
+        didSet {
+            guard hpSpikeThreshold != oldValue else { return }
+            let c = hpSpikeThreshold.clamped(to: 0.02...0.50)
+            if c != hpSpikeThreshold { hpSpikeThreshold = c; return }
+            persist(hpSpikeThreshold, .hpSpikeThreshold)
+        }
+    }
+
+    var hpCrestFactor: Double {
+        didSet {
+            guard hpCrestFactor != oldValue else { return }
+            let c = hpCrestFactor.clamped(to: 1.0...5.0)
+            if c != hpCrestFactor { hpCrestFactor = c; return }
+            persist(hpCrestFactor, .hpCrestFactor)
+        }
+    }
+
+    var hpRiseRate: Double {
+        didSet {
+            guard hpRiseRate != oldValue else { return }
+            let c = hpRiseRate.clamped(to: 0.010...0.200)
+            if c != hpRiseRate { hpRiseRate = c; return }
+            persist(hpRiseRate, .hpRiseRate)
+        }
+    }
+
+    var hpConfirmations: Int {
+        didSet {
+            guard hpConfirmations != oldValue else { return }
+            let c = max(1, min(5, hpConfirmations))
+            if c != hpConfirmations { hpConfirmations = c; return }
+            persist(hpConfirmations, .hpConfirmations)
+        }
+    }
+
+    var hpWarmupSamples: Int {
+        didSet {
+            guard hpWarmupSamples != oldValue else { return }
+            let c = max(10, min(100, hpWarmupSamples))
+            if c != hpWarmupSamples { hpWarmupSamples = c; return }
+            persist(hpWarmupSamples, .hpWarmupSamples)
+        }
+    }
+
     // MARK: - Init
 
     public init() {
@@ -276,8 +387,8 @@ public final class SettingsStore {
 
         sensitivityMin  = d.double(forKey: Key.sensitivityMin.rawValue)
         sensitivityMax  = d.double(forKey: Key.sensitivityMax.rawValue)
-        bandpassLowHz   = d.double(forKey: Key.bandpassLowHz.rawValue)
-        bandpassHighHz  = d.double(forKey: Key.bandpassHighHz.rawValue)
+        accelBandpassLowHz   = d.double(forKey: Key.accelBandpassLowHz.rawValue)
+        accelBandpassHighHz  = d.double(forKey: Key.accelBandpassHighHz.rawValue)
         debounce        = d.double(forKey: Key.debounce.rawValue)
         soundEnabled    = d.bool(forKey:   Key.soundEnabled.rawValue)
         debugLogging    = d.bool(forKey:   Key.debugLogging.rawValue)
@@ -289,14 +400,28 @@ public final class SettingsStore {
         enabledDisplays = d.array(forKey: Key.enabledDisplays.rawValue) as? [Int] ?? []
         enabledAudioDevices = d.array(forKey: Key.enabledAudioDevices.rawValue) as? [String] ?? []
         enabledSensorIDs = d.array(forKey: Key.enabledSensorIDs.rawValue) as? [String] ?? []
-        // Advanced
-        spikeThreshold  = d.double(forKey: Key.spikeThreshold.rawValue)
-        crestFactor     = d.double(forKey: Key.crestFactor.rawValue)
-        riseRate        = d.double(forKey: Key.riseRate.rawValue)
-        confirmations   = d.integer(forKey: Key.confirmations.rawValue)
-        warmupSamples   = d.integer(forKey: Key.warmupSamples.rawValue)
-        reportInterval  = d.double(forKey: Key.reportInterval.rawValue)
-        consensusRequired = d.integer(forKey: Key.consensusRequired.rawValue)
+        consensusRequired     = d.integer(forKey: Key.consensusRequired.rawValue)
+        // Accelerometer
+        accelSpikeThreshold   = d.double(forKey: Key.accelSpikeThreshold.rawValue)
+        accelCrestFactor      = d.double(forKey: Key.accelCrestFactor.rawValue)
+        accelRiseRate         = d.double(forKey: Key.accelRiseRate.rawValue)
+        accelConfirmations    = d.integer(forKey: Key.accelConfirmations.rawValue)
+        accelWarmupSamples    = d.integer(forKey: Key.accelWarmupSamples.rawValue)
+        accelReportInterval   = d.double(forKey: Key.accelReportInterval.rawValue)
+        accelBandpassLowHz    = d.double(forKey: Key.accelBandpassLowHz.rawValue)
+        accelBandpassHighHz   = d.double(forKey: Key.accelBandpassHighHz.rawValue)
+        // Microphone
+        micSpikeThreshold = d.double(forKey: Key.micSpikeThreshold.rawValue)
+        micCrestFactor    = d.double(forKey: Key.micCrestFactor.rawValue)
+        micRiseRate       = d.double(forKey: Key.micRiseRate.rawValue)
+        micConfirmations  = d.integer(forKey: Key.micConfirmations.rawValue)
+        micWarmupSamples  = d.integer(forKey: Key.micWarmupSamples.rawValue)
+        // Headphone
+        hpSpikeThreshold  = d.double(forKey: Key.hpSpikeThreshold.rawValue)
+        hpCrestFactor     = d.double(forKey: Key.hpCrestFactor.rawValue)
+        hpRiseRate        = d.double(forKey: Key.hpRiseRate.rawValue)
+        hpConfirmations   = d.integer(forKey: Key.hpConfirmations.rawValue)
+        hpWarmupSamples   = d.integer(forKey: Key.hpWarmupSamples.rawValue)
     }
 
     // MARK: - Reset
@@ -306,8 +431,8 @@ public final class SettingsStore {
         let d = Self.defaults
         sensitivityMin    = d[Key.sensitivityMin.rawValue]  as! Double
         sensitivityMax    = d[Key.sensitivityMax.rawValue]  as! Double
-        bandpassLowHz     = d[Key.bandpassLowHz.rawValue]   as! Double
-        bandpassHighHz    = d[Key.bandpassHighHz.rawValue]   as! Double
+        accelBandpassLowHz     = d[Key.accelBandpassLowHz.rawValue]   as! Double
+        accelBandpassHighHz    = d[Key.accelBandpassHighHz.rawValue]   as! Double
         debounce          = d[Key.debounce.rawValue]         as! Double
         soundEnabled      = d[Key.soundEnabled.rawValue]     as! Bool
         debugLogging      = d[Key.debugLogging.rawValue]     as! Bool
@@ -319,13 +444,25 @@ public final class SettingsStore {
         enabledDisplays   = d[Key.enabledDisplays.rawValue]  as! [Int]
         enabledAudioDevices = d[Key.enabledAudioDevices.rawValue] as! [String]
         enabledSensorIDs  = d[Key.enabledSensorIDs.rawValue] as! [String]
-        spikeThreshold    = d[Key.spikeThreshold.rawValue]   as! Double
-        crestFactor       = d[Key.crestFactor.rawValue]      as! Double
-        riseRate          = d[Key.riseRate.rawValue]          as! Double
-        confirmations     = d[Key.confirmations.rawValue]    as! Int
-        warmupSamples     = d[Key.warmupSamples.rawValue]    as! Int
-        reportInterval    = d[Key.reportInterval.rawValue]   as! Double
-        consensusRequired = d[Key.consensusRequired.rawValue] as! Int
+        consensusRequired     = d[Key.consensusRequired.rawValue]     as! Int
+        accelSpikeThreshold   = d[Key.accelSpikeThreshold.rawValue]  as! Double
+        accelCrestFactor      = d[Key.accelCrestFactor.rawValue]     as! Double
+        accelRiseRate         = d[Key.accelRiseRate.rawValue]        as! Double
+        accelConfirmations    = d[Key.accelConfirmations.rawValue]   as! Int
+        accelWarmupSamples    = d[Key.accelWarmupSamples.rawValue]   as! Int
+        accelReportInterval   = d[Key.accelReportInterval.rawValue]  as! Double
+        accelBandpassLowHz    = d[Key.accelBandpassLowHz.rawValue]   as! Double
+        accelBandpassHighHz   = d[Key.accelBandpassHighHz.rawValue]  as! Double
+        micSpikeThreshold = d[Key.micSpikeThreshold.rawValue] as! Double
+        micCrestFactor    = d[Key.micCrestFactor.rawValue]    as! Double
+        micRiseRate       = d[Key.micRiseRate.rawValue]       as! Double
+        micConfirmations  = d[Key.micConfirmations.rawValue]  as! Int
+        micWarmupSamples  = d[Key.micWarmupSamples.rawValue]  as! Int
+        hpSpikeThreshold  = d[Key.hpSpikeThreshold.rawValue]  as! Double
+        hpCrestFactor     = d[Key.hpCrestFactor.rawValue]     as! Double
+        hpRiseRate        = d[Key.hpRiseRate.rawValue]        as! Double
+        hpConfirmations   = d[Key.hpConfirmations.rawValue]   as! Int
+        hpWarmupSamples   = d[Key.hpWarmupSamples.rawValue]   as! Int
     }
 
     // MARK: - Private

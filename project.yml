@@ -50,10 +50,9 @@ targets:
       - sdk: SwiftUI.framework
       - sdk: AppKit.framework
     info:
-      path: Bundle/Contents/Info.plist
+      path: Yamete-Info.plist
       properties:
         CFBundleDisplayName: Yamete
-        CFBundleExecutable: Yamete
         CFBundleIconFile: AppIcon
         CFBundleIconName: AppIcon
         CFBundleIdentifier: com.studnicky.yamete

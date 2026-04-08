@@ -28,8 +28,8 @@ final class SettingsStoreIntegrationTests: XCTestCase {
         let cases: [Case] = [
             .init(name: "sensitivityMin",    actual: "\(store.sensitivityMin)",    expected: "0.1"),
             .init(name: "sensitivityMax",    actual: "\(store.sensitivityMax)",    expected: "0.9"),
-            .init(name: "bandpassLowHz",     actual: "\(store.bandpassLowHz)",     expected: "20.0"),
-            .init(name: "bandpassHighHz",    actual: "\(store.bandpassHighHz)",    expected: "25.0"),
+            .init(name: "bandpassLowHz",     actual: "\(store.accelBandpassLowHz)",     expected: "20.0"),
+            .init(name: "bandpassHighHz",    actual: "\(store.accelBandpassHighHz)",    expected: "25.0"),
             .init(name: "debounce",          actual: "\(store.debounce)",          expected: "0.5"),
             .init(name: "soundEnabled",      actual: "\(store.soundEnabled)",      expected: "true"),
             .init(name: "debugLogging",      actual: "\(store.debugLogging)",      expected: "false"),
@@ -38,12 +38,12 @@ final class SettingsStoreIntegrationTests: XCTestCase {
             .init(name: "flashOpacityMax",   actual: "\(store.flashOpacityMax)",   expected: "0.9"),
             .init(name: "volumeMin",         actual: "\(store.volumeMin)",         expected: "0.5"),
             .init(name: "volumeMax",         actual: "\(store.volumeMax)",         expected: "0.9"),
-            .init(name: "spikeThreshold",    actual: "\(store.spikeThreshold)",    expected: "0.02"),
-            .init(name: "crestFactor",       actual: "\(store.crestFactor)",       expected: "1.5"),
-            .init(name: "riseRate",          actual: "\(store.riseRate)",          expected: "0.01"),
-            .init(name: "confirmations",     actual: "\(store.confirmations)",     expected: "3"),
-            .init(name: "warmupSamples",     actual: "\(store.warmupSamples)",     expected: "50"),
-            .init(name: "reportInterval",    actual: "\(store.reportInterval)",    expected: "10000.0"),
+            .init(name: "spikeThreshold",    actual: "\(store.accelSpikeThreshold)",    expected: "0.02"),
+            .init(name: "crestFactor",       actual: "\(store.accelCrestFactor)",       expected: "1.5"),
+            .init(name: "riseRate",          actual: "\(store.accelRiseRate)",          expected: "0.01"),
+            .init(name: "confirmations",     actual: "\(store.accelConfirmations)",     expected: "3"),
+            .init(name: "warmupSamples",     actual: "\(store.accelWarmupSamples)",     expected: "50"),
+            .init(name: "reportInterval",    actual: "\(store.accelReportInterval)",    expected: "10000.0"),
             .init(name: "consensusRequired", actual: "\(store.consensusRequired)", expected: "1"),
         ]
         for c in cases {
@@ -65,17 +65,17 @@ final class SettingsStoreIntegrationTests: XCTestCase {
         let cases: [Case] = [
             .init(name: "sensitivityMin",  key: .sensitivityMin,  write: { $0.sensitivityMin = 0.35 },  value: 0.35),
             .init(name: "sensitivityMax",  key: .sensitivityMax,  write: { $0.sensitivityMax = 0.65 },  value: 0.65),
-            .init(name: "bandpassLowHz",   key: .bandpassLowHz,   write: { $0.bandpassLowHz = 15.0 },   value: 15.0),
-            .init(name: "bandpassHighHz",  key: .bandpassHighHz,  write: { $0.bandpassHighHz = 22.0 },  value: 22.0),
+            .init(name: "bandpassLowHz",   key: .accelBandpassLowHz,   write: { $0.accelBandpassLowHz = 15.0 },   value: 15.0),
+            .init(name: "bandpassHighHz",  key: .accelBandpassHighHz,  write: { $0.accelBandpassHighHz = 22.0 },  value: 22.0),
             .init(name: "debounce",        key: .debounce,        write: { $0.debounce = 1.0 },         value: 1.0),
             .init(name: "flashOpacityMin", key: .flashOpacityMin, write: { $0.flashOpacityMin = 0.2 },  value: 0.2),
             .init(name: "flashOpacityMax", key: .flashOpacityMax, write: { $0.flashOpacityMax = 0.8 },  value: 0.8),
             .init(name: "volumeMin",       key: .volumeMin,       write: { $0.volumeMin = 0.1 },        value: 0.1),
             .init(name: "volumeMax",       key: .volumeMax,       write: { $0.volumeMax = 0.7 },        value: 0.7),
-            .init(name: "spikeThreshold",  key: .spikeThreshold,  write: { $0.spikeThreshold = 0.030 }, value: 0.030),
-            .init(name: "crestFactor",     key: .crestFactor,     write: { $0.crestFactor = 2.5 },      value: 2.5),
-            .init(name: "riseRate",        key: .riseRate,        write: { $0.riseRate = 0.015 },       value: 0.015),
-            .init(name: "reportInterval",  key: .reportInterval,  write: { $0.reportInterval = 20000 }, value: 20000),
+            .init(name: "spikeThreshold",  key: .accelSpikeThreshold,  write: { $0.accelSpikeThreshold = 0.030 }, value: 0.030),
+            .init(name: "crestFactor",     key: .accelCrestFactor,     write: { $0.accelCrestFactor = 2.5 },      value: 2.5),
+            .init(name: "riseRate",        key: .accelRiseRate,        write: { $0.accelRiseRate = 0.015 },       value: 0.015),
+            .init(name: "reportInterval",  key: .accelReportInterval,  write: { $0.accelReportInterval = 20000 }, value: 20000),
         ]
         for c in cases {
             let store = freshStore()
@@ -96,8 +96,8 @@ final class SettingsStoreIntegrationTests: XCTestCase {
     func testIntPersistenceRoundtrip() {
         struct Case { let name: String; let key: SettingsStore.Key; let write: (SettingsStore) -> Void; let value: Int }
         let cases: [Case] = [
-            .init(name: "confirmations",     key: .confirmations,     write: { $0.confirmations = 4 },     value: 4),
-            .init(name: "warmupSamples",     key: .warmupSamples,     write: { $0.warmupSamples = 75 },    value: 75),
+            .init(name: "confirmations",     key: .accelConfirmations,     write: { $0.accelConfirmations = 4 },     value: 4),
+            .init(name: "warmupSamples",     key: .accelWarmupSamples,     write: { $0.accelWarmupSamples = 75 },    value: 75),
             .init(name: "consensusRequired", key: .consensusRequired, write: { $0.consensusRequired = 3 }, value: 3),
         ]
         for c in cases {
@@ -148,10 +148,10 @@ final class SettingsStoreIntegrationTests: XCTestCase {
             .init(name: "sensitivityMax below",  write: { $0.sensitivityMax = $1 }, read: { $0.sensitivityMax }, input: -1.0, validRange: 0...1),
             .init(name: "sensitivityMax above",  write: { $0.sensitivityMax = $1 }, read: { $0.sensitivityMax }, input: 2.0,  validRange: 0...1),
             // Bandpass 10...25
-            .init(name: "bandpassLowHz below",   write: { $0.bandpassLowHz = $1 },  read: { $0.bandpassLowHz },  input: 5.0,   validRange: 10...25),
-            .init(name: "bandpassLowHz above",   write: { $0.bandpassLowHz = $1 },  read: { $0.bandpassLowHz },  input: 30.0,  validRange: 10...25),
-            .init(name: "bandpassHighHz below",  write: { $0.bandpassHighHz = $1 }, read: { $0.bandpassHighHz }, input: 5.0,   validRange: 10...25),
-            .init(name: "bandpassHighHz above",  write: { $0.bandpassHighHz = $1 }, read: { $0.bandpassHighHz }, input: 30.0,  validRange: 10...25),
+            .init(name: "bandpassLowHz below",   write: { $0.accelBandpassLowHz = $1 },  read: { $0.accelBandpassLowHz },  input: 5.0,   validRange: 10...25),
+            .init(name: "bandpassLowHz above",   write: { $0.accelBandpassLowHz = $1 },  read: { $0.accelBandpassLowHz },  input: 30.0,  validRange: 10...25),
+            .init(name: "bandpassHighHz below",  write: { $0.accelBandpassHighHz = $1 }, read: { $0.accelBandpassHighHz }, input: 5.0,   validRange: 10...25),
+            .init(name: "bandpassHighHz above",  write: { $0.accelBandpassHighHz = $1 }, read: { $0.accelBandpassHighHz }, input: 30.0,  validRange: 10...25),
             // Debounce 0...2
             .init(name: "debounce below",        write: { $0.debounce = $1 }, read: { $0.debounce }, input: -1.0, validRange: 0...2),
             .init(name: "debounce above",        write: { $0.debounce = $1 }, read: { $0.debounce }, input: 5.0,  validRange: 0...2),
@@ -164,17 +164,17 @@ final class SettingsStoreIntegrationTests: XCTestCase {
             .init(name: "volumeMin below",       write: { $0.volumeMin = $1 }, read: { $0.volumeMin }, input: -1.0, validRange: 0...1),
             .init(name: "volumeMax above",       write: { $0.volumeMax = $1 }, read: { $0.volumeMax }, input: 5.0,  validRange: 0...1),
             // Advanced: spikeThreshold 0.010...0.040
-            .init(name: "spikeThreshold below",  write: { $0.spikeThreshold = $1 }, read: { $0.spikeThreshold }, input: 0.001, validRange: 0.010...0.040),
-            .init(name: "spikeThreshold above",  write: { $0.spikeThreshold = $1 }, read: { $0.spikeThreshold }, input: 0.100, validRange: 0.010...0.040),
+            .init(name: "spikeThreshold below",  write: { $0.accelSpikeThreshold = $1 }, read: { $0.accelSpikeThreshold }, input: 0.001, validRange: 0.010...0.040),
+            .init(name: "spikeThreshold above",  write: { $0.accelSpikeThreshold = $1 }, read: { $0.accelSpikeThreshold }, input: 0.100, validRange: 0.010...0.040),
             // crestFactor 1.0...5.0
-            .init(name: "crestFactor below",     write: { $0.crestFactor = $1 }, read: { $0.crestFactor }, input: 0.5, validRange: 1.0...5.0),
-            .init(name: "crestFactor above",     write: { $0.crestFactor = $1 }, read: { $0.crestFactor }, input: 10.0, validRange: 1.0...5.0),
+            .init(name: "crestFactor below",     write: { $0.accelCrestFactor = $1 }, read: { $0.accelCrestFactor }, input: 0.5, validRange: 1.0...5.0),
+            .init(name: "crestFactor above",     write: { $0.accelCrestFactor = $1 }, read: { $0.accelCrestFactor }, input: 10.0, validRange: 1.0...5.0),
             // riseRate 0.005...0.020
-            .init(name: "riseRate below",        write: { $0.riseRate = $1 }, read: { $0.riseRate }, input: 0.001, validRange: 0.005...0.020),
-            .init(name: "riseRate above",        write: { $0.riseRate = $1 }, read: { $0.riseRate }, input: 0.050, validRange: 0.005...0.020),
+            .init(name: "riseRate below",        write: { $0.accelRiseRate = $1 }, read: { $0.accelRiseRate }, input: 0.001, validRange: 0.005...0.020),
+            .init(name: "riseRate above",        write: { $0.accelRiseRate = $1 }, read: { $0.accelRiseRate }, input: 0.050, validRange: 0.005...0.020),
             // reportInterval 5000...50000
-            .init(name: "reportInterval below",  write: { $0.reportInterval = $1 }, read: { $0.reportInterval }, input: 1000,  validRange: 5000...50000),
-            .init(name: "reportInterval above",  write: { $0.reportInterval = $1 }, read: { $0.reportInterval }, input: 100000, validRange: 5000...50000),
+            .init(name: "reportInterval below",  write: { $0.accelReportInterval = $1 }, read: { $0.accelReportInterval }, input: 1000,  validRange: 5000...50000),
+            .init(name: "reportInterval above",  write: { $0.accelReportInterval = $1 }, read: { $0.accelReportInterval }, input: 100000, validRange: 5000...50000),
         ]
         for c in cases {
             let store = freshStore()
@@ -189,11 +189,11 @@ final class SettingsStoreIntegrationTests: XCTestCase {
         struct Case { let name: String; let write: (SettingsStore, Int) -> Void; let read: (SettingsStore) -> Int; let input: Int; let validRange: ClosedRange<Int> }
         let cases: [Case] = [
             // confirmations 1...5
-            .init(name: "confirmations below", write: { $0.confirmations = $1 }, read: { $0.confirmations }, input: 0, validRange: 1...5),
-            .init(name: "confirmations above", write: { $0.confirmations = $1 }, read: { $0.confirmations }, input: 10, validRange: 1...5),
+            .init(name: "confirmations below", write: { $0.accelConfirmations = $1 }, read: { $0.accelConfirmations }, input: 0, validRange: 1...5),
+            .init(name: "confirmations above", write: { $0.accelConfirmations = $1 }, read: { $0.accelConfirmations }, input: 10, validRange: 1...5),
             // warmupSamples 10...100
-            .init(name: "warmupSamples below", write: { $0.warmupSamples = $1 }, read: { $0.warmupSamples }, input: 1, validRange: 10...100),
-            .init(name: "warmupSamples above", write: { $0.warmupSamples = $1 }, read: { $0.warmupSamples }, input: 500, validRange: 10...100),
+            .init(name: "warmupSamples below", write: { $0.accelWarmupSamples = $1 }, read: { $0.accelWarmupSamples }, input: 1, validRange: 10...100),
+            .init(name: "warmupSamples above", write: { $0.accelWarmupSamples = $1 }, read: { $0.accelWarmupSamples }, input: 500, validRange: 10...100),
             // consensusRequired 1...10
             .init(name: "consensus below",     write: { $0.consensusRequired = $1 }, read: { $0.consensusRequired }, input: 0, validRange: 1...10),
             .init(name: "consensus above",     write: { $0.consensusRequired = $1 }, read: { $0.consensusRequired }, input: 20, validRange: 1...10),
@@ -227,11 +227,11 @@ final class SettingsStoreIntegrationTests: XCTestCase {
                   readMin: { $0.sensitivityMin }, readMax: { $0.sensitivityMax }),
             // Bandpass low/high
             .init(name: "bandpass low>high",
-                  setup: { $0.bandpassHighHz = 15.0; $0.bandpassLowHz = 20.0 },
-                  readMin: { $0.bandpassLowHz }, readMax: { $0.bandpassHighHz }),
+                  setup: { $0.accelBandpassHighHz = 15.0; $0.accelBandpassLowHz = 20.0 },
+                  readMin: { $0.accelBandpassLowHz }, readMax: { $0.accelBandpassHighHz }),
             .init(name: "bandpass high<low",
-                  setup: { $0.bandpassLowHz = 20.0; $0.bandpassHighHz = 15.0 },
-                  readMin: { $0.bandpassLowHz }, readMax: { $0.bandpassHighHz }),
+                  setup: { $0.accelBandpassLowHz = 20.0; $0.accelBandpassHighHz = 15.0 },
+                  readMin: { $0.accelBandpassLowHz }, readMax: { $0.accelBandpassHighHz }),
             // Flash opacity
             .init(name: "opacity min>max",
                   setup: { $0.flashOpacityMax = 0.3; $0.flashOpacityMin = 0.8 },
@@ -261,32 +261,32 @@ final class SettingsStoreIntegrationTests: XCTestCase {
     func testAdvancedDetectionSettingsPersist() {
         let store = freshStore()
 
-        store.spikeThreshold = 0.025
-        store.crestFactor = 3.0
-        store.riseRate = 0.012
-        store.confirmations = 4
-        store.warmupSamples = 60
-        store.reportInterval = 20000.0
+        store.accelSpikeThreshold = 0.025
+        store.accelCrestFactor = 3.0
+        store.accelRiseRate = 0.012
+        store.accelConfirmations = 4
+        store.accelWarmupSamples = 60
+        store.accelReportInterval = 20000.0
         store.consensusRequired = 2
 
         // Verify through UserDefaults
         let d = UserDefaults.standard
-        XCTAssertEqual(d.double(forKey: "spikeThreshold"), 0.025, accuracy: 1e-10)
-        XCTAssertEqual(d.double(forKey: "crestFactor"), 3.0, accuracy: 1e-10)
-        XCTAssertEqual(d.double(forKey: "riseRate"), 0.012, accuracy: 1e-10)
-        XCTAssertEqual(d.integer(forKey: "confirmations"), 4)
-        XCTAssertEqual(d.integer(forKey: "warmupSamples"), 60)
-        XCTAssertEqual(d.double(forKey: "reportInterval"), 20000.0, accuracy: 1e-10)
+        XCTAssertEqual(d.double(forKey: "accelSpikeThreshold"), 0.025, accuracy: 1e-10)
+        XCTAssertEqual(d.double(forKey: "accelCrestFactor"), 3.0, accuracy: 1e-10)
+        XCTAssertEqual(d.double(forKey: "accelRiseRate"), 0.012, accuracy: 1e-10)
+        XCTAssertEqual(d.integer(forKey: "accelConfirmations"), 4)
+        XCTAssertEqual(d.integer(forKey: "accelWarmupSamples"), 60)
+        XCTAssertEqual(d.double(forKey: "accelReportInterval"), 20000.0, accuracy: 1e-10)
         XCTAssertEqual(d.integer(forKey: "consensusRequired"), 2)
 
         // Verify a new store picks up persisted values
         let reloaded = SettingsStore()
-        XCTAssertEqual(reloaded.spikeThreshold, 0.025, accuracy: 1e-10)
-        XCTAssertEqual(reloaded.crestFactor, 3.0, accuracy: 1e-10)
-        XCTAssertEqual(reloaded.riseRate, 0.012, accuracy: 1e-10)
-        XCTAssertEqual(reloaded.confirmations, 4)
-        XCTAssertEqual(reloaded.warmupSamples, 60)
-        XCTAssertEqual(reloaded.reportInterval, 20000.0, accuracy: 1e-10)
+        XCTAssertEqual(reloaded.accelSpikeThreshold, 0.025, accuracy: 1e-10)
+        XCTAssertEqual(reloaded.accelCrestFactor, 3.0, accuracy: 1e-10)
+        XCTAssertEqual(reloaded.accelRiseRate, 0.012, accuracy: 1e-10)
+        XCTAssertEqual(reloaded.accelConfirmations, 4)
+        XCTAssertEqual(reloaded.accelWarmupSamples, 60)
+        XCTAssertEqual(reloaded.accelReportInterval, 20000.0, accuracy: 1e-10)
         XCTAssertEqual(reloaded.consensusRequired, 2)
     }
 
@@ -302,12 +302,12 @@ final class SettingsStoreIntegrationTests: XCTestCase {
         store.sensitivityMax = 0.8
         store.debounce = 1.0
         store.debounce = 1.0
-        store.spikeThreshold = 0.025
-        store.spikeThreshold = 0.025
+        store.accelSpikeThreshold = 0.025
+        store.accelSpikeThreshold = 0.025
         store.soundEnabled = false
         store.soundEnabled = false
-        store.confirmations = 3
-        store.confirmations = 3
+        store.accelConfirmations = 3
+        store.accelConfirmations = 3
         // No crash = success
     }
 
@@ -329,43 +329,43 @@ final class SettingsStoreIntegrationTests: XCTestCase {
         for _ in 0..<50 {
             store.sensitivityMin = Double.random(in: -1...2)
             store.sensitivityMax = Double.random(in: -1...2)
-            store.bandpassLowHz = Double.random(in: 0...50)
-            store.bandpassHighHz = Double.random(in: 0...50)
+            store.accelBandpassLowHz = Double.random(in: 0...50)
+            store.accelBandpassHighHz = Double.random(in: 0...50)
             store.debounce = Double.random(in: -1...5)
             store.flashOpacityMin = Double.random(in: -1...2)
             store.flashOpacityMax = Double.random(in: -1...2)
             store.volumeMin = Double.random(in: -1...2)
             store.volumeMax = Double.random(in: -1...2)
-            store.spikeThreshold = Double.random(in: 0...0.1)
-            store.crestFactor = Double.random(in: 0...10)
-            store.riseRate = Double.random(in: 0...0.05)
-            store.confirmations = Int.random(in: -5...20)
-            store.warmupSamples = Int.random(in: -10...200)
+            store.accelSpikeThreshold = Double.random(in: 0...0.1)
+            store.accelCrestFactor = Double.random(in: 0...10)
+            store.accelRiseRate = Double.random(in: 0...0.05)
+            store.accelConfirmations = Int.random(in: -5...20)
+            store.accelWarmupSamples = Int.random(in: -10...200)
             store.consensusRequired = Int.random(in: -5...20)
-            store.reportInterval = Double.random(in: 0...100000)
+            store.accelReportInterval = Double.random(in: 0...100000)
         }
 
         // After all mutations, verify all values are within their valid ranges
         XCTAssertTrue((0...1).contains(store.sensitivityMin), "sensitivityMin in range")
         XCTAssertTrue((0...1).contains(store.sensitivityMax), "sensitivityMax in range")
-        XCTAssertTrue((10...25).contains(store.bandpassLowHz), "bandpassLowHz in range")
-        XCTAssertTrue((10...25).contains(store.bandpassHighHz), "bandpassHighHz in range")
+        XCTAssertTrue((10...25).contains(store.accelBandpassLowHz), "bandpassLowHz in range")
+        XCTAssertTrue((10...25).contains(store.accelBandpassHighHz), "bandpassHighHz in range")
         XCTAssertTrue((0...2).contains(store.debounce), "debounce in range")
         XCTAssertTrue((0...1).contains(store.flashOpacityMin), "flashOpacityMin in range")
         XCTAssertTrue((0...1).contains(store.flashOpacityMax), "flashOpacityMax in range")
         XCTAssertTrue((0...1).contains(store.volumeMin), "volumeMin in range")
         XCTAssertTrue((0...1).contains(store.volumeMax), "volumeMax in range")
-        XCTAssertTrue((0.010...0.040).contains(store.spikeThreshold), "spikeThreshold in range")
-        XCTAssertTrue((1.0...5.0).contains(store.crestFactor), "crestFactor in range")
-        XCTAssertTrue((0.005...0.020).contains(store.riseRate), "riseRate in range")
-        XCTAssertTrue((1...5).contains(store.confirmations), "confirmations in range")
-        XCTAssertTrue((10...100).contains(store.warmupSamples), "warmupSamples in range")
+        XCTAssertTrue((0.010...0.040).contains(store.accelSpikeThreshold), "spikeThreshold in range")
+        XCTAssertTrue((1.0...5.0).contains(store.accelCrestFactor), "crestFactor in range")
+        XCTAssertTrue((0.005...0.020).contains(store.accelRiseRate), "riseRate in range")
+        XCTAssertTrue((1...5).contains(store.accelConfirmations), "confirmations in range")
+        XCTAssertTrue((10...100).contains(store.accelWarmupSamples), "warmupSamples in range")
         XCTAssertTrue((1...10).contains(store.consensusRequired), "consensusRequired in range")
-        XCTAssertTrue((5000...50000).contains(store.reportInterval), "reportInterval in range")
+        XCTAssertTrue((5000...50000).contains(store.accelReportInterval), "reportInterval in range")
 
         // Paired constraints
         XCTAssertLessThanOrEqual(store.sensitivityMin, store.sensitivityMax)
-        XCTAssertLessThanOrEqual(store.bandpassLowHz, store.bandpassHighHz)
+        XCTAssertLessThanOrEqual(store.accelBandpassLowHz, store.accelBandpassHighHz)
         XCTAssertLessThanOrEqual(store.flashOpacityMin, store.flashOpacityMax)
         XCTAssertLessThanOrEqual(store.volumeMin, store.volumeMax)
     }

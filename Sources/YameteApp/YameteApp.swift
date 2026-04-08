@@ -1,9 +1,17 @@
 import SwiftUI
 import AppKit
+#if canImport(YameteCore)
 import YameteCore
+#endif
+#if canImport(SensorKit)
 import SensorKit
+#endif
+#if canImport(ResponseKit)
 import ResponseKit
+#endif
+#if canImport(YameteApp)
 import YameteApp
+#endif
 
 @main
 struct YameteApp: App {

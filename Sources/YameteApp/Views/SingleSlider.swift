@@ -36,7 +36,10 @@ struct SingleSlider: View {
         let span = bounds.upperBound - bounds.lowerBound
         let yC = h / 2
         let safeW = max(w, 1)
-        let posX = CGFloat((value - bounds.lowerBound) / span).clamped(to: 0...1) * safeW
+        let half = thumbW / 2
+        let usable = max(safeW - thumbW, 1)
+        let ratio = CGFloat((value - bounds.lowerBound) / span).clamped(to: 0...1)
+        let posX = half + ratio * usable
 
         ZStack {
             // Background track
@@ -46,7 +49,7 @@ struct SingleSlider: View {
 
             // Filled track
             Path { p in
-                p.move(to: .init(x: 0, y: yC))
+                p.move(to: .init(x: half, y: yC))
                 p.addLine(to: .init(x: posX, y: yC))
             }
             .stroke(Theme.pink, lineWidth: trackH)
@@ -60,7 +63,8 @@ struct SingleSlider: View {
                 .highPriorityGesture(
                     DragGesture(coordinateSpace: .named(Self.coordSpace))
                         .onChanged { v in
-                            var raw = bounds.lowerBound + Double(min(max(0, v.location.x), safeW) / safeW) * span
+                            let clamped = min(max(half, v.location.x), half + usable)
+                            var raw = bounds.lowerBound + Double((clamped - half) / usable) * span
                             if let step { raw = (raw / step).rounded() * step }
                             value = raw.clamped(to: bounds)
                         }
