@@ -141,7 +141,7 @@ App/
     faces/                    Face images (any SVG/PNG/JPG, loaded recursively)
     sounds/                   Sound clips (any MP3/WAV/M4A, sorted by duration at startup)
 
-Tests/                        37 tests (unit, integration, E2E)
+Tests/                        117 tests (unit, integration, E2E)
 ```
 
 ## Privacy

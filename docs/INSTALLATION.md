@@ -39,7 +39,7 @@ make install        # builds and copies to /Applications
 | `make release` | `dist/Yamete Direct.app` | Optimized direct build, Developer ID signed |
 | `make dmg` | `dist/Yamete Direct.dmg` | Direct-download disk image |
 | `make install` | `/Applications/Yamete Direct.app` | Build and install the direct product |
-| `make test` | — | Run test suite (37 tests) |
+| `make test` | — | Run test suite (117 tests) |
 | `make clean` | — | Remove build artifacts |
 
 ### App Store archive

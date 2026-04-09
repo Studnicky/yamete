@@ -13,20 +13,28 @@ These must be resolved before submission. No exceptions.
 
 ### BLOCKER-1: Accelerometer Activation API
 
-**Status**: RESOLVED
-**Risk**: None — uses IOKit public API
+**Status**: RESOLVED (with caveat)
+**Risk**: Low — all IOKit functions are public SDK, but driver property keys are undocumented
 
 #### Implementation
 
-The accelerometer adapter uses IOKit public APIs for both activation and reading:
+Sensor activation uses `IORegistryEntrySetCFProperty` (declared in `IOKit/IOKitLib.h`)
+to set properties on `AppleSPUHIDDriver` IORegistry services. Report reading uses
+`IOHIDManager` + `IOHIDDeviceRegisterInputReportCallback` (declared in `IOKit/hid/`).
 
-- **Activation**: `IOHIDEventSystemClientCreateSimpleClient` + `IOHIDServiceClientSetProperty("ReportInterval")`
-- **Reading**: `IOHIDManager` + `IOHIDDeviceRegisterInputReportCallback`
+**What is public API**: Every function called (`IOServiceMatching`, `IOServiceGetMatchingServices`,
+`IORegistryEntrySetCFProperty`, `IOHIDManagerCreate`, `IOHIDDeviceOpen`,
+`IOHIDDeviceRegisterInputReportCallback`). Zero private symbols in the binary.
 
-Service-level functions (`IOHIDServiceClientSetProperty`, `CopyProperty`, `ConformsTo`,
-`GetRegistryID`) are declared in Apple's public SDK header `IOHIDServiceClient.h`.
-The app bridges Apple's public `IOHIDEventSystemClient.h` and `IOHIDServiceClient.h`
-headers via `Sources/IOHIDPublic/include/IOHIDPublic.h`.
+**What is undocumented**: The IORegistry driver class name `AppleSPUHIDDriver` and the
+property keys `ReportInterval`, `SensorPropertyReportingState`, `SensorPropertyPowerState`.
+
+**Why**: `CMMotionManager` is `API_UNAVAILABLE(macos)`. There is no documented Apple API for
+reading the built-in accelerometer on macOS. This is the same approach used by all known
+macOS accelerometer utilities.
+
+**Graceful degradation**: If activation fails (return values checked), the app falls back to
+microphone-only detection. No crash, no error beyond a log message.
 
 No `@_silgen_name` bindings. No `#if !APP_STORE` guards. One adapter, one build.
 Verified: works under App Sandbox with `device.usb` entitlement. 100Hz data on Apple Silicon.

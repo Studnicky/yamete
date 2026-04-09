@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sound selection: pre-sorted by duration at startup, intensity maps to clip length
 - ImpactController split into detect() → respond() with DetectedImpact struct
 - Debounce merged with rearm into single Cooldown control
-- SensorFusionEngine renamed to ImpactDetectionEngine
+- SensorFusionEngine renamed to ImpactFusionEngine
 - Frequency band: configurable bandpass (HP 20Hz + LP 25Hz default)
 - All detection parameters exposed as user-configurable advanced settings
 - Entitlements consolidated to single file (Yamete.entitlements)
@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - LogStore graceful fallback when Application Support unavailable
 
 ### Fixed
-- @MainActor isolation on ImpactDetectionEngine (was unconfined)
+- @MainActor isolation on ImpactFusionEngine (was unconfined)
 - ScreenFlash hide Task missing @MainActor (AppKit thread safety)
 - Updater Tasks missing @MainActor (state mutation isolation)
 - EventContext use-after-free on stream termination
@@ -51,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings schema reset wiping all user preferences on every default change
 
 ### Removed
-- ImpactDetector, SignalDetectors, DetectorConfig (replaced by ImpactDetectionEngine)
+- ImpactDetector, SignalDetectors, DetectorConfig (replaced by ImpactFusionEngine)
 - Self-updater (updates via Mac App Store)
 - Licensing infrastructure (LicenseManager, LicenseStore, trial period)
 - Schema version reset mechanism (UserDefaults.register handles new keys)
