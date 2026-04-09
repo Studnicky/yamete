@@ -8,35 +8,29 @@ import os
 
 // MARK: - BMI286 Accelerometer Adapter
 //
-// Reads the BMI286 accelerometer on Apple Silicon Macs via IOKit public APIs.
+// Reads the BMI286 accelerometer on Apple Silicon Macs via IOKit.
 // Runs its own detection pipeline (bandpass → ImpactDetector) and emits
 // SensorImpact events with 0–1 intensity.
 //
 // The sensor appears as a vendor-defined HID device:
 //   PrimaryUsagePage = 0xFF00, PrimaryUsage = 3, Transport = "SPU"
 //
-// Activation (IOHIDEventSystemClient API):
-//   IOHIDEventSystemClientCreate → create event system client
-//   IOHIDEventSystemClientCopyServices       → enumerate HID services
-//   IOHIDServiceClientConformsTo             → identify the accelerometer service
-//   IOHIDServiceClientSetProperty            → set ReportInterval on SPU service
-//   IOHIDServiceClientCopyProperty           → read service properties (Transport, etc.)
+// Activation uses public IOKit functions (IORegistryEntrySetCFProperty,
+// IOServiceMatching, IOServiceGetMatchingServices) with Apple-internal
+// driver property keys:
+//   Driver class: "AppleSPUHIDDriver"
+//   Properties:   "ReportInterval", "SensorPropertyReportingState",
+//                 "SensorPropertyPowerState"
 //
-// Reading (IOHIDManager API):
-//   IOHIDManagerCreate / Open / SetDeviceMatching / CopyDevices
-//   IOHIDDeviceOpen / RegisterInputReportCallback
+// These driver names and property keys are not documented in the SDK.
+// There is no public Apple API for macOS accelerometer access —
+// CMMotionManager is API_UNAVAILABLE(macos). All IOKit functions called
+// are declared in public SDK headers; no private API symbols are imported.
+// The app degrades gracefully to microphone-only if activation fails.
+//
+// Reading uses the standard public IOHIDManager/IOHIDDevice API.
 //
 // App Sandbox: Requires com.apple.security.device.usb entitlement.
-//
-// Public API documentation:
-//   https://developer.apple.com/documentation/iokit/iohidmanager_h
-//   https://developer.apple.com/documentation/iokit/iohiddevice_h
-//   https://developer.apple.com/documentation/iokit/iohideventsystemclientref
-//   https://developer.apple.com/documentation/iokit/iohidserviceclientref
-//   https://developer.apple.com/documentation/iokit/2269429-iohidserviceclientsetproperty
-//   https://developer.apple.com/documentation/iokit/2269430-iohidserviceclientcopyproperty
-//   https://developer.apple.com/documentation/iokit/2269432-iohideventsystemclientcopyservic
-//   https://developer.apple.com/documentation/iokit/1588653-iohiddevicesetproperty
 
 private let log = AppLog(category: "Accelerometer")
 
@@ -56,7 +50,7 @@ private let rawScale = AccelHardwareConstants.rawScale
 
 /// Reads BMI286 accelerometer via IOKit public APIs and streams impact events.
 ///
-/// Activation: IOHIDEventSystemClientCreate → IOHIDServiceClientSetProperty("ReportInterval")
+/// Activation: IORegistryEntrySetCFProperty on AppleSPUHIDDriver (public function, undocumented driver keys)
 /// Reading: IOHIDManager → IOHIDDeviceRegisterInputReportCallback → bandpass → ImpactDetector
 public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
 
@@ -82,31 +76,7 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
         let intervalUS = reportIntervalUS
 
-        guard let svcClient = IOHIDEventSystemClientCreate(kCFAllocatorDefault)?.takeRetainedValue() else {
-            continuation.finish(throwing: SensorError.deviceNotFound)
-            return stream
-        }
-
-        guard let services = IOHIDEventSystemClientCopyServices(svcClient) else {
-            continuation.finish(throwing: SensorError.deviceNotFound)
-            return stream
-        }
-
-        var activated = false
-        for i in 0..<CFArrayGetCount(services) {
-            let svc = unsafeBitCast(
-                CFArrayGetValueAtIndex(services, i),
-                to: IOHIDServiceClient.self
-            )
-            let matchesUsage = IOHIDServiceClientConformsTo(svc, UInt32(pageAccel), UInt32(usageAccel)) != 0
-            let transport = IOHIDServiceClientCopyProperty(svc, "Transport" as CFString)
-            if matchesUsage && "\(transport ?? ("" as CFString))" == requiredTransport {
-                IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, intervalUS as CFNumber)
-                activated = true
-            }
-        }
-
-        guard activated else {
+        guard SensorActivation.activate(reportIntervalUS: intervalUS) else {
             continuation.finish(throwing: SensorError.deviceNotFound)
             return stream
         }
@@ -115,9 +85,56 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
             adapterID: id, adapterName: name,
             reportIntervalUS: intervalUS,
             bandpassLowHz: bandpassLowHz, bandpassHighHz: bandpassHighHz,
-            detectorConfig: detectorConfig,
-            svcClient: svcClient, services: services
+            detectorConfig: detectorConfig
         )
+    }
+}
+
+// MARK: - Sensor activation via IORegistry
+//
+// Uses public IOKit functions with undocumented Apple-internal driver
+// property keys. See file-level comment for rationale.
+
+private enum SensorActivation {
+    static func activate(reportIntervalUS: Int) -> Bool {
+        var iterator: io_iterator_t = 0
+        let matching = IOServiceMatching("AppleSPUHIDDriver")
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else { return false }
+        defer { IOObjectRelease(iterator) }
+
+        var activated = false
+        while true {
+            let service = IOIteratorNext(iterator)
+            guard service != 0 else { break }
+            defer { IOObjectRelease(service) }
+
+            let r1 = IORegistryEntrySetCFProperty(service, "ReportInterval" as CFString, reportIntervalUS as CFNumber)
+            let r2 = IORegistryEntrySetCFProperty(service, "SensorPropertyReportingState" as CFString, 1 as CFNumber)
+            let r3 = IORegistryEntrySetCFProperty(service, "SensorPropertyPowerState" as CFString, 1 as CFNumber)
+
+            if r1 == KERN_SUCCESS && r2 == KERN_SUCCESS && r3 == KERN_SUCCESS {
+                activated = true
+            } else {
+                log.warning("activity:SensorActivation partial failure r1=\(r1) r2=\(r2) r3=\(r3)")
+            }
+        }
+        return activated
+    }
+
+    static func deactivate() {
+        var iterator: io_iterator_t = 0
+        let matching = IOServiceMatching("AppleSPUHIDDriver")
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else { return }
+        defer { IOObjectRelease(iterator) }
+
+        while true {
+            let service = IOIteratorNext(iterator)
+            guard service != 0 else { break }
+            defer { IOObjectRelease(service) }
+            IORegistryEntrySetCFProperty(service, "ReportInterval" as CFString, 0 as CFNumber)
+            IORegistryEntrySetCFProperty(service, "SensorPropertyReportingState" as CFString, 0 as CFNumber)
+            IORegistryEntrySetCFProperty(service, "SensorPropertyPowerState" as CFString, 0 as CFNumber)
+        }
     }
 }
 
@@ -138,9 +155,7 @@ private enum AccelHardware {
         reportIntervalUS: Int = 10000,
         bandpassLowHz: Float = 20.0,
         bandpassHighHz: Float = 25.0,
-        detectorConfig: ImpactDetectorConfig,
-        svcClient: IOHIDEventSystemClient? = nil,
-        services: CFArray? = nil
+        detectorConfig: ImpactDetectorConfig
     ) -> AsyncThrowingStream<SensorImpact, Error> {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
 
@@ -214,22 +229,12 @@ private enum AccelHardware {
             manager: manager, device: device, buffer: buffer,
             maxSize: maxSize, runLoop: runLoop, runLoopMode: rlMode,
             thread: thread, ctxPtr: ctxPtr, ctx: ctx,
-            svcClient: svcClient, services: services
         ))
 
         continuation.onTermination = { @Sendable _ in
             cleanup.perform { r in
                 r.ctx.invalidate()
-                if let services = r.services {
-                    for i in 0..<CFArrayGetCount(services) {
-                        let svc = unsafeBitCast(CFArrayGetValueAtIndex(services, i), to: IOHIDServiceClient.self)
-                        let matchesUsage = IOHIDServiceClientConformsTo(svc, UInt32(pageAccel), UInt32(usageAccel)) != 0
-                        let transport = IOHIDServiceClientCopyProperty(svc, "Transport" as CFString)
-                        if matchesUsage && "\(transport ?? ("" as CFString))" == requiredTransport {
-                            IOHIDServiceClientSetProperty(svc, "ReportInterval" as CFString, 0 as CFNumber)
-                        }
-                    }
-                }
+                SensorActivation.deactivate()
                 IOHIDDeviceRegisterInputReportCallback(r.device, r.buffer, r.maxSize, nil, nil)
                 IOHIDManagerUnscheduleFromRunLoop(r.manager, r.runLoop, r.runLoopMode.rawValue)
                 CFRunLoopStop(r.runLoop)
@@ -276,8 +281,6 @@ private struct AccelResources {
     let thread: HIDRunLoopThread
     let ctxPtr: Unmanaged<ReportContext>
     let ctx: ReportContext
-    let svcClient: IOHIDEventSystemClient?
-    let services: CFArray?
 }
 
 // MARK: - Report decode + detection context

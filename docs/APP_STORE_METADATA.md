@@ -43,10 +43,9 @@ RESPONSE
 
 CONFIGURATION
 - Range sliders for reactivity, volume, and flash windows
-- Advanced accelerometer tuning (frequency band, spike threshold, crest factor, rise rate)
+- Per-sensor tuning (accelerometer, microphone, headphone motion)
 - Per-sensor enable/disable
 - Launch at Login
-- Debug logging for troubleshooting
 
 PRIVACY
 - Zero network connections
@@ -57,8 +56,9 @@ PRIVACY
 
 COMPATIBILITY
 - MacBook Air / MacBook Pro (Apple Silicon): all three sensors — accelerometer, microphone, headphone motion
-- iMac, Mac Mini, Mac Studio, Mac Pro: microphone and headphone motion only (no built-in accelerometer)
-- Intel Macs: microphone and headphone motion only
+- Other Apple Silicon Macs (iMac, Mac Mini, Mac Studio, Mac Pro): microphone and headphone motion only
+- Intel Macs: runs via Rosetta 2 with microphone and headphone motion only
+- Requires macOS 14.0+ (Sonoma), arm64 binary
 
 Yamete runs entirely in the menu bar with no Dock icon. Best experienced on Apple Silicon MacBooks with the built-in accelerometer. All Macs can use microphone-based impact detection.
 
@@ -96,12 +96,15 @@ What the app does:
   and animated screen flash overlays. It runs as a menu bar app.
 
 Why USB entitlement is needed:
-  The com.apple.security.device.usb entitlement enables IOHIDManager access to
-  read the built-in BMI286 accelerometer via public IOKit APIs. The app uses
-  IOHIDEventSystemClientCreateSimpleClient and IOHIDServiceClientSetProperty (public SDK
-  headers) to activate the sensor, and IOHIDManager with
-  IOHIDDeviceRegisterInputReportCallback to read motion data. No private APIs
-  are used. The accelerometer detects physical impacts on the device.
+  The com.apple.security.device.usb entitlement enables IOHIDManager access
+  to read the built-in BMI286 accelerometer. Sensor activation uses
+  IORegistryEntrySetCFProperty (public IOKit function declared in
+  IOKit/IOKitLib.h) to set driver properties on AppleSPUHIDDriver services.
+  Report reading uses IOHIDManager with IOHIDDeviceRegisterInputReportCallback
+  (public IOKit HID API). No private API symbols are imported into the binary.
+  Note: there is no public Apple API for macOS accelerometer access
+  (CMMotionManager is API_UNAVAILABLE(macos)). If accelerometer activation
+  fails, the app degrades gracefully to microphone-only detection.
 
 Why microphone access is needed:
   The microphone detects impact sounds (desk taps, slaps) as a complementary
