@@ -95,20 +95,38 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
         self.detectorConfig = detectorConfig
     }
 
-    /// True when the SPU HID hardware is present AND the kernel driver has
-    /// emitted a report in the last 500ms. The second half is the honest
-    /// part: in an App Store sandbox build, `SensorActivation.activate()`
+    /// Whether the adapter should be offered to the pipeline.
+    ///
+    /// **Direct build**: `SPU HID hardware is present`. The Direct build
+    /// runs unsandboxed and `SensorActivation.activate()` succeeds at
+    /// pipeline start, so we do not need to probe runtime activity ahead
+    /// of time — we can always start the sensor ourselves on demand.
+    /// Gating on `isSensorActivelyReporting()` here would be a
+    /// chicken-and-egg deadlock: the UI would hide the adapter because
+    /// it's not reporting, `impacts()` would never be called, and so
+    /// the sensor would never start reporting. This is how issue #15
+    /// manifested on M5 MacBooks where macOS does not keep the sensor
+    /// warm at boot.
+    ///
+    /// **App Store build**: `SPU HID hardware is present AND the kernel
+    /// driver has emitted a report in the last 500ms`. The runtime probe
+    /// is honest about sandbox reality: `SensorActivation.activate()`
     /// calls are kernel-rejected (writes require an unsandboxed client),
     /// so whether the adapter can actually produce impacts depends on
     /// whether *something else* has warmed the sensor this boot — either
-    /// macOS itself (WindowServer / locationd, when the system happens to
-    /// subscribe for its own reasons) or an external helper shipping via
-    /// support docs. If neither is true, the sensor is cold and `isAvailable`
-    /// returns false so `Migration.reconcileSensors` prunes the adapter
-    /// before pipeline start instead of letting the watchdog fire on an
-    /// empty stream mid-session.
+    /// macOS itself (WindowServer / locationd, when the system happens
+    /// to subscribe for its own reasons) or the sensor-kickstart helper
+    /// shipping via support docs. If neither is true, the sensor is
+    /// cold and `isAvailable` returns false so
+    /// `Migration.reconcileSensors` prunes the adapter before pipeline
+    /// start instead of letting the watchdog fire on an empty stream
+    /// mid-session.
     public var isAvailable: Bool {
-        AccelHardware.isSPUDevicePresent() && AccelHardware.isSensorActivelyReporting()
+        #if DIRECT_BUILD
+        return AccelHardware.isSPUDevicePresent()
+        #else
+        return AccelHardware.isSPUDevicePresent() && AccelHardware.isSensorActivelyReporting()
+        #endif
     }
 
     /// Device-presence check only (skips the runtime-activity probe).
