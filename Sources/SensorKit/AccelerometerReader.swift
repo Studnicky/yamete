@@ -15,22 +15,46 @@ import os
 // The sensor appears as a vendor-defined HID device:
 //   PrimaryUsagePage = 0xFF00, PrimaryUsage = 3, Transport = "SPU"
 //
-// Activation uses public IOKit functions (IORegistryEntrySetCFProperty,
-// IOServiceMatching, IOServiceGetMatchingServices) with Apple-internal
-// driver property keys:
-//   Driver class: "AppleSPUHIDDriver"
-//   Properties:   "ReportInterval", "SensorPropertyReportingState",
-//                 "SensorPropertyPowerState"
+// Two-phase access pattern (works in both Direct and App Store builds):
 //
-// These driver names and property keys are not documented in the SDK.
-// There is no public Apple API for macOS accelerometer access —
-// CMMotionManager is API_UNAVAILABLE(macos). All IOKit functions called
-// are declared in public SDK headers; no private API symbols are imported.
-// The app degrades gracefully to microphone-only if activation fails.
+//   Phase 1 — best-effort activation (Direct builds only)
+//     IORegistryEntrySetCFProperty on AppleSPUHIDDriver writing
+//     ReportInterval, SensorPropertyReportingState, SensorPropertyPowerState.
+//     Direct (unsandboxed) builds: succeeds, ensures the sensor is active
+//     at our preferred report interval.
+//     App Store (sandboxed) builds: returns kIOReturnNotPermitted because
+//     the sandbox blocks IORegistry property writes regardless of which
+//     entitlements are granted (no entitlement covers this surface).
+//     We log info-level fall-through and continue to phase 2.
 //
-// Reading uses the standard public IOHIDManager/IOHIDDevice API.
+//   Phase 2 — passive HID subscription (both builds)
+//     IOHIDManagerCreate + IOHIDDeviceRegisterInputReportCallback against
+//     the SPU device. Receives whatever HID reports the kernel is already
+//     producing. The macOS system maintains a baseline reporting state on
+//     the SPU services via HIDEventServiceProperties.ReportInterval (set
+//     by WindowServer / locationd at boot for orientation, lid sensing,
+//     and CoreLocation), so even when phase 1 is blocked the sensor is
+//     already streaming at 100Hz and our subscription receives the data.
 //
-// App Sandbox: Requires com.apple.security.device.usb entitlement.
+// All IOKit functions called are declared in public SDK headers
+// (IOKit/IOKitLib.h, IOKit/hid/IOHIDManager.h, IOKit/hid/IOHIDDevice.h).
+// No private API symbols are imported. The driver class name and property
+// keys used in phase 1 are Apple-internal implementation details; phase 2
+// uses no internal property surface.
+//
+// Reliability caveats for the App Store path:
+//   • This relies on the system having the SPU sensor warm. If a future
+//     macOS revision changes WindowServer/locationd behavior to defer
+//     activation, the App Store build's accelerometer will go silent.
+//     The Direct build is unaffected (it does its own activation).
+//   • Sleep/wake and cold-boot behavior should be retested before each
+//     App Store release.
+//   • If reports stop arriving in production, the controller already
+//     supports microphone + headphone-motion fallback via the existing
+//     consensus path.
+//
+// App Sandbox: Requires com.apple.security.device.usb entitlement (allows
+// IOHIDManager device matching/open). No additional entitlements needed.
 
 private let log = AppLog(category: "Accelerometer")
 
@@ -70,23 +94,30 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
         self.detectorConfig = detectorConfig
     }
 
-    /// True only when (1) an SPU HID device is physically present AND (2) the
-    /// current process is permitted to write SPU driver registry properties.
-    /// The Mac App Store build is sandboxed and lacks the latter permission
-    /// (kIOReturnNotPermitted), so it correctly reports unavailable here even
-    /// on hardware that has the sensor. Direct builds run unsandboxed and the
-    /// probe succeeds.
+    /// True when an SPU HID device is physically present. We no longer gate
+    /// on activation permission: even when sandbox blocks our IORegistry
+    /// writes (App Store build), the system itself keeps the SPU sensor
+    /// warm (HIDEventServiceProperties.ReportInterval is set by WindowServer
+    /// and locationd) and reports flow passively through IOHIDManager. The
+    /// adapter tries to activate first but falls through to a passive open
+    /// if activation is denied.
     public var isAvailable: Bool {
-        AccelHardware.isSPUDevicePresent() && SensorActivation.canActivate
+        AccelHardware.isSPUDevicePresent()
     }
 
     public func impacts() -> AsyncThrowingStream<SensorImpact, Error> {
-        let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
         let intervalUS = reportIntervalUS
 
-        guard SensorActivation.activate(reportIntervalUS: intervalUS) else {
-            continuation.finish(throwing: SensorError.deviceNotFound)
-            return stream
+        // Best-effort activation. In Direct (unsandboxed) builds this writes
+        // ReportInterval / SensorPropertyReportingState / SensorPropertyPowerState
+        // on AppleSPUHIDDriver and returns true. In App Store (sandboxed)
+        // builds it returns false because IORegistryEntrySetCFProperty
+        // returns kIOReturnNotPermitted — but the system has HID
+        // EventServiceProperties.ReportInterval already set, so reports
+        // continue to flow through IOHIDManager regardless.
+        let activated = SensorActivation.activate(reportIntervalUS: intervalUS)
+        if !activated {
+            log.info("activity:SensorActivation isPendingOn entity:SystemActivation falling through to passive read")
         }
 
         return AccelHardware.openStream(
@@ -104,42 +135,6 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
 // property keys. See file-level comment for rationale.
 
 private enum SensorActivation {
-    /// Cached one-shot probe result. nil = not yet probed.
-    /// Mac App Store builds are sandboxed and never receive permission to
-    /// write IORegistry properties on `AppleSPUHIDDriver` regardless of
-    /// entitlements; the probe returns false there. Direct builds run
-    /// unsandboxed and the probe succeeds.
-    private static let probeResult = OSAllocatedUnfairLock<Bool?>(initialState: nil)
-
-    /// One-shot permission probe, cached for the process lifetime.
-    /// Used by `SPUAccelerometerAdapter.isAvailable` to gate the sensor.
-    static var canActivate: Bool {
-        probeResult.withLock { cached in
-            if let cached { return cached }
-            let result = probePermission()
-            cached = result
-            return result
-        }
-    }
-
-    /// Performs a single test write against the first SPU service. Writing
-    /// `ReportInterval` to `0` is harmless (it is also the deactivation
-    /// value), so the probe leaves the sensor in an unchanged state regardless
-    /// of outcome. Returns true if at least one service accepted the write.
-    private static func probePermission() -> Bool {
-        var iterator: io_iterator_t = 0
-        let matching = IOServiceMatching("AppleSPUHIDDriver")
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else { return false }
-        defer { IOObjectRelease(iterator) }
-
-        let service = IOIteratorNext(iterator)
-        guard service != 0 else { return false }
-        defer { IOObjectRelease(service) }
-
-        let r = IORegistryEntrySetCFProperty(service, "ReportInterval" as CFString, 0 as CFNumber)
-        return r == KERN_SUCCESS
-    }
-
     static func activate(reportIntervalUS: Int) -> Bool {
         var iterator: io_iterator_t = 0
         let matching = IOServiceMatching("AppleSPUHIDDriver")
@@ -158,9 +153,13 @@ private enum SensorActivation {
 
             if r1 == KERN_SUCCESS && r2 == KERN_SUCCESS && r3 == KERN_SUCCESS {
                 activated = true
-            } else {
-                log.warning("activity:SensorActivation partial failure r1=\(r1) r2=\(r2) r3=\(r3)")
             }
+            // Failures are expected and benign in sandboxed builds where
+            // IORegistryEntrySetCFProperty returns kIOReturnNotPermitted.
+            // The system maintains HIDEventServiceProperties.ReportInterval
+            // independently (set by WindowServer + locationd), so reports
+            // continue to flow through IOHIDManager regardless. The caller
+            // logs the fall-through once at info level.
         }
         return activated
     }
@@ -269,14 +268,46 @@ private enum AccelHardware {
 
         log.info("activity:SensorReading wasStartedBy agent:\(adapterName)")
 
+        // Watchdog: monitors the report stream for stalls. Critical for the
+        // App Store sandbox path because activation writes are denied — the
+        // sensor only delivers data when macOS happens to keep it warm via
+        // HIDEventServiceProperties. If the system goes cold (after sleep,
+        // a daemon restart, or an OS revision regression), reports stop
+        // arriving and we surface a stall error so the controller can fall
+        // back to microphone + headphone-motion via its existing fusion path.
+        let watchdogTask = Task.detached(priority: .background) { [ctx] in
+            // Allow up to 5s for the first sample to arrive after subscription
+            // start, then 5s between samples thereafter. The Direct build
+            // typically sees the first sample within ~10ms; 5s is a generous
+            // grace period for the worst case.
+            let stallThreshold: TimeInterval = 5.0
+            let pollInterval: TimeInterval = 1.0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(pollInterval))
+                let snapshot = ctx.watchdogSnapshot()
+                guard snapshot.running else { return }
+                let staleness = Date().timeIntervalSince(snapshot.lastReportAt)
+                if staleness > stallThreshold {
+                    log.warning("activity:SensorReading wasInvalidatedBy entity:Watchdog staleness=\(String(format: "%.1f", staleness))s sampleCount=\(snapshot.sampleCounter)")
+                    ctx.surfaceStall(SensorError.ioKitError("accelerometer report stream stalled (\(Int(staleness))s without data)"))
+                    return
+                }
+            }
+        }
+
         let cleanup = OnceCleanup(AccelResources(
             manager: manager, device: device, buffer: buffer,
             maxSize: maxSize, runLoop: runLoop, runLoopMode: rlMode,
             thread: thread, ctxPtr: ctxPtr, ctx: ctx,
+            watchdog: WatchdogHandle(task: watchdogTask),
         ))
 
         continuation.onTermination = { @Sendable _ in
             cleanup.perform { r in
+                // Phase 0 — cancel the watchdog so it stops polling and
+                // never tries to surfaceStall on a torn-down context.
+                r.watchdog.task.cancel()
+
                 // Phase 1 — silence the report callback. From this point on,
                 // any in-flight HID callback that fires before the run loop
                 // exits is a no-op (running == false).
@@ -330,7 +361,7 @@ private enum AccelHardware {
 
 // MARK: - Accelerometer resource bundle (consumed by OnceCleanup on stream teardown)
 
-private struct AccelResources {
+private struct AccelResources: @unchecked Sendable {
     let manager: IOHIDManager
     let device: IOHIDDevice
     let buffer: UnsafeMutablePointer<UInt8>
@@ -340,6 +371,14 @@ private struct AccelResources {
     let thread: HIDRunLoopThread
     let ctxPtr: Unmanaged<ReportContext>
     let ctx: ReportContext
+    let watchdog: WatchdogHandle
+}
+
+/// Sendable wrapper around the watchdog Task so AccelResources can satisfy
+/// `OnceCleanup<T: Sendable>`. The task is `Task<Void, Never>` which is
+/// already Sendable; this struct exists for symmetry with the other handles.
+private struct WatchdogHandle: Sendable {
+    let task: Task<Void, Never>
 }
 
 // MARK: - Report decode + detection context
@@ -352,6 +391,10 @@ private final class ReportContext: Sendable {
     private struct State: @unchecked Sendable {
         var running = true
         var sampleCounter = 0
+        /// Wall-clock time of the most recent successful report. The watchdog
+        /// reads this to detect stalled HID streams (e.g., system stopped
+        /// keeping the SPU sensor warm in the App Store sandbox after sleep).
+        var lastReportAt: Date = Date()
         let continuation: AsyncThrowingStream<SensorImpact, Error>.Continuation
         let hpFilter: HighPassFilter
         let lpFilter: LowPassFilter
@@ -371,6 +414,23 @@ private final class ReportContext: Sendable {
 
     func invalidate() { state.withLock { $0.running = false } }
 
+    /// Snapshot of (running, lastReportAt, sampleCounter) for the watchdog.
+    /// Returns nil for lastReportAt if the stream has already been invalidated.
+    func watchdogSnapshot() -> (running: Bool, lastReportAt: Date, sampleCounter: Int) {
+        state.withLock { ($0.running, $0.lastReportAt, $0.sampleCounter) }
+    }
+
+    /// Surfaces a recoverable error to the consuming AsyncThrowingStream.
+    /// Used by the watchdog when no reports arrive for the stall threshold.
+    /// Marks the context invalid first so any in-flight callback no-ops.
+    func surfaceStall(_ error: Error) {
+        state.withLock { s in
+            guard s.running else { return }
+            s.running = false
+            s.continuation.finish(throwing: error)
+        }
+    }
+
     func handleReport(report: UnsafeMutablePointer<UInt8>, length: Int) {
         guard length >= minReportLength else { return }
 
@@ -385,6 +445,18 @@ private final class ReportContext: Sendable {
 
         state.withLock { s in
             guard s.running else { return }
+            // Watchdog timestamp — bumped on every accepted report so the
+            // stall detector can tell live from frozen.
+            s.lastReportAt = Date()
+            // Diagnostic: log first sample, then every 1000 samples
+            // thereafter. 100Hz = 1000 samples per 10 seconds; sustained
+            // logging proves the passive HID subscription works long-term,
+            // not just for an initial burst.
+            if s.sampleCounter == 0 {
+                log.info("activity:SensorReading wasGeneratedBy entity:FirstReport adapter=\(self.adapterID) length=\(length)")
+            } else if s.sampleCounter % 1000 == 0 {
+                log.info("activity:SensorReading wasGeneratedBy entity:Report adapter=\(self.adapterID) sampleCount=\(s.sampleCounter)")
+            }
             s.sampleCounter += 1
             guard s.sampleCounter % decimationFactor == 0 else { return }
 

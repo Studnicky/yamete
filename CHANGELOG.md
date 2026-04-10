@@ -8,6 +8,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Critical
+- **App Store accelerometer two-phase access pattern**: Activation writes
+  (`IORegistryEntrySetCFProperty` on `AppleSPUHIDDriver`) are denied with
+  `kIOReturnNotPermitted` in App Store sandbox builds — no entitlement
+  grants this surface. The adapter now treats activation as best-effort
+  (logged at info level) and falls through to phase 2: passive
+  `IOHIDManager` subscription. The macOS system maintains
+  `HIDEventServiceProperties.ReportInterval=0x2710` (10000µs = 100Hz) on
+  the SPU services *independently* via WindowServer / locationd, so the
+  passive subscription receives the existing 100Hz sample stream even
+  when our writes are blocked. Verified locally: sustained 100Hz reports
+  in the App Store sandbox build (5000+ samples in 50 seconds) with no
+  Direct build active for 10+ minutes.
+
+  **⚠️ UNVERIFIED scenarios that MUST be tested before App Store submission:**
+  1. **Cold boot.** Both Yamete builds are registered in Background Task
+     Management with launch-at-login enabled. The Direct build has been
+     auto-launching at boot, and Direct's `SensorActivation.activate()`
+     writes succeed (it is unsandboxed). We cannot rule out that Direct
+     was the original activator and the SPU sensor's persistent state is
+     a side effect, not a system-managed default.
+     **Test procedure**: reboot the Mac. Do NOT launch any Yamete app.
+     Run `ioreg -rxc AppleSPUHIDDriver | grep ReportInterval`. If
+     `HIDEventServiceProperties = {"ReportInterval"=0x2710}` is present
+     before any Yamete launch, the system warms it independently and the
+     App Store path is real. If only `ReportInterval = 0x0` is present,
+     the system does NOT warm it and the App Store path only works
+     because Direct activated it first in this boot session — meaning
+     the App Store build cannot ship without Direct also being installed
+     and auto-launching, which is not viable for App Store distribution.
+  2. **Sleep / wake recovery.** The watchdog (below) catches a stalled
+     stream within 5 seconds, but it would be better to know whether the
+     sensor goes cold across sleep so we can document the expected
+     fallback behavior accurately. **Test procedure**: launch the App
+     Store build, confirm `FirstReport` and a couple of `sampleCount=`
+     entries in the log, close the lid, wait 60 seconds, open the lid.
+     Watch the log for stall warnings or new sample entries.
+  3. **Multiple Mac models.** All testing so far is on a single
+     development MacBook. Should be re-verified on M1 / M2 / M3 / M4
+     across MacBook Air / MacBook Pro before submission.
+  4. **macOS revisions.** This entire path depends on undocumented
+     behavior of WindowServer and locationd. A future macOS update could
+     break it without warning. Re-test before each submission.
+
+- **Accelerometer stream watchdog**: `SPUAccelerometerAdapter` now spawns
+  a background `Task` per stream that polls `ReportContext.lastReportAt`
+  every 1 second. If no reports arrive for 5 seconds, the watchdog calls
+  `surfaceStall()` which terminates the stream with a recoverable
+  `SensorError.ioKitError`. The controller's existing fusion path then
+  falls back to microphone + headphone-motion automatically. The
+  watchdog is cancelled in cleanup phase 0 so it cannot race with
+  teardown. Polls do not race with `handleReport` — `lastReportAt` lives
+  inside the same `OSAllocatedUnfairLock<State>` block.
+
 - **HID teardown race fix**: `HIDRunLoopThread.join()` now blocks the cleanup
   path until the dedicated HID worker thread has fully exited. CF object
   mutations (`IOHIDManagerUnscheduleFromRunLoop`, `IOHIDManagerClose`) are
