@@ -342,7 +342,7 @@ Notes:
   -
   -
 
-- [ ] Decide whether AppKit-touching rendering helpers should be explicitly `@MainActor`.
+- [ ] Decide whether AppKit-touching rendering helpers should be explicitly `MainActor`.
   Why this matters:
   `NSApp` is UI-actor-isolated in the SDK, and the current helpers rely on that implicitly.
   Notes:
