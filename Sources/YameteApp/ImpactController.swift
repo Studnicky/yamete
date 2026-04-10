@@ -262,7 +262,13 @@ public final class ImpactController {
     private func buildAdapters() -> [any SensorAdapter] {
         let enabled = Set(settings.enabledSensorIDs)
         return allAdapters.compactMap { template -> (any SensorAdapter)? in
-            guard enabled.contains(template.id.rawValue) else { return nil }
+            // Skip adapters the user disabled OR that aren't currently
+            // available on this host. The unavailable check matters for the
+            // Mac App Store build's accelerometer (sandbox blocks IORegistry
+            // writes) and for the headphone motion adapter (no headphones
+            // connected) — without this filter, the pipeline tries to start
+            // them anyway and immediately throws.
+            guard enabled.contains(template.id.rawValue), template.isAvailable else { return nil }
             switch template.id {
             case .accelerometer: return AdapterFactory.accelerometer(from: settings)
             case .microphone:    return AdapterFactory.microphone(from: settings)

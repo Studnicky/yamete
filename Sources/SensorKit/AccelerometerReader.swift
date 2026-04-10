@@ -70,7 +70,15 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
         self.detectorConfig = detectorConfig
     }
 
-    public var isAvailable: Bool { AccelHardware.isSPUDevicePresent() }
+    /// True only when (1) an SPU HID device is physically present AND (2) the
+    /// current process is permitted to write SPU driver registry properties.
+    /// The Mac App Store build is sandboxed and lacks the latter permission
+    /// (kIOReturnNotPermitted), so it correctly reports unavailable here even
+    /// on hardware that has the sensor. Direct builds run unsandboxed and the
+    /// probe succeeds.
+    public var isAvailable: Bool {
+        AccelHardware.isSPUDevicePresent() && SensorActivation.canActivate
+    }
 
     public func impacts() -> AsyncThrowingStream<SensorImpact, Error> {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
@@ -96,6 +104,42 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
 // property keys. See file-level comment for rationale.
 
 private enum SensorActivation {
+    /// Cached one-shot probe result. nil = not yet probed.
+    /// Mac App Store builds are sandboxed and never receive permission to
+    /// write IORegistry properties on `AppleSPUHIDDriver` regardless of
+    /// entitlements; the probe returns false there. Direct builds run
+    /// unsandboxed and the probe succeeds.
+    private static let probeResult = OSAllocatedUnfairLock<Bool?>(initialState: nil)
+
+    /// One-shot permission probe, cached for the process lifetime.
+    /// Used by `SPUAccelerometerAdapter.isAvailable` to gate the sensor.
+    static var canActivate: Bool {
+        probeResult.withLock { cached in
+            if let cached { return cached }
+            let result = probePermission()
+            cached = result
+            return result
+        }
+    }
+
+    /// Performs a single test write against the first SPU service. Writing
+    /// `ReportInterval` to `0` is harmless (it is also the deactivation
+    /// value), so the probe leaves the sensor in an unchanged state regardless
+    /// of outcome. Returns true if at least one service accepted the write.
+    private static func probePermission() -> Bool {
+        var iterator: io_iterator_t = 0
+        let matching = IOServiceMatching("AppleSPUHIDDriver")
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else { return false }
+        defer { IOObjectRelease(iterator) }
+
+        let service = IOIteratorNext(iterator)
+        guard service != 0 else { return false }
+        defer { IOObjectRelease(service) }
+
+        let r = IORegistryEntrySetCFProperty(service, "ReportInterval" as CFString, 0 as CFNumber)
+        return r == KERN_SUCCESS
+    }
+
     static func activate(reportIntervalUS: Int) -> Bool {
         var iterator: io_iterator_t = 0
         let matching = IOServiceMatching("AppleSPUHIDDriver")
