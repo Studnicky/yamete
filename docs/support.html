@@ -4,96 +4,203 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Support — Yamete</title>
+  <meta name="description" content="Support and FAQ for Yamete, the macOS app that reacts when you smack your laptop. Includes setup, troubleshooting, a few cheeky questions, and the occasional useful answer.">
   <style>
-    :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --muted: #888; --card: #1a1a1a; }
+    :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --accent-soft: #ffb3c4; --muted: #888; --card: #1a1a1a; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif; background: var(--bg); color: var(--fg); line-height: 1.7; }
     a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+    code { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 0.9em; background: #1f1f1f; color: var(--accent-soft); padding: 0.1rem 0.4rem; border-radius: 4px; }
+    pre { background: #1f1f1f; border-radius: 6px; padding: 0.75rem 0.9rem; overflow-x: auto; font-size: 0.82rem; margin: 0.6rem 0; border-left: 3px solid var(--accent); }
+    pre code { background: transparent; padding: 0; color: #ddd; }
     .container { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem; }
-    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
-    .subtitle { color: var(--muted); margin-bottom: 2rem; }
-    h2 { font-size: 1.25rem; font-weight: 600; margin: 2rem 0 0.75rem; border-bottom: 1px solid #333; padding-bottom: 0.4rem; }
+    h1 { font-size: 2.2rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .subtitle { color: var(--muted); margin-bottom: 2rem; font-style: italic; }
+    h2 { font-size: 1.3rem; font-weight: 600; margin: 2.5rem 0 0.75rem; border-bottom: 1px solid #333; padding-bottom: 0.4rem; }
+    h2 .qual { font-weight: 400; color: var(--muted); font-size: 0.9rem; }
     p { margin-bottom: 0.75rem; color: #ccc; }
-    .card { background: var(--card); border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
-    .card h3 { font-size: 1rem; margin-bottom: 0.4rem; }
-    .card p { font-size: 0.9rem; color: var(--muted); margin-bottom: 0; }
-    details { margin-bottom: 0.75rem; } details summary { cursor: pointer; font-weight: 500; padding: 0.4rem 0; }
-    details p { margin-top: 0.5rem; font-size: 0.95rem; }
+    .card { background: var(--card); border-radius: 8px; padding: 1.1rem 1.25rem; margin-bottom: 0.9rem; }
+    .card h3 { font-size: 1rem; margin-bottom: 0.4rem; color: var(--accent-soft); }
+    .card p { font-size: 0.92rem; color: #bbb; margin: 0; }
+    .card p + p { margin-top: 0.4rem; }
+    details { margin-bottom: 0.75rem; border-bottom: 1px dashed #222; padding-bottom: 0.5rem; }
+    details summary { cursor: pointer; font-weight: 500; padding: 0.4rem 0; color: var(--fg); }
+    details summary:hover { color: var(--accent-soft); }
+    details[open] summary { color: var(--accent); }
+    details p { margin: 0.5rem 0; font-size: 0.95rem; color: #bbb; }
+    details ol, details ul { margin: 0.5rem 0 0.5rem 1.5rem; font-size: 0.95rem; color: #bbb; }
+    details li { padding: 0.15rem 0; }
+    blockquote { border-left: 3px solid var(--accent); padding: 0.3rem 0 0.3rem 0.9rem; margin: 0.6rem 0; color: #aaa; font-style: italic; font-size: 0.92rem; }
     footer { text-align: center; padding: 2rem 0; color: var(--muted); font-size: 0.85rem; border-top: 1px solid #222; margin-top: 3rem; }
+    footer a { color: var(--muted); } footer a:hover { color: var(--accent); }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Support</h1>
-    <p class="subtitle">Yamete for macOS</p>
+    <p class="subtitle">Everything you need to know (and some things you don't) about Yamete for macOS.</p>
 
     <div class="card">
-      <h3>Bug Reports & Feature Requests</h3>
-      <p><a href="https://github.com/Studnicky/yamete/issues">Open an issue on GitHub</a></p>
+      <h3>Bug reports &amp; feature requests</h3>
+      <p><a href="https://github.com/Studnicky/yamete/issues">Open an issue on GitHub →</a></p>
+      <p>If something is broken, weird, or surprising — yes, even if you're not sure whether it's a bug. Half the value of issues is confirming what works; the other half is finding out what doesn't.</p>
     </div>
 
     <div class="card">
-      <h3>Email Support</h3>
+      <h3>Email</h3>
       <p><a href="mailto:support@studnicky.com">support@studnicky.com</a></p>
     </div>
 
-    <h2>Frequently Asked Questions</h2>
+    <h2>Wait, what is this app? <span class="qual">(good question)</span></h2>
 
-    <details>
-      <summary>No impacts are detected</summary>
-      <p>Make sure you have an Apple Silicon Mac (M1/M2/M3/M4). Check that Reactivity is not set too low. Try lowering the Spike Threshold in Accelerometer Tuning. If using microphone detection, grant microphone permission in System Settings > Privacy & Security.</p>
+    <details open>
+      <summary>What does Yamete actually do?</summary>
+      <p>It sits in your menu bar. When you smack your Mac — desk-slap, laptop-tap, full-force-encouragement of a stuck hinge — it plays a small sound clip, shows a face in the menu bar, and optionally flashes your screen or posts a notification banner. That's the whole app.</p>
+      <p>Under the hood it runs three detection pipelines (accelerometer, microphone, AirPods IMU) in parallel, fuses them via a consensus engine, and scales the response to impact intensity. This is much more engineering than the concept strictly requires, and we are fine with that.</p>
     </details>
 
     <details>
-      <summary>The app detects too many false positives</summary>
-      <p>Increase the Spike Threshold, Crest Factor, and Rise Rate in Accelerometer Tuning. Set Confirmations to 3 or higher. Increase Sensor Consensus to require multiple sensors to agree. Add a Cooldown to space out reactions.</p>
+      <summary>What does "Yamete" mean?</summary>
+      <p>Japanese for "stop". It's the playful/flirty register — closer to "stop ittt" than to "halt immediately". We thought it was funny. We still do.</p>
     </details>
 
     <details>
-      <summary>No sound plays on impact</summary>
-      <p>Check the Volume range slider — both thumbs should be above zero. Verify an audio device is selected in the Devices panel. Make sure sounds are not muted at the system level.</p>
+      <summary>Is this a joke?</summary>
+      <p>Partially. The concept is silly. The implementation is not — it's strict-concurrency-clean Swift, multi-sensor signal processing with proper bandpass filters, a real consensus engine, thread-safe HID stream cleanup, and 129 unit tests. Treat it as a serious art object about a not-serious thing.</p>
     </details>
 
     <details>
-      <summary>Screen flash doesn't appear</summary>
-      <p>Open the menu bar dropdown and confirm Flash Mode is set to <strong>Overlay</strong> (not Off or Notification). Check the Flash Opacity range slider — both thumbs should be above zero. Verify displays are selected in the Devices panel. The flash is gated to the sound clip duration, so audio must also be working.</p>
+      <summary>Why does this exist?</summary>
+      <p>Apple Silicon MacBooks ship with a real BMI286 accelerometer. Apple provides zero public API for macOS accelerometer access. The resulting itch is this app.</p>
+      <p>Also: we wanted to. That is a complete explanation.</p>
     </details>
 
     <details>
-      <summary>Notifications don't appear</summary>
-      <p>Set Flash Mode to <strong>Notification</strong> in the menu bar dropdown. macOS will prompt for notification permission the first time. Check System Settings &rarr; Notifications &rarr; Yamete and ensure banners are allowed. The notification language can be selected separately from your system language under Flash Mode &rarr; Notification Language.</p>
+      <summary>Do I actually need this?</summary>
+      <p>No.</p>
     </details>
 
-    <details>
-      <summary>The menu bar icon shows a face instead of the normal icon</summary>
-      <p>Expected behavior. The menu bar face icon reacts on every detected impact for the duration of the response. This is the always-on visual feedback indicator and is independent of Flash Mode.</p>
-    </details>
+    <h2>Setup &amp; usage</h2>
 
     <details>
-      <summary>The app uses too much CPU</summary>
-      <p>Try increasing the Report Interval (e.g., 20ms instead of 10ms) to reduce accelerometer polling rate. Disable sensors you don't need. The app should use less than 2% CPU during idle monitoring.</p>
-    </details>
-
-    <details>
-      <summary>How do I uninstall?</summary>
-      <p>Direct download: drag <code>Yamete Direct.app</code> from Applications to the Trash, delete <code>~/Library/Preferences/com.studnicky.yamete.direct.plist</code>, and remove <code>~/Library/Application Support/Yamete Direct/</code> if you want to clear logs. Mac App Store build: delete <code>Yamete</code> and remove <code>~/Library/Containers/com.studnicky.yamete/</code> if you want to clear its sandboxed data.</p>
-    </details>
-
-    <details>
-      <summary>Does the app work on Intel Macs?</summary>
-      <p>Partially. Intel Macs lack the BMI286 accelerometer, but microphone-based impact detection works on any Mac with a microphone. Headphone motion also works with compatible AirPods/Beats. Yamete is an arm64 binary; on Intel Macs it runs through Rosetta 2.</p>
+      <summary>How do I get it running?</summary>
+      <p>Download the DMG from the <a href="https://github.com/Studnicky/yamete/releases">releases page</a>, drag <code>Yamete Direct.app</code> into Applications, open it. It appears as a face in your menu bar. Click the face to open the dropdown and tune anything you want. The first launch will ask for microphone permission — say yes if you want the microphone detection path (recommended).</p>
+      <p>The App Store build lands in your Applications folder the normal way once App Review clears.</p>
     </details>
 
     <details>
       <summary>What's the difference between Yamete and Yamete Direct?</summary>
-      <p><strong>Yamete</strong> is the Mac App Store build, rated 12+, with tame flirty notification copy. <strong>Yamete Direct</strong> is the notarized direct download with the spicy notification copy. Both use the same detection engine, settings, and audio. The only difference is the notification text register.</p>
+      <p><strong>Yamete</strong> is the Mac App Store build, rated 12+, with the tame flirty notification copy ("Mm, again?", "Show off~", "OUCH").</p>
+      <p><strong>Yamete Direct</strong> is a notarized direct download with spicier notification copy. Same detection engine, same sounds, same settings, same 40 locales — just a different notification text register. Direct is not submitted to the App Store and never will be.</p>
     </details>
 
-    <h2>System Requirements</h2>
-    <p>macOS 14.0+ (Sonoma), arm64 binary. The built-in accelerometer is only available on Apple Silicon MacBooks; other Apple Silicon Macs and Intel Macs use microphone and headphone motion only. Microphone access is optional and prompts for permission when enabled. Yamete is a menu bar app — there is no Dock icon and no app windows.</p>
+    <details>
+      <summary>Does it work on Intel Macs, iMacs, Mac Mini, Mac Studio, Mac Pro?</summary>
+      <p>Partially. Those Macs don't have the built-in BMI286 accelerometer (only Apple Silicon MacBooks do), but microphone-based impact detection works on every Mac with a microphone. AirPods headphone motion also works whenever you have AirPods Pro or Beats connected. So yes, Yamete runs — you just lose the tactile channel.</p>
+      <p>On Intel Macs, the app runs via Rosetta 2 (we're arm64-only).</p>
+    </details>
+
+    <details>
+      <summary>My MacBook's accelerometer isn't working in the App Store build. (Very common. Please read.)</summary>
+      <p>Short version: App Sandbox (which the Mac App Store requires) silently blocks the IORegistry writes that would start the accelerometer. The App Store build cannot wake the sensor on its own. This is not a bug — it's how sandboxing works.</p>
+      <p>Long version: Apple provides no public macOS API for accelerometer access, so we talk to the SPU HID driver directly via public IOKit functions. Those functions exist and are callable from inside sandbox, but the kernel silently drops the property writes needed to activate the sensor before they reach the driver. The sensor stays cold, our availability probe catches that on launch, and the adapter is dropped from the pipeline automatically — so the app just runs on the microphone and headphone motion instead (which works great).</p>
+      <p>If you specifically want the tactile channel on an Apple Silicon MacBook, there's a small open-source helper at <a href="https://github.com/Studnicky/yamete/tree/develop/docs/community"><code>docs/community/</code></a> in the GitHub repo. You compile a ~150-line Swift file with <code>swiftc</code>, install it as a LaunchDaemon (runs at every boot, outside sandbox, fires the three kernel writes that warm the sensor), then relaunch Yamete. The helper has its own README with install script and safety notes.</p>
+      <blockquote>If you install the helper and it works on your Mac — or if it doesn't — please <a href="https://github.com/Studnicky/yamete/issues/new">file an issue</a>. We're building a known-working matrix across M1 / M2 / M3 / M4, and every data point helps.</blockquote>
+    </details>
+
+    <h2>Tuning</h2>
+
+    <details>
+      <summary>No impacts are detected</summary>
+      <p>Walk through these in order:</p>
+      <ol>
+        <li>Open the menu bar dropdown, expand the Sensors section, and confirm at least one sensor is enabled. If Accelerometer is the only one enabled and the probe hasn't detected an active sensor (common on App Store builds without the community helper — see above), it may have been auto-pruned at launch. Enable Microphone as well.</li>
+        <li>Check Reactivity — both thumbs should be above zero. The default range is fine for most users; very low settings can miss real impacts.</li>
+        <li>If you granted microphone permission: make sure it's still granted. System Settings → Privacy &amp; Security → Microphone → Yamete.</li>
+        <li>Expand Accelerometer Tuning / Microphone Tuning and try lowering the Spike Threshold slightly. Save, and smack the desk firmly.</li>
+      </ol>
+    </details>
+
+    <details>
+      <summary>Way too many false positives (footsteps, typing, a passing truck…)</summary>
+      <p>The consensus engine is your friend. Try this:</p>
+      <ul>
+        <li>Raise Spike Threshold, Crest Factor, and Rise Rate a little.</li>
+        <li>Set Confirmations to 3 or higher — that requires the signal to stay above threshold for multiple samples before firing.</li>
+        <li>Raise Sensor Consensus to require at least two sensors to agree before triggering a reaction. A keyboard tap won't register on the microphone, so that alone filters a lot.</li>
+        <li>Add a Cooldown (try 0.5–1.0s) to space out back-to-back reactions.</li>
+      </ul>
+    </details>
+
+    <details>
+      <summary>No sound plays on impact</summary>
+      <p>Check Volume range (both thumbs above zero), confirm an audio device is selected in Devices, and make sure nothing is muted at the system level. If the face is reacting but no sound plays, it's one of those three.</p>
+    </details>
+
+    <details>
+      <summary>Screen flash isn't showing up</summary>
+      <p>Flash Mode has three states: Off, Overlay, Notification. Open the menu bar dropdown and make sure it's set to <strong>Overlay</strong>. Check Flash Opacity (both thumbs above zero) and confirm at least one display is selected in the Devices panel. The overlay is gated to the sound clip duration, so audio also has to be working.</p>
+    </details>
+
+    <details>
+      <summary>Notifications aren't appearing</summary>
+      <p>Set Flash Mode to <strong>Notification</strong> in the menu bar dropdown. macOS will prompt for notification permission the first time. If you denied it or want to double-check: System Settings → Notifications → Yamete → enable banners. You can also pick the notification language independently of your system language (40 locales) under Flash Mode → Notification Language.</p>
+    </details>
+
+    <details>
+      <summary>The menu bar icon is showing a face instead of the normal icon</summary>
+      <p>Yeah, that's intentional. The menu bar face reacts on every detected impact for the duration of the response. It has eleven expressions and picks the one that matches the hit intensity. If you find it distracting, you'll want to disable the detection pipeline entirely (toggle Sound off and Flash Mode to Off) — the face is tied to detection, not to Flash Mode.</p>
+    </details>
+
+    <details>
+      <summary>CPU usage seems high</summary>
+      <p>Idle Yamete should be under 2% CPU. If it's higher, try raising the Report Interval (e.g., 20ms instead of 10ms) to halve the accelerometer polling rate, and disable any sensors you don't use. If it's still high, <a href="https://github.com/Studnicky/yamete/issues/new">file an issue</a> with your Mac model, macOS version, and what you see in Activity Monitor.</p>
+    </details>
+
+    <details>
+      <summary>How do I uninstall?</summary>
+      <p><strong>Yamete Direct (direct download):</strong></p>
+      <ol>
+        <li>Drag <code>Yamete Direct.app</code> from Applications to the Trash.</li>
+        <li>Delete <code>~/Library/Preferences/com.studnicky.yamete.direct.plist</code>.</li>
+        <li>Delete <code>~/Library/Application Support/Yamete Direct/</code> if you want to clear logs.</li>
+      </ol>
+      <p><strong>Yamete (Mac App Store):</strong></p>
+      <ol>
+        <li>Delete <code>Yamete</code> from Applications.</li>
+        <li>Delete <code>~/Library/Containers/com.studnicky.yamete/</code> to clear its sandboxed data.</li>
+      </ol>
+      <p><strong>Community warm-up helper</strong> (only relevant if you installed it for the App Store accelerometer):</p>
+      <p>Re-run the <code>uninstall.sh</code> script that came with the gist. It unloads the LaunchDaemon and removes <code>/usr/local/libexec/yamete-accel-warmup</code>, <code>/Library/LaunchDaemons/com.studnicky.yamete.accel-warmup.plist</code>, and <code>/var/log/yamete-accel-warmup.log</code>.</p>
+    </details>
+
+    <h2>The questions we hoped you'd ask</h2>
+
+    <details>
+      <summary>Will you add a rotten-tomato sound effect?</summary>
+      <p>Open an <a href="https://github.com/Studnicky/yamete/issues">issue</a> with a link to a royalty-free clip and we'll consider it. Custom sound pools are on the roadmap.</p>
+    </details>
+
+    <details>
+      <summary>Can I use this as a drum machine?</summary>
+      <p>Technically you could map per-intensity tiers to drum hits and tap out rhythms on your laptop. We do not recommend drumming on a USD 3,000 machine, but we do find the idea charming. If you build this, tell us.</p>
+    </details>
+
+    <details>
+      <summary>Will my keyboard typing trigger the accelerometer?</summary>
+      <p>Probably not — normal typing doesn't produce a sharp enough spike to pass the detection gates at default settings. Heavy typists on very lightweight laptops might see occasional false positives; raise the Spike Threshold slightly if so.</p>
+    </details>
+
+    <details>
+      <summary>Is it bad for my Mac?</summary>
+      <p>The <em>app</em> is not bad for your Mac. Hitting your Mac hard enough to trigger it repeatedly might be bad for your Mac. We are not liable for what you do to your own hardware. Please be gentle.</p>
+    </details>
+
+    <h2>System requirements <span class="qual">(the dry version)</span></h2>
+    <p>macOS 14.0+ (Sonoma), arm64 binary. The built-in BMI286 accelerometer is only available on Apple Silicon MacBooks; other Macs use microphone and headphone motion only. Microphone access is optional and prompted for at first launch. Yamete is a menu bar app (<code>LSUIElement</code>) — no Dock icon, no app windows, no noise unless you ask for it.</p>
 
     <footer>
-      <p>&copy; 2026 Studnicky &middot; <a href="index.html">Home</a> &middot; <a href="privacy.html">Privacy</a></p>
+      <p>&copy; 2026 Studnicky · <a href="index.html">Home</a> · <a href="privacy.html">Privacy</a> · <a href="https://github.com/Studnicky/yamete">GitHub</a></p>
     </footer>
   </div>
 </body>

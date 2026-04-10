@@ -3,120 +3,147 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Yamete — Desk Impact Reactions for Mac</title>
-  <meta name="description" content="A macOS menu bar app that detects physical impacts on Apple Silicon MacBooks and responds with audio and visual feedback.">
+  <title>Yamete — An app that reacts when you smack your MacBook</title>
+  <meta name="description" content="A macOS menu bar app that detects physical impacts on your Mac and responds with sound and a little face. It's as silly as it sounds, and it actually works.">
   <style>
-    :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --muted: #888; --card: #1a1a1a; }
+    :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --accent-soft: #ffb3c4; --muted: #888; --card: #1a1a1a; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; }
     a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+    code { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 0.9em; background: #1f1f1f; color: var(--accent-soft); padding: 0.1rem 0.4rem; border-radius: 4px; }
     .container { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem; }
     header { text-align: center; padding: 4rem 0 2rem; }
-    header h1 { font-size: 3rem; font-weight: 700; letter-spacing: -0.02em; }
-    header p { font-size: 1.15rem; color: var(--muted); margin-top: 0.5rem; }
-    .badge { display: inline-block; background: var(--accent); color: #000; font-size: 0.8rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 999px; margin-top: 1rem; }
+    header h1 { font-size: 3.2rem; font-weight: 700; letter-spacing: -0.02em; }
+    header .tagline { font-size: 1.2rem; color: var(--fg); margin-top: 0.6rem; }
+    header .sub { font-size: 0.95rem; color: var(--muted); margin-top: 0.4rem; font-style: italic; }
+    .badge { display: inline-block; background: var(--accent); color: #000; font-size: 0.8rem; font-weight: 600; padding: 0.3rem 0.85rem; border-radius: 999px; margin-top: 1.1rem; }
     section { margin: 2.5rem 0; }
     section h2 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.75rem; border-bottom: 1px solid #333; padding-bottom: 0.5rem; }
     section p, section li { color: #ccc; }
-    ul { list-style: none; padding: 0; } ul li { padding: 0.3rem 0; } ul li::before { content: "- "; color: var(--accent); }
+    section p { margin-bottom: 0.7rem; }
+    section p:last-child { margin-bottom: 0; }
+    ul { list-style: none; padding: 0; } ul li { padding: 0.3rem 0; } ul li::before { content: "— "; color: var(--accent); }
     .features { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
     .feature { background: var(--card); border-radius: 8px; padding: 1.25rem; }
-    .feature h3 { font-size: 1rem; margin-bottom: 0.4rem; }
-    .feature p { font-size: 0.9rem; color: var(--muted); }
+    .feature h3 { font-size: 1rem; margin-bottom: 0.4rem; color: var(--accent-soft); }
+    .feature p { font-size: 0.9rem; color: var(--muted); margin: 0; }
     .cta { text-align: center; margin: 3rem 0; }
-    .cta a { display: inline-block; background: var(--accent); color: #000; font-weight: 600; padding: 0.75rem 2rem; border-radius: 8px; font-size: 1.05rem; }
+    .cta a { display: inline-block; background: var(--accent); color: #000; font-weight: 600; padding: 0.8rem 2rem; border-radius: 8px; font-size: 1.05rem; }
     .cta a:hover { text-decoration: none; opacity: 0.9; }
+    .cta .cta-sub { display: block; margin-top: 0.8rem; font-size: 0.85rem; color: var(--muted); font-style: italic; }
+    blockquote { border-left: 3px solid var(--accent); padding: 0.4rem 0 0.4rem 1rem; margin: 1rem 0; color: #bbb; font-style: italic; }
     footer { text-align: center; padding: 2rem 0; color: var(--muted); font-size: 0.85rem; border-top: 1px solid #222; margin-top: 3rem; }
     footer a { color: var(--muted); } footer a:hover { color: var(--accent); }
-    @media (max-width: 600px) { .features { grid-template-columns: 1fr; } header h1 { font-size: 2.2rem; } }
+    @media (max-width: 600px) { .features { grid-template-columns: 1fr; } header h1 { font-size: 2.4rem; } }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
       <h1>Yamete</h1>
-      <p>Desk Impact Reactions for Mac</p>
-      <span class="badge">macOS 14+ &middot; Apple Silicon</span>
+      <p class="tagline">Your MacBook reacts when you smack it.</p>
+      <p class="sub">Yes. That is the entire app. Welcome.</p>
+      <span class="badge">macOS 14+ · Apple Silicon · v1.0.0</span>
     </header>
 
     <section>
-      <p>A macOS menu bar app that detects physical impacts on Apple Silicon MacBooks and responds with audio and visual feedback. Slap your desk, tap the laptop, get a reaction.</p>
+      <p>Yamete sits in your menu bar and watches the built-in accelerometer, the microphone, and — if you're wearing them — your AirPods. When any of them feel a smack, it plays a small sound, flashes a face, and posts an optional reaction. The face has range.</p>
+      <p>We built this because we wanted to. It runs entirely offline, stores nothing, and will probably not change your life in any measurable way. <em>That's fine.</em></p>
     </section>
 
     <section>
-      <h2>Features</h2>
+      <h2>Features <span style="font-weight: 400; color: var(--muted); font-size: 0.95rem;">(we took this seriously, somehow)</span></h2>
       <div class="features">
         <div class="feature">
-          <h3>Multi-Sensor Detection</h3>
-          <p>Built-in accelerometer (Apple Silicon MacBooks), microphone, and AirPods IMU work together with configurable consensus.</p>
+          <h3>Three Sensors, One Opinion</h3>
+          <p>Built-in accelerometer, microphone transient detection, and AirPods IMU. A consensus engine fuses them before firing so a passing truck doesn't set the whole thing off.</p>
         </div>
         <div class="feature">
-          <h3>Audio Reactions</h3>
-          <p>Impact intensity selects from a library of sound clips. Harder hits play longer, louder sounds.</p>
+          <h3>Sound Clips With Taste</h3>
+          <p>Impact intensity picks the clip — a tap gets a small "mm", a full-force slap gets… more. The volume and clip pool are tunable.</p>
+        </div>
+        <div class="feature">
+          <h3>The Face</h3>
+          <p>A live face in the menu bar that reacts on every detected impact, independent of Flash Mode. It has eleven expressions and picks one that matches the hit.</p>
         </div>
         <div class="feature">
           <h3>Flash Mode</h3>
-          <p>Three-way visual response: off, full-screen overlay flash, or notification banner. Pick what fits your workflow.</p>
-        </div>
-        <div class="feature">
-          <h3>Always-On Menu Bar</h3>
-          <p>The menu bar face icon reacts on every detected impact, even with Flash Mode set to off.</p>
+          <p>Three modes: off, full-screen overlay, or notification banner. Pick the one that won't get you fired.</p>
         </div>
         <div class="feature">
           <h3>40 Languages</h3>
-          <p>Notification copy ships in 40 locales. The notification language can be selected independently of system language.</p>
+          <p>Notification copy ships in 40 locales. You can pick the notification language independently of your system language, for when you want to feel multicultural about it.</p>
         </div>
         <div class="feature">
-          <h3>Fine-Tuned Control</h3>
-          <p>Reactivity, volume, and flash opacity range sliders. Advanced detection gate tuning.</p>
+          <h3>Knobs For Days</h3>
+          <p>Sensitivity range, volume range, flash opacity range, per-sensor gate tuning (spike, crest, rise rate, confirmations), cooldown debounce. Tweak until it reads you.</p>
         </div>
       </div>
     </section>
 
     <section>
-      <h2>How It Works</h2>
-      <p>Each sensor runs its own detection pipeline: raw data passes through bandpass filtering and a 6-gate analysis (spike threshold, rise rate, crest factor, confirmation count). When enough sensors agree within a time window, the app responds with sound and the selected visual response, scaled to impact intensity.</p>
-      <p style="margin-top: 0.75rem;">Yamete is a menu bar app (<code>LSUIElement</code>) — it has no Dock icon and no app windows. All controls live in the menu bar dropdown.</p>
+      <h2>Why though?</h2>
+      <p>Honestly? We wanted to. Apple Silicon MacBooks ship with a real accelerometer — the same BMI286 that's in phones — and Apple provides zero public API to read it. The whole <code>CMMotionManager</code> surface is marked <code>API_UNAVAILABLE(macos)</code>. This felt like a dare.</p>
+      <p>The result is a fully functional reason to touch your laptop too enthusiastically. It's the useless-tool equivalent of building a ship in a bottle: most of the interesting work is invisible, the end result is not especially practical, and the point was the building.</p>
+      <blockquote>If you use this daily, we'd love to hear why. If you install it, laugh once, and delete it — that's also a completely valid outcome and we are glad you stopped by.</blockquote>
     </section>
 
     <section>
-      <h2>Privacy</h2>
-      <p>Yamete makes zero network connections. All sensor data is processed locally in real-time. No audio is recorded or stored. Logs auto-delete after 24 hours. No accounts, no tracking, no ads.</p>
-      <p style="margin-top: 0.75rem;"><a href="privacy.html">Full Privacy Policy</a></p>
+      <h2>How it works</h2>
+      <p>Each sensor runs its own detection pipeline: raw samples pass through bandpass filtering and a six-gate analysis (spike threshold, rise rate, crest factor, confirmation count, warmup, cooldown). When enough sensors agree within a time window, Yamete plays a sound clip and triggers the visual response, both scaled to impact intensity.</p>
+      <p>It's a menu bar app (<code>LSUIElement</code>) — no Dock icon, no app windows. All controls live in the menu bar dropdown, because we are not monsters.</p>
+    </section>
+
+    <section>
+      <h2>Privacy <span style="font-weight: 400; color: var(--muted); font-size: 0.95rem;">(the boring-but-actually-nice kind)</span></h2>
+      <p>Zero network connections. All sensor data processed locally, in real time. Microphone audio is analyzed for transient peaks and immediately discarded — nothing is recorded. Logs auto-delete after 24 hours. No accounts, no tracking, no ads, no telemetry, no analytics, no "just this once" exceptions.</p>
+      <p>If this seems too good to be true, the source code is right there and you're welcome to check.</p>
+      <p><a href="privacy.html">Full Privacy Policy →</a></p>
     </section>
 
     <section>
       <h2>Requirements</h2>
       <ul>
-        <li>macOS 14.0+ (Sonoma), arm64 binary</li>
-        <li>Apple Silicon MacBook (M1/M2/M3/M4) for the built-in accelerometer</li>
-        <li>Any Mac with a microphone for sound-based impact detection</li>
-        <li>AirPods Pro / Beats for headphone motion sensing (optional)</li>
+        <li>macOS 14.0+ (Sonoma)</li>
+        <li>Apple Silicon MacBook (M1/M2/M3/M4) if you want the tactile accelerometer channel</li>
+        <li>Any Mac with a microphone for the sound-based detection path (works on every Mac)</li>
+        <li>AirPods Pro / Beats for headphone motion (optional, but it's fun)</li>
       </ul>
+      <p>If you're on an Intel Mac, a Mac Studio, a Mac Mini, or an iMac: microphone detection still works great. You just won't get the "physically smacked the laptop" channel, on account of not having a laptop to smack.</p>
     </section>
 
     <section>
-      <h2>Builds</h2>
-      <p>Yamete ships in two flavors:</p>
+      <h2>Two builds</h2>
+      <p>Yamete ships in two registers:</p>
       <ul>
-        <li><strong>Yamete</strong> — Mac App Store build, rated 12+, ships with the tame notification copy.</li>
-        <li><strong>Yamete Direct</strong> — notarized direct download, ships with the spicy notification copy. Not submitted to the App Store.</li>
+        <li><strong>Yamete</strong> — the Mac App Store build. Rated 12+, ships with the tame notification copy ("Mm, again?", "Show off~", "OUCH"). Safe for most workplaces, probably.</li>
+        <li><strong>Yamete Direct</strong> — a notarized direct download. Ships with spicier notification copy. Not submitted to the App Store. For consenting adults who specifically wanted the spicier one.</li>
       </ul>
-      <p style="margin-top: 0.75rem;">Both builds share the same detection engine, settings, and audio. They differ only in the notification text register.</p>
+      <p>Both builds use the same detection engine, settings, sounds, and face library. They differ only in the notification text register.</p>
     </section>
 
     <section>
-      <h2>Support</h2>
-      <p>For bug reports, feature requests, or questions: <a href="https://github.com/Studnicky/yamete/issues">GitHub Issues</a></p>
-      <p style="margin-top: 0.5rem;">Email: <a href="mailto:support@studnicky.com">support@studnicky.com</a></p>
+      <h2>Accelerometer setup on App Store (optional)</h2>
+      <p>The Mac App Store build runs under App Sandbox. The sandbox silently blocks the IORegistry writes needed to start the built-in accelerometer, which means — out of the box — the App Store build uses the microphone and headphone motion only. Which is fine. The microphone path works great.</p>
+      <p>If you specifically want the tactile channel on an Apple Silicon MacBook, there's a small open-source helper at <a href="https://github.com/Studnicky/yamete/tree/develop/docs/community"><code>docs/community/</code></a> that you can compile with <code>swiftc</code> and install as a LaunchDaemon. It runs once per boot, warms the sensor, and exits. Yamete then picks it up. Full instructions and safety notes in the gist README.</p>
+      <p style="margin-top: 0.6rem; color: var(--muted); font-size: 0.9rem;">If you install it and it works — or doesn't — please <a href="https://github.com/Studnicky/yamete/issues/new">file an issue</a>. We're building a known-working Mac matrix and every data point helps.</p>
+    </section>
+
+    <section>
+      <h2>Support &amp; questions</h2>
+      <p>The <a href="support.html">Support page</a> has a full FAQ covering setup, tuning, false positives, the accelerometer situation, and a few genuine questions we made up ourselves.</p>
+      <p>Bug reports, feature requests, or "this does a weird thing on my M3 Air": <a href="https://github.com/Studnicky/yamete/issues">GitHub Issues</a>.</p>
+      <p>Email, if you must: <a href="mailto:support@studnicky.com">support@studnicky.com</a>.</p>
     </section>
 
     <div class="cta">
-      <a href="https://github.com/Studnicky/yamete/releases">Download Latest Release</a>
+      <a href="https://github.com/Studnicky/yamete/releases">Download Yamete Direct</a>
+      <span class="cta-sub">(App Store version coming once review is done)</span>
     </div>
 
     <footer>
-      <p>&copy; 2026 Studnicky &middot; <a href="privacy.html">Privacy</a> &middot; <a href="https://github.com/Studnicky/yamete">GitHub</a> &middot; <a href="support.html">Support</a></p>
+      <p>&copy; 2026 Studnicky · <a href="privacy.html">Privacy</a> · <a href="support.html">Support</a> · <a href="https://github.com/Studnicky/yamete">GitHub</a></p>
+      <p style="margin-top: 0.4rem; font-size: 0.8rem;">Made with unnecessary care in an unreasonable timeframe.</p>
     </footer>
   </div>
 </body>
