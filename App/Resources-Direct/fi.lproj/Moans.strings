@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for fi.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/fi.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ iskä~";
+"moan_tap_2" = "Oi~";
+"moan_tap_3" = "Kiusoittelija~";
+"moan_tap_4" = "Hih~";
+"moan_light_1" = "Iskä~";
+"moan_light_2" = "Hmh~";
+"moan_light_3" = "Oi~ ole kiltti~";
+"moan_light_4" = "Älä~";
+"moan_medium_1" = "Iskä, ei~";
+"moan_medium_2" = "Ei sieltä~";
+"moan_medium_3" = "Hyi, niin ilkeä~";
+"moan_medium_4" = "Ole kiltti, iskä~";
+"moan_firm_1" = "Iskä! Liian kovaa!";
+"moan_firm_2" = "Olen kiltti!";
+"moan_firm_3" = "Armoa~ ole kiltti~";
+"moan_firm_4" = "Olet niin ilkeä!";
+"moan_hard_1" = "ISKÄ!!";
+"moan_hard_2" = "AAAH!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "OLEN KILTTI!!";

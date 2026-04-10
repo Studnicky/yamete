@@ -9,9 +9,9 @@ import SensorKit
 #if canImport(ResponseKit)
 import ResponseKit
 #endif
-#if canImport(YameteApp)
-import YameteApp
-#endif
+// Note: no `import YameteApp` — in the Makefile build, all YameteApp/*.swift
+// files (plus this one) compile into a single module named YameteApp, so a
+// self-import is a no-op warning that becomes an error under -warnings-as-errors.
 
 @main
 struct YameteApp: App {
@@ -53,11 +53,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 @MainActor private enum AppWindow {
     static func configureAsMenuBarApp() {
+        // LSUIElement app: no dock icon, no menu bar app menu, no app windows.
+        // Setting the activation policy to .accessory pins it to the menu bar
+        // extra only. There is intentionally no NSApp.applicationIconImage
+        // setup here — Yamete has no dock tile to render an icon into.
         NSApp.setActivationPolicy(.accessory)
-        if let path = Bundle.main.path(forResource: "AppIcon", ofType: "icns"),
-           let icon = NSImage(contentsOfFile: path) {
-            NSApp.applicationIconImage = icon
-        }
     }
 }
 

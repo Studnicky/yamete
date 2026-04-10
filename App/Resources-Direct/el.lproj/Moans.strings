@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for el.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/el.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Μμμ~ μπαμπάκα~";
+"moan_tap_2" = "Αχ~";
+"moan_tap_3" = "Πειραχτήρι~";
+"moan_tap_4" = "Ωχ~";
+"moan_light_1" = "Μπαμπάκα~";
+"moan_light_2" = "Μμνχ~";
+"moan_light_3" = "Αχ~ σε παρακαλώ~";
+"moan_light_4" = "Μην~";
+"moan_medium_1" = "Μπαμπάκα, όχι~";
+"moan_medium_2" = "Όχι εκεί~";
+"moan_medium_3" = "Ωχ, πόσο κακός~";
+"moan_medium_4" = "Σε παρακαλώ, μπαμπάκα~";
+"moan_firm_1" = "Μπαμπάκα! Πολύ δυνατά!";
+"moan_firm_2" = "Θα είμαι καλή!";
+"moan_firm_3" = "Έλεος~ σε παρακαλώ~";
+"moan_firm_4" = "Είσαι τόσο κακός!";
+"moan_hard_1" = "ΜΠΑΜΠΑΚΑ!!";
+"moan_hard_2" = "ΑΑΑΧ!!";
+"moan_hard_3" = "ΓΙΑΜΕΤΕΕΕ!!";
+"moan_hard_4" = "ΘΑ ΕΙΜΑΙ ΚΑΛΗ!!";

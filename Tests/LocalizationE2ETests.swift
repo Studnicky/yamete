@@ -84,6 +84,8 @@ final class LocalizationE2ETests: XCTestCase {
             "setting_reactivity",
             "setting_volume",
             "setting_flash_opacity",
+            "setting_visual_response",
+            "setting_visual_mode",
             "setting_cooldown",
             "setting_frequency_band",
             "setting_spike_threshold",
@@ -101,8 +103,11 @@ final class LocalizationE2ETests: XCTestCase {
             "label_links",
             "button_privacy",
             "button_support",
+            "response_mode_overlay",
+            "response_mode_notification",
             "action_open_privacy_policy",
             "action_open_support",
+            "notification_title",
             "button_quit",
             "status_paused",
             "tier_tap",
@@ -134,6 +139,8 @@ final class LocalizationE2ETests: XCTestCase {
             "help_reactivity",
             "help_volume",
             "help_flash_opacity",
+            "help_visual_response",
+            "help_visual_mode",
             "help_cooldown",
             "help_frequency_band",
             "help_spike_threshold",
@@ -145,6 +152,8 @@ final class LocalizationE2ETests: XCTestCase {
             "help_consensus",
             "help_flash_displays",
             "help_audio_output",
+            "notification_mode_hint",
+            "notification_display_hint",
         ]
 
         for key in helpKeys {

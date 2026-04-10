@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for ar.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/ar.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "ممم~ بابا~";
+"moan_tap_2" = "آه~";
+"moan_tap_3" = "تغاظني~";
+"moan_tap_4" = "أوه~";
+"moan_light_1" = "بابي~";
+"moan_light_2" = "نّغ~";
+"moan_light_3" = "آه~ أرجوك~";
+"moan_light_4" = "لا تفعل~";
+"moan_medium_1" = "بابا، لا~";
+"moan_medium_2" = "ليس هناك~";
+"moan_medium_3" = "أوه، كم أنت قاسٍ~";
+"moan_medium_4" = "أرجوك يا بابا~";
+"moan_firm_1" = "بابا! كفى!";
+"moan_firm_2" = "سأكون مطيعة!";
+"moan_firm_3" = "رحمة~ أرجوك~";
+"moan_firm_4" = "أنت قاسٍ جداً!";
+"moan_hard_1" = "بابااا!!";
+"moan_hard_2" = "آآآه!!";
+"moan_hard_3" = "ياميتي!!";
+"moan_hard_4" = "سأكون مطيعة!!";

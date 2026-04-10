@@ -31,6 +31,21 @@
 /* Flash opacity setting help text */
 "help_flash_opacity" = "Screen flash brightness window. Envelope timing shaped by intensity. Gated inside the sound clip duration.";
 
+/* Notification language picker title */
+"setting_notification_locale" = "Notification Language";
+
+/* Notification language picker help */
+"help_notification_locale" = "Language used for notification body text. Defaults to your system language. Each language carries the same playful arc — only the words change.";
+
+/* Visual response setting title */
+"setting_visual_response" = "Flash Mode";
+
+/* Visual response setting help text */
+"help_visual_response" = "How the flash response fires. Overlay flashes the selected displays; Notification posts a banner; Off disables both. The menu bar icon always reacts when an impact fires, regardless of this setting.";
+
+/* Notification response mode help text */
+"notification_mode_hint" = "Notification mode posts an impact banner to Notification Center. The entry is removed from Notification Center after the cooldown; how long the on-screen banner stays visible is controlled by macOS.";
+
 /* Sensitivity Ruler Labels */
 
 /* Ruler label: hardest impact */
@@ -150,6 +165,24 @@
 /* Flash displays setting help text */
 "help_flash_displays" = "Select which monitors show the flash overlay on impact.";
 
+/* Visual response mode setting title */
+"setting_visual_mode" = "Visual Mode";
+
+/* Visual response mode help text */
+"help_visual_mode" = "Choose between the full-screen overlay and a temporary notification response.";
+
+/* Visual response off label */
+"response_mode_off" = "Off";
+
+/* Overlay response mode label */
+"response_mode_overlay" = "Overlay";
+
+/* Notification response mode label */
+"response_mode_notification" = "Notify";
+
+/* Notification mode display hint */
+"notification_display_hint" = "Notification mode ignores display selection. The notification is removed from Notification Center after the cooldown; banner visibility duration is controlled by macOS.";
+
 /* Audio output setting title */
 "setting_audio_output" = "Audio Output";
 
@@ -209,6 +242,14 @@
 
 /* Support accessibility label */
 "action_open_support" = "Open Support";
+
+/* Impact notification title */
+"notification_title" = "Yamete";
+
+/* Impact notification title and body pools live in Moans.strings.
+   See App/Resources/en.lproj/Moans.strings for the App-Store-safe defaults
+   and App/Resources-Direct/en.lproj/Moans.strings for the Direct-build
+   spicy overrides. */
 
 /* App version label */
 "version_format" = "v%@";

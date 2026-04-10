@@ -1,0 +1,59 @@
+/* Yamete — TAME moan/title pools (App Store + Direct base layer).
+   Loaded by NotificationPhrase from the "Moans" table.
+   For the Direct build, the Makefile overlays App/Resources-Direct/ on top
+   of this file, replacing it with spicy DDLG content. The App Store build
+   uses this file as-is. Tone: flirty playful, App Store rating safe. */
+
+/* Title — flirty observational labels (per-tier random) */
+
+"title_tap_1" = "Mm, again?";
+"title_tap_2" = "Is that all?";
+"title_tap_3" = "Tease~";
+"title_tap_4" = "Show me what you got";
+
+"title_light_1" = "Now you've got my attention";
+"title_light_2" = "I see you";
+"title_light_3" = "Mmm, okay";
+"title_light_4" = "Show me more";
+
+"title_medium_1" = "Mmhmm~";
+"title_medium_2" = "Right there";
+"title_medium_3" = "Show off~";
+"title_medium_4" = "I like where this is going";
+
+"title_firm_1" = "Don't you dare stop";
+"title_firm_2" = "You're spoiling me";
+"title_firm_3" = "Look at you go";
+"title_firm_4" = "Mm, you remembered";
+
+"title_hard_1" = "There it is~";
+"title_hard_2" = "That's the stuff";
+"title_hard_3" = "Now we're talking";
+"title_hard_4" = "Mmmmm~";
+
+/* Body — clean playful exclamations (per-tier random) */
+
+"moan_tap_1" = "Hey~";
+"moan_tap_2" = "Oh!";
+"moan_tap_3" = "Hi there";
+"moan_tap_4" = "Mm?";
+
+"moan_light_1" = "Whoa";
+"moan_light_2" = "Hey now";
+"moan_light_3" = "Easy";
+"moan_light_4" = "Oh!";
+
+"moan_medium_1" = "Easy!";
+"moan_medium_2" = "Whoa there";
+"moan_medium_3" = "Hey!";
+"moan_medium_4" = "Oof";
+
+"moan_firm_1" = "Ow";
+"moan_firm_2" = "Easy now!";
+"moan_firm_3" = "Take it easy";
+"moan_firm_4" = "Whoa whoa";
+
+"moan_hard_1" = "OUCH";
+"moan_hard_2" = "STOP!";
+"moan_hard_3" = "WHOA!!";
+"moan_hard_4" = "EASY!!";
