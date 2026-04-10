@@ -67,4 +67,10 @@ public enum AccelHardwareConstants {
     public static let minReportLength = 18
     public static let rawScale: Float = 65536.0
     public static let defaultSampleRate: Float = 50.0
+
+    /// `AccelHardware.isSensorActivelyReporting()` returns true only when
+    /// the driver's `_last_event_timestamp` is within this many nanoseconds
+    /// of now. At 100Hz reports arrive every 10ms; 500ms is 50 missed
+    /// samples — safely outside normal scheduler / run-loop jitter.
+    public static let sensorActivityStalenessNs: UInt64 = 500_000_000
 }
