@@ -24,6 +24,7 @@ final class SettingsStoreTests: XCTestCase {
             .init(name: "sensitivityMax",  read: { "\($0.sensitivityMax)" },  expected: "0.9"),
             .init(name: "debounce",     read: { "\($0.debounce)" },     expected: "0.5"),
             .init(name: "screenFlash",     read: { "\($0.screenFlash)" },     expected: "true"),
+            .init(name: "visualResponseMode", read: { $0.visualResponseMode.rawValue }, expected: "overlay"),
             .init(name: "flashOpacityMin", read: { "\($0.flashOpacityMin)" }, expected: "0.5"),
             .init(name: "flashOpacityMax", read: { "\($0.flashOpacityMax)" }, expected: "0.9"),
             .init(name: "volumeMin",       read: { "\($0.volumeMin)" },       expected: "0.5"),
@@ -92,17 +93,34 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
-    func testBoolPersistence() {
-        struct Case { let name: String; let key: SettingsStore.Key; let write: (SettingsStore) -> Void; let value: Bool }
-        let cases: [Case] = [
-            .init(name: "screenFlash off",  key: .screenFlash, write: { $0.screenFlash = false }, value: false),
-            .init(name: "screenFlash on",   key: .screenFlash, write: { $0.screenFlash = true },  value: true),
-        ]
-        for c in cases {
-            let store = freshStore()
-            c.write(store)
-            XCTAssertEqual(UserDefaults.standard.bool(forKey: c.key.rawValue), c.value, "\(c.name)")
-        }
+    /// `screenFlash` is now a computed proxy over `visualResponseMode`. The
+    /// only thing that persists is `visualResponseMode` — writing screenFlash
+    /// should reflect in the visualResponseMode key on disk.
+    func testScreenFlashProxiesVisualResponseMode() {
+        let store = freshStore()
+
+        store.screenFlash = false
+        XCTAssertEqual(store.visualResponseMode, .off)
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: SettingsStore.Key.visualResponseMode.rawValue),
+            VisualResponseMode.off.rawValue)
+
+        store.screenFlash = true
+        // False → true flips .off back to .overlay as the default "on" mode.
+        XCTAssertEqual(store.visualResponseMode, .overlay)
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: SettingsStore.Key.visualResponseMode.rawValue),
+            VisualResponseMode.overlay.rawValue)
+    }
+
+    func testVisualResponseModePersistence() {
+        let store = freshStore()
+        store.visualResponseMode = .notification
+
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: SettingsStore.Key.visualResponseMode.rawValue),
+            VisualResponseMode.notification.rawValue
+        )
     }
 
     // MARK: - Boundary values (all Double properties)
@@ -193,6 +211,7 @@ final class SettingsStoreTests: XCTestCase {
             .init(name: "sensitivityMax") { $0.sensitivityMax = 0.5; $0.sensitivityMax = 0.5 },
             .init(name: "debounce")    { $0.debounce = 0.2; $0.debounce = 0.2 },
             .init(name: "screenFlash")    { $0.screenFlash = false; $0.screenFlash = false },
+            .init(name: "visualResponseMode") { $0.visualResponseMode = .notification; $0.visualResponseMode = .notification },
             .init(name: "flashOpacityMin"){ $0.flashOpacityMin = 0.3; $0.flashOpacityMin = 0.3 },
             .init(name: "flashOpacityMax"){ $0.flashOpacityMax = 0.7; $0.flashOpacityMax = 0.7 },
             .init(name: "volumeMin")      { $0.volumeMin = 0.2; $0.volumeMin = 0.2 },

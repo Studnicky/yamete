@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for ru.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/ru.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Ммм~ папочка~";
+"moan_tap_2" = "Ах~";
+"moan_tap_3" = "Дразнишь~";
+"moan_tap_4" = "Ой~";
+"moan_light_1" = "Папочка~";
+"moan_light_2" = "Мнгх~";
+"moan_light_3" = "Ах~ пожалуйста~";
+"moan_light_4" = "Не надо~";
+"moan_medium_1" = "Папочка, не~";
+"moan_medium_2" = "Не туда~";
+"moan_medium_3" = "Ой, какой злой~";
+"moan_medium_4" = "Пожалуйста, папочка~";
+"moan_firm_1" = "Папа! Слишком!";
+"moan_firm_2" = "Я буду хорошей!";
+"moan_firm_3" = "Пощади~ прошу~";
+"moan_firm_4" = "Ты такой злой!";
+"moan_hard_1" = "ПАПОЧКА!!";
+"moan_hard_2" = "АААХ!!";
+"moan_hard_3" = "ЯМЕТЭЭЭ!!";
+"moan_hard_4" = "Я БУДУ ХОРОШЕЙ!!";

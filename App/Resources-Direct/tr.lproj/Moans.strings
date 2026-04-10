@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for tr.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/tr.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ babacım~";
+"moan_tap_2" = "Ah~";
+"moan_tap_3" = "Yaramaz~";
+"moan_tap_4" = "Of~";
+"moan_light_1" = "Babacım~";
+"moan_light_2" = "Hnnh~";
+"moan_light_3" = "Ah~ lütfen~";
+"moan_light_4" = "Yapma~";
+"moan_medium_1" = "Babacım, yapma~";
+"moan_medium_2" = "Orası olmaz~";
+"moan_medium_3" = "Of, çok yaramazsın~";
+"moan_medium_4" = "Lütfen, babacım~";
+"moan_firm_1" = "Babacım! Çok fazla!";
+"moan_firm_2" = "Uslu duracağım!";
+"moan_firm_3" = "Aman~ lütfen~";
+"moan_firm_4" = "Çok kötüsün!";
+"moan_hard_1" = "BABACIM!!";
+"moan_hard_2" = "AAAH!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "USLU DURACAĞIM!!";

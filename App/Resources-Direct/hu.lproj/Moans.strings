@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for hu.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/hu.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ apuci~";
+"moan_tap_2" = "Ó~";
+"moan_tap_3" = "Ugratsz~";
+"moan_tap_4" = "Hmm~";
+"moan_light_1" = "Apuci~";
+"moan_light_2" = "Nnh~";
+"moan_light_3" = "Ó~ kérlek~";
+"moan_light_4" = "Ne~";
+"moan_medium_1" = "Apuci, ne~";
+"moan_medium_2" = "Ott ne~";
+"moan_medium_3" = "Jaj, olyan rossz~";
+"moan_medium_4" = "Kérlek, apuci~";
+"moan_firm_1" = "Apuci! Túl sok!";
+"moan_firm_2" = "Jó leszek!";
+"moan_firm_3" = "Kegyelem~ kérlek~";
+"moan_firm_4" = "Olyan rossz vagy!";
+"moan_hard_1" = "APUCI!!";
+"moan_hard_2" = "ÁÁÁH!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "JÓ LESZEK!!";

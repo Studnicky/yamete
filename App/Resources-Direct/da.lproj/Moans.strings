@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for da.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/da.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ daddy~";
+"moan_tap_2" = "Åh~";
+"moan_tap_3" = "Du drille~";
+"moan_tap_4" = "Hnn~";
+"moan_light_1" = "Daddy~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Åh~ vær sød~";
+"moan_light_4" = "Lad være~";
+"moan_medium_1" = "Daddy, nej~";
+"moan_medium_2" = "Ikke der~";
+"moan_medium_3" = "Du er så led~";
+"moan_medium_4" = "Vær sød, daddy~";
+"moan_firm_1" = "Daddy! For meget!";
+"moan_firm_2" = "Jeg skal være god!";
+"moan_firm_3" = "Nåde~ vær sød~";
+"moan_firm_4" = "Du er så ond!";
+"moan_hard_1" = "DADDY!!";
+"moan_hard_2" = "AHHHN!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "JEG SKAL VÆRE GOD!!";

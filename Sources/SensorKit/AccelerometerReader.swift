@@ -233,12 +233,27 @@ private enum AccelHardware {
 
         continuation.onTermination = { @Sendable _ in
             cleanup.perform { r in
+                // Phase 1 — silence the report callback. From this point on,
+                // any in-flight HID callback that fires before the run loop
+                // exits is a no-op (running == false).
                 r.ctx.invalidate()
                 SensorActivation.deactivate()
+
+                // Phase 2 — stop the dedicated HID thread and WAIT for it
+                // to exit. CFRunLoopStop is documented thread-safe; the
+                // thread.cancel + join pair ensures the worker is no longer
+                // inside CFRunLoopRunInMode before we touch any CF objects
+                // it had scheduled. Without the join, the next phase races
+                // CF data-structure modification (TSAN reports SEGV in
+                // CF_IS_OBJC during a worker-thread CF dispatch).
+                r.thread.cancel()
+                CFRunLoopStop(r.runLoop)
+                r.thread.join()
+
+                // Phase 3 — now safe to mutate IOHIDManager state and
+                // close the device. The HID worker is fully exited.
                 IOHIDDeviceRegisterInputReportCallback(r.device, r.buffer, r.maxSize, nil, nil)
                 IOHIDManagerUnscheduleFromRunLoop(r.manager, r.runLoop, r.runLoopMode.rawValue)
-                CFRunLoopStop(r.runLoop)
-                r.thread.cancel()
                 IOHIDDeviceClose(r.device, IOOptionBits(kIOHIDOptionsTypeNone))
                 IOHIDManagerClose(r.manager, IOOptionBits(kIOHIDOptionsTypeNone))
                 r.buffer.deallocate()
@@ -315,9 +330,14 @@ private final class ReportContext: Sendable {
     func handleReport(report: UnsafeMutablePointer<UInt8>, length: Int) {
         guard length >= minReportLength else { return }
 
-        let rawX = report.advanced(by: 6).withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
-        let rawY = report.advanced(by: 10).withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
-        let rawZ = report.advanced(by: 14).withMemoryRebound(to: Int32.self, capacity: 1) { $0.pointee }
+        // Int32 axes at byte offsets 6/10/14 are NOT 4-byte aligned. Using
+        // `withMemoryRebound` on a misaligned pointer is undefined behavior
+        // per the Swift memory model, even if it happens to work on Apple
+        // Silicon. `loadUnaligned` is the sanctioned API for this case.
+        let rawBuffer = UnsafeRawPointer(report)
+        let rawX = rawBuffer.loadUnaligned(fromByteOffset: 6, as: Int32.self)
+        let rawY = rawBuffer.loadUnaligned(fromByteOffset: 10, as: Int32.self)
+        let rawZ = rawBuffer.loadUnaligned(fromByteOffset: 14, as: Int32.self)
 
         state.withLock { s in
             guard s.running else { return }
@@ -343,6 +363,13 @@ private final class ReportContext: Sendable {
 
 /// Manages a dedicated thread hosting a CFRunLoop for HID report callbacks.
 /// Lock-protected state; the underlying Thread is not exposed.
+///
+/// Lifecycle: `start()` → `waitUntilReady()` → use → `cancel()` → `join()`.
+/// `join()` MUST be called before tearing down any CF objects scheduled on
+/// the run loop (e.g. `IOHIDManagerUnscheduleFromRunLoop`, `IOHIDManagerClose`).
+/// Calling those from outside the HID thread while the HID thread is still
+/// inside `CFRunLoopRunInMode` modifies CF data structures concurrently and
+/// causes SEGV in `CF_IS_OBJC` (caught by ThreadSanitizer).
 private struct HIDRunLoopThread: Sendable {
     private struct State: @unchecked Sendable {
         var runLoop: CFRunLoop?
@@ -350,6 +377,9 @@ private struct HIDRunLoopThread: Sendable {
     }
     private let state: OSAllocatedUnfairLock<State>
     private let ready = DispatchSemaphore(value: 0)
+    /// Signaled by the worker thread when its run loop has exited.
+    /// `join()` waits on this; cleanup must wait before touching CF objects.
+    private let done = DispatchSemaphore(value: 0)
 
     var runLoop: CFRunLoop? { state.withLock { $0.runLoop } }
 
@@ -360,6 +390,7 @@ private struct HIDRunLoopThread: Sendable {
     func start() {
         let stateRef = state
         let readyRef = ready
+        let doneRef = done
         let thread = Thread {
             stateRef.withLock { $0.runLoop = CFRunLoopGetCurrent() }
             readyRef.signal()
@@ -368,6 +399,7 @@ private struct HIDRunLoopThread: Sendable {
                 CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0.25, false)
                 cancelled = stateRef.withLock { $0.thread?.isCancelled ?? true }
             }
+            doneRef.signal()
         }
         state.withLockUnchecked { $0.thread = thread }
         thread.start()
@@ -381,4 +413,9 @@ private struct HIDRunLoopThread: Sendable {
             if let rl = s.runLoop { CFRunLoopStop(rl) }
         }
     }
+
+    /// Blocks the calling thread until the HID worker has fully exited its
+    /// run loop. Combined with `cancel()` first, guarantees no CF callbacks
+    /// or run-loop state changes can race teardown of the IOHIDManager.
+    func join() { done.wait() }
 }
