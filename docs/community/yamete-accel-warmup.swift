@@ -11,8 +11,25 @@
 // writes reach the driver and start the sensor streaming. Yamete then
 // subscribes passively and receives the existing report stream.
 //
-// Warmth persists across subscriber cycles, so this only needs to run
-// once per boot. A single LaunchDaemon `RunAtLoad = true` is sufficient.
+// Modes:
+//   probe       one-shot: report whether the sensor is currently streaming
+//   warmup      one-shot: write the activation properties and exit
+//   deactivate  one-shot: write zero to the activation properties and exit
+//   daemon      long-lived: run warmup on startup, then subscribe to IOKit
+//               system power notifications via `IORegisterForSystemPower`
+//               and re-warm on every `kIOMessageSystemHasPoweredOn` event.
+//               This is how the shipping LaunchDaemon invokes the helper —
+//               `RunAtLoad=true` starts it at boot and the wake watcher
+//               keeps the sensor warm across sleep/wake cycles for the
+//               rest of the session.
+//
+// Empirical note on sleep/wake: on the hardware we have tested, the
+// BMI286 sits in the always-on power domain and continues streaming at
+// 100Hz throughout sleep with no intervention — the daemon's wake
+// handler is defense in depth for hardware or macOS revisions we have
+// not yet verified. If you observe the sensor going cold across sleep
+// on a Mac where this helper is running, please file an issue (see the
+// README for the diagnostics checklist).
 //
 // Build:
 //   swiftc yamete-accel-warmup.swift -o yamete-accel-warmup \
@@ -22,9 +39,11 @@
 //   see install.sh in the same gist
 //
 // Source of truth: https://github.com/Studnicky/yamete/blob/develop/docs/community/
+// Report problems:  https://github.com/Studnicky/yamete/issues/new
 
 import Foundation
 import IOKit
+import IOKit.pwr_mgt
 
 // MARK: - IORegistry helpers
 
@@ -106,6 +125,7 @@ func probe() -> Int32 {
 /// are command channels — success doesn't update a stored value in the
 /// IOKit property dict, it triggers a hardware command.
 /// Exit code 0 on success, 1 on any write failure, 2 if no hardware.
+@discardableResult
 func warmup(intervalUS: Int = 10000) -> Int32 {
     var anyFound = false
     var anySuccess = false
@@ -159,17 +179,104 @@ func deactivate() -> Int32 {
     return anyFound ? 0 : 2
 }
 
+// MARK: - Daemon: long-lived wake-watcher
+
+/// IOKit system power message types. The IOKit header defines these via
+/// a `iokit_common_msg(X)` macro that expands to `0xe0000000 | X`, using
+/// a nested macro expansion that Swift's C importer cannot translate —
+/// so we define the numeric values directly. These values are stable
+/// across every macOS release since IOKit was introduced and are
+/// documented in IOKit/IOMessage.h.
+private let MsgCanSystemSleep:     UInt32 = 0xe0000270
+private let MsgSystemWillSleep:    UInt32 = 0xe0000280
+private let MsgSystemHasPoweredOn: UInt32 = 0xe0000300
+
+/// File-scope storage for the IOKit root power domain connection.
+/// The power notification callback has `@convention(c)` and cannot
+/// capture local scope, so it reads this through the global instead.
+/// Set once, inside `daemon()`, before the run loop starts — the
+/// callback cannot fire until we are inside `CFRunLoopRun()`.
+private var g_rootPort: io_connect_t = 0
+
+/// IOKit system power notification callback. Fires on:
+///   - `MsgCanSystemSleep` / `MsgSystemWillSleep`: we ack immediately
+///     via `IOAllowPowerChange` so we never block sleep.
+///   - `MsgSystemHasPoweredOn`: the system has finished waking — re-warm
+///     the accelerometer in case the driver cooled across sleep.
+private let powerCallback: IOServiceInterestCallback = { (_, _, messageType, messageArgument) in
+    switch messageType {
+    case MsgCanSystemSleep, MsgSystemWillSleep:
+        IOAllowPowerChange(g_rootPort, unsafeBitCast(messageArgument, to: Int.self))
+
+    case MsgSystemHasPoweredOn:
+        let ts = ISO8601DateFormatter().string(from: Date())
+        print("\(ts) daemon: system has powered on — re-warming accelerometer")
+        fflush(stdout)
+        warmup()
+
+    default:
+        break
+    }
+}
+
+/// Long-lived daemon mode: runs `warmup()` once on startup, then
+/// subscribes to IOKit system power notifications and re-warms on every
+/// wake event. Returns from `CFRunLoopRun()` only if the run loop is
+/// explicitly stopped (never in normal operation — launchd SIGTERMs
+/// us on shutdown).
+func daemon() -> Int32 {
+    let ts = ISO8601DateFormatter().string(from: Date())
+    print("\(ts) daemon: startup, running initial warmup")
+    fflush(stdout)
+
+    let initial = warmup()
+    if initial == 2 {
+        FileHandle.standardError.write(
+            "daemon: no SPU accelerometer hardware found — not an Apple Silicon MacBook?, exiting\n".data(using: .utf8)!
+        )
+        return 2
+    }
+
+    var notificationPort: IONotificationPortRef?
+    var notifier: io_object_t = 0
+
+    let port = IORegisterForSystemPower(nil, &notificationPort, powerCallback, &notifier)
+    guard port != 0, let np = notificationPort else {
+        FileHandle.standardError.write(
+            "daemon: IORegisterForSystemPower failed\n".data(using: .utf8)!
+        )
+        return 1
+    }
+    g_rootPort = port
+
+    let runLoopSource = IONotificationPortGetRunLoopSource(np).takeUnretainedValue()
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .defaultMode)
+
+    let ts2 = ISO8601DateFormatter().string(from: Date())
+    print("\(ts2) daemon: wake watcher registered, entering run loop")
+    fflush(stdout)
+
+    CFRunLoopRun()
+
+    // Unreachable in normal operation.
+    FileHandle.standardError.write("daemon: run loop exited unexpectedly\n".data(using: .utf8)!)
+    return 1
+}
+
 // MARK: - Entry point
 
 let args = CommandLine.arguments
 guard args.count >= 2 else {
-    print("usage: \(args[0]) [probe|warmup|deactivate]")
+    print("usage: \(args[0]) [probe|warmup|deactivate|daemon]")
     print("")
-    print("  probe       print the accelerometer streaming state and exit")
+    print("  probe       one-shot: print the accelerometer streaming state and exit")
     print("              (exit 0 = active, 1 = cold, 2 = no hardware)")
-    print("  warmup      start the BMI286 streaming at 100Hz")
+    print("  warmup      one-shot: start the BMI286 streaming at 100Hz and exit")
     print("              (exit 0 = accepted by driver, 1 = write rejected, 2 = no hardware)")
-    print("  deactivate  stop the BMI286 streaming (useful for testing)")
+    print("  deactivate  one-shot: stop the BMI286 streaming and exit (useful for testing)")
+    print("  daemon      long-lived: run warmup once, then subscribe to IOKit system")
+    print("              power notifications and re-warm on every wake. This is how")
+    print("              the shipping LaunchDaemon invokes the helper.")
     exit(64)
 }
 
@@ -177,6 +284,7 @@ switch args[1] {
 case "probe":      exit(probe())
 case "warmup":     exit(warmup())
 case "deactivate": exit(deactivate())
+case "daemon":     exit(daemon())
 default:
     FileHandle.standardError.write("unknown command: \(args[1])\n".data(using: .utf8)!)
     exit(64)
