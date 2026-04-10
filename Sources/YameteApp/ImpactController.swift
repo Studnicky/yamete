@@ -7,6 +7,7 @@ import SensorKit
 #if canImport(ResponseKit)
 import ResponseKit
 #endif
+import AppKit
 import Foundation
 import Observation
 
@@ -15,7 +16,11 @@ private let log = AppLog(category: "ImpactController")
 /// Coordinates sensor adapters, impact fusion, and app responses.
 ///
 /// Signal chain:
-///   adapter (per-sensor detection) → fusion engine (consensus + rearm) → response (audio + flash)
+///   adapter (per-sensor detection)
+///     → fusion engine (consensus + rearm)
+///     → audio response (per impact, gated by `soundEnabled`)
+///     + visual response (overlay or notification, gated by `visualResponseMode`)
+///     + always-on menu bar face reaction (independent of Flash Mode)
 @MainActor @Observable
 public final class ImpactController {
     let settings: SettingsStore
@@ -24,11 +29,13 @@ public final class ImpactController {
     public let allAdapters: [any SensorAdapter]
     private var sensorManager: SensorManager
     private let fusion = ImpactFusionEngine()
-    private let screenFlash: any FlashResponder
+    private let overlayResponder: any VisualResponder
+    private let notificationResponder: any VisualResponder
 
     var impactCount: Int = 0
     var isEnabled = false
     var sensorError: String?
+    var reactionFace: NSImage?
     var lastImpactMagnitude: Float = 0
     var lastImpactTier: ImpactTier?
 
@@ -39,13 +46,25 @@ public final class ImpactController {
     private var countDate: Date = Calendar.current.startOfDay(for: Date())
     private var activeSensorIDs: Set<SensorID> = []
 
+    /// Cached face images resolved with the current appearance palette.
+    /// Rebuilt on pipeline start (via `syncPipelineState`) and when the user
+    /// toggles dark/light mode while the pipeline is running. Avoids the
+    /// per-impact main-actor hitch from re-parsing 11 SVG files on every hit.
+    private var faceCache: [NSImage] = []
+    private var faceCacheAppearance: NSAppearance.Name?
+
     public init(settings: SettingsStore,
          audioPlayer: (any AudioResponder)? = nil,
-         flashResponder: (any FlashResponder)? = nil,
+         overlayResponder: (any VisualResponder)? = nil,
+         notificationResponder: (any VisualResponder)? = nil,
          adapters: [any SensorAdapter]? = nil) {
         self.settings = settings
         self.audioPlayer = audioPlayer ?? AudioPlayer()
-        self.screenFlash = flashResponder ?? ScreenFlash()
+        self.overlayResponder = overlayResponder ?? ScreenFlash()
+        self.notificationResponder = notificationResponder ?? NotificationResponder(
+            localeProvider: { [weak settings] in
+                settings?.resolvedNotificationLocale ?? (Bundle.main.preferredLocalizations.first ?? "en")
+            })
         self.allAdapters = adapters ?? [
             SPUAccelerometerAdapter(),
             MicrophoneAdapter(),
@@ -57,7 +76,9 @@ public final class ImpactController {
     // MARK: - Lifecycle (driven by response toggles)
 
     /// Whether any response is enabled. Pipeline runs only when true.
-    var shouldBeEnabled: Bool { settings.soundEnabled || settings.screenFlash }
+    /// Derived from the single visualResponseMode source of truth, not the
+    /// legacy screenFlash key (removed as part of the Major #4 unification).
+    var shouldBeEnabled: Bool { settings.soundEnabled || settings.visualResponseMode != .off }
 
     /// Called once at app launch. Starts the settings observation loop
     /// which manages the pipeline lifecycle based on response toggles.
@@ -86,6 +107,7 @@ public final class ImpactController {
         isEnabled = true
         sensorError = nil
 
+        refreshFaceCacheIfNeeded()
         let adapters = buildAdapters()
         sensorManager = SensorManager(adapters: adapters)
         log.info("activity:ImpactDetection wasStartedBy agent:ImpactController adapters=\(adapters.map(\.name))")
@@ -121,7 +143,7 @@ public final class ImpactController {
                     withObservationTracking {
                         guard let self else { return }
                         _ = self.settings.soundEnabled
-                        _ = self.settings.screenFlash
+                        _ = self.settings.visualResponseMode
                         _ = self.settings.debugLogging
                         _ = self.settings.accelSpikeThreshold
                         _ = self.settings.accelRiseRate
@@ -172,6 +194,8 @@ public final class ImpactController {
 
     // MARK: - Response
 
+    private var reactionTask: Task<Void, Never>?
+
     private func respond(intensity: Float, timestamp: Date, confidence: Float) {
         let tier = ImpactTier.from(intensity: intensity)
         lastImpactMagnitude = intensity
@@ -181,12 +205,54 @@ public final class ImpactController {
             audioPlayer: audioPlayer, settings: settings, intensity: intensity)
         rearmUntil = ImpactResponse.rearmDeadline(
             from: timestamp, clipDuration: clipDuration, debounce: settings.debounce)
+
+        // Show reaction face in menu bar + app icon for the duration of the
+        // response. Pulled from the cache — rebuilt only when the pipeline
+        // restarts or when the user toggles dark/light mode.
+        refreshFaceCacheIfNeeded()
+        let face = faceCache.randomElement()
+        showReactionFace(face, duration: max(clipDuration, settings.debounce))
+
         ImpactResponse.triggerFlash(
-            flashResponder: screenFlash, settings: settings,
-            intensity: intensity, clipDuration: clipDuration)
+            overlayResponder: overlayResponder,
+            notificationResponder: notificationResponder,
+            settings: settings,
+            intensity: intensity,
+            clipDuration: clipDuration,
+            dismissAfter: timestamp.distance(to: rearmUntil))
 
         log.debug("entity:Impact tier=\(tier) intensity=\(String(format: "%.2f", intensity)) confidence=\(String(format: "%.2f", confidence))")
         incrementDailyCount(now: timestamp)
+    }
+
+    private func showReactionFace(_ face: NSImage?, duration: Double) {
+        guard let face else { return }
+
+        // Yamete is an LSUIElement (menu-bar-only) app — there is no dock
+        // icon to swap. The menu bar face icon is the only always-on visual
+        // feedback. Flash Mode controls the optional supplemental responses
+        // (overlay, notification); the menu bar icon is independent of it.
+        // Reusing the same SVG NSImage at 18pt logical size — the menu bar
+        // honors intrinsic NSImage size, not SwiftUI .frame() constraints.
+        face.size = NSSize(width: 18, height: 18)
+        reactionFace = face
+
+        reactionTask?.cancel()
+        reactionTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled else { return }
+            self.reactionFace = nil
+        }
+    }
+
+    /// Rebuilds `faceCache` when empty or when the system appearance has
+    /// flipped since the last build (keeps colors in sync with dark/light).
+    /// Called on pipeline start and once per impact (cheap when cached).
+    private func refreshFaceCacheIfNeeded() {
+        let current = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
+        if !faceCache.isEmpty && current == faceCacheAppearance { return }
+        faceCache = FaceRenderer.loadFaces()
+        faceCacheAppearance = current
     }
 
     // MARK: - Configuration
@@ -254,14 +320,26 @@ private enum ImpactResponse {
         timestamp.addingTimeInterval(max(clipDuration, debounce))
     }
 
-    static func triggerFlash(flashResponder: any FlashResponder, settings: SettingsStore,
-                             intensity: Float, clipDuration: Double) {
-        guard settings.screenFlash else { return }
-        flashResponder.flash(
+    static func triggerFlash(overlayResponder: any VisualResponder,
+                             notificationResponder: any VisualResponder,
+                             settings: SettingsStore,
+                             intensity: Float,
+                             clipDuration: Double,
+                             dismissAfter: Double) {
+        guard settings.visualResponseMode != .off else { return }
+
+        let responder: any VisualResponder = switch settings.visualResponseMode {
+        case .overlay: overlayResponder
+        case .notification: notificationResponder
+        case .off: overlayResponder // unreachable, guarded above
+        }
+
+        responder.flash(
             intensity: intensity,
             opacityMin: Float(settings.flashOpacityMin),
             opacityMax: Float(settings.flashOpacityMax),
             clipDuration: clipDuration > 0 ? clipDuration : 0.5,
+            dismissAfter: dismissAfter,
             enabledDisplayIDs: settings.enabledDisplays)
     }
 }

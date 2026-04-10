@@ -1,0 +1,45 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for es_419.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/es_419.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"title_tap_1" = "¿Eso fuiste tú?";
+"title_tap_2" = "Sentí una brisita";
+"title_tap_3" = "¿Era en serio?";
+"title_tap_4" = "¿Holaaa?";
+"title_light_1" = "¿Perdón?";
+"title_light_2" = "Qué atrevido";
+"title_light_3" = "Ah, ¿así vamos a jugar?";
+"title_light_4" = "La osadía";
+"title_medium_1" = "Señor, compórtese";
+"title_medium_2" = "Bájale dos rayitas";
+"title_medium_3" = "Necesitamos hablar";
+"title_medium_4" = "Anotado y documentado";
+"title_firm_1" = "Le voy a acusar con mi mamá";
+"title_firm_2" = "Mi terapeuta se va a enterar";
+"title_firm_3" = "Voy a levantar un acta";
+"title_firm_4" = "Quiero hablar con el gerente";
+"title_hard_1" = "911, ¿cuál es su emergencia?";
+"title_hard_2" = "estoy en peligro";
+"title_hard_3" = "Lo sentí en 4D";
+"title_hard_4" = "MIS ANCESTROS ESTÁN ENOJADOS";
+"moan_tap_1" = "Mmm~ papito~";
+"moan_tap_2" = "Ahn~";
+"moan_tap_3" = "Travieso~";
+"moan_tap_4" = "Ay~";
+"moan_light_1" = "Papito~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ahn~ porfa~";
+"moan_light_4" = "Nou~";
+"moan_medium_1" = "¡Papito, no~!";
+"moan_medium_2" = "¡Ahí no~!";
+"moan_medium_3" = "Ay, qué malito~";
+"moan_medium_4" = "Porfa, papi~";
+"moan_firm_1" = "¡Papi! ¡Ya, mucho!";
+"moan_firm_2" = "¡Me porto bien!";
+"moan_firm_3" = "¡Piedad~ porfa~!";
+"moan_firm_4" = "¡Eres malito!";
+"moan_hard_1" = "¡¡PAPITO!!";
+"moan_hard_2" = "¡¡AHHHN!!";
+"moan_hard_3" = "¡¡YAMETEEE!!";
+"moan_hard_4" = "¡¡ME PORTO BIEN!!";

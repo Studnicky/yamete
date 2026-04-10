@@ -1,0 +1,45 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for fr.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/fr.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"title_tap_1" = "Attends, c'était toi ?";
+"title_tap_2" = "J'ai senti un courant d'air";
+"title_tap_3" = "C'était sérieux ?";
+"title_tap_4" = "Allô ??";
+"title_light_1" = "Excuse-moi ?!";
+"title_light_2" = "Audacieux";
+"title_light_3" = "Ah, on fait ça ?";
+"title_light_4" = "Quelle audace";
+"title_medium_1" = "Monsieur, je vous en prie";
+"title_medium_2" = "On baisse d'un ton";
+"title_medium_3" = "Il faut qu'on parle";
+"title_medium_4" = "Noté et archivé";
+"title_firm_1" = "Je le dis à ma mère";
+"title_firm_2" = "Mon psy va en entendre parler";
+"title_firm_3" = "Je dépose une main courante";
+"title_firm_4" = "Je voudrais parler au directeur";
+"title_hard_1" = "Le 17, j'écoute ?";
+"title_hard_2" = "je suis en danger";
+"title_hard_3" = "Je l'ai senti en 4D";
+"title_hard_4" = "MES ANCÊTRES SONT MÉCONTENTS";
+"moan_tap_1" = "Mmm~ papa~";
+"moan_tap_2" = "Ahn~";
+"moan_tap_3" = "Coquin~";
+"moan_tap_4" = "Oh~";
+"moan_light_1" = "Papa~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ahn~ s'il te plaît~";
+"moan_light_4" = "Non~";
+"moan_medium_1" = "Papa, non~ !";
+"moan_medium_2" = "Pas là~ !";
+"moan_medium_3" = "Oh, t'es méchant~";
+"moan_medium_4" = "S'il te plaît, papa~";
+"moan_firm_1" = "Papa ! C'est trop !";
+"moan_firm_2" = "Je serai sage !";
+"moan_firm_3" = "Pitié~ s'il te plaît~ !";
+"moan_firm_4" = "T'es trop méchant !";
+"moan_hard_1" = "PAPA !!";
+"moan_hard_2" = "AHHHN !!";
+"moan_hard_3" = "YAMETEEE !!";
+"moan_hard_4" = "JE SERAI SAGE !!";

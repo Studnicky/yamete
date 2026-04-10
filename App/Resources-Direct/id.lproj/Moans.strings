@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for id.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/id.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Hmm~ papi~";
+"moan_tap_2" = "Ahh~";
+"moan_tap_3" = "Papi nakal sih~";
+"moan_tap_4" = "Ih~";
+"moan_light_1" = "Papi~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ahh~ please dong~";
+"moan_light_4" = "Jangan dong~";
+"moan_medium_1" = "Papi, jangan~";
+"moan_medium_2" = "Jangan di situ dong~";
+"moan_medium_3" = "Aduh, jahat banget sih~";
+"moan_medium_4" = "Papi, please dong~";
+"moan_firm_1" = "Papi! Kebangetan sih!";
+"moan_firm_2" = "Aku akan jadi anak baik!";
+"moan_firm_3" = "Ampun~ please~";
+"moan_firm_4" = "Papi jahat banget sih!";
+"moan_hard_1" = "PAPIIII!!";
+"moan_hard_2" = "AAAHHH!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "AKU JADI ANAK BAIK!!";

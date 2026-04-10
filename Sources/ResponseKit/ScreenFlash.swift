@@ -9,14 +9,24 @@ private let log = AppLog(category: "ScreenFlash")
 /// Flashes face overlays on impact across selected screens.
 /// Uses per-screen history to reduce immediate face repeats.
 @MainActor
-public final class ScreenFlash: FlashResponder {
+public final class ScreenFlash: VisualResponder {
     /// Rotation matrix: `history[monitorIndex]` is the ordered list of face indices
     /// previously shown on that monitor, most recent last. The matrix drives all
     /// dedup logic from a single data structure — no separate event/monitor tracking.
     private var history: [[Int]] = []
 
     public init() {}
-    private lazy var faceImages: [NSImage] = loadFaceImages()
+    private var cachedFaces: [NSImage] = []
+    private var cachedAppearance: NSAppearance.Name?
+
+    private var faceImages: [NSImage] {
+        let current = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
+        if cachedFaces.isEmpty || current != cachedAppearance {
+            cachedFaces = loadFaceImages()
+            cachedAppearance = current
+        }
+        return cachedFaces
+    }
 
     /// Reusable window pool keyed by screen index. Avoids NSWindow creation per impact.
     private var windowPool: [Int: NSWindow] = [:]
@@ -25,7 +35,7 @@ public final class ScreenFlash: FlashResponder {
 
     /// Flashes all screens with a face overlay gated inside `clipDuration`.
     /// - Parameter enabledDisplayIDs: display IDs to flash. Empty = all displays.
-    public func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, enabledDisplayIDs: [Int] = []) {
+    public func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, dismissAfter _: Double, enabledDisplayIDs: [Int] = []) {
         guard clipDuration > 0 else { return }
 
         let screens = selectScreens(enabledIDs: enabledDisplayIDs)
@@ -120,8 +130,7 @@ public final class ScreenFlash: FlashResponder {
     // MARK: - Resource loading
 
     private func loadFaceImages() -> [NSImage] {
-        let urls = BundleResources.urls(in: "faces", extensions: ["svg", "png", "jpg", "jpeg"])
-        let images = urls.compactMap { NSImage(contentsOf: $0) }
+        let images = FaceRenderer.loadFaces()
         if images.isEmpty {
             log.error("entity:FaceLibrary wasInvalidatedBy activity:ResourceLoad — no face images in bundle/faces")
         } else {

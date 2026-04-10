@@ -52,6 +52,7 @@ let package = Package(
                 .linkedFramework("AppKit"),
                 .linkedFramework("CoreAudio"),
                 .linkedFramework("SwiftUI"),
+                .linkedFramework("UserNotifications"),
             ]
         ),
 

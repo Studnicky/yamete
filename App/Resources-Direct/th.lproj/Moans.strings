@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for th.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/th.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "อื้อ~ ป๋า~";
+"moan_tap_2" = "อ้าน~";
+"moan_tap_3" = "แกล้งหนูอ่ะ~";
+"moan_tap_4" = "โอ๊ย~";
+"moan_light_1" = "ป๋า~";
+"moan_light_2" = "อึ๋ย~";
+"moan_light_3" = "อ้าน~ ขอร้องน่ะ~";
+"moan_light_4" = "อย่าน่ะ~";
+"moan_medium_1" = "ป๋า, อย่าน่ะ~";
+"moan_medium_2" = "ไม่เอาตรงนั้นอ่ะ~";
+"moan_medium_3" = "โอ๊ย ใจร้ายจัง~";
+"moan_medium_4" = "ขอร้องน่ะ คุณพ่อ~";
+"moan_firm_1" = "ป๋า! แรงไปแล้ว!";
+"moan_firm_2" = "หนูจะเป็นเด็กดี!";
+"moan_firm_3" = "เมตตาหนูหน่อยน่ะ~";
+"moan_firm_4" = "ใจร้ายอ่ะ!";
+"moan_hard_1" = "ป๋าาาา!!";
+"moan_hard_2" = "อ้านนนน!!";
+"moan_hard_3" = "ยาเมะเตะ!!";
+"moan_hard_4" = "หนูจะเป็นเด็กดีแล้ว!!";
