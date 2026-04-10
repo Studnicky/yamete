@@ -1,24 +1,24 @@
-# yamete-accel-warmup
+# yamete-sensor-kickstart
 
-**What it is**: a tiny open-source helper that starts the built-in BMI286
-accelerometer on Apple Silicon MacBooks so the Yamete App Store build can
-read its 100Hz report stream.
+**What it is**: a tiny open-source helper that kickstarts the built-in
+BMI286 accelerometer on Apple Silicon MacBooks so the Yamete App Store
+build can read its 100Hz report stream.
 
 **Why you need it**: Yamete on the Mac App Store runs under App Sandbox.
-The sandbox silently blocks the IORegistry writes that tell the accelerometer
-to start reporting, so inside the sandbox Yamete cannot wake the sensor on
-its own. Until something *outside* the sandbox warms the sensor, the adapter
-reports as unavailable and the app falls back to microphone + headphone-motion
-only.
+The sandbox silently blocks the IORegistry writes that tell the
+accelerometer to start reporting, so inside the sandbox Yamete cannot
+wake the sensor on its own. Until something *outside* the sandbox
+kickstarts the sensor, the adapter reports as unavailable and the app
+falls back to microphone + headphone-motion only.
 
 **Who should install it**: users on an M1 / M2 / M3 / M4 MacBook Air or
 MacBook Pro who want the tactile detection channel (desk slaps and taps
 picked up through the laptop chassis) in addition to the microphone. On
 Macs without the BMI286 (iMac, Mac Mini, Mac Studio, Mac Pro, Intel Macs),
-this helper does nothing useful — there is no sensor to warm.
+this helper does nothing useful — there is no sensor to kickstart.
 
 **Who should NOT install it**: anyone who is not comfortable compiling a
-~150-line Swift source file and installing a LaunchDaemon as root. The
+~250-line Swift source file and installing a LaunchDaemon as root. The
 microphone detection path in the App Store build works on every Mac with
 zero setup, and headphone-motion works whenever AirPods / Beats are
 connected. You don't need this helper for Yamete to function.
@@ -40,16 +40,16 @@ Please include:
 - **Your macOS version**: full string including the point release, e.g.
   `14.5 (23F79)`.
 - **What you were expecting vs. what happened**: one line each is fine.
-- **Output of the probe command, before and after running `warmup`**:
+- **Output of the probe command, before and after running `kickstart`**:
   ```bash
-  /usr/local/libexec/yamete-accel-warmup probe
-  /usr/local/libexec/yamete-accel-warmup warmup
-  /usr/local/libexec/yamete-accel-warmup probe
+  /usr/local/libexec/yamete-sensor-kickstart probe
+  /usr/local/libexec/yamete-sensor-kickstart kickstart
+  /usr/local/libexec/yamete-sensor-kickstart probe
   ```
 - **The last 20 lines of the LaunchDaemon log** (after a reboot if you
   can reproduce the issue at boot):
   ```bash
-  tail -20 /var/log/yamete-accel-warmup.log
+  tail -20 /var/log/yamete-sensor-kickstart.log
   ```
 - **The last 20 lines of the Yamete app log** (helpful for cross-
   referencing the probe result with what Yamete actually saw):
@@ -63,7 +63,7 @@ point helps.
 
 ## Safety notes
 
-1. **This is an open-source community helper, not an Apple-sanctioned
+1. **This is an open-source helper, not an Apple-sanctioned
    interface.** The three property writes it issues (`ReportInterval`,
    `SensorPropertyReportingState`, `SensorPropertyPowerState` on the
    `AppleSPUHIDDriver` service) are Apple-internal driver commands. They
@@ -72,44 +72,44 @@ point helps.
    update can change or remove this surface without warning.
 2. **It runs as root via a LaunchDaemon.** That is necessary because
    LaunchDaemons execute outside of any user's App Sandbox. Review the
-   source (`yamete-accel-warmup.swift`) before running the installer
+   source (`yamete-sensor-kickstart.swift`) before running the installer
    if you want to audit exactly what it does — it is short enough to
    read in a few minutes.
 3. **It does not touch the network, write to user data, load kexts,
    install launch agents as other users, or persist anything other
    than the LaunchDaemon plist + the compiled binary.** The install
-   paths are `/usr/local/libexec/yamete-accel-warmup` and
-   `/Library/LaunchDaemons/com.studnicky.yamete.accel-warmup.plist`.
+   paths are `/usr/local/libexec/yamete-sensor-kickstart` and
+   `/Library/LaunchDaemons/com.studnicky.yamete.sensor-kickstart.plist`.
    The uninstall script removes both.
 4. **`sudo` is required** for the install and uninstall scripts. You
    will be prompted for your admin password.
 
-## Files in this gist
+## Files in this directory
 
-- **`yamete-accel-warmup.swift`** — the helper source (single file,
+- **`yamete-sensor-kickstart.swift`** — the helper source (single file,
   uses only `Foundation` and `IOKit`). Implements four subcommands:
   - `probe` — report whether the sensor is currently streaming
-  - `warmup` — one-shot: write the activation properties and exit
+  - `kickstart` — one-shot: write the activation properties and exit
   - `deactivate` — one-shot: stop streaming (for testing)
-  - `daemon` — long-lived: run `warmup` on startup, then subscribe to
+  - `daemon` — long-lived: run `kickstart` on startup, then subscribe to
     IOKit system power notifications via `IORegisterForSystemPower` and
-    re-warm the sensor on every wake event. **This is how the shipping
+    re-run `kickstart` on every wake event. **This is how the shipping
     LaunchDaemon invokes the helper.**
-- **`com.studnicky.yamete.accel-warmup.plist`** — the LaunchDaemon
+- **`com.studnicky.yamete.sensor-kickstart.plist`** — the LaunchDaemon
   plist. `RunAtLoad = true`, `KeepAlive = true`, `ProcessType = Background` —
-  the helper starts at boot in `daemon` mode, warms the sensor once,
+  the helper starts at boot in `daemon` mode, kickstarts the sensor once,
   then parks itself in `CFRunLoopRun` waiting for wake notifications.
   Idle CPU cost is effectively zero (it is asleep on a run loop).
-  Logs to `/var/log/yamete-accel-warmup.log`.
+  Logs to `/var/log/yamete-sensor-kickstart.log`.
 - **`install.sh`** — compiles the Swift file with `swiftc`, copies the
   binary to `/usr/local/libexec/`, copies the plist to
   `/Library/LaunchDaemons/`, and loads it with `launchctl bootstrap`.
 - **`uninstall.sh`** — unloads the LaunchDaemon and removes both files
-  and the log.
+  plus the log.
 
 ## Installation
 
-Download all four files from the gist into a fresh directory and run:
+Download all four files into a fresh directory and run:
 
 ```bash
 chmod +x install.sh uninstall.sh
@@ -118,14 +118,14 @@ chmod +x install.sh uninstall.sh
 
 The installer will:
 1. Verify the Mac is `arm64` (Apple Silicon).
-2. Compile `yamete-accel-warmup.swift` with `swiftc`.
+2. Compile `yamete-sensor-kickstart.swift` with `swiftc`.
 3. Smoke-test the compiled binary against the probe subcommand.
 4. Unload any previously-installed version of the LaunchDaemon.
 5. Copy the binary and plist to their system locations (sudo prompt).
 6. Load the LaunchDaemon with `launchctl bootstrap` (triggers `RunAtLoad`
-   — the daemon starts, warms the sensor immediately, and registers its
-   wake watcher).
-7. Probe the sensor again to confirm the warmup succeeded.
+   — the daemon starts, kickstarts the sensor immediately, and registers
+   its wake watcher).
+7. Probe the sensor again to confirm the kickstart succeeded.
 
 If the final probe succeeds, launch or relaunch Yamete. Open the menu
 bar dropdown, expand the Sensors section, and toggle **Accelerometer**
@@ -133,10 +133,10 @@ on. You should see the accelerometer detecting desk taps alongside the
 microphone.
 
 From the next reboot onward, the LaunchDaemon starts automatically at
-boot and Yamete picks up the warm sensor without any further action.
-The daemon runs for the whole session — it re-warms the sensor on every
-wake event so sleep / lid close / display sleep cannot cool it out from
-under the app.
+boot and Yamete picks up the live sensor without any further action.
+The daemon runs for the whole session — it re-runs the kickstart on
+every wake event so sleep / lid close / display sleep cannot cool it
+out from under the app.
 
 ## Uninstallation
 
@@ -155,8 +155,8 @@ The LaunchDaemon may have run before the IOKit service matching became
 ready. Try forcing it to run again:
 
 ```bash
-sudo launchctl kickstart -k system/com.studnicky.yamete.accel-warmup
-/usr/local/libexec/yamete-accel-warmup probe
+sudo launchctl kickstart -k system/com.studnicky.yamete.sensor-kickstart
+/usr/local/libexec/yamete-sensor-kickstart probe
 ```
 
 **`probe: no AppleSPUHIDDriver dispatchAccel=Yes service found`**  
@@ -172,8 +172,8 @@ be), the IOKit calls need native arm64. Nothing to do here.
 **Yamete still doesn't show the Accelerometer in the Sensors list**  
 Open the Yamete menu bar dropdown once after the helper has run. The
 sensor availability is probed when the dropdown opens. Also make sure
-you toggled the Accelerometer row on — the helper warms the hardware
-but doesn't change Yamete's settings.
+you toggled the Accelerometer row on — the helper kickstarts the
+hardware but doesn't change Yamete's settings.
 
 **Does the sensor survive sleep/wake?**  
 Yes, two ways:
@@ -184,25 +184,25 @@ Yes, two ways:
    empirically: a 35-second sleep period showed `_num_events`
    incrementing at the full 100 events/sec rate throughout sleep.
 2. **Defense in depth**: the daemon subscribes to IOKit system power
-   notifications via `IORegisterForSystemPower` and re-runs `warmup()`
-   on every `kIOMessageSystemHasPoweredOn` event. Even if a future
-   macOS revision or a specific hardware configuration starts cooling
-   the sensor during sleep, the daemon will re-warm it the moment the
-   system finishes waking.
+   notifications via `IORegisterForSystemPower` and re-runs
+   `kickstart()` on every `kIOMessageSystemHasPoweredOn` event. Even if
+   a future macOS revision or a specific hardware configuration starts
+   cooling the sensor during sleep, the daemon will re-run the
+   kickstart the moment the system finishes waking.
 
 You can confirm the wake handler is firing by tailing the log across a
 sleep cycle:
 
 ```bash
-tail -f /var/log/yamete-accel-warmup.log
+tail -f /var/log/yamete-sensor-kickstart.log
 # ... close the lid, wait, open the lid ...
-# expect a new line: "... daemon: system has powered on — re-warming accelerometer"
+# expect a new line: "... daemon: system has powered on — re-running kickstart"
 ```
 
 If you ever see the sensor going cold despite the daemon running,
 please <a href="https://github.com/Studnicky/yamete/issues/new">file an
 issue</a> with your Mac model, macOS version, and the last 20 lines of
-`/var/log/yamete-accel-warmup.log`.
+`/var/log/yamete-sensor-kickstart.log`.
 
 ## License
 
