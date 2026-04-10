@@ -6,6 +6,7 @@
 # Run from the gist directory containing all four files.
 #
 # Source of truth: https://github.com/Studnicky/yamete/blob/develop/docs/community/
+# Report problems:  https://github.com/Studnicky/yamete/issues/new
 
 set -euo pipefail
 
@@ -90,5 +91,9 @@ else
     echo "  /var/log/yamete-accel-warmup.log" >&2
     echo "and the LaunchDaemon state with:" >&2
     echo "  sudo launchctl print system/${LABEL}" >&2
+    echo "" >&2
+    echo "If the issue persists, please file a report (see the README" >&2
+    echo "for the exact diagnostics to include) at:" >&2
+    echo "  https://github.com/Studnicky/yamete/issues/new" >&2
     exit 1
 fi

@@ -22,6 +22,7 @@
 //   see install.sh in the same gist
 //
 // Source of truth: https://github.com/Studnicky/yamete/blob/develop/docs/community/
+// Report problems:  https://github.com/Studnicky/yamete/issues/new
 
 import Foundation
 import IOKit

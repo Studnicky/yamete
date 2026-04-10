@@ -23,6 +23,44 @@ microphone detection path in the App Store build works on every Mac with
 zero setup, and headphone-motion works whenever AirPods / Beats are
 connected. You don't need this helper for Yamete to function.
 
+## Report issues (please!)
+
+**If this helper doesn't work on your Mac, we want to know.** The
+`AppleSPUHIDDriver` property surface is undocumented — Apple can change
+it at any macOS update, and it is physically only available on a subset
+of Apple Silicon MacBooks we haven't all tested. Verification relies on
+the community.
+
+**File a report here**: <https://github.com/Studnicky/yamete/issues/new>
+
+Please include:
+
+- **Your Mac model**: e.g., "MacBook Pro 14-inch, M2 Pro, 2023". The
+  "About This Mac" dialog has all of this.
+- **Your macOS version**: full string including the point release, e.g.
+  `14.5 (23F79)`.
+- **What you were expecting vs. what happened**: one line each is fine.
+- **Output of the probe command, before and after running `warmup`**:
+  ```bash
+  /usr/local/libexec/yamete-accel-warmup probe
+  /usr/local/libexec/yamete-accel-warmup warmup
+  /usr/local/libexec/yamete-accel-warmup probe
+  ```
+- **The last 20 lines of the LaunchDaemon log** (after a reboot if you
+  can reproduce the issue at boot):
+  ```bash
+  tail -20 /var/log/yamete-accel-warmup.log
+  ```
+- **The last 20 lines of the Yamete app log** (helpful for cross-
+  referencing the probe result with what Yamete actually saw):
+  ```bash
+  tail -20 "$HOME/Library/Containers/com.studnicky.yamete/Data/Library/Application Support/Yamete/logs/yamete-$(date +%Y-%m-%d).log"
+  ```
+
+Reports on Macs where this **does** work are just as valuable as reports
+where it doesn't — we are building a known-working matrix and every data
+point helps.
+
 ## Safety notes
 
 1. **This is an open-source community helper, not an Apple-sanctioned
