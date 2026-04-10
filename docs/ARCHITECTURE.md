@@ -320,7 +320,7 @@ graph BT
 
 ## Concurrency model
 
-All stateful components are `@MainActor`-confined: `ImpactController`, `SensorManager`, `AudioPlayer`, `ScreenFlash`, `SettingsStore`. Sensor adapters run their I/O on background threads/queues but deliver `SensorImpact` events through `AsyncThrowingStream` continuations that are consumed on the main actor via `SensorManager.events()`.
+All stateful components are `MainActor`-confined: `ImpactController`, `SensorManager`, `AudioPlayer`, `ScreenFlash`, `SettingsStore`. Sensor adapters run their I/O on background threads/queues but deliver `SensorImpact` events through `AsyncThrowingStream` continuations that are consumed on the main actor via `SensorManager.events()`.
 
 | Pattern | Where | Purpose |
 |---------|-------|---------|
@@ -328,6 +328,6 @@ All stateful components are `@MainActor`-confined: `ImpactController`, `SensorMa
 | `AsyncStream` | `SensorManager.events()` | Unified event stream from all adapters |
 | `TaskGroup` | Inside `SensorManager.events()` | Run adapters concurrently |
 | `withObservationTracking` | `ImpactController` | React to settings changes |
-| `@MainActor` | Controller, Manager, Responders | Thread confinement for shared state |
+| `MainActor` | Controller, Manager, Responders | Thread confinement for shared state |
 | `HIDRunLoopThread` | `AccelerometerReader` | Dedicated thread for IOKit callbacks |
 | `OperationQueue` | `HeadphoneMotionAdapter` | CoreMotion delivery queue |
