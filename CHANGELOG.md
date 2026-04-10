@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-04-10
+
+### Fixed
+- **Accelerometer not detected on M5 Macs (Direct build)** — closes #15.
+  `SPUAccelerometerAdapter.isAvailable` was gating on
+  `isSensorActivelyReporting()` for all build variants, creating a
+  chicken-and-egg in the Direct build: the UI hid the accel toggle
+  because the sensor wasn't reporting, `impacts()` was never called,
+  and so the sensor never started reporting. Worked on M4 because
+  the sensor happened to be warm at launch; broke on M5 because
+  macOS apparently doesn't keep the SPU accel warm by default on
+  that silicon. The runtime probe is now gated behind
+  `#if !DIRECT_BUILD` — Direct checks only `isSPUDevicePresent()`
+  (it has full IOKit write access and can always self-activate via
+  `SensorActivation.activate()` at pipeline start), while the App
+  Store build keeps the full probe because the sandbox constraint
+  is real there.
+
 ### Changed
 - **Sensor kickstart helper is now a long-lived daemon with a wake
   watcher.** `docs/sensor-kickstart/yamete-sensor-kickstart.swift` has
@@ -23,12 +41,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in depth for hardware or macOS revisions we have not verified — even
   if the driver cools the sensor during sleep, the daemon's wake
   handler re-runs the kickstart before the user notices.
-- IOKit system power message constants (`MsgCanSystemSleep`,
+- **Helper renamed** from `docs/community/yamete-accel-warmup` to
+  `docs/sensor-kickstart/yamete-sensor-kickstart`. The old "community"
+  directory name was a vague dumping-ground; the new name reflects what
+  the thing actually does. Rename cascades across the directory, the
+  Swift source, the LaunchDaemon plist label
+  (`com.studnicky.yamete.sensor-kickstart`), the binary install path
+  (`/usr/local/libexec/yamete-sensor-kickstart`), the log path
+  (`/var/log/yamete-sensor-kickstart.log`), the Swift function
+  (`warmup()` → `kickstart()`), the CLI subcommand (`warmup` →
+  `kickstart`), and every prose reference in public docs.
+- **GitHub Pages now serves only public content.** `docs/` was the
+  publish root but had been used as a dumping-ground for internal
+  planning docs. Removed: `APP_STORE_METADATA.md`,
+  `APP_STORE_RELEASE.md`, `APP_STORE_REVIEW_CHECKLIST.md`,
+  `CODEX_REVIEW_PLAN.md`. Moved to repo root: `ARCHITECTURE.md`. Kept
+  in `docs/` as legitimate public content: `index.html`,
+  `support.html`, `privacy.html`, `INSTALLATION.md`,
+  `sensor-kickstart/`.
+- **Published GitHub Pages refreshed with personality.** The three HTML
+  pages (`index.html`, `support.html`, `privacy.html`) were rewritten
+  to match the app's actual voice — confident self-awareness instead
+  of dry marketing speak — while keeping every bit of genuinely useful
+  content and adding cheeky-but-helpful FAQs ("Wait, what is this
+  app?", "Is this a joke?", "Do I actually need this? — No.", "Can I
+  use this as a drum machine?"). The support page's accelerometer FAQ
+  walks users through the sandbox situation and links to the
+  sensor-kickstart helper for opt-in power users.
+- **`@MainActor` → `MainActor` in all prose, commit messages, CHANGELOG,
+  and release bodies.** Source code `.swift` files intentionally keep
+  the `@MainActor` attribute — it is a compiler-enforced Swift language
+  construct and GitHub's @-mention parser does not index source code
+  blobs. Prose was scrubbed because GitHub was resolving `@MainActor`
+  in commit bodies to an unrelated GitHub user whose login happens to
+  collide with the Swift concurrency attribute. Two `git filter-repo`
+  passes + force-push on master/develop + v1.0.0 re-tag cleaned the
+  history; this release is clean by construction.
+
+### Added
+- **CLAUDE.md + scratch-doc patterns** now in `.gitignore`. Project-
+  specific Claude Code instructions live in a gitignored
+  `CLAUDE.md` at the repo root with the project-specific hard rules
+  (no `@MainActor` in prose, no author email anywhere, build system
+  quick reference, branch protection convention, helper internals).
+  Ad-hoc scratch docs (`*.scratch.md`, `*.tmp.md`, `.plans/`, `.dev/`,
+  `scratch/`, `plans/`, etc.) are all gitignored so they never leak
+  into the repo.
+- **IOKit system power message constants** (`MsgCanSystemSleep`,
   `MsgSystemWillSleep`, `MsgSystemHasPoweredOn`) are defined
   numerically in the helper because Swift's C importer cannot
   translate the `iokit_common_msg(X)` macro expansion. Values are
   `0xe0000000 | X` per `IOKit/IOMessage.h` and are stable across
   every macOS release since IOKit was introduced.
+- **CI workflow** now bumps `actions/checkout` from `v4` to `v5` to
+  stay off the Node.js 20 deprecation treadmill.
+
+### Removed
+- **Email contact** (`support@studnicky.com`) removed from every
+  published page. GitHub Issues is now the only support channel, and
+  every page that would otherwise say "email X" now says "file an
+  issue at github.com/Studnicky/yamete/issues" with the same
+  friendliness. `docs/privacy.html` Contact section points at
+  `issues/new` instead of a `mailto:` link, with a one-liner
+  explaining that because the app collects nothing and sends nothing
+  over the network, there's nothing to ask about privately — open
+  issues make better documentation anyway.
 
 ## [1.0.0] - 2026-04-10
 
