@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# uninstall.sh — remove the yamete-accel-warmup LaunchDaemon
+# uninstall.sh — remove the yamete-sensor-kickstart LaunchDaemon
 
 set -euo pipefail
 
-BINARY_DEST="/usr/local/libexec/yamete-accel-warmup"
-PLIST_DEST="/Library/LaunchDaemons/com.studnicky.yamete.accel-warmup.plist"
-LABEL="com.studnicky.yamete.accel-warmup"
-LOG_PATH="/var/log/yamete-accel-warmup.log"
+LABEL="com.studnicky.yamete.sensor-kickstart"
+BINARY_DEST="/usr/local/libexec/yamete-sensor-kickstart"
+PLIST_DEST="/Library/LaunchDaemons/com.studnicky.yamete.sensor-kickstart.plist"
+LOG_PATH="/var/log/yamete-sensor-kickstart.log"
 
 if launchctl print "system/${LABEL}" >/dev/null 2>&1; then
     echo "==> Unloading LaunchDaemon"

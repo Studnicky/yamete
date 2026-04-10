@@ -1,8 +1,8 @@
-// yamete-accel-warmup.swift
+// yamete-sensor-kickstart.swift
 //
-// Warms the built-in BMI286 accelerometer on Apple Silicon Macs so that
-// the Yamete App Store build can passively subscribe to the 100Hz HID
-// report stream via IOHIDManager.
+// Kickstarts the built-in BMI286 accelerometer on Apple Silicon Macs
+// so that the Yamete App Store build can passively subscribe to the
+// 100Hz HID report stream via IOHIDManager.
 //
 // Why this exists: the App Store build of Yamete runs under App Sandbox.
 // Sandboxed apps cannot write `IORegistryEntrySetCFProperty` to the
@@ -13,15 +13,15 @@
 //
 // Modes:
 //   probe       one-shot: report whether the sensor is currently streaming
-//   warmup      one-shot: write the activation properties and exit
+//   kickstart   one-shot: write the activation properties and exit
 //   deactivate  one-shot: write zero to the activation properties and exit
-//   daemon      long-lived: run warmup on startup, then subscribe to IOKit
-//               system power notifications via `IORegisterForSystemPower`
-//               and re-warm on every `kIOMessageSystemHasPoweredOn` event.
-//               This is how the shipping LaunchDaemon invokes the helper —
-//               `RunAtLoad=true` starts it at boot and the wake watcher
-//               keeps the sensor warm across sleep/wake cycles for the
-//               rest of the session.
+//   daemon      long-lived: run kickstart on startup, then subscribe to
+//               IOKit system power notifications via
+//               `IORegisterForSystemPower` and re-kickstart on every
+//               `kIOMessageSystemHasPoweredOn` event. This is how the
+//               shipping LaunchDaemon invokes the helper — `RunAtLoad=true`
+//               starts it at boot and the wake watcher keeps the sensor
+//               warm across sleep/wake cycles for the rest of the session.
 //
 // Empirical note on sleep/wake: on the hardware we have tested, the
 // BMI286 sits in the always-on power domain and continues streaming at
@@ -32,13 +32,13 @@
 // README for the diagnostics checklist).
 //
 // Build:
-//   swiftc yamete-accel-warmup.swift -o yamete-accel-warmup \
+//   swiftc yamete-sensor-kickstart.swift -o yamete-sensor-kickstart \
 //          -framework IOKit -framework Foundation
 //
 // Install:
-//   see install.sh in the same gist
+//   see install.sh in the same directory
 //
-// Source of truth: https://github.com/Studnicky/yamete/blob/develop/docs/community/
+// Source of truth: https://github.com/Studnicky/yamete/blob/master/docs/sensor-kickstart/
 // Report problems:  https://github.com/Studnicky/yamete/issues/new
 
 import Foundation
@@ -55,7 +55,7 @@ func iterateAccelServices(_ body: (io_service_t) -> Void) {
     let matching = IOServiceMatching("AppleSPUHIDDriver")
     guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {
         FileHandle.standardError.write(
-            "yamete-accel-warmup: IOServiceGetMatchingServices failed — AppleSPUHIDDriver class not present (Intel Mac or unsupported macOS version)\n".data(using: .utf8)!
+            "yamete-sensor-kickstart: IOServiceGetMatchingServices failed — AppleSPUHIDDriver class not present (Intel Mac or unsupported macOS version)\n".data(using: .utf8)!
         )
         return
     }
@@ -126,7 +126,7 @@ func probe() -> Int32 {
 /// IOKit property dict, it triggers a hardware command.
 /// Exit code 0 on success, 1 on any write failure, 2 if no hardware.
 @discardableResult
-func warmup(intervalUS: Int = 10000) -> Int32 {
+func kickstart(intervalUS: Int = 10000) -> Int32 {
     var anyFound = false
     var anySuccess = false
     iterateAccelServices { service in
@@ -143,20 +143,20 @@ func warmup(intervalUS: Int = 10000) -> Int32 {
         let ok = r1 == KERN_SUCCESS && r2 == KERN_SUCCESS && r3 == KERN_SUCCESS
         if ok { anySuccess = true }
         print(String(
-            format: "warmup: r1=0x%08x r2=0x%08x r3=0x%08x ok=%@",
+            format: "kickstart: r1=0x%08x r2=0x%08x r3=0x%08x ok=%@",
             r1, r2, r3, ok ? "true" : "false"
         ))
     }
     if !anyFound {
         FileHandle.standardError.write(
-            "yamete-accel-warmup: no dispatchAccel=Yes service found — not an Apple Silicon MacBook with BMI286?\n".data(using: .utf8)!
+            "yamete-sensor-kickstart: no dispatchAccel=Yes service found — not an Apple Silicon MacBook with BMI286?\n".data(using: .utf8)!
         )
         return 2
     }
     return anySuccess ? 0 : 1
 }
 
-/// Opposite of warmup: writes 0 to the three activation properties to
+/// Opposite of kickstart: writes 0 to the three activation properties to
 /// stop the sensor streaming. Useful for testing fallback behavior.
 func deactivate() -> Int32 {
     var anyFound = false
@@ -201,8 +201,8 @@ private var g_rootPort: io_connect_t = 0
 /// IOKit system power notification callback. Fires on:
 ///   - `MsgCanSystemSleep` / `MsgSystemWillSleep`: we ack immediately
 ///     via `IOAllowPowerChange` so we never block sleep.
-///   - `MsgSystemHasPoweredOn`: the system has finished waking — re-warm
-///     the accelerometer in case the driver cooled across sleep.
+///   - `MsgSystemHasPoweredOn`: the system has finished waking — re-run
+///     the kickstart in case the driver cooled across sleep.
 private let powerCallback: IOServiceInterestCallback = { (_, _, messageType, messageArgument) in
     switch messageType {
     case MsgCanSystemSleep, MsgSystemWillSleep:
@@ -210,26 +210,26 @@ private let powerCallback: IOServiceInterestCallback = { (_, _, messageType, mes
 
     case MsgSystemHasPoweredOn:
         let ts = ISO8601DateFormatter().string(from: Date())
-        print("\(ts) daemon: system has powered on — re-warming accelerometer")
+        print("\(ts) daemon: system has powered on — re-running kickstart")
         fflush(stdout)
-        warmup()
+        kickstart()
 
     default:
         break
     }
 }
 
-/// Long-lived daemon mode: runs `warmup()` once on startup, then
-/// subscribes to IOKit system power notifications and re-warms on every
-/// wake event. Returns from `CFRunLoopRun()` only if the run loop is
-/// explicitly stopped (never in normal operation — launchd SIGTERMs
-/// us on shutdown).
+/// Long-lived daemon mode: runs `kickstart()` once on startup, then
+/// subscribes to IOKit system power notifications and re-runs it on
+/// every wake event. Returns from `CFRunLoopRun()` only if the run
+/// loop is explicitly stopped (never in normal operation — launchd
+/// SIGTERMs us on shutdown).
 func daemon() -> Int32 {
     let ts = ISO8601DateFormatter().string(from: Date())
-    print("\(ts) daemon: startup, running initial warmup")
+    print("\(ts) daemon: startup, running initial kickstart")
     fflush(stdout)
 
-    let initial = warmup()
+    let initial = kickstart()
     if initial == 2 {
         FileHandle.standardError.write(
             "daemon: no SPU accelerometer hardware found — not an Apple Silicon MacBook?, exiting\n".data(using: .utf8)!
@@ -267,22 +267,22 @@ func daemon() -> Int32 {
 
 let args = CommandLine.arguments
 guard args.count >= 2 else {
-    print("usage: \(args[0]) [probe|warmup|deactivate|daemon]")
+    print("usage: \(args[0]) [probe|kickstart|deactivate|daemon]")
     print("")
     print("  probe       one-shot: print the accelerometer streaming state and exit")
     print("              (exit 0 = active, 1 = cold, 2 = no hardware)")
-    print("  warmup      one-shot: start the BMI286 streaming at 100Hz and exit")
+    print("  kickstart   one-shot: start the BMI286 streaming at 100Hz and exit")
     print("              (exit 0 = accepted by driver, 1 = write rejected, 2 = no hardware)")
     print("  deactivate  one-shot: stop the BMI286 streaming and exit (useful for testing)")
-    print("  daemon      long-lived: run warmup once, then subscribe to IOKit system")
-    print("              power notifications and re-warm on every wake. This is how")
+    print("  daemon      long-lived: run kickstart once, then subscribe to IOKit system")
+    print("              power notifications and re-run it on every wake. This is how")
     print("              the shipping LaunchDaemon invokes the helper.")
     exit(64)
 }
 
 switch args[1] {
 case "probe":      exit(probe())
-case "warmup":     exit(warmup())
+case "kickstart":  exit(kickstart())
 case "deactivate": exit(deactivate())
 case "daemon":     exit(daemon())
 default:
