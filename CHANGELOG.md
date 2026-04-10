@@ -8,29 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- **Community accel warm-up helper is now a long-lived daemon with a
-  wake watcher.** `docs/community/yamete-accel-warmup.swift` gains a
-  new `daemon` subcommand that runs `warmup()` once on startup, then
+- **Sensor kickstart helper is now a long-lived daemon with a wake
+  watcher.** `docs/sensor-kickstart/yamete-sensor-kickstart.swift` has
+  a `daemon` subcommand that runs `kickstart()` once on startup, then
   subscribes to IOKit system power notifications via
-  `IORegisterForSystemPower` and re-warms the accelerometer on every
+  `IORegisterForSystemPower` and re-runs the kickstart on every
   `kIOMessageSystemHasPoweredOn` event. The shipping LaunchDaemon plist
-  (`com.studnicky.yamete.accel-warmup.plist`) flips from `KeepAlive =
-  false` + one-shot `warmup` arg to `KeepAlive = true` + `ProcessType =
-  Background` + `daemon` arg, and picks up a `ThrottleInterval = 10`
-  to rate-limit crash-loop respawns. Idle CPU cost remains effectively
-  zero (the daemon sits parked in `CFRunLoopRun` waiting for notifications).
-  Motivation: on the hardware we have tested the sensor stays warm
-  across sleep/wake, but this is defense in depth for hardware or macOS
-  revisions we have not verified — even if the driver cools the sensor
-  during sleep, the daemon's wake handler brings it back before the
-  user notices.
-- Community helper README, install flow description, Yamete landing
-  page (`docs/index.html`), Yamete support FAQ (`docs/support.html`),
-  and App Review Notes (`docs/APP_STORE_METADATA.md`) all updated to
-  reflect the new daemon mode. The README's "Does the sensor survive
-  sleep/wake?" section replaces its "please file an issue if it
-  breaks" language with a log-tailing walkthrough for confirming the
-  wake handler is firing.
+  (`com.studnicky.yamete.sensor-kickstart.plist`) ships with `KeepAlive
+  = true` + `ProcessType = Background` + `daemon` arg, and a
+  `ThrottleInterval = 10` to rate-limit crash-loop respawns. Idle CPU
+  cost is effectively zero (the daemon sits parked in `CFRunLoopRun`
+  waiting for notifications). Motivation: on the hardware we have
+  tested the sensor stays live across sleep/wake, but this is defense
+  in depth for hardware or macOS revisions we have not verified — even
+  if the driver cools the sensor during sleep, the daemon's wake
+  handler re-runs the kickstart before the user notices.
 - IOKit system power message constants (`MsgCanSystemSleep`,
   `MsgSystemWillSleep`, `MsgSystemHasPoweredOn`) are defined
   numerically in the helper because Swift's C importer cannot
@@ -87,31 +79,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       *before* the driver's `setProperty` is reached — the call
       returns `KERN_SUCCESS` to the client but the write never lands.
       This is why the App Store build cannot activate the sensor
-      itself and depends on an external warm-up path.
+      itself and depends on an external kickstart path.
 
-  **External warm-up for App Store users**: A minimal Swift helper
-  (`docs/community/yamete-accel-warmup.swift`) + LaunchDaemon plist is
-  provided via support docs. Users who want the accelerometer in the
-  App Store build compile it once with `swiftc`, install the LaunchDaemon
-  to `/Library/LaunchDaemons/`, and reboot. The helper does the same
-  three `IORegistryEntrySetCFProperty` writes that the Direct build's
-  `SensorActivation.activate()` does, and since it runs outside App
-  Sandbox its writes reach the driver. Warmth persists across subscriber
-  cycles — the helper only needs to run once per boot, not continuously.
-  Verified empirically: after warmup, the App Store build's probe returns
-  true and `adapters=["Accelerometer", ...]` logs alongside `sampleCount=`
-  entries at sustained 100Hz.
+  **External sensor kickstart for App Store users**: A minimal Swift
+  helper (`docs/sensor-kickstart/yamete-sensor-kickstart.swift`) +
+  LaunchDaemon plist is provided via support docs. Users who want the
+  accelerometer in the App Store build compile it once with `swiftc`,
+  install the LaunchDaemon to `/Library/LaunchDaemons/`, and reboot.
+  The helper does the same three `IORegistryEntrySetCFProperty` writes
+  that the Direct build's `SensorActivation.activate()` does, and
+  since it runs outside App Sandbox its writes reach the driver. The
+  sensor stays active across subscriber cycles and sleep/wake, and
+  the daemon re-runs the kickstart on every wake as defense in depth.
+  Verified empirically: after kickstart, the App Store build's probe
+  returns true and `adapters=["Accelerometer", ...]` logs alongside
+  `sampleCount=` entries at sustained 100Hz.
 
   **Sleep/wake verified (2026-04-10)**: The BMI286 is in Apple
   Silicon's always-on power domain. Verified empirically that once
-  warmed, the sensor continues streaming at 100Hz across sleep/wake
-  cycles without interruption — a 35-second sleep period advanced
-  `_num_events` from 101 to 3615 (100.4 events/sec, exactly the
-  awake rate), meaning the driver was emitting reports the entire
-  time the lid was closed. The `RunAtLoad`-only LaunchDaemon plist
-  is therefore sufficient: the helper runs once per boot and the
-  warmth carries through every subsequent sleep/wake until the next
-  reboot. No wake watcher needed.
+  kickstarted, the sensor continues streaming at 100Hz across
+  sleep/wake cycles without interruption — a 35-second sleep period
+  advanced `_num_events` from 101 to 3615 (100.4 events/sec, exactly
+  the awake rate), meaning the driver was emitting reports the entire
+  time the lid was closed.
 
   **Still to verify on other Mac models and macOS revisions**:
   1. **Multiple Apple Silicon models.** All testing so far is on a

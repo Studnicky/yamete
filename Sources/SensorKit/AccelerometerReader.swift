@@ -19,7 +19,7 @@ import os
 //
 //   Activation — IORegistryEntrySetCFProperty on AppleSPUHIDDriver writing
 //     ReportInterval, SensorPropertyReportingState, SensorPropertyPowerState.
-//     Unsandboxed clients (Direct build, external warm-up helper): the
+//     Unsandboxed clients (Direct build, external sensor-kickstart helper): the
 //     writes reach the driver and start the BMI286 streaming at the
 //     requested rate. Note the driver treats these properties as *command*
 //     channels — read-back always returns 0 regardless of success, so

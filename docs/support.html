@@ -99,7 +99,7 @@
       <summary>My MacBook's accelerometer isn't working in the App Store build. (Very common. Please read.)</summary>
       <p>Short version: App Sandbox (which the Mac App Store requires) silently blocks the IORegistry writes that would start the accelerometer. The App Store build cannot wake the sensor on its own. This is not a bug — it's how sandboxing works.</p>
       <p>Long version: Apple provides no public macOS API for accelerometer access, so we talk to the SPU HID driver directly via public IOKit functions. Those functions exist and are callable from inside sandbox, but the kernel silently drops the property writes needed to activate the sensor before they reach the driver. The sensor stays cold, our availability probe catches that on launch, and the adapter is dropped from the pipeline automatically — so the app just runs on the microphone and headphone motion instead (which works great).</p>
-      <p>If you specifically want the tactile channel on an Apple Silicon MacBook, there's a small open-source helper at <a href="https://github.com/Studnicky/yamete/tree/develop/docs/community"><code>docs/community/</code></a> in the GitHub repo. You compile a single Swift file with <code>swiftc</code> and install it as a LaunchDaemon. The daemon does two things: it warms the sensor immediately at boot, and it subscribes to IOKit system power notifications so that <em>every</em> wake event triggers another warm-up. That way even if a future macOS revision starts cooling the sensor during sleep, the sensor is back up by the time your fingers hit the trackpad. Idle CPU cost is effectively zero — the daemon spends its life parked in a run loop waiting for notifications. Full instructions, safety notes, and troubleshooting in the gist README.</p>
+      <p>If you specifically want the tactile channel on an Apple Silicon MacBook, there's a small open-source helper at <a href="https://github.com/Studnicky/yamete/tree/master/docs/sensor-kickstart"><code>docs/sensor-kickstart/</code></a> in the GitHub repo. You compile a single Swift file with <code>swiftc</code> and install it as a LaunchDaemon. The daemon does two things: it kickstarts the sensor immediately at boot, and it subscribes to IOKit system power notifications so that <em>every</em> wake event triggers another kickstart. That way even if a future macOS revision starts cooling the sensor during sleep, the sensor is back up by the time your fingers hit the trackpad. Idle CPU cost is effectively zero — the daemon spends its life parked in a run loop waiting for notifications. Full instructions, safety notes, and troubleshooting in the README.</p>
       <blockquote>If you install the helper and it works on your Mac — or if it doesn't — please <a href="https://github.com/Studnicky/yamete/issues/new">file an issue</a>. We're building a known-working matrix across M1 / M2 / M3 / M4, and every data point helps.</blockquote>
     </details>
 
@@ -109,7 +109,7 @@
       <summary>No impacts are detected</summary>
       <p>Walk through these in order:</p>
       <ol>
-        <li>Open the menu bar dropdown, expand the Sensors section, and confirm at least one sensor is enabled. If Accelerometer is the only one enabled and the probe hasn't detected an active sensor (common on App Store builds without the community helper — see above), it may have been auto-pruned at launch. Enable Microphone as well.</li>
+        <li>Open the menu bar dropdown, expand the Sensors section, and confirm at least one sensor is enabled. If Accelerometer is the only one enabled and the probe hasn't detected an active sensor (common on App Store builds without the sensor-kickstart helper — see above), it may have been auto-pruned at launch. Enable Microphone as well.</li>
         <li>Check Reactivity — both thumbs should be above zero. The default range is fine for most users; very low settings can miss real impacts.</li>
         <li>If you granted microphone permission: make sure it's still granted. System Settings → Privacy &amp; Security → Microphone → Yamete.</li>
         <li>Expand Accelerometer Tuning / Microphone Tuning and try lowering the Spike Threshold slightly. Save, and smack the desk firmly.</li>
@@ -165,8 +165,8 @@
         <li>Delete <code>Yamete</code> from Applications.</li>
         <li>Delete <code>~/Library/Containers/com.studnicky.yamete/</code> to clear its sandboxed data.</li>
       </ol>
-      <p><strong>Community warm-up helper</strong> (only relevant if you installed it for the App Store accelerometer):</p>
-      <p>Re-run the <code>uninstall.sh</code> script that came with the gist. It unloads the LaunchDaemon and removes <code>/usr/local/libexec/yamete-accel-warmup</code>, <code>/Library/LaunchDaemons/com.studnicky.yamete.accel-warmup.plist</code>, and <code>/var/log/yamete-accel-warmup.log</code>.</p>
+      <p><strong>Sensor kickstart helper</strong> (only relevant if you installed it for the App Store accelerometer):</p>
+      <p>Re-run the <code>uninstall.sh</code> script that came with it. It unloads the LaunchDaemon and removes <code>/usr/local/libexec/yamete-sensor-kickstart</code>, <code>/Library/LaunchDaemons/com.studnicky.yamete.sensor-kickstart.plist</code>, and <code>/var/log/yamete-sensor-kickstart.log</code>.</p>
     </details>
 
     <h2>The questions we hoped you'd ask</h2>
