@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Community accel warm-up helper is now a long-lived daemon with a
+  wake watcher.** `docs/community/yamete-accel-warmup.swift` gains a
+  new `daemon` subcommand that runs `warmup()` once on startup, then
+  subscribes to IOKit system power notifications via
+  `IORegisterForSystemPower` and re-warms the accelerometer on every
+  `kIOMessageSystemHasPoweredOn` event. The shipping LaunchDaemon plist
+  (`com.studnicky.yamete.accel-warmup.plist`) flips from `KeepAlive =
+  false` + one-shot `warmup` arg to `KeepAlive = true` + `ProcessType =
+  Background` + `daemon` arg, and picks up a `ThrottleInterval = 10`
+  to rate-limit crash-loop respawns. Idle CPU cost remains effectively
+  zero (the daemon sits parked in `CFRunLoopRun` waiting for notifications).
+  Motivation: on the hardware we have tested the sensor stays warm
+  across sleep/wake, but this is defense in depth for hardware or macOS
+  revisions we have not verified — even if the driver cools the sensor
+  during sleep, the daemon's wake handler brings it back before the
+  user notices.
+- Community helper README, install flow description, Yamete landing
+  page (`docs/index.html`), Yamete support FAQ (`docs/support.html`),
+  and App Review Notes (`docs/APP_STORE_METADATA.md`) all updated to
+  reflect the new daemon mode. The README's "Does the sensor survive
+  sleep/wake?" section replaces its "please file an issue if it
+  breaks" language with a log-tailing walkthrough for confirming the
+  wake handler is firing.
+- IOKit system power message constants (`MsgCanSystemSleep`,
+  `MsgSystemWillSleep`, `MsgSystemHasPoweredOn`) are defined
+  numerically in the helper because Swift's C importer cannot
+  translate the `iokit_common_msg(X)` macro expansion. Values are
+  `0xe0000000 | X` per `IOKit/IOMessage.h` and are stable across
+  every macOS release since IOKit was introduced.
+
 ## [1.0.0] - 2026-04-10
 
 ### Critical

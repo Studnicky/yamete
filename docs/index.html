@@ -125,7 +125,7 @@
     <section>
       <h2>Accelerometer setup on App Store (optional)</h2>
       <p>The Mac App Store build runs under App Sandbox. The sandbox silently blocks the IORegistry writes needed to start the built-in accelerometer, which means — out of the box — the App Store build uses the microphone and headphone motion only. Which is fine. The microphone path works great.</p>
-      <p>If you specifically want the tactile channel on an Apple Silicon MacBook, there's a small open-source helper at <a href="https://github.com/Studnicky/yamete/tree/develop/docs/community"><code>docs/community/</code></a> that you can compile with <code>swiftc</code> and install as a LaunchDaemon. It runs once per boot, warms the sensor, and exits. Yamete then picks it up. Full instructions and safety notes in the gist README.</p>
+      <p>If you specifically want the tactile channel on an Apple Silicon MacBook, there's a small open-source helper at <a href="https://github.com/Studnicky/yamete/tree/develop/docs/community"><code>docs/community/</code></a> that you can compile with <code>swiftc</code> and install as a LaunchDaemon. The daemon warms the sensor at boot and keeps it warm across sleep / wake cycles by re-running the activation on every wake event. Yamete then picks up the live stream. Full instructions, safety notes, and diagnostics in the gist README.</p>
       <p style="margin-top: 0.6rem; color: var(--muted); font-size: 0.9rem;">If you install it and it works — or doesn't — please <a href="https://github.com/Studnicky/yamete/issues/new">file an issue</a>. We're building a known-working Mac matrix and every data point helps.</p>
     </section>
 

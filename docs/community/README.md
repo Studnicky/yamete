@@ -49,12 +49,20 @@ connected. You don't need this helper for Yamete to function.
 ## Files in this gist
 
 - **`yamete-accel-warmup.swift`** — the helper source (single file,
-  uses only `Foundation` and `IOKit`). Implements `probe`, `warmup`,
-  and `deactivate` subcommands. The LaunchDaemon invokes `warmup`.
+  uses only `Foundation` and `IOKit`). Implements four subcommands:
+  - `probe` — report whether the sensor is currently streaming
+  - `warmup` — one-shot: write the activation properties and exit
+  - `deactivate` — one-shot: stop streaming (for testing)
+  - `daemon` — long-lived: run `warmup` on startup, then subscribe to
+    IOKit system power notifications via `IORegisterForSystemPower` and
+    re-warm the sensor on every wake event. **This is how the shipping
+    LaunchDaemon invokes the helper.**
 - **`com.studnicky.yamete.accel-warmup.plist`** — the LaunchDaemon
-  plist. `RunAtLoad = true`, `KeepAlive = false` — the helper runs
-  once at boot, warms the sensor, and exits. Logs to
-  `/var/log/yamete-accel-warmup.log`.
+  plist. `RunAtLoad = true`, `KeepAlive = true`, `ProcessType = Background` —
+  the helper starts at boot in `daemon` mode, warms the sensor once,
+  then parks itself in `CFRunLoopRun` waiting for wake notifications.
+  Idle CPU cost is effectively zero (it is asleep on a run loop).
+  Logs to `/var/log/yamete-accel-warmup.log`.
 - **`install.sh`** — compiles the Swift file with `swiftc`, copies the
   binary to `/usr/local/libexec/`, copies the plist to
   `/Library/LaunchDaemons/`, and loads it with `launchctl bootstrap`.
@@ -77,7 +85,8 @@ The installer will:
 4. Unload any previously-installed version of the LaunchDaemon.
 5. Copy the binary and plist to their system locations (sudo prompt).
 6. Load the LaunchDaemon with `launchctl bootstrap` (triggers `RunAtLoad`
-   — the sensor warms up immediately).
+   — the daemon starts, warms the sensor immediately, and registers its
+   wake watcher).
 7. Probe the sensor again to confirm the warmup succeeded.
 
 If the final probe succeeds, launch or relaunch Yamete. Open the menu
@@ -85,8 +94,11 @@ bar dropdown, expand the Sensors section, and toggle **Accelerometer**
 on. You should see the accelerometer detecting desk taps alongside the
 microphone.
 
-From the next reboot onward, the LaunchDaemon runs automatically at boot
-and Yamete picks up the warm sensor without any further action.
+From the next reboot onward, the LaunchDaemon starts automatically at
+boot and Yamete picks up the warm sensor without any further action.
+The daemon runs for the whole session — it re-warms the sensor on every
+wake event so sleep / lid close / display sleep cannot cool it out from
+under the app.
 
 ## Uninstallation
 
@@ -126,15 +138,33 @@ you toggled the Accelerometer row on — the helper warms the hardware
 but doesn't change Yamete's settings.
 
 **Does the sensor survive sleep/wake?**  
-Yes. Verified on Apple Silicon: the BMI286 is in the always-on power
-domain, so once warmed it streams continuously at 100Hz across lid
-close / open cycles without interruption. The `RunAtLoad`-only
-LaunchDaemon runs the helper once per boot and that single warm-up
-carries the sensor through every subsequent sleep/wake until the next
-reboot. If you observe any deviation (the sensor going cold after
-sleep on a specific Mac model or macOS revision), please file an
-issue at <https://github.com/Studnicky/yamete/issues> — we will add a
-wake watcher to the plist if a counter-example turns up.
+Yes, two ways:
+
+1. **On the hardware we have tested**, the BMI286 sits in Apple
+   Silicon's always-on power domain and streams continuously at 100Hz
+   across lid close / open cycles with no intervention. Verified
+   empirically: a 35-second sleep period showed `_num_events`
+   incrementing at the full 100 events/sec rate throughout sleep.
+2. **Defense in depth**: the daemon subscribes to IOKit system power
+   notifications via `IORegisterForSystemPower` and re-runs `warmup()`
+   on every `kIOMessageSystemHasPoweredOn` event. Even if a future
+   macOS revision or a specific hardware configuration starts cooling
+   the sensor during sleep, the daemon will re-warm it the moment the
+   system finishes waking.
+
+You can confirm the wake handler is firing by tailing the log across a
+sleep cycle:
+
+```bash
+tail -f /var/log/yamete-accel-warmup.log
+# ... close the lid, wait, open the lid ...
+# expect a new line: "... daemon: system has powered on — re-warming accelerometer"
+```
+
+If you ever see the sensor going cold despite the daemon running,
+please <a href="https://github.com/Studnicky/yamete/issues/new">file an
+issue</a> with your Mac model, macOS version, and the last 20 lines of
+`/var/log/yamete-accel-warmup.log`.
 
 ## License
 

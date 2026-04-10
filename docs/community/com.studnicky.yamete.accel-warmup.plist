@@ -5,20 +5,44 @@
     <key>Label</key>
     <string>com.studnicky.yamete.accel-warmup</string>
 
+    <!--
+        Long-lived daemon mode. The helper runs `warmup()` once on startup
+        and then subscribes to IOKit system power notifications via
+        `IORegisterForSystemPower`, re-warming the accelerometer on every
+        `kIOMessageSystemHasPoweredOn` event so the sensor stays hot across
+        sleep / wake cycles even on hardware or macOS revisions where the
+        driver cools the sensor during sleep. Idle CPU cost: ~0 (it is
+        parked in `CFRunLoopRun`).
+    -->
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/libexec/yamete-accel-warmup</string>
-        <string>warmup</string>
+        <string>daemon</string>
     </array>
 
     <key>RunAtLoad</key>
     <true/>
 
+    <!--
+        Restart if the daemon ever exits (it shouldn't — `CFRunLoopRun`
+        blocks indefinitely — but if something crashes it, come back up).
+    -->
     <key>KeepAlive</key>
-    <false/>
-
-    <key>AbandonProcessGroup</key>
     <true/>
+
+    <!--
+        If the daemon crashes in a tight loop, throttle the restart rate
+        so we don't spin launchd. 10 seconds between respawns.
+    -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!--
+        Background process type: lower scheduler / I/O priority than
+        Interactive or Standard. Appropriate for a passive watcher.
+    -->
+    <key>ProcessType</key>
+    <string>Background</string>
 
     <key>StandardOutPath</key>
     <string>/var/log/yamete-accel-warmup.log</string>
