@@ -7,49 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Critical
-- **App Store accelerometer two-phase access pattern**: Activation writes
-  (`IORegistryEntrySetCFProperty` on `AppleSPUHIDDriver`) are denied with
-  `kIOReturnNotPermitted` in App Store sandbox builds — no entitlement
-  grants this surface. The adapter now treats activation as best-effort
-  (logged at info level) and falls through to phase 2: passive
-  `IOHIDManager` subscription. The macOS system maintains
-  `HIDEventServiceProperties.ReportInterval=0x2710` (10000µs = 100Hz) on
-  the SPU services *independently* via WindowServer / locationd, so the
-  passive subscription receives the existing 100Hz sample stream even
-  when our writes are blocked. Verified locally: sustained 100Hz reports
-  in the App Store sandbox build (5000+ samples in 50 seconds) with no
-  Direct build active for 10+ minutes.
+## [1.0.0] - 2026-04-10
 
-  **⚠️ UNVERIFIED scenarios that MUST be tested before App Store submission:**
-  1. **Cold boot.** Both Yamete builds are registered in Background Task
-     Management with launch-at-login enabled. The Direct build has been
-     auto-launching at boot, and Direct's `SensorActivation.activate()`
-     writes succeed (it is unsandboxed). We cannot rule out that Direct
-     was the original activator and the SPU sensor's persistent state is
-     a side effect, not a system-managed default.
-     **Test procedure**: reboot the Mac. Do NOT launch any Yamete app.
-     Run `ioreg -rxc AppleSPUHIDDriver | grep ReportInterval`. If
-     `HIDEventServiceProperties = {"ReportInterval"=0x2710}` is present
-     before any Yamete launch, the system warms it independently and the
-     App Store path is real. If only `ReportInterval = 0x0` is present,
-     the system does NOT warm it and the App Store path only works
-     because Direct activated it first in this boot session — meaning
-     the App Store build cannot ship without Direct also being installed
-     and auto-launching, which is not viable for App Store distribution.
-  2. **Sleep / wake recovery.** The watchdog (below) catches a stalled
-     stream within 5 seconds, but it would be better to know whether the
-     sensor goes cold across sleep so we can document the expected
-     fallback behavior accurately. **Test procedure**: launch the App
-     Store build, confirm `FirstReport` and a couple of `sampleCount=`
-     entries in the log, close the lid, wait 60 seconds, open the lid.
-     Watch the log for stall warnings or new sample entries.
-  3. **Multiple Mac models.** All testing so far is on a single
-     development MacBook. Should be re-verified on M1 / M2 / M3 / M4
-     across MacBook Air / MacBook Pro before submission.
-  4. **macOS revisions.** This entire path depends on undocumented
-     behavior of WindowServer and locationd. A future macOS update could
-     break it without warning. Re-test before each submission.
+### Critical
+- **App Store accelerometer: runtime availability probe replaces the
+  unconditional passive-read assumption.** The prior "passive HID read
+  always works because macOS warms the SPU sensor at boot" hypothesis
+  was falsified by a cold-boot verification on a clean Mac with Yamete
+  Direct uninstalled: `ioreg -rxc AppleSPUHIDDriver` showed the accel
+  service (`dispatchAccel = Yes`, BMI286) with `ReportInterval = 0x0`,
+  no `HIDEventServiceProperties` dict, and `DebugState._num_events = 0`.
+  Two consecutive App Store launches (BTM auto + manual `open`) both
+  produced `Watchdog staleness=5.0s sampleCount=0` — zero samples
+  received, zero events in the driver. Conclusion: macOS does NOT
+  independently warm the SPU accelerometer at cold boot; in prior
+  observations the sensor was warm only because Yamete Direct (which
+  *can* write to IORegistry from outside the sandbox) had run earlier
+  in the session and left the sensor active.
+
+  **Fix**: `SPUAccelerometerAdapter.isAvailable` now does a runtime
+  probe via `AccelHardware.isSensorActivelyReporting()` that reads
+  `DebugState._last_event_timestamp` on the `AppleSPUHIDDriver` service
+  and compares against `mach_absolute_time()`. The adapter reports
+  available only when the sensor has emitted a report within the last
+  500ms (`AccelHardwareConstants.sensorActivityStalenessNs`). With this
+  probe, `Migration.reconcileSensors` — which already runs on every
+  launch and prunes unavailable adapters — correctly drops the
+  accelerometer from the pipeline when the sensor is cold, letting the
+  microphone + headphone-motion fallback path activate cleanly instead
+  of letting the 5s watchdog fire on an empty stream while the user
+  sees no impacts at all.
+
+  **Driver internals discovered while building the probe**:
+    - `IORegistryEntrySetCFProperty` with `ReportInterval`,
+      `SensorPropertyReportingState`, `SensorPropertyPowerState` is a
+      command channel, not a stored value. The driver's `setProperty`
+      accepts the write, triggers the hardware, and returns
+      `KERN_SUCCESS` without updating the IOKit property dict — so
+      property read-back on the service always returns `0` regardless
+      of whether the sensor is streaming.
+    - `DebugState._num_events` is a monotonic counter that freezes at
+      deactivation and doesn't reset until reboot — useless as a
+      "currently active" signal on its own.
+    - `DebugState._last_event_timestamp` (in `mach_absolute_time`
+      units) is the only field that decays correctly when the sensor
+      goes cold.
+    - Sandbox rejection of `IORegistryEntrySetCFProperty` happens
+      *before* the driver's `setProperty` is reached — the call
+      returns `KERN_SUCCESS` to the client but the write never lands.
+      This is why the App Store build cannot activate the sensor
+      itself and depends on an external warm-up path.
+
+  **External warm-up for App Store users**: A minimal Swift helper
+  (`docs/community/yamete-accel-warmup.swift`) + LaunchDaemon plist is
+  provided via support docs. Users who want the accelerometer in the
+  App Store build compile it once with `swiftc`, install the LaunchDaemon
+  to `/Library/LaunchDaemons/`, and reboot. The helper does the same
+  three `IORegistryEntrySetCFProperty` writes that the Direct build's
+  `SensorActivation.activate()` does, and since it runs outside App
+  Sandbox its writes reach the driver. Warmth persists across subscriber
+  cycles — the helper only needs to run once per boot, not continuously.
+  Verified empirically: after warmup, the App Store build's probe returns
+  true and `adapters=["Accelerometer", ...]` logs alongside `sampleCount=`
+  entries at sustained 100Hz.
+
+  **Sleep/wake verified (2026-04-10)**: The BMI286 is in Apple
+  Silicon's always-on power domain. Verified empirically that once
+  warmed, the sensor continues streaming at 100Hz across sleep/wake
+  cycles without interruption — a 35-second sleep period advanced
+  `_num_events` from 101 to 3615 (100.4 events/sec, exactly the
+  awake rate), meaning the driver was emitting reports the entire
+  time the lid was closed. The `RunAtLoad`-only LaunchDaemon plist
+  is therefore sufficient: the helper runs once per boot and the
+  warmth carries through every subsequent sleep/wake until the next
+  reboot. No wake watcher needed.
+
+  **Still to verify on other Mac models and macOS revisions**:
+  1. **Multiple Apple Silicon models.** All testing so far is on a
+     single development MacBook. Should be re-verified on M1 / M2 /
+     M3 / M4 across MacBook Air / MacBook Pro before submission to
+     confirm `AppleSPUHIDDriver` / `dispatchAccel` / `DebugState` are
+     present and behave identically on each generation.
+  2. **macOS revisions.** `IORegistryEntrySetCFProperty` on
+     `AppleSPUHIDDriver` with these specific property keys is an
+     undocumented Apple-internal surface. A future macOS update could
+     break it. Re-test before every App Store submission, and monitor
+     reports via the support-docs helper link.
 
 - **Accelerometer stream watchdog**: `SPUAccelerometerAdapter` now spawns
   a background `Task` per stream that polls `ReportContext.lastReportAt`

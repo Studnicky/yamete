@@ -68,12 +68,18 @@ PRIVACY
 - Logs auto-delete after 24 hours
 
 COMPATIBILITY
-- MacBook Air / MacBook Pro (Apple Silicon): all three sensors — accelerometer, microphone, headphone motion
-- Other Apple Silicon Macs (iMac, Mac Mini, Mac Studio, Mac Pro): microphone and headphone motion only
-- Intel Macs: runs via Rosetta 2 with microphone and headphone motion only
+- All Macs: microphone + headphone-motion impact detection (default)
+- MacBook Air / MacBook Pro (Apple Silicon): an optional one-time external
+  helper warms the built-in BMI286 accelerometer at boot via a user-installed
+  LaunchDaemon, adding a third detection channel. Setup is documented on
+  the support page; the App Store build itself cannot warm the sensor from
+  inside the sandbox.
 - Requires macOS 14.0+ (Sonoma), arm64 binary
 
-Yamete runs entirely in the menu bar with no Dock icon. Best experienced on Apple Silicon MacBooks with the built-in accelerometer. All Macs can use microphone-based impact detection.
+Yamete runs entirely in the menu bar with no Dock icon. Microphone-based
+impact detection works on every Mac out of the box; the accelerometer is a
+power-user opt-in on Apple Silicon MacBooks that adds a tactile detection
+channel complementary to the microphone.
 
 ## Keywords (100 chars max)
 
@@ -111,37 +117,62 @@ What the app does:
   with no Dock icon and no app windows.
 
 Accelerometer implementation note (please read carefully):
-  This app reads the built-in BMI286 accelerometer using the public IOKit
-  framework. The imported symbols are all publicly declared in the SDK
-  headers shipped with Xcode:
+  The App Store build ships with the accelerometer detection path present
+  but **runtime-gated**: it only activates when the kernel driver is already
+  actively reporting, which inside the App Sandbox we cannot cause ourselves.
+  `IORegistryEntrySetCFProperty` writes to the `AppleSPUHIDDriver` service
+  are silently dropped by the sandbox before they reach the driver, so the
+  App Store build itself never starts the sensor.
+
+  On launch, the adapter reads `DebugState._last_event_timestamp` from the
+  driver service (a read-only IORegistry lookup that works from inside
+  sandbox) and compares it to `mach_absolute_time()`. If the delta exceeds
+  500ms — meaning no reports have been emitted recently, i.e. the sensor
+  is cold — the adapter reports `isAvailable = false` and the settings
+  reconciler prunes it from the pipeline entirely. The app then runs on
+  microphone + headphone-motion only, which is the default experience for
+  every App Store user.
+
+  For users who want the tactile detection channel, the support page links
+  an open-source GitHub gist containing a minimal Swift helper
+  (`yamete-accel-warmup.swift`, ~100 lines) plus a LaunchDaemon plist.
+  The helper compiles with `swiftc`, installs to `/usr/local/libexec/`,
+  and runs once per boot via LaunchDaemon to issue the three driver
+  property writes that start the BMI286 streaming. Because the LaunchDaemon
+  runs outside the App Sandbox, its writes reach the driver successfully.
+  The warmth persists across subscriber cycles, so the Yamete App Store
+  build's subsequent `IOHIDManager` subscription receives the live 100Hz
+  stream with no further involvement from the helper.
+
+  IOKit symbols used by the app (all in public SDK headers):
     - IOServiceGetMatchingServices (IOKit/IOKitLib.h)
-    - IORegistryEntrySetCFProperty (IOKit/IOKitLib.h)
+    - IORegistryEntryCreateCFProperty (IOKit/IOKitLib.h) — availability probe
     - IOHIDManagerCreate (IOKit/hid/IOHIDManager.h)
     - IOHIDDeviceRegisterInputReportCallback (IOKit/hid/IOHIDDevice.h)
-  No private API symbols are imported. The com.apple.security.device.usb
-  entitlement is the documented entitlement for IOHIDManager access.
+  No private API symbols are imported. The `com.apple.security.device.usb`
+  entitlement is the documented entitlement for `IOHIDManager` access.
 
-  The activation step uses these public IOKit functions to set driver
-  properties on `AppleSPUHIDDriver` services. The driver class name and
-  the property keys (`ReportInterval`, `SensorPropertyReportingState`,
-  `SensorPropertyPowerState`) are not surfaced in the public SDK headers
-  as documented constants — they are Apple-internal implementation details
-  of the SPU HID driver. We are using public IOKit APIs to talk to an
-  undocumented driver surface; we are not using private APIs.
+  The service class name (`AppleSPUHIDDriver`) and the property keys read
+  by the probe (`DebugState._last_event_timestamp`, `dispatchAccel`) are
+  Apple-internal implementation details of the SPU HID driver, not
+  documented SDK constants. The app uses public IOKit read functions to
+  inspect an undocumented driver surface; this is not a private API import.
 
-  Why this matters: there is no public Apple API for macOS accelerometer
-  access. `CMMotionManager` is `API_UNAVAILABLE(macos)`, and no replacement
-  has been provided. The IOKit + AppleSPUHIDDriver path is the only way
-  to read the built-in accelerometer from a third-party macOS app. If you
-  prefer that we remove this code path entirely from the App Store build,
-  we are happy to do so — accelerometer detection is one of three sensor
-  inputs and the app continues to function with microphone and headphone
-  motion only.
+  Why any of this matters: there is no public Apple API for macOS
+  accelerometer access. `CMMotionManager` is `API_UNAVAILABLE(macos)`, and
+  no replacement has been provided. The BMI286 is a real piece of hardware
+  on every Apple Silicon MacBook and the `AppleSPUHIDDriver` is its only
+  host-accessible surface. If App Review prefers that we remove this code
+  path entirely, we are happy to ship App Store with microphone +
+  headphone-motion only — the runtime probe already guarantees the
+  accelerometer code is dormant unless a user has explicitly opted in via
+  the external helper.
 
-  Graceful degradation: if accelerometer activation fails for any reason
-  (sandbox restriction, driver unavailable, OS version mismatch), the app
-  continues to detect impacts via the microphone and headphone motion
-  sensors. There is no error state and no degraded user experience.
+  Graceful degradation: if the accelerometer is cold, the adapter is
+  pruned before pipeline start and the app runs on the remaining sensors.
+  If the sensor goes cold mid-session (e.g., after sleep), the existing
+  5-second stream watchdog surfaces the stall and the fusion engine
+  continues on the other adapters. There is no user-visible error state.
 
 Why microphone access is needed:
   The microphone detects impact sounds (desk taps, slaps) as a complementary
