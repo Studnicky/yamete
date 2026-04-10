@@ -12,29 +12,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Type-check with strict concurrency
-        run: |
-          swiftc -typecheck \
-            -module-name Yamete -target arm64-apple-macosx14.0 -parse-as-library \
-            -framework SwiftUI -framework AppKit -framework AVFoundation -framework ServiceManagement \
-            -strict-concurrency=complete \
-            -warnings-as-errors \
-            $(find Sources -name '*.swift' | sort)
+        run: make lint
 
   build:
     name: Build
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Build app bundle
+      - name: Build Direct bundle
         run: make build
+      - name: Build App Store bundle
+        run: make appstore
       - name: Verify bundle contents
         run: |
-          test -f dist/Yamete.app/Contents/MacOS/yamete
-          test -f dist/Yamete.app/Contents/Info.plist
-          test -d dist/Yamete.app/Contents/Resources/faces
-          test -d dist/Yamete.app/Contents/Resources/sounds
-          FACE_COUNT=$(find dist/Yamete.app/Contents/Resources/faces -type f \( -name '*.svg' -o -name '*.png' -o -name '*.jpg' \) | wc -l | tr -d ' ')
-          SOUND_COUNT=$(find dist/Yamete.app/Contents/Resources/sounds -type f \( -name '*.mp3' -o -name '*.wav' -o -name '*.m4a' \) | wc -l | tr -d ' ')
+          test -f "dist/Yamete Direct.app/Contents/MacOS/yamete-direct"
+          test -f "dist/Yamete Direct.app/Contents/Info.plist"
+          test -f "dist/Yamete.app/Contents/MacOS/yamete"
+          test -f "dist/Yamete.app/Contents/Info.plist"
+          test -d "dist/Yamete.app/Contents/Resources/faces"
+          test -d "dist/Yamete.app/Contents/Resources/sounds"
+          FACE_COUNT=$(find "dist/Yamete.app/Contents/Resources/faces" -type f \( -name '*.svg' -o -name '*.png' -o -name '*.jpg' \) | wc -l | tr -d ' ')
+          SOUND_COUNT=$(find "dist/Yamete.app/Contents/Resources/sounds" -type f \( -name '*.mp3' -o -name '*.wav' -o -name '*.m4a' \) | wc -l | tr -d ' ')
           echo "Faces: $FACE_COUNT, Sounds: $SOUND_COUNT"
           test "$FACE_COUNT" -ge 1
           test "$SOUND_COUNT" -ge 1
