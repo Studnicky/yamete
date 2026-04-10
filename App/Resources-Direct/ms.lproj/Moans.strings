@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for ms.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/ms.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Hmm~ ayah~";
+"moan_tap_2" = "Ahh~";
+"moan_tap_3" = "Ayah usik la~";
+"moan_tap_4" = "Ish~";
+"moan_light_1" = "Ayah~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ahh~ tolong lah~";
+"moan_light_4" = "Jangan la~";
+"moan_medium_1" = "Ayah, jangan lah~";
+"moan_medium_2" = "Jangan situ tau~";
+"moan_medium_3" = "Aduh, jahat betul la~";
+"moan_medium_4" = "Ayah, tolong lah~";
+"moan_firm_1" = "Ayah! Keterlaluan dah!";
+"moan_firm_2" = "Aku akan jadi baik tau!";
+"moan_firm_3" = "Ampun~ tolong la~";
+"moan_firm_4" = "Ayah jahat la!";
+"moan_hard_1" = "AYAHHH!!";
+"moan_hard_2" = "AAAHHH!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "AKU JADI BAIK LA!!";

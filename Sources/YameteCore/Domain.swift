@@ -62,10 +62,16 @@ public protocol AudioResponder {
     var longestSoundURL: URL? { get }
 }
 
-/// Flashes screen overlay scaled by impact intensity.
+/// Visual reaction to an impact. Implementations include the full-screen
+/// overlay (`ScreenFlash`) and the system notification responder
+/// (`NotificationResponder`); both fire from the same dispatch path.
+///
+/// `flash` is the historical method name kept for source compatibility.
+/// Parameter shape is preserved as a flat list rather than a typed request
+/// object — the typed-request refactor is tracked separately.
 @MainActor
-public protocol FlashResponder {
-    func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, enabledDisplayIDs: [Int])
+public protocol VisualResponder {
+    func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, dismissAfter: Double, enabledDisplayIDs: [Int])
 }
 
 // MARK: - Type-safe identifiers
@@ -103,7 +109,8 @@ extension Comparable {
 
 /// Sendable wrapper that ensures a cleanup action runs exactly once.
 /// Resources are consumed on first `perform()` call; subsequent calls are no-ops.
-public struct OnceCleanup<T>: Sendable {
+/// `T` must itself be `Sendable` so the lock state is concurrency-safe.
+public struct OnceCleanup<T: Sendable>: Sendable {
     private let resources: OSAllocatedUnfairLock<T?>
 
     public init(_ resources: T) {
@@ -135,4 +142,3 @@ public enum BundleResources {
         return results.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 }
-

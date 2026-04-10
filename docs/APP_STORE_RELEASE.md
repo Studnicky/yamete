@@ -13,31 +13,74 @@ These must be resolved before submission. No exceptions.
 
 ### BLOCKER-1: Accelerometer Activation API
 
-**Status**: RESOLVED (with caveat)
-**Risk**: Low — all IOKit functions are public SDK, but driver property keys are undocumented
+**Status**: Honest assessment — public SDK symbols only, but the driver
+property surface we talk to is undocumented. Review outcome is uncertain
+under App Review 2.5.1.
+**Risk**: Real and not yet resolved by code changes alone. Mitigation is
+honest review-notes documentation plus graceful microphone/headphone fallback.
 
-#### Implementation
+#### What is public, what is undocumented
 
-Sensor activation uses `IORegistryEntrySetCFProperty` (declared in `IOKit/IOKitLib.h`)
-to set properties on `AppleSPUHIDDriver` IORegistry services. Report reading uses
-`IOHIDManager` + `IOHIDDeviceRegisterInputReportCallback` (declared in `IOKit/hid/`).
+**Public SDK symbols imported into the binary** (zero private API):
 
-**What is public API**: Every function called (`IOServiceMatching`, `IOServiceGetMatchingServices`,
-`IORegistryEntrySetCFProperty`, `IOHIDManagerCreate`, `IOHIDDeviceOpen`,
-`IOHIDDeviceRegisterInputReportCallback`). Zero private symbols in the binary.
+- `IOServiceMatching` — `IOKit/IOKitLib.h`
+- `IOServiceGetMatchingServices` — `IOKit/IOKitLib.h`
+- `IORegistryEntrySetCFProperty` — `IOKit/IOKitLib.h`
+- `IOObjectRelease`, `IOIteratorNext` — `IOKit/IOKitLib.h`
+- `IOHIDManagerCreate`, `IOHIDManagerSetDeviceMatching`, `IOHIDManagerOpen` — `IOKit/hid/IOHIDManager.h`
+- `IOHIDDeviceRegisterInputReportCallback` — `IOKit/hid/IOHIDDevice.h`
 
-**What is undocumented**: The IORegistry driver class name `AppleSPUHIDDriver` and the
-property keys `ReportInterval`, `SensorPropertyReportingState`, `SensorPropertyPowerState`.
+All of the above are declared in the public SDK headers shipped with Xcode.
+No `@_silgen_name`, no private framework imports, no obfuscated lookups.
 
-**Why**: `CMMotionManager` is `API_UNAVAILABLE(macos)`. There is no documented Apple API for
-reading the built-in accelerometer on macOS. This is the same approach used by all known
-macOS accelerometer utilities.
+**Undocumented behavior we depend on** (this is the review risk):
 
-**Graceful degradation**: If activation fails (return values checked), the app falls back to
-microphone-only detection. No crash, no error beyond a log message.
+- The IORegistry driver class name `AppleSPUHIDDriver` is an Apple-internal
+  driver bundled with macOS on Apple Silicon Macs. It is not surfaced as a
+  documented constant in any public SDK header.
+- The property keys we set on that driver — `ReportInterval`,
+  `SensorPropertyReportingState`, `SensorPropertyPowerState` — are
+  Apple-internal driver implementation details, also not documented.
+- The HID report layout we decode (Int32 axes at byte offsets 6/10/14) is
+  not documented public format; we read it via a public IOHIDManager callback.
 
-No `@_silgen_name` bindings. No `#if !APP_STORE` guards. One adapter, one build.
-Verified: works under App Sandbox with `device.usb` entitlement. 100Hz data on Apple Silicon.
+**Why this exists at all**: there is no public Apple API for reading the
+built-in accelerometer from a macOS app. `CMMotionManager` is
+`API_UNAVAILABLE(macos)`, and Apple has not provided a replacement. The
+IOKit + AppleSPUHIDDriver path is the only known way to access this sensor
+from a third-party macOS app.
+
+**What App Review 2.5.1 says** (paraphrased): apps must use only documented,
+public APIs. Public-symbol-but-undocumented-driver-surface is a gray area.
+A reviewer could reasonably interpret this as compliant (we use public
+functions) or non-compliant (we depend on undocumented driver behavior).
+We have not received an official Apple ruling on this specific pattern.
+
+**Graceful degradation**: if accelerometer activation fails for any reason
+— return values are checked — the app falls back to microphone and
+headphone-motion detection. No crash, no degraded UX, no missing features
+beyond the accelerometer input itself. The pipeline runs identically.
+
+**Mitigation**:
+
+- Honest, detailed review notes (see `APP_STORE_METADATA.md` → App Review Notes).
+- Explicit offer to remove the accelerometer code path entirely if Review prefers.
+- Two other sensor inputs (microphone, headphone motion) provide a complete
+  user experience without the accelerometer.
+- Public-only IOKit symbols means there is nothing to find with `nm -u` or
+  binary inspection that could be flagged as private API usage.
+
+**Outstanding work before submission**:
+
+- [ ] Reach out to App Review or DTS for guidance on this specific pattern.
+- [ ] Build a reviewer-ready test plan including the fallback path.
+- [ ] Decide whether to ship accelerometer in App Store build at all, or
+      restrict it to the Direct build only (current decision: ship in both,
+      accept review risk).
+
+This blocker is **not resolved by code**. The code is as good as it can be
+within the constraints. Resolution requires either Apple guidance or a
+publishing decision to remove the accelerometer path from the App Store build.
 
 #### Files
 - [x] `Sources/IOHIDPublic/include/IOHIDPublic.h` — C bridging header for public SDK headers

@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for cs.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/cs.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ tatínku~";
+"moan_tap_2" = "Ách~";
+"moan_tap_3" = "Škádlíš~";
+"moan_tap_4" = "Och~";
+"moan_light_1" = "Tatínku~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ách~ prosím~";
+"moan_light_4" = "Nech~";
+"moan_medium_1" = "Tatínku, ne~";
+"moan_medium_2" = "Tam ne~";
+"moan_medium_3" = "Och, tak zlý~";
+"moan_medium_4" = "Prosím, tatínku~";
+"moan_firm_1" = "Tati! Moc!";
+"moan_firm_2" = "Budu hodná!";
+"moan_firm_3" = "Smiluj se~ prosím~";
+"moan_firm_4" = "Jsi tak zlý!";
+"moan_hard_1" = "TATÍNKU!!";
+"moan_hard_2" = "ÁÁÁCH!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "BUDU HODNÁ!!";

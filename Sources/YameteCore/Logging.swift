@@ -84,7 +84,12 @@ public final class LogStore: Sendable {
     private let directory: URL
     private let maxAge: TimeInterval = 24 * 60 * 60
 
-    private struct State {
+    /// Mutable per-day rotation state. Always accessed under `state` lock,
+    /// so marking `@unchecked Sendable` is safe — the lock provides the
+    /// serialization the Sendable contract requires. The fields hold a
+    /// `FileHandle` (not Sendable) plus two formatters that are stable
+    /// after construction.
+    private struct State: @unchecked Sendable {
         var fileHandle: FileHandle?
         var currentDate = ""
         let dateFmt: DateFormatter = {

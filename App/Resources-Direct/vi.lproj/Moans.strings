@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for vi.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/vi.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Ư~ anh~";
+"moan_tap_2" = "Á~";
+"moan_tap_3" = "Anh trêu em~";
+"moan_tap_4" = "Ôi~";
+"moan_light_1" = "Anh ơi~";
+"moan_light_2" = "Hic~";
+"moan_light_3" = "Á~ em xin mà~";
+"moan_light_4" = "Đừng mà~";
+"moan_medium_1" = "Anh ơi, đừng~";
+"moan_medium_2" = "Không phải chỗ đó~";
+"moan_medium_3" = "Ôi, anh ác ghê~";
+"moan_medium_4" = "Em xin anh mà~";
+"moan_firm_1" = "Anh! Quá sức rồi!";
+"moan_firm_2" = "Em sẽ ngoan mà!";
+"moan_firm_3" = "Tha cho em~ đi mà~";
+"moan_firm_4" = "Anh ác quá à!";
+"moan_hard_1" = "ANH ƠIIII!!";
+"moan_hard_2" = "ÁAAAA!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "EM NGOAN MÀ!!";

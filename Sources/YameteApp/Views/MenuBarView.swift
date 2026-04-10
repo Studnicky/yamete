@@ -24,7 +24,7 @@ public struct MenuBarView: View {
         VStack(spacing: 0) {
             HeaderSection()
             Divider()
-            BasicSection()
+            ResponseSection()
             Divider()
             SensorSection(availableSensors: availableSensors)
             if settings.enabledSensorIDs.contains(SensorID.accelerometer.rawValue) {
@@ -45,8 +45,9 @@ public struct MenuBarView: View {
             if let error = controller.sensorError {
                 Divider()
                 Text(error)
-                    .font(.caption).foregroundStyle(.red)
-                    .padding(Theme.footerPadding)
+                    .font(.caption).foregroundStyle(Theme.mauve)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(Theme.sectionPadding)
             }
 
             Divider()
@@ -99,23 +100,31 @@ public struct MenuBarView: View {
 
 // MARK: - Shared formatters
 
+/// Closure-typed value formatters used by the slider labels. Marked
+/// `@Sendable` so they satisfy `-strict-concurrency=complete`. The closures
+/// only call `NSLocalizedString` and `String(format:)`, both of which are
+/// thread-safe.
 private enum Fmt {
-    static let percent: (Double) -> String = { String(format: NSLocalizedString("unit_percent", comment: "Percentage format"), Int($0 * 100)) }
-    static let gforce: (Double) -> String = { String(format: NSLocalizedString("unit_gforce", comment: "G-force format"), $0) }
-    static let multiplier: (Double) -> String = { String(format: NSLocalizedString("unit_multiplier", comment: "Multiplier format"), $0) }
-    static let seconds: (Double) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), $0) }
-    static let hz: (Double) -> String = { String(format: NSLocalizedString("unit_hz", comment: "Hertz format"), Int($0)) }
-    static let ms: (Double) -> String = { String(format: NSLocalizedString("unit_milliseconds", comment: "Milliseconds format"), $0 / 1000) }
-    static let amplitude: (Double) -> String = { String(format: "%.3f", $0) }
-    static let warmup: (Double) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), $0 / 50.0) }
-    static let warmupInt: (Int) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), Double($0) / 50.0) }
-    static let confirmations: (Int) -> String = { String(format: NSLocalizedString("confirmations_format", comment: "Confirmation hit count"), $0) }
-    static let consensus: (Int) -> String = { String(format: NSLocalizedString("consensus_format", comment: "Sensor consensus count"), $0) }
+    static let percent: @Sendable (Double) -> String = { String(format: NSLocalizedString("unit_percent", comment: "Percentage format"), Int($0 * 100)) }
+    static let gforce: @Sendable (Double) -> String = { String(format: NSLocalizedString("unit_gforce", comment: "G-force format"), $0) }
+    static let multiplier: @Sendable (Double) -> String = { String(format: NSLocalizedString("unit_multiplier", comment: "Multiplier format"), $0) }
+    static let seconds: @Sendable (Double) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), $0) }
+    static let hz: @Sendable (Double) -> String = { String(format: NSLocalizedString("unit_hz", comment: "Hertz format"), Int($0)) }
+    static let ms: @Sendable (Double) -> String = { String(format: NSLocalizedString("unit_milliseconds", comment: "Milliseconds format"), $0 / 1000) }
+    static let amplitude: @Sendable (Double) -> String = { String(format: "%.3f", $0) }
+    static let warmup: @Sendable (Double) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), $0 / 50.0) }
+    static let warmupInt: @Sendable (Int) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), Double($0) / 50.0) }
+    static let confirmations: @Sendable (Int) -> String = { String(format: NSLocalizedString("confirmations_format", comment: "Confirmation hit count"), $0) }
+    static let consensus: @Sendable (Int) -> String = { String(format: NSLocalizedString("consensus_format", comment: "Sensor consensus count"), $0) }
 }
 
 // MARK: - Generic toggle binding for array-backed selections
 
-private func arrayToggleBinding<T: Equatable>(
+/// Bridges a `Binding<[T]>` and an element value into a `Binding<Bool>` for
+/// switch-row use. `@MainActor` because all call sites are inside SwiftUI
+/// view bodies and the `Binding` get/set closures fire on the main actor.
+@MainActor
+private func arrayToggleBinding<T: Equatable & Sendable>(
     _ array: Binding<[T]>, element: T
 ) -> Binding<Bool> {
     Binding(
@@ -155,15 +164,16 @@ private struct HeaderSection: View {
     }
 }
 
-// MARK: - Basic (reactivity, volume, flash)
+// MARK: - Response (reactivity, sound, visual)
 
-private struct BasicSection: View {
+private struct ResponseSection: View {
     @Environment(SettingsStore.self) var settings
 
     public var body: some View {
         @Bindable var s = settings
 
         Group {
+            // Reactivity — impact force response window
             VStack(alignment: .leading, spacing: 6) {
                 SettingHeader(icon: "gauge.with.needle", title: NSLocalizedString("setting_reactivity", comment: "Reactivity setting title"),
                               help: NSLocalizedString("help_reactivity", comment: "Reactivity setting help text"))
@@ -174,6 +184,7 @@ private struct BasicSection: View {
             .padding(Theme.sectionPadding)
             Divider()
 
+            // Sound — audio playback toggle + volume range
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     SettingHeader(icon: "speaker.wave.2", title: NSLocalizedString("setting_volume", comment: "Volume setting title"),
@@ -190,21 +201,119 @@ private struct BasicSection: View {
             .padding(Theme.sectionPadding)
             Divider()
 
+            // Visual — three-way: off / overlay / notification
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    SettingHeader(icon: "sun.max", title: NSLocalizedString("setting_flash_opacity", comment: "Flash opacity setting title"),
-                                  help: NSLocalizedString("help_flash_opacity", comment: "Flash opacity setting help text"))
-                    Spacer()
-                    Toggle("", isOn: $s.screenFlash)
-                        .themeMiniSwitch()
+                SettingHeader(
+                    icon: s.visualResponseMode == .notification ? "bell.badge" : "sun.max",
+                    title: NSLocalizedString("setting_visual_response", comment: "Visual response setting title"),
+                    help: NSLocalizedString("help_visual_response", comment: "Visual response setting help text"))
+
+                SelectionList(
+                    items: [
+                        .init(title: NSLocalizedString("response_mode_off", comment: "Visual response off"),
+                              subtitle: nil, icon: "moon.zzz", id: VisualResponseMode.off),
+                        .init(title: NSLocalizedString("response_mode_overlay", comment: "Screen flash overlay"),
+                              subtitle: nil, icon: "sun.max", id: VisualResponseMode.overlay),
+                        .init(title: NSLocalizedString("response_mode_notification", comment: "System notification"),
+                              subtitle: nil, icon: "bell.badge", id: VisualResponseMode.notification),
+                    ],
+                    selection: $s.visualResponseMode)
+                .onChange(of: s.visualResponseMode) { _, mode in
+                    if mode == .notification { NotificationResponder.requestAuthorizationIfNeeded() }
                 }
-                if s.screenFlash {
-                    RangeSlider(low: $s.flashOpacityMin, high: $s.flashOpacityMax,
-                                bounds: Detection.unitRange, labelWidth: tuningLabelWidth, format: Fmt.percent)
+
+                if s.visualResponseMode == .overlay {
+                    VStack(alignment: .leading, spacing: 4) {
+                        SettingHeader(
+                            icon: "circle.lefthalf.filled",
+                            title: NSLocalizedString("setting_flash_opacity", comment: "Flash opacity slider label"),
+                            help: NSLocalizedString("help_flash_opacity", comment: "Flash opacity slider help"))
+                        RangeSlider(low: $s.flashOpacityMin, high: $s.flashOpacityMax,
+                                    bounds: Detection.unitRange, labelWidth: tuningLabelWidth, format: Fmt.percent)
+                    }
+                    .padding(.top, 4)
+                }
+
+                if s.visualResponseMode == .notification {
+                    VStack(alignment: .leading, spacing: 4) {
+                        SettingHeader(
+                            icon: "globe",
+                            title: NSLocalizedString("setting_notification_locale", comment: "Notification language picker label"),
+                            help: NSLocalizedString("help_notification_locale", comment: "Notification language picker help"))
+                        NotificationLocalePicker(selection: $s.notificationLocale)
+                    }
+                    .padding(.top, 4)
                 }
             }
             .padding(Theme.sectionPadding)
         }
+    }
+}
+
+// MARK: - Notification locale picker
+
+/// Themed dropdown for selecting which lproj bundle the notification body
+/// strings are loaded from. Lists every locale present in the app bundle,
+/// resolved to its native display name (e.g. "Français", "日本語").
+private struct NotificationLocalePicker: View {
+    @Binding var selection: String
+
+    private static let options: [(id: String, name: String)] = {
+        // Bundle.main.localizations may include "Base"; filter it out.
+        let ids = Bundle.main.localizations.filter { $0 != "Base" }
+        let formatter = Locale(identifier: "en_US_POSIX")
+        let options = ids.map { id -> (String, String) in
+            let display = Locale(identifier: id).localizedString(forIdentifier: id)
+                ?? formatter.localizedString(forIdentifier: id)
+                ?? id
+            return (id, display.capitalized(with: Locale(identifier: id)))
+        }
+        return options.sorted { $0.1.localizedCaseInsensitiveCompare($1.1) == .orderedAscending }
+    }()
+
+    var body: some View {
+        Menu {
+            ForEach(Self.options, id: \.id) { option in
+                Button {
+                    selection = option.id
+                } label: {
+                    HStack {
+                        Text(option.name)
+                        if option.id == effectiveSelection {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(displayName(for: effectiveSelection))
+                    .font(.caption)
+                    .foregroundStyle(Theme.pink)
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Theme.mauve)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Theme.listBackground)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.listCornerRadius))
+        }
+        .buttonStyle(.plain)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+    }
+
+    /// If `selection` is empty (sentinel for "follow system"), resolve to the
+    /// best-matching available locale so the picker shows that as selected.
+    private var effectiveSelection: String {
+        if !selection.isEmpty { return selection }
+        return Bundle.main.preferredLocalizations.first ?? "en"
+    }
+
+    private func displayName(for id: String) -> String {
+        Self.options.first(where: { $0.id == id })?.name ?? id
     }
 }
 
@@ -334,6 +443,9 @@ private struct SettingRow<Content: View>: View {
 // MARK: - Shared detection gate parameters (crest factor, confirmations, warmup)
 
 // Shared setting row builders for parameters common to all sensors.
+// `@MainActor` because the wrapped SettingRow / SingleSlider initializers
+// are SwiftUI views constructed inside a view body — always main-actor.
+@MainActor
 private enum GateRows {
     @ViewBuilder static func confirmations(_ binding: Binding<Int>, bounds: ClosedRange<Int>, lw: CGFloat) -> some View {
         SettingRow(icon: "checkmark.circle",
@@ -529,6 +641,60 @@ private struct DeviceToggleList<ID: Hashable>: View {
     }
 }
 
+private struct SelectionList<ID: Hashable>: View {
+    struct Item {
+        let title: String
+        let subtitle: String?
+        let icon: String
+        let id: ID
+    }
+
+    let items: [Item]
+    @Binding var selection: ID
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.offset) { i, item in
+                Button(action: { selection = item.id }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: item.icon)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(selection == item.id ? Theme.pink : Theme.mauve)
+                            .frame(width: 14)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.title)
+                                .font(.caption)
+                                .foregroundStyle(selection == item.id ? .primary : .primary)
+                            if let subtitle = item.subtitle {
+                                Text(subtitle)
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+
+                        Spacer()
+
+                        Image(systemName: selection == item.id ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 12))
+                            .foregroundStyle(selection == item.id ? Theme.pink : Color.secondary.opacity(0.5))
+                    }
+                    .padding(Theme.toggleRowPadding)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if i < items.count - 1 {
+                    Divider().padding(.leading, Theme.listDividerInset)
+                }
+            }
+        }
+        .background(Theme.listBackground)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.listCornerRadius))
+    }
+}
+
 // MARK: - Devices (collapsible)
 
 private struct DeviceSection: View {
@@ -609,8 +775,7 @@ private struct FooterSection: View {
                 Text(NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label"))
                 Spacer()
                 Toggle("", isOn: $launchAtLogin)
-                    .toggleStyle(.switch).tint(Theme.pink)
-                    .labelsHidden().controlSize(.mini)
+                    .themeMiniSwitch()
                     .onChange(of: launchAtLogin) { _, on in
                         do {
                             if on { try SMAppService.mainApp.register() }
@@ -628,8 +793,7 @@ private struct FooterSection: View {
                     Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label"))
                     Spacer()
                     Toggle("", isOn: $s.debugLogging)
-                        .toggleStyle(.switch).tint(Theme.pink)
-                        .labelsHidden().controlSize(.mini)
+                        .themeMiniSwitch()
                 }
                 .font(.caption)
                 .padding(Theme.footerPadding)

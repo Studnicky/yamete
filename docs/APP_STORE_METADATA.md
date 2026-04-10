@@ -10,8 +10,15 @@
 - **Secondary Category**: Utilities
 - **Price**: Tier 3 ($2.99 USD)
 - **Availability**: All territories
-- **Age Rating**: 4+
+- **Age Rating**: 12+ (see Content Rating section below)
 - **Copyright**: 2026 Studnicky
+
+> **Build distinction**: this metadata applies to the App Store build only.
+> Two builds exist: the **App Store build** (rated 12+, ships with the tame
+> `App/Resources/.../Moans.strings`) and a separate **Direct build** (notarized
+> direct download, ships with the spicy `App/Resources-Direct/.../Moans.strings`
+> overlay added by the `Direct` Makefile target). The Direct build is **not**
+> submitted to the App Store.
 
 ## Description
 
@@ -36,8 +43,14 @@ DETECTION
 - Adjustable cooldown between reactions
 
 RESPONSE
-- Sound clips selected by impact intensity
-- Per-monitor screen flash with animated face overlays
+- Sound clips selected by impact intensity (audio always-on when enabled)
+- Always-on menu bar face icon reaction on every detected impact
+- Flash Mode (off / overlay / notification) for the visual response
+  - **Overlay**: per-monitor screen flash with animated face
+  - **Notification**: posts an impact banner with a tier-appropriate
+    flirty playful one-liner; entry is removed from Notification Center
+    after the cooldown
+- Selectable notification language (independent of system language)
 - Reactivity, volume, and flash opacity range controls
 - Multi-device audio output selection
 
@@ -92,19 +105,43 @@ Screenshot ideas:
 ```
 What the app does:
   Yamete detects physical impacts (desk slaps, taps) on Apple Silicon MacBooks
-  using the built-in accelerometer and microphone. It responds with audio clips
-  and animated screen flash overlays. It runs as a menu bar app.
+  using the built-in accelerometer, microphone, and headphone motion. It
+  responds with audio clips and an optional visual response (full-screen
+  overlay or notification banner). It runs as a menu bar (LSUIElement) app
+  with no Dock icon and no app windows.
 
-Why USB entitlement is needed:
-  The com.apple.security.device.usb entitlement enables IOHIDManager access
-  to read the built-in BMI286 accelerometer. Sensor activation uses
-  IORegistryEntrySetCFProperty (public IOKit function declared in
-  IOKit/IOKitLib.h) to set driver properties on AppleSPUHIDDriver services.
-  Report reading uses IOHIDManager with IOHIDDeviceRegisterInputReportCallback
-  (public IOKit HID API). No private API symbols are imported into the binary.
-  Note: there is no public Apple API for macOS accelerometer access
-  (CMMotionManager is API_UNAVAILABLE(macos)). If accelerometer activation
-  fails, the app degrades gracefully to microphone-only detection.
+Accelerometer implementation note (please read carefully):
+  This app reads the built-in BMI286 accelerometer using the public IOKit
+  framework. The imported symbols are all publicly declared in the SDK
+  headers shipped with Xcode:
+    - IOServiceGetMatchingServices (IOKit/IOKitLib.h)
+    - IORegistryEntrySetCFProperty (IOKit/IOKitLib.h)
+    - IOHIDManagerCreate (IOKit/hid/IOHIDManager.h)
+    - IOHIDDeviceRegisterInputReportCallback (IOKit/hid/IOHIDDevice.h)
+  No private API symbols are imported. The com.apple.security.device.usb
+  entitlement is the documented entitlement for IOHIDManager access.
+
+  The activation step uses these public IOKit functions to set driver
+  properties on `AppleSPUHIDDriver` services. The driver class name and
+  the property keys (`ReportInterval`, `SensorPropertyReportingState`,
+  `SensorPropertyPowerState`) are not surfaced in the public SDK headers
+  as documented constants — they are Apple-internal implementation details
+  of the SPU HID driver. We are using public IOKit APIs to talk to an
+  undocumented driver surface; we are not using private APIs.
+
+  Why this matters: there is no public Apple API for macOS accelerometer
+  access. `CMMotionManager` is `API_UNAVAILABLE(macos)`, and no replacement
+  has been provided. The IOKit + AppleSPUHIDDriver path is the only way
+  to read the built-in accelerometer from a third-party macOS app. If you
+  prefer that we remove this code path entirely from the App Store build,
+  we are happy to do so — accelerometer detection is one of three sensor
+  inputs and the app continues to function with microphone and headphone
+  motion only.
+
+  Graceful degradation: if accelerometer activation fails for any reason
+  (sandbox restriction, driver unavailable, OS version mismatch), the app
+  continues to detect impacts via the microphone and headphone motion
+  sensors. There is no error state and no degraded user experience.
 
 Why microphone access is needed:
   The microphone detects impact sounds (desk taps, slaps) as a complementary
@@ -130,19 +167,39 @@ Testing note:
   the Mac's built-in microphone.
 ```
 
-## Content Rating Questionnaire
+## Content Rating Questionnaire (App Store build)
 
 | Question | Answer |
 |----------|--------|
 | Violence | None |
-| Sexual Content | None |
-| Profanity | None |
+| Sexual Content or Nudity | None |
+| Profanity or Crude Humor | None |
 | Drugs/Alcohol/Tobacco | None |
 | Gambling | None |
 | Horror/Fear | None |
 | Medical/Treatment | None |
-| Mature/Suggestive Themes | None |
+| Mature/Suggestive Themes | Infrequent/Mild |
 | Unrestricted Web Access | No |
 | Contests | None |
 
-**Result**: 4+ (Ages 4 and Up)
+**Result**: 12+ (Ages 12 and Up)
+
+### Rationale for Mature/Suggestive Themes = Infrequent/Mild
+
+The App Store build ships with the tame `Moans.strings` pool only. Notification
+copy is flirty/playful but not sexual ("Mm, again?", "Show off~", "Whoa!",
+"OUCH"). The app concept (a name derived from the Japanese word for "stop"
+and a notification voice that reacts to laptop impacts in a flirty register)
+warrants the Infrequent/Mild Mature/Suggestive Themes descriptor and the
+12+ rating, even though no explicit content is present.
+
+The Direct build (notarized download, NOT submitted to the App Store) ships
+with the spicy `App/Resources-Direct/.../Moans.strings` overlay containing
+DDLG-register sub vocabulary. That build is rated separately and is not the
+subject of this App Store submission.
+
+### Build content guarantee
+
+The App Store build's bundle MUST NOT contain the spicy moans. Verification
+gate: any `Moans.strings` shipped in the App Store build that contains the
+substring "daddy" in any locale should fail bundle lint.

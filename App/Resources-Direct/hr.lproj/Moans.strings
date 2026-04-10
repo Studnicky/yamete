@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for hr.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/hr.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ tatice~";
+"moan_tap_2" = "Ah~";
+"moan_tap_3" = "Zadirkuješ~";
+"moan_tap_4" = "Oh~";
+"moan_light_1" = "Tatice~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ah~ molim te~";
+"moan_light_4" = "Nemoj~";
+"moan_medium_1" = "Tatice, ne~";
+"moan_medium_2" = "Ne tamo~";
+"moan_medium_3" = "Oh, tako zločest~";
+"moan_medium_4" = "Molim te, tatice~";
+"moan_firm_1" = "Tata! Previše!";
+"moan_firm_2" = "Bit ću dobra!";
+"moan_firm_3" = "Milost~ molim~";
+"moan_firm_4" = "Tako si zločest!";
+"moan_hard_1" = "TATICE!!";
+"moan_hard_2" = "AAAH!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "BIT ĆU DOBRA!!";
