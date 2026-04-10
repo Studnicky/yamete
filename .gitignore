@@ -6,8 +6,22 @@ dist/
 *.swp
 *~
 
-# Claude Code sessions
+# Claude Code sessions + per-project instructions (local only)
 .claude/
+CLAUDE.md
+CLAUDE.local.md
+
+# Dev / scratch / temp docs (local only, never committed)
+*.scratch.md
+*.scratch
+*.tmp.md
+*.tmp
+*.dev.md
+.scratch/
+.plans/
+.dev/
+scratch/
+plans/
 
 # Xcode / SwiftPM IDE state
 *.xcodeproj/
