@@ -3,20 +3,20 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.studnicky.yamete.accel-warmup</string>
+    <string>com.studnicky.yamete.sensor-kickstart</string>
 
     <!--
-        Long-lived daemon mode. The helper runs `warmup()` once on startup
-        and then subscribes to IOKit system power notifications via
-        `IORegisterForSystemPower`, re-warming the accelerometer on every
-        `kIOMessageSystemHasPoweredOn` event so the sensor stays hot across
-        sleep / wake cycles even on hardware or macOS revisions where the
-        driver cools the sensor during sleep. Idle CPU cost: ~0 (it is
-        parked in `CFRunLoopRun`).
+        Long-lived daemon mode. The helper runs `kickstart()` once on
+        startup and then subscribes to IOKit system power notifications
+        via `IORegisterForSystemPower`, re-running the kickstart on every
+        `kIOMessageSystemHasPoweredOn` event so the sensor stays active
+        across sleep / wake cycles even on hardware or macOS revisions
+        where the driver cools the sensor during sleep. Idle CPU cost: ~0
+        (it is parked in `CFRunLoopRun`).
     -->
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/libexec/yamete-accel-warmup</string>
+        <string>/usr/local/libexec/yamete-sensor-kickstart</string>
         <string>daemon</string>
     </array>
 
@@ -45,9 +45,9 @@
     <string>Background</string>
 
     <key>StandardOutPath</key>
-    <string>/var/log/yamete-accel-warmup.log</string>
+    <string>/var/log/yamete-sensor-kickstart.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/var/log/yamete-accel-warmup.log</string>
+    <string>/var/log/yamete-sensor-kickstart.log</string>
 </dict>
 </plist>
