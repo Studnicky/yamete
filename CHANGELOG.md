@@ -69,19 +69,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   true and `adapters=["Accelerometer", ...]` logs alongside `sampleCount=`
   entries at sustained 100Hz.
 
+  **Sleep/wake verified (2026-04-10)**: The BMI286 is in Apple
+  Silicon's always-on power domain. Verified empirically that once
+  warmed, the sensor continues streaming at 100Hz across sleep/wake
+  cycles without interruption — a 35-second sleep period advanced
+  `_num_events` from 101 to 3615 (100.4 events/sec, exactly the
+  awake rate), meaning the driver was emitting reports the entire
+  time the lid was closed. The `RunAtLoad`-only LaunchDaemon plist
+  is therefore sufficient: the helper runs once per boot and the
+  warmth carries through every subsequent sleep/wake until the next
+  reboot. No wake watcher needed.
+
   **Still to verify on other Mac models and macOS revisions**:
   1. **Multiple Apple Silicon models.** All testing so far is on a
      single development MacBook. Should be re-verified on M1 / M2 /
      M3 / M4 across MacBook Air / MacBook Pro before submission to
      confirm `AppleSPUHIDDriver` / `dispatchAccel` / `DebugState` are
      present and behave identically on each generation.
-  2. **Sleep / wake recovery with the helper installed.** Open question
-     whether the helper's warmth survives a sleep/wake cycle or if the
-     kernel cools the sensor across sleep, requiring the helper to
-     re-run. If so, the helper plist may need `KeepAlive` or a
-     `com.apple.sleep.wake` notification watcher rather than just
-     `RunAtLoad`.
-  3. **macOS revisions.** `IORegistryEntrySetCFProperty` on
+  2. **macOS revisions.** `IORegistryEntrySetCFProperty` on
      `AppleSPUHIDDriver` with these specific property keys is an
      undocumented Apple-internal surface. A future macOS update could
      break it. Re-test before every App Store submission, and monitor

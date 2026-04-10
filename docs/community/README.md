@@ -125,10 +125,16 @@ sensor availability is probed when the dropdown opens. Also make sure
 you toggled the Accelerometer row on — the helper warms the hardware
 but doesn't change Yamete's settings.
 
-**The sensor goes cold after sleep/wake**  
-Open question. If you observe this, please file an issue at
-<https://github.com/Studnicky/yamete/issues>. A future version of the
-helper plist may need to re-warm on wake via a watcher.
+**Does the sensor survive sleep/wake?**  
+Yes. Verified on Apple Silicon: the BMI286 is in the always-on power
+domain, so once warmed it streams continuously at 100Hz across lid
+close / open cycles without interruption. The `RunAtLoad`-only
+LaunchDaemon runs the helper once per boot and that single warm-up
+carries the sensor through every subsequent sleep/wake until the next
+reboot. If you observe any deviation (the sensor going cold after
+sleep on a specific Mac model or macOS revision), please file an
+issue at <https://github.com/Studnicky/yamete/issues> — we will add a
+wake watcher to the plist if a counter-example turns up.
 
 ## License
 
