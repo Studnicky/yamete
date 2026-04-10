@@ -18,21 +18,26 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Run tests
-        run: swift test
-
-      - name: Update Info.plist version
+      - name: Verify tag version matches project.yml
         run: |
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" Bundle/Contents/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Bundle/Contents/Info.plist
+          PROJECT_VERSION=$(sed -n 's/^[[:space:]]*MARKETING_VERSION: "\([^"]*\)"/\1/p' project.yml | head -n 1)
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          if [[ "$PROJECT_VERSION" != "$TAG_VERSION" ]]; then
+            echo "::error::project.yml MARKETING_VERSION ($PROJECT_VERSION) does not match tag version ($TAG_VERSION)"
+            exit 1
+          fi
+          echo "version check passed: $TAG_VERSION"
 
-      - name: Build DMG
+      - name: Run tests
+        run: make test
+
+      - name: Build DMG (Direct variant)
         run: make dmg
 
       - name: Compute SHA256 of DMG
         id: checksum
         run: |
-          SHA256=$(shasum -a 256 dist/Yamete.dmg | awk '{print $1}')
+          SHA256=$(shasum -a 256 "dist/Yamete Direct.dmg" | awk '{print $1}')
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "SHA256: $SHA256"
 
@@ -50,5 +55,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body_path: /tmp/release_notes.md
-          files: dist/Yamete.dmg
+          files: dist/Yamete Direct.dmg
           generate_release_notes: false
