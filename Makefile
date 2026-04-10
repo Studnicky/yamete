@@ -13,14 +13,38 @@
 #   4. sign       codesign with entitlements + hardened runtime
 #   5. verify     validate structure, signature, asset counts
 
+# ── Build variant selection ───────────────────────────────────
+# BUILD_VARIANT controls which app gets built:
+#   direct   → Yamete Direct.app (notarized direct download, spicy content)
+#   appstore → Yamete.app        (Mac App Store, tame content only)
+# Default is direct so existing `make`, `make install`, `make build` keep
+# their previous behavior. Use `make appstore` or `make appstore-install`
+# (or `BUILD_VARIANT=appstore make build`) for the App Store variant.
+BUILD_VARIANT ?= direct
+
+ifeq ($(BUILD_VARIANT),appstore)
+APP        := Yamete
+EXECUTABLE := yamete
+BUNDLE_ID  := com.studnicky.yamete
+ENTITLE    := App/Config/AppStore.entitlements
+VARIANT_FLAGS :=
+APPLY_DIRECT_OVERLAY := 0
+else ifeq ($(BUILD_VARIANT),direct)
 APP        := Yamete Direct
 EXECUTABLE := yamete-direct
 BUNDLE_ID  := com.studnicky.yamete.direct
+ENTITLE    := App/Config/Direct.entitlements
+VARIANT_FLAGS := -D DIRECT_BUILD
+APPLY_DIRECT_OVERLAY := 1
+else
+$(error BUILD_VARIANT must be 'direct' or 'appstore', got '$(BUILD_VARIANT)')
+endif
+
 DEVELOPMENT_LANGUAGE := en
 MARKETING_VERSION := $(shell sed -n 's/^[[:space:]]*MARKETING_VERSION: "\([^"]*\)"/\1/p' project.yml | head -n 1)
 CURRENT_PROJECT_VERSION := $(shell sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION: "\([^"]*\)"/\1/p' project.yml | head -n 1)
 DIST      := dist
-BUILD     := .build-stage
+BUILD     := .build-stage/$(BUILD_VARIANT)
 TARGET    := $(DIST)/$(APP).app
 BINARY    := $(TARGET)/Contents/MacOS/$(EXECUTABLE)
 RES_DIR   := $(TARGET)/Contents/Resources
@@ -40,14 +64,14 @@ BUNDLE_RESOURCES := $(shell find $(RESOURCE_SRC) $(RESOURCE_DIRECT) -type f 2>/d
 
 FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio CoreMotion ServiceManagement
 SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as-library \
-              -D DIRECT_BUILD \
+              $(VARIANT_FLAGS) \
               $(addprefix -framework ,$(FRAMEWORKS)) \
               -I Sources/IOHIDPublic/include
 
-ENTITLE   := $(CONFIG_DIR)/Direct.entitlements
 SIGNING_ID ?= -
 
-.PHONY: all build test install uninstall clean dmg lint verify release notarize appstore-lint
+.PHONY: all build test install uninstall clean dmg lint verify release notarize \
+        appstore appstore-install appstore-lint
 
 all: build
 
@@ -62,15 +86,20 @@ $(BUILD)/.minified: $(BUILD_BINARY) $(BUNDLE_RESOURCES)
 	@printf "  strip     symbols\n"
 	@strip -x "$(BUILD_BINARY)" -o "$(BUILD_BINARY).stripped"
 	@mv "$(BUILD_BINARY).stripped" "$(BUILD_BINARY)"
-	@# Stage resources: tame base + direct overlay (Direct build only).
+	@# Stage resources: tame base, then direct overlay if applicable.
 	@# The overlay replaces tame Moans.strings with spicy DDLG content.
+	@# It is gated on BUILD_VARIANT — App Store build NEVER copies the overlay.
 	@rm -rf "$(BUILD)/resources"
 	@mkdir -p "$(BUILD)/resources"
 	@rsync -a --exclude '*.xcassets' "$(RESOURCE_SRC)/" "$(BUILD)/resources/"
+ifeq ($(APPLY_DIRECT_OVERLAY),1)
 	@if [ -d "$(RESOURCE_DIRECT)" ]; then \
 		printf "  overlay   $(RESOURCE_DIRECT)\n"; \
 		rsync -a "$(RESOURCE_DIRECT)/" "$(BUILD)/resources/"; \
 	fi
+else
+	@printf "  variant   $(BUILD_VARIANT) (no overlay)\n"
+endif
 	@# SVG minification (if svgo installed)
 	@which svgo > /dev/null 2>&1 && { \
 		printf "  minify    SVGs\n"; \
@@ -108,14 +137,26 @@ lint:
 	@printf "  lint      strict concurrency\n"
 	@swiftc -typecheck $(SWIFTFLAGS) -strict-concurrency=complete -warnings-as-errors $(SOURCES)
 
+# ── App Store build convenience targets ──────────────────────
+# These wrappers force BUILD_VARIANT=appstore so the right resources,
+# bundle ID, executable name, and entitlements are used. The default
+# `make build` / `make install` keep building Direct.
+
+appstore:
+	@$(MAKE) build BUILD_VARIANT=appstore
+
+appstore-install:
+	@$(MAKE) install BUILD_VARIANT=appstore
+
 # Bundle-lint gate for App Store builds. Fails if any spicy content leaked
-# into a Moans.strings file in the bundle. Run this against an App Store
-# build (no Direct overlay) to verify the dual-build separation is intact.
-# Currently scans for the substring "daddy" in any locale's Moans.strings.
-appstore-lint: build
+# into a Moans.strings file in the bundle. Re-runs the bundle build under
+# BUILD_VARIANT=appstore so the lint always reflects the App Store layout
+# regardless of which variant was last built.
+appstore-lint:
+	@$(MAKE) build BUILD_VARIANT=appstore
 	@printf "  appstore  lint Moans.strings for spicy leakage\n"
 	@FOUND=0; \
-	for f in "$(RES_DIR)"/*.lproj/Moans.strings; do \
+	for f in "$(DIST)/Yamete.app/Contents/Resources"/*.lproj/Moans.strings; do \
 		if [ -f "$$f" ] && plutil -p "$$f" 2>/dev/null | grep -qi 'daddy'; then \
 			printf "  FAIL      $$f contains 'daddy'\n"; \
 			FOUND=1; \

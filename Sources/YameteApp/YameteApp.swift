@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppWindow.configureAsMenuBarApp()
         Migration.applyDeviceDefaults(settings: settings, adapters: controller.allAdapters)
+        Migration.reconcileSensors(settings: settings, adapters: controller.allAdapters)
         Onboarding.promptMicrophoneIfNeeded(settings: settings)
         controller.bootstrap()
         Onboarding.playWelcomeSoundIfFirstLaunch(controller: controller)
@@ -115,5 +116,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         d.set(1, forKey: versionKey)
+    }
+
+    /// Runs on every launch (not just first install). Removes any sensor IDs
+    /// from `enabledSensorIDs` whose adapter currently reports unavailable.
+    /// If pruning leaves the user with no enabled sensors at all, falls back
+    /// to enabling every currently-available adapter so the pipeline still
+    /// works. This handles two real cases:
+    ///   1. App Store build where the accelerometer is permanently
+    ///      unavailable (sandbox blocks IORegistry writes) but the user's
+    ///      persisted settings list it as enabled.
+    ///   2. Headphone motion adapter that becomes unavailable when AirPods
+    ///      disconnect (re-runs whenever the menu refreshes).
+    static func reconcileSensors(settings: SettingsStore, adapters: [any SensorAdapter]) {
+        let availableIDs = Set(adapters.filter { $0.isAvailable }.map { $0.id.rawValue })
+        let currentEnabled = Set(settings.enabledSensorIDs)
+        let stillEnabled = currentEnabled.intersection(availableIDs)
+
+        if stillEnabled.isEmpty && !availableIDs.isEmpty {
+            // No previously enabled sensors are available — fall back to all
+            // currently-available adapters so the pipeline still detects
+            // impacts. Without this the user sees a working app with no
+            // active inputs.
+            settings.enabledSensorIDs = Array(availableIDs).sorted()
+        } else if stillEnabled.count != currentEnabled.count {
+            // Prune unavailable IDs but keep the rest.
+            settings.enabledSensorIDs = Array(stillEnabled).sorted()
+        }
     }
 }
