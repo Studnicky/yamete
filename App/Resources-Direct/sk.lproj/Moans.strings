@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for sk.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/sk.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ ocko~";
+"moan_tap_2" = "Ách~";
+"moan_tap_3" = "Doberáš~";
+"moan_tap_4" = "Och~";
+"moan_light_1" = "Ocko~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ách~ prosím~";
+"moan_light_4" = "Nie~";
+"moan_medium_1" = "Ocko, nie~";
+"moan_medium_2" = "Tam nie~";
+"moan_medium_3" = "Och, taký zlý~";
+"moan_medium_4" = "Prosím, ocko~";
+"moan_firm_1" = "Ocko! Priveľa!";
+"moan_firm_2" = "Budem dobrá!";
+"moan_firm_3" = "Zľutuj sa~ prosím~";
+"moan_firm_4" = "Si taký zlý!";
+"moan_hard_1" = "OCKO!!";
+"moan_hard_2" = "ÁÁÁCH!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "BUDEM DOBRÁ!!";

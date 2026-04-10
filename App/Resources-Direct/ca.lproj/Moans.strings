@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for ca.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/ca.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ papi~";
+"moan_tap_2" = "Ahn~";
+"moan_tap_3" = "Murri~";
+"moan_tap_4" = "Ai~";
+"moan_light_1" = "Papi~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ahn~ si us plau~";
+"moan_light_4" = "No~";
+"moan_medium_1" = "¡Papi, no~!";
+"moan_medium_2" = "¡Aquí no~!";
+"moan_medium_3" = "Ai, que dolent~";
+"moan_medium_4" = "Si us plau, papi~";
+"moan_firm_1" = "¡Papi! ¡És massa!";
+"moan_firm_2" = "¡Seré bona!";
+"moan_firm_3" = "¡Pietat~ si us plau~!";
+"moan_firm_4" = "¡Ets molt dolent!";
+"moan_hard_1" = "¡¡PAPI!!";
+"moan_hard_2" = "¡¡AHHHN!!";
+"moan_hard_3" = "¡¡YAMETEEE!!";
+"moan_hard_4" = "¡¡SERÉ BONA!!";

@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for zh_HK.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/zh_HK.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "嗯~爸爸~";
+"moan_tap_2" = "啊嗯~";
+"moan_tap_3" = "唔好啦~";
+"moan_tap_4" = "哼嗯~";
+"moan_light_1" = "爸爸~";
+"moan_light_2" = "嗯嗚~";
+"moan_light_3" = "啊嗯~求你啦~";
+"moan_light_4" = "唔好嘛~";
+"moan_medium_1" = "爸爸，唔好~";
+"moan_medium_2" = "嗰度唔得~";
+"moan_medium_3" = "你好壞~";
+"moan_medium_4" = "求你啦，爸爸~";
+"moan_firm_1" = "爸爸！人家頂唔順啦！";
+"moan_firm_2" = "人家會乖嘅！";
+"moan_firm_3" = "放過人家啦~求你啦~";
+"moan_firm_4" = "爸爸真係好過份！";
+"moan_hard_1" = "爸爸！！";
+"moan_hard_2" = "啊嗯嗯！！";
+"moan_hard_3" = "雅蠛蝶！！";
+"moan_hard_4" = "人家會乖嘅啦！！";

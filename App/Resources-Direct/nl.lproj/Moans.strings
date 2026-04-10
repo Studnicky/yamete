@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for nl.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/nl.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ papi~";
+"moan_tap_2" = "Ohh~";
+"moan_tap_3" = "Je plaagt me~";
+"moan_tap_4" = "Hnnn~";
+"moan_light_1" = "Papi~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ohh~ alsjeblieft~";
+"moan_light_4" = "Niet doen~";
+"moan_medium_1" = "Papi, nee~";
+"moan_medium_2" = "Niet daar~";
+"moan_medium_3" = "Je bent zo stout~";
+"moan_medium_4" = "Alsjeblieft, papi~";
+"moan_firm_1" = "Papi! Te veel!";
+"moan_firm_2" = "Ik zal lief zijn!";
+"moan_firm_3" = "Genade~ alsjeblieft~";
+"moan_firm_4" = "Je bent zo gemeen!";
+"moan_hard_1" = "PAPI!!";
+"moan_hard_2" = "AHHHN!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "IK ZAL LIEF ZIJN!!";

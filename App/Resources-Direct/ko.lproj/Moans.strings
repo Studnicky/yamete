@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for ko.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/ko.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "응~ 오빠~";
+"moan_tap_2" = "아앙~";
+"moan_tap_3" = "치이~";
+"moan_tap_4" = "앙~";
+"moan_light_1" = "오빠아~";
+"moan_light_2" = "응으응~";
+"moan_light_3" = "아앙~ 제발~";
+"moan_light_4" = "하지 마아~";
+"moan_medium_1" = "오빠, 안 돼~";
+"moan_medium_2" = "거긴 안 돼~";
+"moan_medium_3" = "너무해애~";
+"moan_medium_4" = "제발, 오빠아~";
+"moan_firm_1" = "오빠! 너무해!";
+"moan_firm_2" = "착하게 할게!";
+"moan_firm_3" = "용서해줘어~ 제발~";
+"moan_firm_4" = "오빠 진짜 너무해!";
+"moan_hard_1" = "오빠아아!!";
+"moan_hard_2" = "아하앙!!";
+"moan_hard_3" = "야메떼!!";
+"moan_hard_4" = "착하게 할게에!!";
