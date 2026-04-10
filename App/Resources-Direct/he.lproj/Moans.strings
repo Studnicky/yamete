@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for he.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/he.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "מממ~ אבא~";
+"moan_tap_2" = "אה~";
+"moan_tap_3" = "מקניט~";
+"moan_tap_4" = "אוי~";
+"moan_light_1" = "דדי~";
+"moan_light_2" = "נּגה~";
+"moan_light_3" = "אה~ בבקשה~";
+"moan_light_4" = "אל~";
+"moan_medium_1" = "אבא, לא~";
+"moan_medium_2" = "לא שם~";
+"moan_medium_3" = "אוי, כזה רשע~";
+"moan_medium_4" = "בבקשה, אבא~";
+"moan_firm_1" = "אבא! יותר מדי!";
+"moan_firm_2" = "אני אהיה טובה!";
+"moan_firm_3" = "רחמים~ בבקשה~";
+"moan_firm_4" = "אתה כזה רשע!";
+"moan_hard_1" = "אבאאא!!";
+"moan_hard_2" = "אההההה!!";
+"moan_hard_3" = "יאמטה!!";
+"moan_hard_4" = "אהיה טובה!!";

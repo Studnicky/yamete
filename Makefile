@@ -26,14 +26,17 @@ BINARY    := $(TARGET)/Contents/MacOS/$(EXECUTABLE)
 RES_DIR   := $(TARGET)/Contents/Resources
 BUILD_BINARY := $(BUILD)/$(EXECUTABLE)
 
-APP_LAYOUT   := App
-CONFIG_DIR   := $(APP_LAYOUT)/Config
-RESOURCE_SRC := $(APP_LAYOUT)/Resources
-INFO_PLIST   := $(CONFIG_DIR)/Info.plist
-PKGINFO      := $(CONFIG_DIR)/PkgInfo
+APP_LAYOUT      := App
+CONFIG_DIR      := $(APP_LAYOUT)/Config
+RESOURCE_SRC    := $(APP_LAYOUT)/Resources
+# Direct-only resources (spicy DDLG Moans.strings overrides). Copied on top
+# of $(RESOURCE_SRC) at bundle time for the Direct build, NEVER for App Store.
+RESOURCE_DIRECT := $(APP_LAYOUT)/Resources-Direct
+INFO_PLIST      := $(CONFIG_DIR)/Info.plist
+PKGINFO         := $(CONFIG_DIR)/PkgInfo
 
 SOURCES := $(shell find Sources -name '*.swift' | sort)
-BUNDLE_RESOURCES := $(shell find $(RESOURCE_SRC) -type f 2>/dev/null)
+BUNDLE_RESOURCES := $(shell find $(RESOURCE_SRC) $(RESOURCE_DIRECT) -type f 2>/dev/null)
 
 FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio CoreMotion ServiceManagement
 SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as-library \
@@ -44,7 +47,7 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 ENTITLE   := $(CONFIG_DIR)/Direct.entitlements
 SIGNING_ID ?= -
 
-.PHONY: all build test install uninstall clean dmg lint verify release notarize
+.PHONY: all build test install uninstall clean dmg lint verify release notarize appstore-lint
 
 all: build
 
@@ -59,10 +62,15 @@ $(BUILD)/.minified: $(BUILD_BINARY) $(BUNDLE_RESOURCES)
 	@printf "  strip     symbols\n"
 	@strip -x "$(BUILD_BINARY)" -o "$(BUILD_BINARY).stripped"
 	@mv "$(BUILD_BINARY).stripped" "$(BUILD_BINARY)"
-	@# Copy resources (preserving subdirectory structure)
+	@# Stage resources: tame base + direct overlay (Direct build only).
+	@# The overlay replaces tame Moans.strings with spicy DDLG content.
 	@rm -rf "$(BUILD)/resources"
 	@mkdir -p "$(BUILD)/resources"
 	@rsync -a --exclude '*.xcassets' "$(RESOURCE_SRC)/" "$(BUILD)/resources/"
+	@if [ -d "$(RESOURCE_DIRECT)" ]; then \
+		printf "  overlay   $(RESOURCE_DIRECT)\n"; \
+		rsync -a "$(RESOURCE_DIRECT)/" "$(BUILD)/resources/"; \
+	fi
 	@# SVG minification (if svgo installed)
 	@which svgo > /dev/null 2>&1 && { \
 		printf "  minify    SVGs\n"; \
@@ -99,6 +107,25 @@ build: $(BUILD_BINARY) $(BUILD)/.minified
 lint:
 	@printf "  lint      strict concurrency\n"
 	@swiftc -typecheck $(SWIFTFLAGS) -strict-concurrency=complete -warnings-as-errors $(SOURCES)
+
+# Bundle-lint gate for App Store builds. Fails if any spicy content leaked
+# into a Moans.strings file in the bundle. Run this against an App Store
+# build (no Direct overlay) to verify the dual-build separation is intact.
+# Currently scans for the substring "daddy" in any locale's Moans.strings.
+appstore-lint: build
+	@printf "  appstore  lint Moans.strings for spicy leakage\n"
+	@FOUND=0; \
+	for f in "$(RES_DIR)"/*.lproj/Moans.strings; do \
+		if [ -f "$$f" ] && plutil -p "$$f" 2>/dev/null | grep -qi 'daddy'; then \
+			printf "  FAIL      $$f contains 'daddy'\n"; \
+			FOUND=1; \
+		fi; \
+	done; \
+	if [ "$$FOUND" -eq 0 ]; then \
+		printf "  appstore  ✓ no spicy leakage in Moans.strings\n"; \
+	else \
+		exit 1; \
+	fi
 
 # ── Test ──────────────────────────────────────────────────────
 test:

@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for hi.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/hi.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "म्म्म~ पापा~";
+"moan_tap_2" = "आह~";
+"moan_tap_3" = "सताते हो~";
+"moan_tap_4" = "ओह~";
+"moan_light_1" = "डैडी~";
+"moan_light_2" = "न्ङ~";
+"moan_light_3" = "आह~ प्लीज़~";
+"moan_light_4" = "मत करो~";
+"moan_medium_1" = "पापा, नहीं~";
+"moan_medium_2" = "वहाँ नहीं~";
+"moan_medium_3" = "ओह, कितने बुरे हो~";
+"moan_medium_4" = "प्लीज़, पापा~";
+"moan_firm_1" = "पापा! बहुत हो गया!";
+"moan_firm_2" = "मैं अच्छी बनूँगी!";
+"moan_firm_3" = "रहम~ प्लीज़~";
+"moan_firm_4" = "आप बहुत बुरे हैं!";
+"moan_hard_1" = "पापाऽऽ!!";
+"moan_hard_2" = "आआआह!!";
+"moan_hard_3" = "यामेते!!";
+"moan_hard_4" = "अच्छी बनूँगी!!";

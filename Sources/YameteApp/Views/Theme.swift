@@ -38,6 +38,8 @@ enum Theme {
 
 extension Toggle {
     /// Standard pink mini switch used throughout the app.
+    /// `@MainActor` because `SwitchToggleStyle.switch` is main-actor isolated.
+    @MainActor
     func themeMiniSwitch() -> some View {
         self.toggleStyle(.switch).tint(Theme.pink)
             .labelsHidden().controlSize(.mini)

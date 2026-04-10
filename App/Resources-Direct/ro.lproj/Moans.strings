@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for ro.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/ro.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ tati~";
+"moan_tap_2" = "Ahn~";
+"moan_tap_3" = "Obraznicule~";
+"moan_tap_4" = "Of~";
+"moan_light_1" = "Tati~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ahn~ te rog~";
+"moan_light_4" = "Nu~";
+"moan_medium_1" = "Tati, nu~!";
+"moan_medium_2" = "Nu acolo~!";
+"moan_medium_3" = "Of, ce rău ești~";
+"moan_medium_4" = "Te rog, tati~";
+"moan_firm_1" = "Tati! E prea mult!";
+"moan_firm_2" = "Voi fi cuminte!";
+"moan_firm_3" = "Milă~ te rog~!";
+"moan_firm_4" = "Ești atât de rău!";
+"moan_hard_1" = "TATI!!";
+"moan_hard_2" = "AHHHN!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "VOI FI CUMINTE!!";

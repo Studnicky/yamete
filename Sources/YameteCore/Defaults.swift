@@ -15,6 +15,7 @@ public enum Defaults {
     public static let flashOpacityMax: Double = 0.90
     public static let soundEnabled = true
     public static let screenFlash = true
+    public static let visualResponseMode = VisualResponseMode.overlay
     public static let debugLogging = false
 
     // MARK: - Fusion / timing

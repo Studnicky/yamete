@@ -1,0 +1,25 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for pl.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/pl.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"moan_tap_1" = "Mmm~ tatuśku~";
+"moan_tap_2" = "Ach~";
+"moan_tap_3" = "Drażnisz~";
+"moan_tap_4" = "Och~";
+"moan_light_1" = "Tatuśku~";
+"moan_light_2" = "Nnngh~";
+"moan_light_3" = "Ach~ proszę~";
+"moan_light_4" = "Nie~";
+"moan_medium_1" = "Tatuśku, nie~";
+"moan_medium_2" = "Nie tam~";
+"moan_medium_3" = "Och, taki niedobry~";
+"moan_medium_4" = "Proszę, tatuśku~";
+"moan_firm_1" = "Tatusiu! Za mocno!";
+"moan_firm_2" = "Będę grzeczna!";
+"moan_firm_3" = "Litości~ proszę~";
+"moan_firm_4" = "Jesteś taki niedobry!";
+"moan_hard_1" = "TATUŚKU!!";
+"moan_hard_2" = "AAACH!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "BĘDĘ GRZECZNA!!";

@@ -1,0 +1,45 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools for ja.
+   This file is bundled only for the notarized direct-download build.
+   Overlaid on top of App/Resources/ja.lproj/Moans.strings (the tame
+   App Store version) by the Direct Makefile target. */
+
+"title_tap_1" = "今のなに？";
+"title_tap_2" = "気のせい？";
+"title_tap_3" = "風？";
+"title_tap_4" = "あれ？";
+"title_light_1" = "ちょっと？";
+"title_light_2" = "まじで？";
+"title_light_3" = "本気？";
+"title_light_4" = "へぇ〜";
+"title_medium_1" = "おい";
+"title_medium_2" = "あのさ";
+"title_medium_3" = "話そっか";
+"title_medium_4" = "メモった";
+"title_firm_1" = "ママに言うよ";
+"title_firm_2" = "通報案件";
+"title_firm_3" = "店長呼んで";
+"title_firm_4" = "弁護士に相談する";
+"title_hard_1" = "110番";
+"title_hard_2" = "事件です";
+"title_hard_3" = "祖先が怒ってる";
+"title_hard_4" = "次元を超えた";
+"moan_tap_1" = "ん〜パパぁ〜";
+"moan_tap_2" = "あんっ〜";
+"moan_tap_3" = "もぉ〜いじわるぅ〜";
+"moan_tap_4" = "ひゃんっ〜";
+"moan_light_1" = "お兄ちゃぁん〜";
+"moan_light_2" = "んっ〜んんっ〜";
+"moan_light_3" = "あぁんっ、おねがぁい〜";
+"moan_light_4" = "やめてぇ〜";
+"moan_medium_1" = "パパぁ、だめぇ〜";
+"moan_medium_2" = "そこはだめぇ〜";
+"moan_medium_3" = "もぉ〜いじわるぅ〜";
+"moan_medium_4" = "おねがい、パパぁ〜";
+"moan_firm_1" = "パパぁっ！もうむりぃ！";
+"moan_firm_2" = "いい子にするからぁ！";
+"moan_firm_3" = "ゆるしてぇ〜おねがぁい〜";
+"moan_firm_4" = "パパのいじわるぅっ！";
+"moan_hard_1" = "パパぁぁぁっ！！";
+"moan_hard_2" = "あぁぁんっ！！";
+"moan_hard_3" = "やめてぇぇ！！";
+"moan_hard_4" = "いい子にするからぁっ！！";

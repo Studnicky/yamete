@@ -1,0 +1,60 @@
+/* Yamete — DIRECT BUILD ONLY moan/title pools.
+   This file is bundled only for the notarized direct-download build.
+   It is NOT included in the App Store build. The Makefile copies the
+   App/Resources-Direct/ tree on top of App/Resources/ during the direct
+   build, replacing the tame Moans.strings shipped with App/Resources/.
+   NotificationPhrase loads from the "Moans" table at runtime. */
+
+/* Title — flirty observational labels (per-tier random) */
+
+"title_tap_1" = "Mm, again?";
+"title_tap_2" = "Is that all?";
+"title_tap_3" = "Tease~";
+"title_tap_4" = "Show me what you got";
+
+"title_light_1" = "Now you've got my attention";
+"title_light_2" = "I see you";
+"title_light_3" = "Mmm, okay";
+"title_light_4" = "Show me more";
+
+"title_medium_1" = "Mmhmm~";
+"title_medium_2" = "Right there";
+"title_medium_3" = "Show off~";
+"title_medium_4" = "I like where this is going";
+
+"title_firm_1" = "Don't you dare stop";
+"title_firm_2" = "You're spoiling me";
+"title_firm_3" = "Look at you go";
+"title_firm_4" = "Mm, you remembered";
+
+"title_hard_1" = "There it is~";
+"title_hard_2" = "That's the stuff";
+"title_hard_3" = "You absolute treat";
+"title_hard_4" = "Mmmmm~";
+
+/* Body — DDLG sub moans (per-tier random) */
+
+"moan_tap_1" = "Mmm~ daddy~";
+"moan_tap_2" = "Ahn~";
+"moan_tap_3" = "Tease~";
+"moan_tap_4" = "Oh~";
+
+"moan_light_1" = "Daddy~";
+"moan_light_2" = "Nngh~";
+"moan_light_3" = "Ahn~ please~";
+"moan_light_4" = "Don't~";
+
+"moan_medium_1" = "Daddy, no~";
+"moan_medium_2" = "Not there~";
+"moan_medium_3" = "Ooh, so mean~";
+"moan_medium_4" = "Please, daddy~";
+
+"moan_firm_1" = "Daddy! Too much!";
+"moan_firm_2" = "I'll be good!";
+"moan_firm_3" = "Mercy~ please~";
+"moan_firm_4" = "You're so mean!";
+
+"moan_hard_1" = "DADDY!!";
+"moan_hard_2" = "AHHHN!!";
+"moan_hard_3" = "YAMETEEE!!";
+"moan_hard_4" = "I'LL BE GOOD!!";

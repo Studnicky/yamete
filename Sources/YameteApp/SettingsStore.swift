@@ -14,7 +14,8 @@ public final class SettingsStore {
     enum Key: String, CaseIterable, Sendable {
         case sensitivityMin, sensitivityMax
         case debounce
-        case screenFlash
+        case visualResponseMode
+        case notificationLocale
         case flashOpacityMin, flashOpacityMax
         case volumeMin, volumeMax
         case soundEnabled, debugLogging, enabledDisplays, enabledAudioDevices, enabledSensorIDs
@@ -36,7 +37,8 @@ public final class SettingsStore {
         Key.debounce.rawValue:        Defaults.debounce,
         Key.soundEnabled.rawValue:    true,
         Key.debugLogging.rawValue:    false,
-        Key.screenFlash.rawValue:     true,
+        Key.visualResponseMode.rawValue: Defaults.visualResponseMode.rawValue,
+        Key.notificationLocale.rawValue: "",
         Key.flashOpacityMin.rawValue: Defaults.flashOpacityMin,
         Key.flashOpacityMax.rawValue: Defaults.flashOpacityMax,
         Key.volumeMin.rawValue:       Defaults.volumeMin,
@@ -145,11 +147,42 @@ public final class SettingsStore {
         }
     }
 
+    /// Computed proxy: true iff the user wants any visual response.
+    /// Backed entirely by `visualResponseMode` — no separate storage. Exists
+    /// so existing call sites (and tests) can keep reading/writing a Bool.
     var screenFlash: Bool {
-        didSet {
-            guard screenFlash != oldValue else { return }
-            persist(screenFlash, .screenFlash)
+        get { visualResponseMode != .off }
+        set {
+            if newValue {
+                if visualResponseMode == .off { visualResponseMode = .overlay }
+            } else {
+                visualResponseMode = .off
+            }
         }
+    }
+
+    var visualResponseMode: VisualResponseMode {
+        didSet {
+            guard visualResponseMode != oldValue else { return }
+            persist(visualResponseMode.rawValue, .visualResponseMode)
+        }
+    }
+
+    /// Locale identifier used for notification body strings (e.g. "en", "ja", "es").
+    /// Empty string means "follow system language" — resolved at read time via
+    /// `Bundle.main.preferredLocalizations.first`.
+    var notificationLocale: String {
+        didSet {
+            guard notificationLocale != oldValue else { return }
+            persist(notificationLocale, .notificationLocale)
+        }
+    }
+
+    /// Resolved locale identifier: honors the user's override, or falls back to
+    /// the system's preferred language (whichever available lproj matches best).
+    var resolvedNotificationLocale: String {
+        if !notificationLocale.isEmpty { return notificationLocale }
+        return Bundle.main.preferredLocalizations.first ?? "en"
     }
 
     // MARK: - Flash opacity band (intensity → flash brightness)
@@ -396,7 +429,22 @@ public final class SettingsStore {
         debounce        = d.double(forKey: Key.debounce.rawValue)
         soundEnabled    = d.bool(forKey:   Key.soundEnabled.rawValue)
         debugLogging    = d.bool(forKey:   Key.debugLogging.rawValue)
-        screenFlash     = d.bool(forKey:   Key.screenFlash.rawValue)
+        visualResponseMode = VisualResponseMode(
+            rawValue: d.string(forKey: Key.visualResponseMode.rawValue) ?? Defaults.visualResponseMode.rawValue
+        ) ?? Defaults.visualResponseMode
+        // Legacy migration: old builds persisted a separate `screenFlash` Bool.
+        // If an existing user had screenFlash=false (explicitly disabled visual
+        // response) but visualResponseMode defaulted to .overlay, unify them by
+        // forcing visualResponseMode=.off, then delete the legacy key.
+        let legacyScreenFlashKey = "screenFlash"
+        if d.object(forKey: legacyScreenFlashKey) != nil {
+            if d.bool(forKey: legacyScreenFlashKey) == false {
+                visualResponseMode = .off
+                d.set(VisualResponseMode.off.rawValue, forKey: Key.visualResponseMode.rawValue)
+            }
+            d.removeObject(forKey: legacyScreenFlashKey)
+        }
+        notificationLocale = d.string(forKey: Key.notificationLocale.rawValue) ?? ""
         flashOpacityMin = d.double(forKey: Key.flashOpacityMin.rawValue)
         flashOpacityMax = d.double(forKey: Key.flashOpacityMax.rawValue)
         volumeMin       = d.double(forKey: Key.volumeMin.rawValue)
@@ -445,7 +493,10 @@ public final class SettingsStore {
         debounce          = d[Key.debounce.rawValue]         as! Double
         soundEnabled      = d[Key.soundEnabled.rawValue]     as! Bool
         debugLogging      = AppLog.supportsDebugLogging ? d[Key.debugLogging.rawValue] as! Bool : false
-        screenFlash       = d[Key.screenFlash.rawValue]      as! Bool
+        visualResponseMode = VisualResponseMode(
+            rawValue: d[Key.visualResponseMode.rawValue] as! String
+        ) ?? Defaults.visualResponseMode
+        notificationLocale = d[Key.notificationLocale.rawValue] as! String
         flashOpacityMin   = d[Key.flashOpacityMin.rawValue]  as! Double
         flashOpacityMax   = d[Key.flashOpacityMax.rawValue]  as! Double
         volumeMin         = d[Key.volumeMin.rawValue]        as! Double

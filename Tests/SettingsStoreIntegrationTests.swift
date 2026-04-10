@@ -34,6 +34,7 @@ final class SettingsStoreIntegrationTests: XCTestCase {
             .init(name: "soundEnabled",      actual: "\(store.soundEnabled)",      expected: "true"),
             .init(name: "debugLogging",      actual: "\(store.debugLogging)",      expected: "false"),
             .init(name: "screenFlash",       actual: "\(store.screenFlash)",       expected: "true"),
+            .init(name: "visualResponseMode", actual: store.visualResponseMode.rawValue, expected: "overlay"),
             .init(name: "flashOpacityMin",   actual: "\(store.flashOpacityMin)",   expected: "0.5"),
             .init(name: "flashOpacityMax",   actual: "\(store.flashOpacityMax)",   expected: "0.9"),
             .init(name: "volumeMin",         actual: "\(store.volumeMin)",         expected: "0.5"),
@@ -115,13 +116,25 @@ final class SettingsStoreIntegrationTests: XCTestCase {
             .init(name: "soundEnabled off",  key: .soundEnabled,  write: { $0.soundEnabled = false },  value: false),
             .init(name: "soundEnabled on",   key: .soundEnabled,  write: { $0.soundEnabled = true },   value: true),
             .init(name: "debugLogging on",   key: .debugLogging,  write: { $0.debugLogging = true },   value: AppLog.supportsDebugLogging),
-            .init(name: "screenFlash off",   key: .screenFlash,   write: { $0.screenFlash = false },   value: false),
         ]
         for c in cases {
             let store = freshStore()
             c.write(store)
             XCTAssertEqual(UserDefaults.standard.bool(forKey: c.key.rawValue), c.value, c.name)
         }
+    }
+
+    func testVisualResponseModePersistenceRoundtrip() {
+        let store = freshStore()
+        store.visualResponseMode = .notification
+
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: SettingsStore.Key.visualResponseMode.rawValue),
+            VisualResponseMode.notification.rawValue
+        )
+
+        let reloaded = SettingsStore()
+        XCTAssertEqual(reloaded.visualResponseMode, .notification)
     }
 
     func testArrayPersistence() {

@@ -7,9 +7,17 @@ public struct MenuBarLabel: View {
     public init() {}
 
     public var body: some View {
-        FaceIcon()
-            .opacity(controller.isEnabled ? 1.0 : 0.4)
-            .frame(width: 18, height: 18)
+        Group {
+            if let face = controller.reactionFace {
+                Image(nsImage: face)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                FaceIcon()
+                    .opacity(controller.isEnabled ? 1.0 : 0.4)
+            }
+        }
+        .frame(width: 18, height: 18)
     }
 }
 

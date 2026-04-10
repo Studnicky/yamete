@@ -56,7 +56,17 @@
 
     <details>
       <summary>Screen flash doesn't appear</summary>
-      <p>Check the Flash Opacity range slider — both thumbs should be above zero. Verify displays are selected in the Devices panel. The flash is gated to the sound clip duration, so audio must also be working.</p>
+      <p>Open the menu bar dropdown and confirm Flash Mode is set to <strong>Overlay</strong> (not Off or Notification). Check the Flash Opacity range slider — both thumbs should be above zero. Verify displays are selected in the Devices panel. The flash is gated to the sound clip duration, so audio must also be working.</p>
+    </details>
+
+    <details>
+      <summary>Notifications don't appear</summary>
+      <p>Set Flash Mode to <strong>Notification</strong> in the menu bar dropdown. macOS will prompt for notification permission the first time. Check System Settings &rarr; Notifications &rarr; Yamete and ensure banners are allowed. The notification language can be selected separately from your system language under Flash Mode &rarr; Notification Language.</p>
+    </details>
+
+    <details>
+      <summary>The menu bar icon shows a face instead of the normal icon</summary>
+      <p>Expected behavior. The menu bar face icon reacts on every detected impact for the duration of the response. This is the always-on visual feedback indicator and is independent of Flash Mode.</p>
     </details>
 
     <details>
@@ -71,11 +81,16 @@
 
     <details>
       <summary>Does the app work on Intel Macs?</summary>
-      <p>Partially. Intel Macs lack the BMI286 accelerometer, but microphone-based impact detection works on any Mac with a microphone. Headphone motion also works with compatible AirPods/Beats.</p>
+      <p>Partially. Intel Macs lack the BMI286 accelerometer, but microphone-based impact detection works on any Mac with a microphone. Headphone motion also works with compatible AirPods/Beats. Yamete is an arm64 binary; on Intel Macs it runs through Rosetta 2.</p>
+    </details>
+
+    <details>
+      <summary>What's the difference between Yamete and Yamete Direct?</summary>
+      <p><strong>Yamete</strong> is the Mac App Store build, rated 12+, with tame flirty notification copy. <strong>Yamete Direct</strong> is the notarized direct download with the spicy notification copy. Both use the same detection engine, settings, and audio. The only difference is the notification text register.</p>
     </details>
 
     <h2>System Requirements</h2>
-    <p>macOS 14.0+ (Sonoma), Apple Silicon recommended. Accelerometer support requires Apple Silicon; microphone detection is optional and prompts for permission when enabled.</p>
+    <p>macOS 14.0+ (Sonoma), arm64 binary. The built-in accelerometer is only available on Apple Silicon MacBooks; other Apple Silicon Macs and Intel Macs use microphone and headphone motion only. Microphone access is optional and prompts for permission when enabled. Yamete is a menu bar app — there is no Dock icon and no app windows.</p>
 
     <footer>
       <p>&copy; 2026 Studnicky &middot; <a href="index.html">Home</a> &middot; <a href="privacy.html">Privacy</a></p>
