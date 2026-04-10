@@ -15,46 +15,47 @@ import os
 // The sensor appears as a vendor-defined HID device:
 //   PrimaryUsagePage = 0xFF00, PrimaryUsage = 3, Transport = "SPU"
 //
-// Two-phase access pattern (works in both Direct and App Store builds):
+// Access model:
 //
-//   Phase 1 — best-effort activation (Direct builds only)
-//     IORegistryEntrySetCFProperty on AppleSPUHIDDriver writing
+//   Activation — IORegistryEntrySetCFProperty on AppleSPUHIDDriver writing
 //     ReportInterval, SensorPropertyReportingState, SensorPropertyPowerState.
-//     Direct (unsandboxed) builds: succeeds, ensures the sensor is active
-//     at our preferred report interval.
-//     App Store (sandboxed) builds: returns kIOReturnNotPermitted because
-//     the sandbox blocks IORegistry property writes regardless of which
-//     entitlements are granted (no entitlement covers this surface).
-//     We log info-level fall-through and continue to phase 2.
+//     Unsandboxed clients (Direct build, external warm-up helper): the
+//     writes reach the driver and start the BMI286 streaming at the
+//     requested rate. Note the driver treats these properties as *command*
+//     channels — read-back always returns 0 regardless of success, so
+//     don't use property read-back as confirmation.
+//     Sandboxed clients (App Store build): writes return KERN_SUCCESS
+//     via `IORegistryEntrySetCFProperty` but the kernel silently drops
+//     them before they reach the driver's `setProperty`, so the sensor
+//     is never started by our code.
 //
-//   Phase 2 — passive HID subscription (both builds)
-//     IOHIDManagerCreate + IOHIDDeviceRegisterInputReportCallback against
-//     the SPU device. Receives whatever HID reports the kernel is already
-//     producing. The macOS system maintains a baseline reporting state on
-//     the SPU services via HIDEventServiceProperties.ReportInterval (set
-//     by WindowServer / locationd at boot for orientation, lid sensing,
-//     and CoreLocation), so even when phase 1 is blocked the sensor is
-//     already streaming at 100Hz and our subscription receives the data.
+//   Passive HID subscription — IOHIDManagerCreate +
+//     IOHIDDeviceRegisterInputReportCallback against the SPU device. Once
+//     *something* has warmed the sensor (our own activation in the Direct
+//     build, an external helper shipping via support docs for App Store
+//     users, or macOS itself via WindowServer / locationd when it
+//     subscribes for lid / orientation reasons), the subscription
+//     receives the live 100Hz stream regardless of who did the warming.
+//
+//   Runtime availability probe — `isSensorActivelyReporting()` reads
+//     `DebugState._last_event_timestamp` from the driver service and
+//     compares against `mach_absolute_time()`. If the delta exceeds
+//     500ms the sensor is considered cold and the adapter's `isAvailable`
+//     returns false, so `Migration.reconcileSensors` prunes the adapter
+//     before pipeline start rather than letting the stream watchdog fire
+//     on an empty subscription mid-session.
 //
 // All IOKit functions called are declared in public SDK headers
 // (IOKit/IOKitLib.h, IOKit/hid/IOHIDManager.h, IOKit/hid/IOHIDDevice.h).
 // No private API symbols are imported. The driver class name and property
-// keys used in phase 1 are Apple-internal implementation details; phase 2
-// uses no internal property surface.
-//
-// Reliability caveats for the App Store path:
-//   • This relies on the system having the SPU sensor warm. If a future
-//     macOS revision changes WindowServer/locationd behavior to defer
-//     activation, the App Store build's accelerometer will go silent.
-//     The Direct build is unaffected (it does its own activation).
-//   • Sleep/wake and cold-boot behavior should be retested before each
-//     App Store release.
-//   • If reports stop arriving in production, the controller already
-//     supports microphone + headphone-motion fallback via the existing
-//     consensus path.
+// keys are Apple-internal implementation details used only via the public
+// `IOServiceMatching` / `IORegistryEntry*` surface.
 //
 // App Sandbox: Requires com.apple.security.device.usb entitlement (allows
-// IOHIDManager device matching/open). No additional entitlements needed.
+// IOHIDManager device matching/open). IORegistry reads (the availability
+// probe) work from inside sandbox without any additional entitlement.
+// IORegistry writes (the activation attempt) are silently rejected, which
+// is why the App Store build depends on an external warm-up path.
 
 private let log = AppLog(category: "Accelerometer")
 
@@ -94,14 +95,28 @@ public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
         self.detectorConfig = detectorConfig
     }
 
-    /// True when an SPU HID device is physically present. We no longer gate
-    /// on activation permission: even when sandbox blocks our IORegistry
-    /// writes (App Store build), the system itself keeps the SPU sensor
-    /// warm (HIDEventServiceProperties.ReportInterval is set by WindowServer
-    /// and locationd) and reports flow passively through IOHIDManager. The
-    /// adapter tries to activate first but falls through to a passive open
-    /// if activation is denied.
+    /// True when the SPU HID hardware is present AND the kernel driver has
+    /// emitted a report in the last 500ms. The second half is the honest
+    /// part: in an App Store sandbox build, `SensorActivation.activate()`
+    /// calls are kernel-rejected (writes require an unsandboxed client),
+    /// so whether the adapter can actually produce impacts depends on
+    /// whether *something else* has warmed the sensor this boot — either
+    /// macOS itself (WindowServer / locationd, when the system happens to
+    /// subscribe for its own reasons) or an external helper shipping via
+    /// support docs. If neither is true, the sensor is cold and `isAvailable`
+    /// returns false so `Migration.reconcileSensors` prunes the adapter
+    /// before pipeline start instead of letting the watchdog fire on an
+    /// empty stream mid-session.
     public var isAvailable: Bool {
+        AccelHardware.isSPUDevicePresent() && AccelHardware.isSensorActivelyReporting()
+    }
+
+    /// Device-presence check only (skips the runtime-activity probe).
+    /// Tests that exercise stream lifecycle need to run on any Apple
+    /// Silicon host with the BMI286 hardware, whether or not the sensor
+    /// is currently warm — the tests don't depend on report delivery,
+    /// they stress open/close cleanup paths.
+    internal var hardwarePresent: Bool {
         AccelHardware.isSPUDevicePresent()
     }
 
@@ -190,6 +205,68 @@ private enum AccelHardware {
         IOHIDManagerSetDeviceMatching(manager, matchingDict)
         guard let devices = IOHIDManagerCopyDevices(manager) else { return false }
         return findSPUDevice(in: devices) != nil
+    }
+
+    /// Reads `DebugState._last_event_timestamp` on the `AppleSPUHIDDriver`
+    /// service with `dispatchAccel = Yes` and compares it to
+    /// `mach_absolute_time()`. Returns true when the most recent emitted
+    /// report is within 500ms, meaning the kernel driver is actively
+    /// streaming.
+    ///
+    /// Why this signal and not `ReportInterval` or `_num_events`:
+    ///   • `ReportInterval` on the IOKit property dict is a write-only
+    ///     command channel — the driver's `setProperty` accepts the write
+    ///     as a "start streaming at this rate" command but never stores
+    ///     the value, so reads always return 0 regardless of state.
+    ///   • `_num_events` is a monotonic counter that freezes on
+    ///     deactivation and doesn't reset until reboot, so a non-zero
+    ///     value doesn't mean "currently streaming" — only "has ever
+    ///     streamed this boot".
+    ///   • `_last_event_timestamp` (mach_absolute_time units) updates
+    ///     every report and is the only field that decays correctly when
+    ///     the sensor goes cold. A 500ms staleness threshold is ~50
+    ///     missed samples at 100Hz — well outside normal scheduler jitter.
+    ///
+    /// Read-only IORegistry lookup. Works from inside App Sandbox
+    /// (sandbox blocks property WRITES, not reads).
+    static func isSensorActivelyReporting() -> Bool {
+        var iterator: io_iterator_t = 0
+        let matching = IOServiceMatching("AppleSPUHIDDriver")
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {
+            return false
+        }
+        defer { IOObjectRelease(iterator) }
+
+        while true {
+            let service = IOIteratorNext(iterator)
+            guard service != 0 else { break }
+            defer { IOObjectRelease(service) }
+
+            // The SPU bus also hosts gyro, temperature, and hinge-angle
+            // services. Only the one carrying `dispatchAccel = Yes` is
+            // ours.
+            let dispatchAccel = IORegistryEntryCreateCFProperty(
+                service, "dispatchAccel" as CFString, kCFAllocatorDefault, 0
+            )?.takeRetainedValue() as? Bool ?? false
+            guard dispatchAccel else { continue }
+
+            guard let debug = IORegistryEntryCreateCFProperty(
+                service, "DebugState" as CFString, kCFAllocatorDefault, 0
+            )?.takeRetainedValue() as? [String: Any],
+                  let lastTsRaw = debug["_last_event_timestamp"] as? Int,
+                  lastTsRaw > 0 else {
+                return false
+            }
+            let lastTs = UInt64(lastTsRaw)
+            let now = mach_absolute_time()
+            guard now > lastTs else { return false }
+
+            var timebase = mach_timebase_info_data_t()
+            mach_timebase_info(&timebase)
+            let deltaNs = (now - lastTs) &* UInt64(timebase.numer) / UInt64(timebase.denom)
+            return deltaNs < AccelHardwareConstants.sensorActivityStalenessNs
+        }
+        return false
     }
 
     static func openStream(
