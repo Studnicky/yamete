@@ -192,10 +192,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ImpactController.shouldBeEnabled`** reads `visualResponseMode != .off`
   directly instead of `screenFlash`.
 - **`-strict-concurrency=complete` cleanup**: `FaceRenderer.Palette` is
-  `Sendable`; `currentPalette` and `loadFaces(palette:)` are `@MainActor`;
+  `Sendable`; `currentPalette` and `loadFaces(palette:)` are `MainActor`;
   `Fmt` slider formatters are `@Sendable` closures; `arrayToggleBinding`
-  is `@MainActor` and requires `T: Sendable`; `GateRows` is `@MainActor`;
-  `Toggle.themeMiniSwitch` is `@MainActor`; `OnceCleanup` requires
+  is `MainActor` and requires `T: Sendable`; `GateRows` is `MainActor`;
+  `Toggle.themeMiniSwitch` is `MainActor`; `OnceCleanup` requires
   `T: Sendable`; `LogStore.State` is `@unchecked Sendable` (lock-protected).
 - Removed the `import YameteApp` self-import from `YameteApp.swift` (was a
   Makefile-only no-op warning that became an error under `-warnings-as-errors`).
@@ -261,9 +261,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - LogStore graceful fallback when Application Support unavailable
 
 ### Fixed
-- @MainActor isolation on ImpactFusionEngine (was unconfined)
-- ScreenFlash hide Task missing @MainActor (AppKit thread safety)
-- Updater Tasks missing @MainActor (state mutation isolation)
+- MainActor isolation on ImpactFusionEngine (was unconfined)
+- ScreenFlash hide Task missing MainActor (AppKit thread safety)
+- Updater Tasks missing MainActor (state mutation isolation)
 - EventContext use-after-free on stream termination
 - Force unwraps in AccelerometerReader run loop and mode resolution
 - Rise rate gate checking instantaneous value instead of window peak
