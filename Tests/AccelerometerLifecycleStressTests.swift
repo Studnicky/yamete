@@ -9,7 +9,11 @@ import XCTest
 /// Most useful when run with `swift test --sanitize=thread` on a real
 /// Apple Silicon MacBook with the BMI286 SPU device available. On hardware
 /// without an SPU device the adapter is not available and the test exits
-/// early via `XCTSkipUnless`.
+/// early via `XCTSkipUnless`. Uses `hardwarePresent` (not `isAvailable`)
+/// because the tests exercise lifecycle cleanup paths that don't require
+/// the sensor to be actively streaming — a cold sensor is a valid test
+/// condition, and exits via the 50ms drain timeout rather than delivering
+/// actual reports.
 ///
 /// Goal: each open/close cycle must complete cleanly without:
 ///   - crashing on the report callback after teardown
@@ -24,7 +28,7 @@ final class AccelerometerLifecycleStressTests: XCTestCase {
     /// to surface state-leak races on a real device.
     func testRepeatedOpenClose() async throws {
         let adapter = SPUAccelerometerAdapter()
-        try XCTSkipUnless(adapter.isAvailable, "SPU accelerometer not available on this host")
+        try XCTSkipUnless(adapter.hardwarePresent, "SPU accelerometer not available on this host")
 
         let cycles = 25
         for cycle in 0..<cycles {
@@ -64,7 +68,7 @@ final class AccelerometerLifecycleStressTests: XCTestCase {
     /// closure runs before the report callback has been registered.
     func testCancelBeforeFirstReport() async throws {
         let adapter = SPUAccelerometerAdapter()
-        try XCTSkipUnless(adapter.isAvailable, "SPU accelerometer not available on this host")
+        try XCTSkipUnless(adapter.hardwarePresent, "SPU accelerometer not available on this host")
 
         for _ in 0..<10 {
             let task = Task<Void, Error> {
