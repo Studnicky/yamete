@@ -135,14 +135,17 @@ Accelerometer implementation note (please read carefully):
 
   For users who want the tactile detection channel, the support page links
   an open-source GitHub gist containing a minimal Swift helper
-  (`yamete-accel-warmup.swift`, ~100 lines) plus a LaunchDaemon plist.
-  The helper compiles with `swiftc`, installs to `/usr/local/libexec/`,
-  and runs once per boot via LaunchDaemon to issue the three driver
-  property writes that start the BMI286 streaming. Because the LaunchDaemon
-  runs outside the App Sandbox, its writes reach the driver successfully.
-  The warmth persists across subscriber cycles, so the Yamete App Store
-  build's subsequent `IOHIDManager` subscription receives the live 100Hz
-  stream with no further involvement from the helper.
+  (`yamete-accel-warmup.swift`) plus a LaunchDaemon plist. The helper
+  compiles with `swiftc`, installs to `/usr/local/libexec/`, and runs as
+  a long-lived LaunchDaemon that warms the sensor once at boot and then
+  subscribes to IOKit system power notifications via
+  `IORegisterForSystemPower` to re-warm on every wake event. Because
+  the LaunchDaemon runs outside the App Sandbox, its writes reach the
+  driver successfully. The daemon idles at effectively zero CPU when
+  nothing is happening (parked in `CFRunLoopRun` waiting for wake
+  notifications), so the Yamete App Store build's subsequent
+  `IOHIDManager` subscription receives the live 100Hz stream with no
+  further involvement from the app itself.
 
   IOKit symbols used by the app (all in public SDK headers):
     - IOServiceGetMatchingServices (IOKit/IOKitLib.h)
