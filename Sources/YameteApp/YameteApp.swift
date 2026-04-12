@@ -47,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Onboarding.promptMicrophoneIfNeeded(settings: settings)
         controller.bootstrap()
         Onboarding.playWelcomeSoundIfFirstLaunch(controller: controller)
+        updater.checkIfNeeded()
     }
 }
 
