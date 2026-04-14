@@ -20,9 +20,21 @@ final class StatusBarController {
     private let statusItem: NSStatusItem
     private let panel: MenuBarPanel
     private var monitor: Any?
+    private let controller: ImpactController
+    private let templateIcon: NSImage?
 
     init(settings: SettingsStore, controller: ImpactController, updater: Updater) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        self.controller = controller
+
+        templateIcon = {
+            guard let path = Bundle.main.path(forResource: "menubar_icon", ofType: "png"),
+                  let img = NSImage(contentsOfFile: path),
+                  let copy = img.copy() as? NSImage else { return nil }
+            copy.size = NSSize(width: 18, height: 18)
+            copy.isTemplate = true
+            return copy
+        }()
 
         panel = MenuBarPanel(
             contentView: MenuBarView()
@@ -32,58 +44,42 @@ final class StatusBarController {
         )
         panel.onDismiss = { [weak self] in self?.removeMonitor() }
 
-        configureButton(controller: controller)
+        guard let button = statusItem.button else { return }
+        button.action = #selector(togglePanel)
+        button.target = self
+
+        applyIcon()
+        observeIcon()
     }
 
     deinit {
         removeMonitor()
     }
 
-    // MARK: - Status item button
+    // MARK: - Status item icon
 
-    /// Sets the button image from the controller's observable state and
-    /// re-observes whenever it changes. Uses `withObservationTracking` to
-    /// track `reactionFace` and `isEnabled` without embedding an
-    /// NSHostingView inside the status bar button (which breaks its layout).
-    private func configureButton(controller: ImpactController) {
+    private func applyIcon() {
         guard let button = statusItem.button else { return }
-        button.action = #selector(togglePanel)
-        button.target = self
+        if let face = controller.reactionFace {
+            button.image = face
+            button.alphaValue = 1.0
+        } else {
+            button.image = templateIcon
+            button.alphaValue = controller.isEnabled ? 1.0 : 0.4
+        }
+    }
 
-        let templateIcon: NSImage? = {
-            guard let path = Bundle.main.path(forResource: "menubar_icon", ofType: "png"),
-                  let img = NSImage(contentsOfFile: path),
-                  let copy = img.copy() as? NSImage else { return nil }
-            copy.size = NSSize(width: 18, height: 18)
-            copy.isTemplate = true
-            return copy
-        }()
-
-        func applyIcon() {
-            if let face = controller.reactionFace {
-                button.image = face
-                button.alphaValue = 1.0
-            } else {
-                button.image = templateIcon
-                button.alphaValue = controller.isEnabled ? 1.0 : 0.4
+    private func observeIcon() {
+        withObservationTracking {
+            _ = controller.reactionFace
+            _ = controller.isEnabled
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.applyIcon()
+                self.observeIcon()
             }
         }
-
-        func observe() {
-            withObservationTracking {
-                _ = controller.reactionFace
-                _ = controller.isEnabled
-            } onChange: { [weak self] in
-                Task { @MainActor [weak self] in
-                    guard self != nil else { return }
-                    applyIcon()
-                    observe()
-                }
-            }
-        }
-
-        applyIcon()
-        observe()
     }
 
     // MARK: - Panel toggle
