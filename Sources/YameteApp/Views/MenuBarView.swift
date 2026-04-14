@@ -58,6 +58,9 @@ public struct MenuBarView: View {
             AudioDeviceManager.startObserving()
             refreshAll()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .menuBarPanelDidShow)) { _ in
+            refreshAll()
+        }
         .onReceive(NotificationCenter.default.publisher(for: AudioDeviceManager.devicesDidChangeNotification)) { _ in
             refreshAudioDevices()
             refreshSensors()

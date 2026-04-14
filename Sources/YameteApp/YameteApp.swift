@@ -18,17 +18,11 @@ struct YameteApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        MenuBarExtra {
-            MenuBarView()
-                .environment(appDelegate.settings)
-                .environment(appDelegate.controller)
-                .environment(appDelegate.updater)
-        } label: {
-            MenuBarLabel()
-                .environment(appDelegate.settings)
-                .environment(appDelegate.controller)
-        }
-        .menuBarExtraStyle(.window)
+        // The menu bar UI is managed by StatusBarController (NSStatusItem +
+        // custom NSPanel) rather than MenuBarExtra, giving us direct control
+        // over the panel's backing material and initial sizing.
+        // An empty Settings scene satisfies the Scene requirement.
+        Settings { EmptyView() }
     }
 }
 
@@ -39,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let settings = SettingsStore()
     lazy var controller = ImpactController(settings: settings)
     let updater = Updater()
+    private var statusBar: StatusBarController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppWindow.configureAsMenuBarApp()
@@ -48,6 +43,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.bootstrap()
         Onboarding.playWelcomeSoundIfFirstLaunch(controller: controller)
         updater.checkIfNeeded()
+
+        statusBar = StatusBarController(
+            settings: settings,
+            controller: controller,
+            updater: updater
+        )
     }
 }
 
