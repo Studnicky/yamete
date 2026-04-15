@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-15
+
+### Added
+- **Auto-update via GitHub Releases (Direct build only)** — PR #18.
+  The previously stubbed `Updater` is now a full update lifecycle:
+  checks GitHub Releases on launch (throttled to every 4 hours),
+  downloads the signed+notarized DMG, installs, and relaunches. The
+  menu bar footer surfaces live update state with contextual action
+  buttons (check / download / install / restart). All update logic
+  is gated behind `#if DIRECT_BUILD`; the App Store build keeps the
+  stub because App Store Connect handles distribution there.
+
+### Changed
+- **Menu bar shell replaced: `MenuBarExtra` → directly-managed
+  `NSStatusItem` + `NSPanel`** — PR #20, closes #19. SwiftUI's
+  `MenuBarExtra(.window)` was rendering the popover with a blank gap
+  above the content and letting the desktop wallpaper bleed through
+  the background, making text unreadable on light wallpapers. The new
+  `StatusBarController` manages an `NSStatusItem` directly and hosts
+  the SwiftUI content inside an `NSPanel` backed by an
+  `NSVisualEffectView` with `.menu` material, sized to the SwiftUI
+  content before display. Icon reactivity is preserved via
+  `withObservationTracking` rather than embedding `NSHostingView` in
+  the status bar button. Escape and outside-click dismiss behavior
+  are unchanged from user perspective.
+
+### Fixed
+- **Menu bar popover background transparency rendered content
+  unreadable** — closes #19. See NSPanel migration above.
+
 ## [1.0.1] - 2026-04-10
 
 ### Fixed
