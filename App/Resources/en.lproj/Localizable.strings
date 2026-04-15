@@ -254,6 +254,14 @@
 /* App version label */
 "version_format" = "v%@";
 
+/* Auto-update status labels (Direct build only) */
+"update_checking" = "Checking for updates…";
+"update_available_format" = "v%@ available";
+"update_downloading" = "Downloading update…";
+"update_installing" = "Installing update…";
+"update_check_tooltip" = "Check for updates";
+"button_update" = "Update";
+
 /* Quit application button */
 "button_quit" = "Quit";
 
