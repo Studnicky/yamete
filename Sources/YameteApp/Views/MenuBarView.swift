@@ -58,6 +58,9 @@ public struct MenuBarView: View {
             AudioDeviceManager.startObserving()
             refreshAll()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .menuBarPanelDidShow)) { _ in
+            refreshAll()
+        }
         .onReceive(NotificationCenter.default.publisher(for: AudioDeviceManager.devicesDidChangeNotification)) { _ in
             refreshAudioDevices()
             refreshSensors()
@@ -825,11 +828,18 @@ private struct FooterSection: View {
             .padding(Theme.footerPadding)
 
             HStack(spacing: 5) {
+                #if DIRECT_BUILD
+                updateStatusIcon
+                updateStatusLabel
+                Spacer()
+                updateActionButton
+                #else
                 Image(systemName: "info.circle")
                     .themeFooterIcon()
                 Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
                     .font(.caption).foregroundStyle(.tertiary)
                 Spacer()
+                #endif
                 Button(action: { confirmAndReset() }) {
                     Text(NSLocalizedString("button_reset", comment: "Reset to defaults button"))
                         .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
@@ -861,4 +871,78 @@ private struct FooterSection: View {
     private func open(_ url: URL) {
         NSWorkspace.shared.open(url)
     }
+
+    // MARK: - Auto-update views (Direct build only)
+
+    #if DIRECT_BUILD
+    @ViewBuilder
+    private var updateStatusIcon: some View {
+        switch updater.state {
+        case .checking, .downloading, .installing:
+            ProgressView()
+                .controlSize(.mini)
+                .frame(width: 10, height: 10)
+        case .upToDate:
+            Image(systemName: "checkmark.circle")
+                .themeFooterIcon()
+        case .available:
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(Theme.pink)
+        case .failed:
+            Image(systemName: "exclamationmark.triangle")
+                .themeFooterIcon()
+        case .idle:
+            Image(systemName: "info.circle")
+                .themeFooterIcon()
+        }
+    }
+
+    @ViewBuilder
+    private var updateStatusLabel: some View {
+        switch updater.state {
+        case .checking:
+            Text(NSLocalizedString("update_checking", comment: "Checking for updates status"))
+                .font(.caption).foregroundStyle(.tertiary)
+        case .available(let version, _):
+            Text(String(format: NSLocalizedString("update_available_format", comment: "Update available label"), version))
+                .font(.caption).foregroundStyle(Theme.pink)
+        case .downloading:
+            Text(NSLocalizedString("update_downloading", comment: "Downloading update status"))
+                .font(.caption).foregroundStyle(.tertiary)
+        case .installing:
+            Text(NSLocalizedString("update_installing", comment: "Installing update status"))
+                .font(.caption).foregroundStyle(.tertiary)
+        case .failed(let message):
+            Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
+                .font(.caption).foregroundStyle(.tertiary)
+                .help(message)
+        case .idle, .upToDate:
+            Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
+                .font(.caption).foregroundStyle(.tertiary)
+        }
+    }
+
+    @ViewBuilder
+    private var updateActionButton: some View {
+        switch updater.state {
+        case .idle, .upToDate, .failed:
+            Button(action: { updater.checkForUpdates() }) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 10))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.pink.opacity(0.6))
+            .help(NSLocalizedString("update_check_tooltip", comment: "Check for updates tooltip"))
+        case .available:
+            Button(action: { updater.installUpdate() }) {
+                Text(NSLocalizedString("button_update", comment: "Install update button"))
+                    .themePillButton(background: Theme.pink, foreground: .white)
+            }
+            .buttonStyle(.plain)
+        case .checking, .downloading, .installing:
+            EmptyView()
+        }
+    }
+    #endif
 }
