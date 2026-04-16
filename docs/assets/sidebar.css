@@ -1,0 +1,19 @@
+/* Shared sidebar styles */
+.sidebar { width: var(--sidebar-w); flex-shrink: 0; padding: 3rem 0; }
+.sidebar-inner { position: sticky; top: 2rem; }
+.app-icon { width: 100%; border-radius: 14px; display: block; margin-bottom: 0.85rem; background: #fff; padding: 8px; object-fit: contain; }
+.sidebar h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.2rem; }
+.sidebar .tagline { font-size: 0.8rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.4; }
+.badge { display: inline-block; background: #1f1f1f; color: var(--muted); font-size: 0.72rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 999px; border: 1px solid #333; margin-bottom: 1.5rem; }
+.dl-btn { display: block; background: var(--accent); color: #000; font-weight: 600; padding: 0.65rem 1rem; border-radius: 8px; font-size: 0.9rem; text-align: center; margin-bottom: 0.5rem; }
+.dl-btn:hover { text-decoration: none; opacity: 0.9; }
+.dl-sub { font-size: 0.75rem; color: var(--muted); font-style: italic; text-align: center; display: block; margin-bottom: 1.75rem; }
+.toc-label, .pages-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.5rem; display: block; }
+.toc { list-style: none; margin-bottom: 1.75rem; }
+.toc li { padding: 0.15rem 0; }
+.toc a { font-size: 0.82rem; color: #aaa; }
+.toc a:hover { color: var(--accent); text-decoration: none; }
+.page-links { list-style: none; }
+.page-links li { padding: 0.15rem 0; }
+.page-links a { font-size: 0.82rem; color: #aaa; }
+.page-links a:hover { color: var(--accent); text-decoration: none; }
