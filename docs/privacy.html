@@ -3,84 +3,141 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Privacy Policy — Yamete</title>
+  <title>Privacy Policy: Yamete</title>
+  <meta name="description" content="Privacy policy for Yamete, the macOS app that reacts when you smack your laptop. Nothing leaves your Mac.">
+  <link rel="stylesheet" href="assets/sidebar.css">
   <style>
-    :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --muted: #888; }
+    :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --accent-soft: #ffb3c4; --muted: #888; --card: #1a1a1a; --sidebar-w: 200px; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif; background: var(--bg); color: var(--fg); line-height: 1.7; }
     a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
-    .container { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem; }
-    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
-    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
-    h2 { font-size: 1.25rem; font-weight: 600; margin: 2rem 0 0.75rem; border-bottom: 1px solid #333; padding-bottom: 0.4rem; }
+    code { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 0.9em; background: #1f1f1f; color: var(--accent-soft); padding: 0.1rem 0.4rem; border-radius: 4px; }
+    .layout { display: flex; max-width: 980px; margin: 0 auto; padding: 0 1.5rem; gap: 3rem; }
+    .main { flex: 1; min-width: 0; padding: 3rem 0 3rem 3rem; border-left: 1px solid #1e1e1e; }
+    .main h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 2rem; }
+    section { margin-bottom: 2rem; scroll-margin-top: 2rem; }
+    section h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: 0.65rem; border-bottom: 1px solid #2a2a2a; padding-bottom: 0.35rem; }
     p { margin-bottom: 0.75rem; color: #ccc; }
-    ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; } li { color: #ccc; padding: 0.15rem 0; }
-    footer { text-align: center; padding: 2rem 0; color: var(--muted); font-size: 0.85rem; border-top: 1px solid #222; margin-top: 3rem; }
+    p:last-child { margin-bottom: 0; }
+    ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+    li { color: #ccc; padding: 0.15rem 0; }
+    footer { border-top: 1px solid #1e1e1e; margin-top: 3rem; padding: 1.75rem 0 2rem; color: var(--muted); font-size: 0.82rem; }
+    footer a { color: var(--muted); } footer a:hover { color: var(--accent); }
+    @media (max-width: 700px) {
+      .layout { flex-direction: column; gap: 0; padding: 0 1.25rem; }
+      .sidebar { width: 100%; padding: 2rem 0 0; }
+      .sidebar-inner { position: static; }
+      .main { border-left: none; border-top: 1px solid #1e1e1e; padding-left: 0; padding-top: 2rem; margin-top: 1.5rem; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Privacy Policy</h1>
-    <p class="meta">Effective: April 10, 2026 &middot; App: Yamete for macOS</p>
+  <div class="layout">
 
-    <p><strong>Yamete</strong> is a macOS menu bar app that detects physical impacts on your Mac and responds with sound and a small animated face. This is the formal document about what it does and does not do with your data. Short version up front: <strong>nothing leaves your Mac</strong>. Full details below.</p>
+    <aside class="sidebar">
+      <div class="sidebar-inner" id="sidebar-placeholder"></div>
+    </aside>
 
-    <h2>Data collection</h2>
-    <p>Yamete collects and stores the following data <strong>locally on your Mac only</strong>:</p>
+    <main class="main">
+      <h1>Privacy Policy</h1>
+      <p class="meta">Effective: April 10, 2026 &middot; App: Yamete for macOS</p>
 
-    <h2>Activity logs</h2>
-    <ul>
-      <li>Timestamped sensor and detection events written to the app's log directory (<code>~/Library/Application Support/Yamete Direct/logs/</code> for direct downloads, <code>~/Library/Containers/com.studnicky.yamete/Data/Library/Application Support/Yamete/logs/</code> for the Mac App Store build)</li>
-      <li>Logs may include your Mac's accelerometer serial number (a hardware identifier, used only for debugging)</li>
-      <li><strong>Retention: 24 hours</strong> — log files older than 24 hours are automatically deleted</li>
-      <li>Logs are never transmitted over the network</li>
-    </ul>
+      <p><strong>Yamete</strong> is a macOS menu bar app that reacts when you smack your laptop. This is the formal document about what it does and does not do with your data. Short answer: <strong>nothing leaves your Mac</strong>. Your smacking habits are your business.</p>
 
-    <h2>User preferences</h2>
-    <ul>
-      <li>Detection sensitivity, volume, opacity, frequency band, per-sensor tuning, and device settings</li>
-      <li>Stored in macOS UserDefaults (standard app preferences)</li>
-      <li>No personally identifiable information</li>
-    </ul>
+      <section id="collection">
+        <h2>Data collection</h2>
+        <p>Yamete collects and stores the following data <strong>locally on your Mac only</strong>:</p>
+      </section>
 
-    <h2>Device identifiers</h2>
-    <ul>
-      <li>Core Audio device UIDs (for audio output routing)</li>
-      <li>Display IDs (for flash overlay targeting)</li>
-      <li>These are hardware identifiers used only for local device selection — they do not leave the Mac</li>
-    </ul>
+      <section id="logs">
+        <h2>Activity logs</h2>
+        <ul>
+          <li>Timestamped sensor and detection events written to the app's log directory (<code>~/Library/Application Support/Yamete Direct/logs/</code> for direct downloads, <code>~/Library/Containers/com.studnicky.yamete/Data/Library/Application Support/Yamete/logs/</code> for the Mac App Store build)</li>
+          <li>Logs may include your Mac's accelerometer serial number (a hardware identifier, used only for debugging)</li>
+          <li><strong>Retention: 24 hours.</strong> Log files older than 24 hours are automatically deleted.</li>
+          <li>Logs are never transmitted over the network</li>
+        </ul>
+      </section>
 
-    <h2>Network access</h2>
-    <p>Yamete does not make any network connections. None. Not even for software updates (the Direct build checks GitHub via the standard Sparkle updater if you opt in, but the core app does nothing network-ish).</p>
+      <section id="prefs">
+        <h2>User preferences</h2>
+        <ul>
+          <li>Detection sensitivity, volume, opacity, frequency band, per-sensor tuning, and device settings</li>
+          <li>Stored in macOS UserDefaults (standard app preferences)</li>
+          <li>No personally identifiable information</li>
+        </ul>
+      </section>
 
-    <h2>No data sharing</h2>
-    <p>Yamete does not:</p>
-    <ul>
-      <li>Collect personal information</li>
-      <li>Track usage patterns</li>
-      <li>Send data to third parties</li>
-      <li>Use advertising identifiers</li>
-      <li>Require an account or login</li>
-      <li>Include analytics, telemetry, or crash reporting services</li>
-    </ul>
+      <section id="device-ids">
+        <h2>Device identifiers</h2>
+        <ul>
+          <li>Core Audio device UIDs (for audio output routing)</li>
+          <li>Display IDs (for flash overlay targeting)</li>
+          <li>These are hardware identifiers used only for local device selection. They do not leave the Mac.</li>
+        </ul>
+      </section>
 
-    <h2>Sensor data</h2>
-    <p>Accelerometer, microphone, and headphone motion data is processed in real time for impact detection only. No sensor data is recorded, stored beyond the detection moment, or transmitted anywhere.</p>
-    <p>Microphone audio buffers are analyzed for transient peaks (short, sharp energy spikes) and immediately discarded. No audio recording occurs at any point. The app is not capable of recording audio — the analysis path does not retain the input buffers.</p>
+      <section id="network">
+        <h2>Network access</h2>
+        <p>Yamete does not make any network connections. None. Not even for software updates (the Direct build checks GitHub via the standard Sparkle updater if you opt in, but the core app does nothing network-ish).</p>
+      </section>
 
-    <h2>Children's privacy</h2>
-    <p>Yamete does not collect any personal information from any user, including children under 13.</p>
+      <section id="sharing">
+        <h2>No data sharing</h2>
+        <p>Yamete does not:</p>
+        <ul>
+          <li>Collect personal information</li>
+          <li>Track usage patterns</li>
+          <li>Send data to third parties</li>
+          <li>Use advertising identifiers</li>
+          <li>Require an account or login</li>
+          <li>Include analytics, telemetry, or crash reporting services</li>
+        </ul>
+      </section>
 
-    <h2>Changes to this policy</h2>
-    <p>If this policy changes, the updated version will be posted at this URL. The effective date at the top of the page will be updated.</p>
+      <section id="sensor">
+        <h2>Sensor data</h2>
+        <p>Accelerometer, microphone, and headphone motion data is processed in real time for impact detection only. No sensor data is recorded, stored beyond the detection moment, or transmitted anywhere.</p>
+        <p>Microphone audio buffers are analyzed for transient peaks (short, sharp energy spikes) and immediately discarded. No audio recording occurs at any point. The analysis path does not retain input buffers. The app is structurally incapable of recording you.</p>
+      </section>
 
-    <h2>Contact</h2>
-    <p>For privacy questions, corrections to this policy, or anything you'd like clarified: <a href="https://github.com/Studnicky/yamete/issues/new">file an issue on GitHub</a>. Because Yamete collects nothing and sends nothing over the network, there is essentially nothing to ask about privately — open issues are a better venue because the answers become public documentation for anyone else with the same question.</p>
-    <p>Source code: <a href="https://github.com/Studnicky/yamete">github.com/Studnicky/yamete</a>. If you don't trust us, you are absolutely welcome to read the code and confirm every word of this policy. We encourage it.</p>
+      <section id="children">
+        <h2>Children's privacy</h2>
+        <p>Yamete does not collect any personal information from any user, including children under 13.</p>
+      </section>
 
-    <footer>
-      <p>&copy; 2026 Studnicky &middot; <a href="index.html">Home</a> &middot; <a href="support.html">Support</a></p>
-    </footer>
+      <section id="changes">
+        <h2>Changes to this policy</h2>
+        <p>If this policy changes, the updated version will be posted at this URL. The effective date at the top of the page will be updated.</p>
+      </section>
+
+      <section id="contact">
+        <h2>Contact</h2>
+        <p>For privacy questions or corrections to this policy: <a href="https://github.com/Studnicky/yamete/issues/new">file an issue on GitHub</a>. Because Yamete collects nothing and sends nothing, there's essentially nothing to ask about privately. Open issues are a better venue anyway; the answers become public documentation for everyone with the same question.</p>
+        <p>Source code is public at <a href="https://github.com/Studnicky/yamete">github.com/Studnicky/yamete</a>. If you don't trust the policy, read the code. Every word of this is verifiable. I prefer it that way.</p>
+      </section>
+
+      <footer>
+        <p>&copy; 2026 Studnicky &middot; <a href="index.html">Home</a> &middot; <a href="support.html">Support</a> &middot; <a href="https://github.com/Studnicky/yamete/releases">Releases</a> &middot; <a href="https://github.com/Studnicky/yamete/issues">Issues</a> &middot; <a href="https://github.com/Studnicky/yamete">GitHub</a></p>
+      </footer>
+    </main>
+
   </div>
+  <script src="assets/sidebar.js"></script>
+  <script>
+    initSidebar([
+      { href: '#collection', label: 'Data collection' },
+      { href: '#logs',       label: 'Activity logs' },
+      { href: '#prefs',      label: 'Preferences' },
+      { href: '#device-ids', label: 'Device identifiers' },
+      { href: '#network',    label: 'Network access' },
+      { href: '#sharing',    label: 'No data sharing' },
+      { href: '#sensor',     label: 'Sensor data' },
+      { href: '#children',   label: "Children's privacy" },
+      { href: '#changes',    label: 'Changes' },
+      { href: '#contact',    label: 'Contact' },
+    ], 'privacy.html');
+  </script>
 </body>
 </html>
