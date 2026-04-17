@@ -159,7 +159,11 @@ public final class HeadphoneMotionAdapter: SensorAdapter, Sendable {
 /// `CMHeadphoneMotionManager.isDeviceMotionAvailable` only reports framework
 /// support — it returns true on every Apple Silicon Mac regardless of whether
 /// AirPods are paired/connected. Real connection state requires the delegate.
-private final class HeadphoneConnectionTracker: NSObject, CMHeadphoneMotionManagerDelegate, @unchecked Sendable {
+///
+/// Sendable: the only stored state is an `OSAllocatedUnfairLock<Bool>`.
+/// `OSAllocatedUnfairLock` is Sendable when its state type is Sendable, and
+/// `Bool` is Sendable. No unchecked escape required.
+private final class HeadphoneConnectionTracker: NSObject, CMHeadphoneMotionManagerDelegate, Sendable {
     private let state = OSAllocatedUnfairLock<Bool>(initialState: false)
 
     var isConnected: Bool { state.withLock { $0 } }
