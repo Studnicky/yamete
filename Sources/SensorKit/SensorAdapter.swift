@@ -103,7 +103,11 @@ public final class SensorManager {
                                 continuation.yield(.impact(impact))
                             }
                         } catch is CancellationError {
-                            return
+                            // Cancellation is a normal adapter lifecycle termination — fall through
+                            // so the post-catch adaptersChanged emission still runs. Returning here
+                            // would leave the tracker thinking the adapter is still active, which
+                            // (under concurrent cancellation on remaining adapters) can drop the
+                            // terminal adaptersChanged([]) snapshot the consumer relies on.
                         } catch {
                             log.warning("entity:Adapter wasInvalidatedBy activity:SensorError name=\(adapter.name) — \(error.localizedDescription)")
                             continuation.yield(.error("\(adapter.name): \(error.localizedDescription)"))
