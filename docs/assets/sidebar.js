@@ -10,12 +10,13 @@ function initSidebar(tocItems, activePage) {
   ).join('\n          ');
 
   const pages = [
-    { href: 'index.html',   label: 'Home' },
-    { href: 'support.html', label: 'Support &amp; FAQ' },
-    { href: 'privacy.html', label: 'Privacy Policy' },
-    { href: RELEASES_URL,   label: 'Releases' },
-    { href: ISSUES_URL,     label: 'Issues' },
-    { href: REPO,           label: 'GitHub' },
+    { href: 'index.html',        label: 'Home' },
+    { href: 'support.html',      label: 'Support &amp; FAQ' },
+    { href: 'privacy.html',      label: 'Privacy Policy' },
+    { href: 'architecture.html', label: 'Architecture' },
+    { href: RELEASES_URL,        label: 'Releases' },
+    { href: ISSUES_URL,          label: 'Issues' },
+    { href: REPO,                label: 'GitHub' },
   ];
 
   const pagesHtml = pages.map(({ href, label }) => {
