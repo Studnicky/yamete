@@ -5,6 +5,12 @@ on:
     branches: ['**']
   pull_request:
 
+# Least-privilege default for every job below. The CI workflow only reads the
+# repo and runs local build/test commands; no write access is needed.
+# Closes CodeQL actions/missing-workflow-permissions alerts (#1, #2, #4).
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint (strict concurrency)
