@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-04-16
+
+### Fixed
+- **Recursive lock crash on launch-at-login** — PR #23. `AccelerometerReader.surfaceStall()` and `handleReport()` called `AsyncThrowingStream.Continuation.finish()`/`yield()` while holding the `OSAllocatedUnfairLock`. `AsyncThrowingStream._Storage` acquires its own internal `os_unfair_lock` in those methods, causing a non-reentrant double-acquisition (abort cause 89859). Fixed by capturing the continuation reference (and the value to yield) as the lock's return value, releasing the lock, then calling the continuation method outside.
+
 ## [1.1.0] - 2026-04-15
 
 ### Added
