@@ -102,7 +102,8 @@ final class StatusBarController {
 
         // Defer sizing + display to the next run-loop tick so the hosting
         // view's fittingSize reflects the refreshed SwiftUI content tree.
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
+            await Task.yield()
             guard let self else { return }
             self.panel.sizeToContent()
 
