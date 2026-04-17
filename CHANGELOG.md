@@ -13,6 +13,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [1.3.1] - 2026-04-17
+
+### Fixed
+- **`MicrophoneAdapter` teardown crashed the test process under certain
+  CoreAudio states (SIGSEGV)** — PR #38. Observed on CI run 24548266785
+  on the 1.3.0-bound `develop`, but the underlying race was latent
+  regardless of release.
+  - Teardown order in `continuation.onTermination` was reversed:
+    `inputNode.removeTap(onBus: 0)` ran BEFORE `engine.stop()`. Removing
+    a tap while the engine is still running lets the audio thread fire
+    one more buffer callback that dereferences state captured by the
+    tap closure after it has been torn down. Correct order is stop
+    first (blocks until pending audio-thread callbacks drain) then
+    remove. Inline comment documents the invariant.
+  - Added a format-validity gate on `inputNode.outputFormat(forBus: 0)`.
+    Hosts with no real audio input (headless CI runners, containers,
+    virtualized macOS) can return a format with zero channels or zero
+    sample rate; `installTap` with such a format is undefined behavior
+    in CoreAudio. The adapter now finishes the stream with
+    `SensorError.deviceNotFound` up front so the manager falls through
+    to other adapters cleanly instead of crashing.
+  - The `engine.start()` failure branch now pairs its `continuation.finish`
+    with `inputNode.removeTap(onBus: 0)` so a failed start doesn't leak
+    an installed tap.
+
 ## [1.3.0] - 2026-04-17
 
 ### Changed
