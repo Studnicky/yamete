@@ -13,6 +13,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [1.3.2] - 2026-04-17
+
+No source-code changes since 1.3.1 — the shipped app binary is behaviorally identical. This release cuts a tag so the accumulated docs, Pages, and CI-hygiene work reaches the Pages site and the repo's default-facing README.
+
+### Added
+- **Dependabot config for GitHub Actions dependencies** — PR #40.
+  `.github/dependabot.yml` schedules weekly action-version updates with
+  minor + patch bumps grouped into a single PR. Swift Package Manager
+  is not yet a Dependabot ecosystem (tracked upstream at
+  dependabot/dependabot-core#7268) so SPM deps in `Package.swift` still
+  require manual bumps.
+- **Workflow-YAML linting via actionlint** — PR #40. New `actionlint`
+  job in `ci.yml` using `raven-actions/actionlint@v2` catches syntax
+  and shellcheck-level bugs in workflow YAML before a push lands on a
+  runner. Caught a real SC2129 in `release.yml` on its first run.
+- **App icon + an intentionally silly number of badges in the README**
+  — PRs #43, #44. The `AppIcon.appiconset` 128x128 asset renders
+  centered at the top of the README at 160px. Thirty-eight shields.io
+  badges across six themed rows: ship status, platform + stack,
+  what's inside, promises, flex, and a row of CI-shaped exclamation
+  badges for things that are decidedly not CI status (current face,
+  last impact tier, watchdog status, machine spirits, etc.).
+
+### Changed
+- **README redesigned: voice match Pages, link instead of duplicate**
+  — PR #43. The README was repeating content that lives more
+  comfortably on `studnicky.github.io/yamete` (How it works,
+  Configuration, Distribution, Project structure, the ASCII detection
+  diagram). The rewrite matches the project site's voice, sends
+  visitors to the right Pages section via a link list at the top,
+  and trims 157 lines down to ~70 + a badge wall. Single source of
+  truth per topic lives on Pages; the README orients visitors.
+- **User-facing docs refreshed to present tense** — PR #43. Scrubbed
+  phrasing about what things "used to be", "was renamed", "now
+  ships" across README, `docs/architecture.html`, `docs/support.html`,
+  `docs/INSTALLATION.md`. Bumped `docs/assets/sidebar.js` version
+  badge to 1.3.2 so every published page surfaces the current
+  release consistently.
+- **CI workflow concurrency groups** — PR #40. Rapid-fire pushes on
+  non-`master` refs now cancel stale in-flight CI runs instead of
+  stacking them behind each other. Release workflow uses the group
+  for observability only (never cancels a tagged build mid-run).
+- **Release workflow opted into Node.js 24** — PR #40. Node.js 20 is
+  scheduled for removal from GitHub-hosted runners on 2026-09-16.
+  `softprops/action-gh-release@v2` currently runs on Node 20; setting
+  `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"` at the workflow env
+  level migrates ahead of the forced cutover.
+
+### Fixed
+- **Release notes were three separate `echo >> file` appends instead
+  of a grouped redirect** — PR #40 follow-up. actionlint/shellcheck
+  flagged the pattern as SC2129 on its first run; consolidated the
+  three appends and the `awk` invocation into a single `{ ...; ... }
+  > file` block. Same output, one syscall instead of four.
+
 ## [1.3.1] - 2026-04-17
 
 ### Fixed

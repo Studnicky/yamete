@@ -1,155 +1,135 @@
-# Yamete
+<p align="center">
+  <a href="https://studnicky.github.io/yamete">
+    <img src="App/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256%401x.png" alt="Yamete" width="160" height="160">
+  </a>
+</p>
 
-**[studnicky.github.io/yamete](https://studnicky.github.io/yamete)**
+<h1 align="center">Yamete</h1>
 
-A macOS menu bar app that detects physical impacts on Apple Silicon MacBooks and responds with audio and visual feedback.
+<p align="center"><em>An app that reacts when you smack your MacBook.</em></p>
 
-Uses the built-in BMI286 accelerometer via IOKit public APIs (IOHIDEventSystemClient + IOHIDManager) with a multi-gate impact detection pipeline calibrated to reject ambient vibrations while responding to direct desk impacts. Also supports microphone-based detection (all Macs) and headphone motion (AirPods/Beats).
+<!-- ----- ship status ----- -->
 
-## Requirements
+[![CI](https://github.com/Studnicky/yamete/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/Studnicky/yamete/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Studnicky/yamete?display_name=tag&label=release&color=brightgreen)](https://github.com/Studnicky/yamete/releases/latest)
+[![Release date](https://img.shields.io/github/release-date/Studnicky/yamete?color=blue&label=last%20release)](https://github.com/Studnicky/yamete/releases)
+[![Downloads](https://img.shields.io/github/downloads/Studnicky/yamete/total?label=DMG%20downloads&color=orange)](https://github.com/Studnicky/yamete/releases)
+[![Latest commit](https://img.shields.io/github/last-commit/Studnicky/yamete/develop?label=last%20commit&color=success)](https://github.com/Studnicky/yamete/commits/develop)
+[![Open PRs](https://img.shields.io/github/issues-pr/Studnicky/yamete?color=orchid)](https://github.com/Studnicky/yamete/pulls)
 
-- macOS 14.0+ (Sonoma)
+<!-- ----- platform + stack ----- -->
 
-### Sensor compatibility
+[![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](https://swift.org)
+[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
+[![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M4-555555?logo=apple&logoColor=white)](https://www.apple.com/mac/)
+[![Xcode 16](https://img.shields.io/badge/Xcode-16-1575F9?logo=xcode&logoColor=white)](https://developer.apple.com/xcode/)
+[![SPM](https://img.shields.io/badge/SwiftPM-compatible-brightgreen?logo=swift&logoColor=white)](Package.swift)
+[![Strict Concurrency](https://img.shields.io/badge/strict%20concurrency-complete-blue)](Sources/)
+[![No 3rd-party deps](https://img.shields.io/badge/3rd--party%20deps-zero-success)](Package.swift)
+[![Menu bar only](https://img.shields.io/badge/LSUIElement-true-lightgrey)](App/Config/Info.plist)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
-| Sensor | Supported Macs | Notes |
-|--------|---------------|-------|
-| Accelerometer (BMI286) | MacBook Air (M1–M4), MacBook Pro (M1–M4) | Built-in SPU accelerometer, Apple Silicon laptops only |
-| Microphone | Any Mac with audio input | Built-in or external microphone |
-| Headphone Motion | Any Mac + AirPods Pro/Max, AirPods 3rd gen+, Beats Fit Pro | Requires connected compatible headphones |
+<!-- ----- what's inside ----- -->
 
-Desktop Macs (iMac, Mac Mini, Mac Studio, Mac Pro) can use microphone and headphone motion detection but do not have a built-in accelerometer.
+[![Sensors](https://img.shields.io/badge/sensors-3-blueviolet)](https://studnicky.github.io/yamete/architecture.html#modules)
+[![Detection gates](https://img.shields.io/badge/detection%20gates-6-teal)](https://studnicky.github.io/yamete/architecture.html#detection-gates)
+[![SPM modules](https://img.shields.io/badge/SPM%20modules-4-steelblue)](https://studnicky.github.io/yamete/architecture.html#modules)
+[![Face expressions](https://img.shields.io/badge/face%20expressions-11-9cf)](https://studnicky.github.io/yamete)
+[![Sound clips](https://img.shields.io/badge/sound%20clips-9-ff8c00)](App/Resources/sounds)
+[![Locales](https://img.shields.io/badge/locales-40-ff69b4)](App/Resources)
+[![Build variants](https://img.shields.io/badge/build%20variants-2-yellowgreen)](https://studnicky.github.io/yamete/#two-builds)
+
+<!-- ----- promises ----- -->
+
+[![Zero network](https://img.shields.io/badge/network-zero-black)](https://studnicky.github.io/yamete/privacy.html)
+[![Zero analytics](https://img.shields.io/badge/analytics-none)](https://studnicky.github.io/yamete/privacy.html)
+[![Zero telemetry](https://img.shields.io/badge/telemetry-none)](https://studnicky.github.io/yamete/privacy.html)
+[![Zero tracking](https://img.shields.io/badge/tracking-nope)](https://studnicky.github.io/yamete/privacy.html)
+[![Zero Electron](https://img.shields.io/badge/Electron-heavens%20no-darkgreen)](Package.swift)
+[![Zero onboarding](https://img.shields.io/badge/onboarding-skipped-lightgrey)](App/Config/Info.plist)
+[![Zero cloud](https://img.shields.io/badge/cloud-absent-skyblue)]()
+[![Log retention](https://img.shields.io/badge/log%20retention-24h-slategray)](Sources/YameteCore/Logging.swift)
+
+<!-- ----- flex ----- -->
+
+[![Reads an accelerometer Apple never shipped a public API for](https://img.shields.io/badge/audacity-high-red)](https://studnicky.github.io/yamete/architecture.html)
+[![BMI286 whisperer](https://img.shields.io/badge/BMI286-whisperer-crimson)](https://studnicky.github.io/yamete/architecture.html#modules)
+[![IOKit respecter](https://img.shields.io/badge/IOKit-respecter-indigo)](Sources/SensorKit/AccelerometerReader.swift)
+[![MainActor discipline](https://img.shields.io/badge/MainActor-disciplined-purple)](Sources/YameteApp/ImpactController.swift)
+[![CFRunLoopRun parked](https://img.shields.io/badge/CFRunLoopRun-parked%20gracefully-darkorchid)](Sources/SensorKit/AccelerometerReader.swift)
+[![@unchecked Sendable: 2](https://img.shields.io/badge/unchecked%20Sendable-2%20narrow%20wrappers-lightblue)](Sources/SensorKit/AccelerometerReader.swift)
+
+<!-- ----- exclamations (CI-badge style for things that are not CI) ----- -->
+
+[![yamete](https://img.shields.io/badge/%E3%82%84%E3%82%81%E3%81%A6-stopppp-brightgreen)](https://studnicky.github.io/yamete)
+[![itai](https://img.shields.io/badge/%E3%81%84%E3%81%9F%E3%81%84-ouch-red)](App/Resources/sounds)
+[![mou](https://img.shields.io/badge/%E3%82%82%E3%81%86-enough-orange)](App/Resources/faces)
+[![yabai](https://img.shields.io/badge/%E3%82%84%E3%81%B0%E3%81%84-uh%20oh-yellow)](https://github.com/Studnicky/yamete/issues)
+[![chotto](https://img.shields.io/badge/%E3%81%A1%E3%82%87%E3%81%A3%E3%81%A8-hold%20on-blueviolet)](Sources/YameteApp/ImpactController.swift)
+[![desk-slap](https://img.shields.io/badge/desk%20slap-detected-success)](Sources/SensorKit/AccelerometerReader.swift)
+[![face](https://img.shields.io/badge/current%20face-screaming-ff4757)](App/Resources/faces)
+[![impact-tier](https://img.shields.io/badge/last%20impact-FIRM-critical)](https://studnicky.github.io/yamete/architecture.html#detection-gates)
+[![watchdog](https://img.shields.io/badge/watchdog-watching-informational)](Sources/SensorKit/AccelerometerReader.swift)
+[![machine spirits](https://img.shields.io/badge/machine%20spirits-appeased-blueviolet)](CLAUDE.md)
+
+<!-- ----- flavor ----- -->
+
+[![The face has seen things](https://img.shields.io/badge/the%20face-has%20seen%20things-8a2be2)](https://studnicky.github.io/yamete)
+[![Does it spark joy](https://img.shields.io/badge/does%20it%20spark%20joy-occasionally-ffb6c1)](https://studnicky.github.io/yamete/#features)
+[![Will improve your life](https://img.shields.io/badge/will%20improve%20your%20life-no-lightcoral)](https://studnicky.github.io/yamete/#why)
+[![Engineering effort](https://img.shields.io/badge/engineering%20effort-wildly%20disproportionate-orange)](https://studnicky.github.io/yamete/#why)
+[![Dinner party defensibility](https://img.shields.io/badge/dinner%20party%20defensibility-tenuous-gold)](https://studnicky.github.io/yamete/#why)
+[![Screaming face](https://img.shields.io/badge/screaming%20face-on%20demand-hotpink)](App/Resources/faces)
+[![Warranty](https://img.shields.io/badge/warranty-none%20whatsoever-lightgrey)](#license)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/Studnicky/yamete/pulls)
+[![Built on a Friday](https://img.shields.io/badge/built-on%20a%20Friday-cyan)]()
+[![Made with ](https://img.shields.io/badge/made%20with-%E2%9D%A4-red)]()
+
+Yamete sits in your menu bar, watches the built-in accelerometer, the microphone, and your AirPods if you're wearing them, and plays a sound + flashes a face when anything feels like a smack. The face has range. The sounds have opinions. The notifications, in the Direct build, have no shame whatsoever.
+
+**Everything lives on the project site** → **[studnicky.github.io/yamete](https://studnicky.github.io/yamete)**
+
+This README is the short version. For the tour:
+
+- **[Features, screenshots, the whole pitch](https://studnicky.github.io/yamete)** — what it does and why you might want that
+- **[Architecture](https://studnicky.github.io/yamete/architecture.html)** — module graph, detection gates, concurrency model, the whole signal path from IOKit to speaker
+- **[Support & FAQ](https://studnicky.github.io/yamete/support.html)** — "what is this", "how do I tune it", "why won't the accelerometer wake up on App Store"
+- **[Privacy](https://studnicky.github.io/yamete/privacy.html)** — nothing leaves your Mac. Nothing. *(elaboration unnecessary but available)*
+- **[CHANGELOG](CHANGELOG.md)** — every release, what changed, why
 
 ## Install
 
-### From DMG
+Download the latest **Yamete Direct.dmg** from **[Releases](https://github.com/Studnicky/yamete/releases/latest)**, mount it, drag *Yamete Direct.app* to Applications. Done.
 
-Download the latest direct-distribution `.dmg` from [Releases](../../releases), open it, and drag **Yamete Direct.app** to Applications. The Mac App Store build ships separately as **Yamete**.
+The Mac App Store build ships separately as **Yamete** and is sandboxed. If you want the accelerometer channel on App Store, [install the sensor-kickstart helper](https://studnicky.github.io/yamete/#accelerometer) once per machine — Apple's sandbox won't let the app wake the sensor itself, but a LaunchDaemon can.
 
-### From source
+### Build from source
 
 ```sh
 git clone https://github.com/Studnicky/yamete.git
 cd yamete
-make install
+make install     # Yamete Direct.app → /Applications
 ```
 
-### Build only
+Other make targets: `make build`, `make appstore`, `make dmg`, `make test`, `make lint`.
 
-```sh
-make build        # dist/Yamete Direct.app
-make dmg          # dist/Yamete Direct.dmg
-make test         # run test suite
-```
+## What's under the hood
 
-## How it works
+- **Three sensor adapters** fused by a consensus engine with rearm. [Full pipeline on the architecture page](https://studnicky.github.io/yamete/architecture.html#how-it-works).
+- **Swift 6 with complete strict concurrency.** The `@unchecked Sendable` surface is two narrow framework-handle wrappers with inline rationale. Everything else is genuine `Sendable` or actor-isolated.
+- **Four SPM modules** with a unidirectional graph: `YameteCore` ← `SensorKit`/`ResponseKit` ← `YameteApp`. [Source map](https://studnicky.github.io/yamete/architecture.html#files).
+- **Zero network.** No analytics. No telemetry. Local logs auto-rotate every 24 hours. [Privacy page](https://studnicky.github.io/yamete/privacy.html) has the receipts.
 
-```
-Sensor Adapters (each runs its own detection pipeline):
-    Accelerometer (IOHIDEventSystemClient activation + IOHIDManager reading)
-        100Hz raw → 2:1 decimation → bandpass (HP 20Hz + LP 25Hz)
-        → spike/rise/crest/confirmations gates → SensorImpact (0-1 intensity)
-    Microphone (AVAudioEngine, public API, works on all Macs)
-        48kHz audio → per-buffer peak → DC-blocking HP filter
-        → spike/rise/crest/confirmations gates → SensorImpact (0-1 intensity)
-    Headphone Motion (CoreMotion, AirPods/Beats IMU)
-        userAcceleration magnitude → gates → SensorImpact (0-1 intensity)
+## Why does this exist
 
-Impact Fusion Engine:
-    Collects SensorImpact events within a time window
-    Consensus: N sensors must independently detect (user-configurable, 1-5)
-    Rearm: cooldown between responses (user-configurable)
-    Fused intensity: average across participating sensors
+Apple Silicon MacBooks ship with a real BMI286 accelerometer — the same class of part that's in phones — and Apple exposes exactly zero public API for it on macOS. The entire `CMMotionManager` surface is `API_UNAVAILABLE(macos)`. I read that as an invitation. [Full context](https://studnicky.github.io/yamete/#why).
 
-Response:
-    Reactivity band maps fused intensity to 0-1 response intensity
-    Intensity drives audio clip selection, volume, flash opacity, and envelope
-    Impact tier classification (Tap / Light / Medium / Firm / Hard)
-```
+> If you use this daily, I genuinely want to know why. If you install it, laugh once, and delete it, that's a completely valid outcome and I'm glad you stopped by.
 
-## Configuration
+## Contributing
 
-All settings are in the menu bar dropdown. Main controls use range sliders where the two thumbs define a response window. Each setting has an icon with tappable inline help.
-
-### Main Controls
-
-- **Reactivity** (0-100%): Impact force response window. Higher = responds to lighter impacts. The five tiers (Hard/Firm/Med/Light/Tap) are marked on the ruler.
-- **Volume** (0-100%): Audio playback level window. Intensity maps linearly between low and high thumbs.
-- **Flash Opacity** (0-100%): Screen flash brightness window. Envelope (attack/hold/decay) shaped by intensity.
-
-### Collapsible Panels
-
-- **Device Settings**: Select which displays show the flash overlay and which audio devices play sounds.
-- **Sensitivity Settings**: Advanced detection tuning — frequency band, cooldown, spike threshold, rise rate, confirmations, warmup. Each has a tappable help icon.
-
-### Footer
-
-- **Pause / Resume**: Stop/start the detection pipeline.
-- **Launch at Login**: Register with macOS for auto-start.
-- **Impact counter**: Shows daily count and last impact tier + magnitude.
-
-## Distribution
-
-The repo now ships two distinct products:
-
-- **Yamete**: Mac App Store build, bundle id `com.studnicky.yamete`, sandboxed with `device.usb` and `device.audio-input` entitlements.
-- **Yamete Direct**: direct-download build, bundle id `com.studnicky.yamete.direct`, unsandboxed, signed and notarized separately.
-
-Both products use the same public IOKit accelerometer path: `IOHIDEventSystemClientCreateSimpleClient` + `IOHIDServiceClientSetProperty` for activation, and `IOHIDManager` input report callbacks for reading.
-
-## Project structure
-
-Four SPM modules with a clean dependency graph: `YameteCore <- SensorKit, ResponseKit <- YameteApp`.
-
-```
-Sources/
-  YameteCore/                 Shared types, logging, signal processing
-    Domain.swift              Vec3, ImpactTier, SensorID, protocols
-    Logging.swift             Dual-sink logger (os.Logger + file, 24h retention)
-    SignalProcessing.swift    RingBuffer, HighPassFilter, LowPassFilter
-
-  SensorKit/                  Sensor adapters, per-adapter detection, fusion
-    SensorAdapter.swift       SensorAdapter protocol, SensorImpact, SensorManager
-    ImpactDetector.swift      Per-adapter gate pipeline (spike, rise, crest, confirmations)
-    ImpactDetection.swift     ImpactFusionEngine (consensus, rearm, response dispatch)
-    AccelerometerReader.swift BMI286 accelerometer adapter (IOKit public API)
-    MicrophoneAdapter.swift   Audio transient detection (AVAudioEngine)
-    HeadphoneMotionAdapter.swift AirPods/Beats IMU (CoreMotion)
-
-  ResponseKit/                Audio playback, device enumeration, screen flash
-    AudioDevice.swift         CoreAudio output device enumeration
-    AudioPlayer.swift         Sound playback, duration-sorted clip selection
-    ScreenFlash.swift         Per-monitor radial vignette overlay
-
-  YameteApp/                  App layer: controller, settings, views
-    YameteApp.swift           App entry point, menu bar setup
-    ImpactController.swift    Coordinator: detect() -> respond() pipeline
-    SettingsStore.swift       UserDefaults persistence, range validation
-    Updater.swift             App version display
-    Views/
-      MenuBarView.swift       Settings dropdown with accordion panels
-      MenuBarIcon.swift       Menu bar icon
-      Theme.swift             Color palette, AccordionCard, SettingHeader
-      RangeSlider.swift       Dual-thumb range slider component
-
-App/
-  Config/
-    Info.plist                Shared app metadata for Xcode and direct builds
-    AppStore.entitlements     Mac App Store signing entitlements
-    Direct.entitlements       Direct-distribution signing entitlements (empty: unsandboxed)
-
-  Resources/
-    Assets.xcassets/          App Store app icon catalog
-    faces/                    Face images (any SVG/PNG/JPG, loaded recursively)
-    sounds/                   Sound clips (any MP3/WAV/M4A, sorted by duration at startup)
-
-Tests/                        117 tests (unit, integration, E2E)
-```
-
-## Privacy
-
-See [PRIVACY.md](PRIVACY.md). No data leaves your Mac. Logs auto-delete after 24 hours.
+Issues and PRs welcome at [github.com/Studnicky/yamete](https://github.com/Studnicky/yamete). Support is GitHub Issues only — there's no email.
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE). Bundled sound and face assets have their own provenance; see [LICENSES-CONTENT.md](LICENSES-CONTENT.md).

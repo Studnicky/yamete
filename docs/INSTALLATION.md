@@ -3,6 +3,8 @@
 ## Requirements
 
 - macOS 14.0+ (Sonoma)
+- Built with Swift 6 (complete strict concurrency)
+- Latest release: 1.3.2
 
 ### Sensor compatibility by Mac model
 
@@ -39,7 +41,7 @@ make install        # builds and copies to /Applications
 | `make release` | `dist/Yamete Direct.app` | Optimized direct build, Developer ID signed |
 | `make dmg` | `dist/Yamete Direct.dmg` | Direct-download disk image |
 | `make install` | `/Applications/Yamete Direct.app` | Build and install the direct product |
-| `make test` | — | Run test suite (117 tests) |
+| `make test` | — | Run the full test suite (unit, integration, E2E) |
 | `make clean` | — | Remove build artifacts |
 
 ### App Store archive

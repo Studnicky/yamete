@@ -11,7 +11,22 @@ on:
 permissions:
   contents: read
 
+# Cancel in-progress CI runs for the same ref when a new push lands. Saves
+# runner minutes and stops stale builds from racing newer ones. Not applied
+# to the `master` ref (the default branch keeps every run visible).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
+  actionlint:
+    name: Lint workflow YAML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run actionlint
+        uses: raven-actions/actionlint@v2
+
   lint:
     name: Lint (strict concurrency)
     runs-on: macos-15
