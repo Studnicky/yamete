@@ -485,44 +485,39 @@ public final class SettingsStore {
 
     /// Restores all settings to their factory default values.
     func resetToDefaults() {
-        let d = Self.defaults
-        sensitivityMin    = d[Key.sensitivityMin.rawValue]  as! Double
-        sensitivityMax    = d[Key.sensitivityMax.rawValue]  as! Double
-        accelBandpassLowHz     = d[Key.accelBandpassLowHz.rawValue]   as! Double
-        accelBandpassHighHz    = d[Key.accelBandpassHighHz.rawValue]   as! Double
-        debounce          = d[Key.debounce.rawValue]         as! Double
-        soundEnabled      = d[Key.soundEnabled.rawValue]     as! Bool
-        debugLogging      = AppLog.supportsDebugLogging ? d[Key.debugLogging.rawValue] as! Bool : false
-        visualResponseMode = VisualResponseMode(
-            rawValue: d[Key.visualResponseMode.rawValue] as! String
-        ) ?? Defaults.visualResponseMode
-        notificationLocale = d[Key.notificationLocale.rawValue] as! String
-        flashOpacityMin   = d[Key.flashOpacityMin.rawValue]  as! Double
-        flashOpacityMax   = d[Key.flashOpacityMax.rawValue]  as! Double
-        volumeMin         = d[Key.volumeMin.rawValue]        as! Double
-        volumeMax         = d[Key.volumeMax.rawValue]        as! Double
-        enabledDisplays   = d[Key.enabledDisplays.rawValue]  as! [Int]
-        enabledAudioDevices = d[Key.enabledAudioDevices.rawValue] as! [String]
-        enabledSensorIDs  = d[Key.enabledSensorIDs.rawValue] as! [String]
-        consensusRequired     = d[Key.consensusRequired.rawValue]     as! Int
-        accelSpikeThreshold   = d[Key.accelSpikeThreshold.rawValue]  as! Double
-        accelCrestFactor      = d[Key.accelCrestFactor.rawValue]     as! Double
-        accelRiseRate         = d[Key.accelRiseRate.rawValue]        as! Double
-        accelConfirmations    = d[Key.accelConfirmations.rawValue]   as! Int
-        accelWarmupSamples    = d[Key.accelWarmupSamples.rawValue]   as! Int
-        accelReportInterval   = d[Key.accelReportInterval.rawValue]  as! Double
-        accelBandpassLowHz    = d[Key.accelBandpassLowHz.rawValue]   as! Double
-        accelBandpassHighHz   = d[Key.accelBandpassHighHz.rawValue]  as! Double
-        micSpikeThreshold = d[Key.micSpikeThreshold.rawValue] as! Double
-        micCrestFactor    = d[Key.micCrestFactor.rawValue]    as! Double
-        micRiseRate       = d[Key.micRiseRate.rawValue]       as! Double
-        micConfirmations  = d[Key.micConfirmations.rawValue]  as! Int
-        micWarmupSamples  = d[Key.micWarmupSamples.rawValue]  as! Int
-        hpSpikeThreshold  = d[Key.hpSpikeThreshold.rawValue]  as! Double
-        hpCrestFactor     = d[Key.hpCrestFactor.rawValue]     as! Double
-        hpRiseRate        = d[Key.hpRiseRate.rawValue]        as! Double
-        hpConfirmations   = d[Key.hpConfirmations.rawValue]   as! Int
-        hpWarmupSamples   = d[Key.hpWarmupSamples.rawValue]   as! Int
+        sensitivityMin        = Defaults.sensitivityMin
+        sensitivityMax        = Defaults.sensitivityMax
+        accelBandpassLowHz    = Defaults.accelBandpassLow
+        accelBandpassHighHz   = Defaults.accelBandpassHigh
+        debounce              = Defaults.debounce
+        soundEnabled          = Defaults.soundEnabled
+        debugLogging          = AppLog.supportsDebugLogging ? Defaults.debugLogging : false
+        visualResponseMode    = Defaults.visualResponseMode
+        notificationLocale    = ""
+        flashOpacityMin       = Defaults.flashOpacityMin
+        flashOpacityMax       = Defaults.flashOpacityMax
+        volumeMin             = Defaults.volumeMin
+        volumeMax             = Defaults.volumeMax
+        enabledDisplays       = []
+        enabledAudioDevices   = []
+        enabledSensorIDs      = []
+        consensusRequired     = Defaults.consensus
+        accelSpikeThreshold   = Defaults.accelSpikeThreshold
+        accelCrestFactor      = Defaults.accelCrestFactor
+        accelRiseRate         = Defaults.accelRiseRate
+        accelConfirmations    = Defaults.accelConfirmations
+        accelWarmupSamples    = Defaults.accelWarmup
+        accelReportInterval   = Defaults.accelReportInterval
+        micSpikeThreshold     = Defaults.micSpikeThreshold
+        micCrestFactor        = Defaults.micCrestFactor
+        micRiseRate           = Defaults.micRiseRate
+        micConfirmations      = Defaults.micConfirmations
+        micWarmupSamples      = Defaults.micWarmup
+        hpSpikeThreshold      = Defaults.hpSpikeThreshold
+        hpCrestFactor         = Defaults.hpCrestFactor
+        hpRiseRate            = Defaults.hpRiseRate
+        hpConfirmations       = Defaults.hpConfirmations
+        hpWarmupSamples       = Defaults.hpWarmup
     }
 
     // MARK: - Private
