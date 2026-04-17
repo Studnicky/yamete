@@ -40,9 +40,19 @@ else
 $(error BUILD_VARIANT must be 'direct' or 'appstore', got '$(BUILD_VARIANT)')
 endif
 
+# ── yq dependency check ───────────────────────────────────────
+# Structured queries against project.yml use yq (not sed regex). This keeps
+# Makefile and CI in sync with the YAML schema and avoids brittle patterns
+# that break the moment formatting changes. yq must be installed locally;
+# print a helpful error and bail early if it is missing.
+YQ := $(shell command -v yq 2>/dev/null)
+ifndef YQ
+$(error yq not found in PATH. Install with `brew install yq` (https://github.com/mikefarah/yq))
+endif
+
 DEVELOPMENT_LANGUAGE := en
-MARKETING_VERSION := $(shell sed -n 's/^[[:space:]]*MARKETING_VERSION: "\([^"]*\)"/\1/p' project.yml | head -n 1)
-CURRENT_PROJECT_VERSION := $(shell sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION: "\([^"]*\)"/\1/p' project.yml | head -n 1)
+MARKETING_VERSION := $(shell yq -r '.settings.base.MARKETING_VERSION' project.yml)
+CURRENT_PROJECT_VERSION := $(shell yq -r '.settings.base.CURRENT_PROJECT_VERSION' project.yml)
 DIST      := dist
 BUILD     := .build-stage/$(BUILD_VARIANT)
 TARGET    := $(DIST)/$(APP).app
@@ -62,7 +72,17 @@ PKGINFO         := $(CONFIG_DIR)/PkgInfo
 SOURCES := $(shell find Sources -name '*.swift' | sort)
 BUNDLE_RESOURCES := $(shell find $(RESOURCE_SRC) $(RESOURCE_DIRECT) -type f 2>/dev/null)
 
-FRAMEWORKS := SwiftUI AppKit AVFoundation CoreAudio CoreMotion ServiceManagement
+# ── Framework list (drift-guarded) ────────────────────────────
+# The set of system frameworks the app links against is enumerated in THREE
+# places that must stay in lockstep:
+#   1. This FRAMEWORKS variable           (Makefile: `make build` / `make lint`)
+#   2. Package.swift  `.linkedFramework(…)` entries per target (SPM builds)
+#   3. project.yml    `dependencies: [- sdk: …]` on the Yamete target (Xcode)
+# The `lint-frameworks` target below diffs all three and fails if they disagree,
+# so any addition/removal here MUST be mirrored in Package.swift and project.yml.
+# Keep the list sorted in normalized form (framework basename, no `.framework`
+# suffix, case-sensitive) to make diffs readable.
+FRAMEWORKS := AppKit AVFoundation CoreAudio CoreMotion IOKit ServiceManagement SwiftUI UserNotifications
 SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as-library \
               $(VARIANT_FLAGS) \
               $(addprefix -framework ,$(FRAMEWORKS)) \
@@ -70,7 +90,7 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 
 SIGNING_ID ?= -
 
-.PHONY: all build test install uninstall clean dmg lint verify release notarize \
+.PHONY: all build test install uninstall clean dmg lint lint-frameworks verify release notarize \
         appstore appstore-install appstore-lint
 
 all: build
@@ -133,15 +153,52 @@ build: $(BUILD_BINARY) $(BUILD)/.minified
 	 printf "  bundle    $(TARGET) ($$SIZE)\n"
 
 # ── Lint ──────────────────────────────────────────────────────
-lint:
+lint: lint-frameworks
 	@printf "  lint      strict concurrency\n"
 	@swiftc -typecheck $(SWIFTFLAGS) -strict-concurrency=complete -warnings-as-errors $(SOURCES)
+
+# ── Lint: framework-list drift guard ─────────────────────────
+# Fails if the framework list in the Makefile (FRAMEWORKS), Package.swift
+# (.linkedFramework(…) across all targets), and project.yml (sdk: …
+# dependencies on the Yamete target) disagree. See the comment block above
+# FRAMEWORKS for why this matters. Normalizes by stripping `.framework`
+# suffixes and sorting.
+lint-frameworks:
+	@printf "  lint      framework-list drift guard\n"
+	@YML_LIST=$$(yq -r '.targets.Yamete.dependencies[] | select(.sdk) | .sdk' project.yml \
+		| sed 's/\.framework$$//' | sort -u); \
+	PKG_LIST=$$(grep -E '^[[:space:]]*\.linkedFramework\(' Package.swift \
+		| sed -E 's/.*\.linkedFramework\("([^"]+)"\).*/\1/' | sort -u); \
+	MAK_LIST=$$(printf '%s\n' $(FRAMEWORKS) | sort -u); \
+	YML_TMP=$$(mktemp); PKG_TMP=$$(mktemp); MAK_TMP=$$(mktemp); \
+	printf '%s\n' "$$YML_LIST" > "$$YML_TMP"; \
+	printf '%s\n' "$$PKG_LIST" > "$$PKG_TMP"; \
+	printf '%s\n' "$$MAK_LIST" > "$$MAK_TMP"; \
+	DIFF_YP=$$(diff -u "$$YML_TMP" "$$PKG_TMP" || true); \
+	DIFF_YM=$$(diff -u "$$YML_TMP" "$$MAK_TMP" || true); \
+	rm -f "$$YML_TMP" "$$PKG_TMP" "$$MAK_TMP"; \
+	if [ -n "$$DIFF_YP" ] || [ -n "$$DIFF_YM" ]; then \
+		printf "  FAIL      framework lists drifted across sources\n"; \
+		printf "\n  project.yml (sdk:) vs Package.swift (.linkedFramework):\n"; \
+		printf "%s\n" "$$DIFF_YP"; \
+		printf "\n  project.yml (sdk:) vs Makefile FRAMEWORKS:\n"; \
+		printf "%s\n" "$$DIFF_YM"; \
+		printf "\n  Fix: align all three. Sources:\n"; \
+		printf "    - Makefile FRAMEWORKS variable\n"; \
+		printf "    - Package.swift .linkedFramework(...) per target\n"; \
+		printf "    - project.yml targets.Yamete.dependencies (sdk: X.framework)\n"; \
+		exit 1; \
+	fi
+	@printf "  lint      ✓ frameworks aligned across Makefile, Package.swift, project.yml\n"
 
 # ── App Store build convenience targets ──────────────────────
 # These wrappers force BUILD_VARIANT=appstore so the right resources,
 # bundle ID, executable name, and entitlements are used. The default
 # `make build` / `make install` keep building Direct.
 
+# NOTE: `make appstore` builds the sandboxed App Store variant. Sandbox
+# entitlements ONLY apply to this target (and archive) — not Xcode's Run
+# button on the Yamete-AppStore scheme, which uses Debug config.
 appstore:
 	@$(MAKE) build BUILD_VARIANT=appstore
 

@@ -1,5 +1,7 @@
 # Yamete
 
+**[studnicky.github.io/yamete](https://studnicky.github.io/yamete)**
+
 A macOS menu bar app that detects physical impacts on Apple Silicon MacBooks and responds with audio and visual feedback.
 
 Uses the built-in BMI286 accelerometer via IOKit public APIs (IOHIDEventSystemClient + IOHIDManager) with a multi-gate impact detection pipeline calibrated to reject ambient vibrations while responding to direct desk impacts. Also supports microphone-based detection (all Macs) and headphone motion (AirPods/Beats).
