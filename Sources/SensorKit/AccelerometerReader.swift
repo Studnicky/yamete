@@ -391,10 +391,13 @@ private enum AccelHardware {
         }
 
         let cleanup = OnceCleanup(AccelResources(
-            manager: manager, device: device, buffer: buffer,
-            maxSize: maxSize, runLoop: runLoop, runLoopMode: rlMode,
-            thread: thread, ctxPtr: ctxPtr, ctx: ctx,
-            watchdog: WatchdogHandle(task: watchdogTask),
+            iokit: IOKitHandles(
+                manager: manager, device: device, buffer: buffer,
+                maxSize: maxSize, runLoop: runLoop, runLoopMode: rlMode,
+                ctxPtr: ctxPtr
+            ),
+            thread: thread, ctx: ctx,
+            watchdog: WatchdogHandle(task: watchdogTask)
         ))
 
         continuation.onTermination = { @Sendable _ in
@@ -417,17 +420,18 @@ private enum AccelHardware {
                 // CF data-structure modification (TSAN reports SEGV in
                 // CF_IS_OBJC during a worker-thread CF dispatch).
                 r.thread.cancel()
-                CFRunLoopStop(r.runLoop)
+                CFRunLoopStop(r.iokit.runLoop)
                 r.thread.join()
 
                 // Phase 3 — now safe to mutate IOHIDManager state and
                 // close the device. The HID worker is fully exited.
-                IOHIDDeviceRegisterInputReportCallback(r.device, r.buffer, r.maxSize, nil, nil)
-                IOHIDManagerUnscheduleFromRunLoop(r.manager, r.runLoop, r.runLoopMode.rawValue)
-                IOHIDDeviceClose(r.device, IOOptionBits(kIOHIDOptionsTypeNone))
-                IOHIDManagerClose(r.manager, IOOptionBits(kIOHIDOptionsTypeNone))
-                r.buffer.deallocate()
-                r.ctxPtr.release()
+                let k = r.iokit
+                IOHIDDeviceRegisterInputReportCallback(k.device, k.buffer, k.maxSize, nil, nil)
+                IOHIDManagerUnscheduleFromRunLoop(k.manager, k.runLoop, k.runLoopMode.rawValue)
+                IOHIDDeviceClose(k.device, IOOptionBits(kIOHIDOptionsTypeNone))
+                IOHIDManagerClose(k.manager, IOOptionBits(kIOHIDOptionsTypeNone))
+                k.buffer.deallocate()
+                k.ctxPtr.release()
             }
             log.info("activity:SensorReading wasEndedBy agent:\(adapterName)")
         }
@@ -456,15 +460,56 @@ private enum AccelHardware {
 
 // MARK: - Accelerometer resource bundle (consumed by OnceCleanup on stream teardown)
 
-private struct AccelResources: @unchecked Sendable {
+/// Opaque handle bundle over the IOKit/CoreFoundation objects plus the raw
+/// report buffer and retained `Unmanaged<ReportContext>`. Every field here is
+/// a framework-owned type that does not (and cannot) participate in Swift
+/// concurrency's Sendable graph: `IOHIDManager`, `IOHIDDevice`, `CFRunLoop`,
+/// and `CFRunLoopMode` are CoreFoundation classes imported without Sendable
+/// conformance; `UnsafeMutablePointer` is never Sendable; `Unmanaged` is a
+/// retain-count wrapper with no concurrency semantics.
+///
+/// `@unchecked Sendable` is sound here because these handles participate in
+/// a strictly-phased lifecycle that rules out concurrent access:
+///
+/// 1. Construction (on the thread that called `openStream`): all handles are
+///    fetched / allocated / opened before the struct is built. Nothing else
+///    in the process has a reference yet.
+/// 2. Publish: the struct is moved once into `OnceCleanup(AccelResources)`
+///    and then into the `continuation.onTermination` closure. No mutation
+///    happens after publish; every field is `let`.
+/// 3. Teardown: the cleanup closure is guaranteed to run at most once
+///    (`OnceCleanup` uses an `OSAllocatedUnfairLock` around a consumed
+///    optional). The teardown order is phase-sequenced:
+///     - cancel the watchdog Task (waits for in-flight snapshot to finish)
+///     - invalidate the ReportContext (subsequent HID callbacks no-op)
+///     - cancel the HID thread and `join()` it so the run loop is fully
+///       exited before we mutate CF state
+///     - only then touch `manager`, `device`, `runLoop`, `runLoopMode`
+///     - only then deallocate the buffer and release `ctxPtr`
+///    After this closure returns, nothing in the program holds a live
+///    reference to any of these handles.
+///
+/// The boundary is limited to the framework handles. The project-owned
+/// `HIDRunLoopThread`, `ReportContext`, and `WatchdogHandle` live in the
+/// enclosing `AccelResources` and participate in the Sendable graph
+/// normally (they are real `Sendable`).
+private struct IOKitHandles: @unchecked Sendable {
     let manager: IOHIDManager
     let device: IOHIDDevice
     let buffer: UnsafeMutablePointer<UInt8>
     let maxSize: Int
     let runLoop: CFRunLoop
     let runLoopMode: CFRunLoopMode
-    let thread: HIDRunLoopThread
     let ctxPtr: Unmanaged<ReportContext>
+}
+
+/// Resource bundle consumed by `OnceCleanup` on stream teardown. Sendable
+/// because every field is either project-owned Sendable (`HIDRunLoopThread`,
+/// `ReportContext`, `WatchdogHandle`) or wrapped in the narrow
+/// `IOKitHandles` framework-boundary escape hatch above.
+private struct AccelResources: Sendable {
+    let iokit: IOKitHandles
+    let thread: HIDRunLoopThread
     let ctx: ReportContext
     let watchdog: WatchdogHandle
 }
@@ -592,6 +637,41 @@ private final class ReportContext: Sendable {
 /// inside `CFRunLoopRunInMode` modifies CF data structures concurrently and
 /// causes SEGV in `CF_IS_OBJC` (caught by ThreadSanitizer).
 private struct HIDRunLoopThread: Sendable {
+    /// Framework-handle bundle for the HID worker thread. Both fields fall
+    /// outside Swift concurrency's Sendable graph: `Thread` is explicitly
+    /// marked `@_nonSendable` in the Foundation overlay, and `CFRunLoop`
+    /// is a CoreFoundation class imported without Sendable conformance.
+    ///
+    /// This is the minimal possible `@unchecked Sendable` boundary: the
+    /// struct holds only the two framework handles with no other state.
+    /// Access is sound because:
+    ///
+    /// 1. Every read and write goes through the enclosing
+    ///    `OSAllocatedUnfairLock<State>`, serializing observation order.
+    /// 2. The handles' mutating operations are independently thread-safe
+    ///    by Apple design:
+    ///      - `Thread.cancel()` and `Thread.isCancelled` are documented
+    ///        thread-safe.
+    ///      - `CFRunLoopStop(_:)` is documented thread-safe — the canonical
+    ///        cross-thread way to wake a run loop and exit
+    ///        `CFRunLoopRunInMode`.
+    ///      - `CFRunLoopGetCurrent()` is called only inside the Thread
+    ///        block, on the worker thread itself, and the result is
+    ///        published under the lock before any external observer can
+    ///        read `runLoop`.
+    /// 3. The lifecycle is phased — `start()` → `waitUntilReady()` → use →
+    ///    `cancel()` → `join()`. Teardown callers must `join()` before
+    ///    touching CF objects the worker scheduled, or they race
+    ///    `CF_IS_OBJC` (TSAN-caught SEGV). The outer `AccelResources`
+    ///    teardown closure enforces this ordering.
+    ///
+    /// What would break if we dropped the lock: after `start()` returns,
+    /// two threads can legally race `state.thread?.isCancelled` (worker
+    /// thread reads in its poll loop) against the main thread's
+    /// `cancel()` write to `state.thread` or `state.runLoop`. The lock
+    /// prevents that data race on the `Optional<Thread>` / `Optional<CFRunLoop>`
+    /// storage slots themselves, which is separate from the thread-safety
+    /// of the pointees' own APIs.
     private struct State: @unchecked Sendable {
         var runLoop: CFRunLoop?
         var thread: Thread?
