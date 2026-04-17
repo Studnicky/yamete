@@ -1,0 +1,24 @@
+# Dependabot keeps GitHub Actions dependencies up to date. Swift Package
+# Manager is not yet a supported ecosystem (tracked upstream at
+# https://github.com/dependabot/dependabot-core/issues/7268), so SPM
+# dependencies in Package.swift still have to be bumped by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/New_York
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      github-actions-minor-patch:
+        update-types:
+          - minor
+          - patch
