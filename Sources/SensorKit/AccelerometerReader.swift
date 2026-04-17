@@ -519,11 +519,12 @@ private final class ReportContext: Sendable {
     /// Used by the watchdog when no reports arrive for the stall threshold.
     /// Marks the context invalid first so any in-flight callback no-ops.
     func surfaceStall(_ error: Error) {
-        state.withLock { s in
-            guard s.running else { return }
+        let cont = state.withLock { s -> AsyncThrowingStream<SensorImpact, Error>.Continuation? in
+            guard s.running else { return nil }
             s.running = false
-            s.continuation.finish(throwing: error)
+            return s.continuation
         }
+        cont?.finish(throwing: error)
     }
 
     func handleReport(report: UnsafeMutablePointer<UInt8>, length: Int) {
@@ -538,8 +539,12 @@ private final class ReportContext: Sendable {
         let rawY = rawBuffer.loadUnaligned(fromByteOffset: 10, as: Int32.self)
         let rawZ = rawBuffer.loadUnaligned(fromByteOffset: 14, as: Int32.self)
 
-        state.withLock { s in
-            guard s.running else { return }
+        // Resolve any pending yield outside the lock. Calling continuation.yield()
+        // while holding state.lock would cause a recursive os_unfair_lock abort
+        // because AsyncThrowingStream._Storage acquires the same lock internally.
+        typealias Pending = (cont: AsyncThrowingStream<SensorImpact, Error>.Continuation, impact: SensorImpact)
+        let pending: Pending? = state.withLock { s in
+            guard s.running else { return nil }
             // Watchdog timestamp — bumped on every accepted report so the
             // stall detector can tell live from frozen.
             s.lastReportAt = Date()
@@ -553,20 +558,20 @@ private final class ReportContext: Sendable {
                 log.info("activity:SensorReading wasGeneratedBy entity:Report adapter=\(self.adapterID) sampleCount=\(s.sampleCounter)")
             }
             s.sampleCounter += 1
-            guard s.sampleCounter % decimationFactor == 0 else { return }
+            guard s.sampleCounter % decimationFactor == 0 else { return nil }
 
             let raw = Vec3(x: Float(rawX) / rawScale, y: Float(rawY) / rawScale, z: Float(rawZ) / rawScale)
             let rawMag = raw.magnitude
-            guard rawMag > magnitudeMin && rawMag < magnitudeMax else { return }
+            guard rawMag > magnitudeMin && rawMag < magnitudeMax else { return nil }
 
             let filtered = s.lpFilter.process(s.hpFilter.process(raw))
             let filteredMag = filtered.magnitude
 
             let now = Date()
-            if let intensity = s.detector.process(magnitude: filteredMag, timestamp: now) {
-                s.continuation.yield(SensorImpact(source: self.adapterID, timestamp: now, intensity: intensity))
-            }
+            guard let intensity = s.detector.process(magnitude: filteredMag, timestamp: now) else { return nil }
+            return (s.continuation, SensorImpact(source: self.adapterID, timestamp: now, intensity: intensity))
         }
+        if let pending { pending.cont.yield(pending.impact) }
     }
 }
 
