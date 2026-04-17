@@ -54,6 +54,7 @@ targets:
       - sdk: ServiceManagement.framework
       - sdk: SwiftUI.framework
       - sdk: AppKit.framework
+      - sdk: UserNotifications.framework
     settings:
       base:
         PRODUCT_NAME: Yamete
@@ -63,12 +64,16 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: App/Config/AppStore.entitlements
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+        # Both paths are required and not redundant: SWIFT_INCLUDE_PATHS lets
+        # the Swift driver locate `module.modulemap`, while HEADER_SEARCH_PATHS
+        # lets the C/Objective-C compiler resolve the headers that module map
+        # references. Removing either breaks the IOHIDPublic C bridging module.
         SWIFT_INCLUDE_PATHS: "$(SRCROOT)/Sources/IOHIDPublic/include"
         HEADER_SEARCH_PATHS: "$(SRCROOT)/Sources/IOHIDPublic/include"
       configs:
         Debug:
           SWIFT_OPTIMIZATION_LEVEL: "-Onone"
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG"
         DebugDirect:
           SWIFT_OPTIMIZATION_LEVEL: "-Onone"
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG DIRECT_BUILD"
@@ -86,7 +91,7 @@ targets:
         ReleaseDirect:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
           SWIFT_COMPILATION_MODE: wholemodule
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DIRECT_BUILD
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DIRECT_BUILD"
           DEAD_CODE_STRIPPING: true
           STRIP_INSTALLED_PRODUCT: true
           STRIP_SWIFT_SYMBOLS: true
@@ -115,6 +120,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete.tests
 
 schemes:
+  # NOTE: run config is Debug — sandbox entitlements only apply via 'make appstore' or archive. Do not rely on Xcode Run button for sandboxing checks.
   Yamete-AppStore:
     build:
       targets:
