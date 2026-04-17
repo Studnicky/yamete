@@ -15,7 +15,8 @@ configs:
 
 settings:
   base:
-    SWIFT_VERSION: "5.9"
+    SWIFT_VERSION: "6"
+    SWIFT_STRICT_CONCURRENCY: complete
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ARCHS: arm64
     DEVELOPMENT_LANGUAGE: en
