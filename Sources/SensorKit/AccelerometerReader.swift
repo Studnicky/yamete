@@ -483,7 +483,12 @@ private struct WatchdogHandle: Sendable {
 private final class ReportContext: Sendable {
     let adapterID: SensorID
 
-    private struct State: @unchecked Sendable {
+    /// Every field is now Sendable on its own: the continuation, filters,
+    /// and detector are all Sendable value- or lock-protected types, so the
+    /// state struct is genuinely Sendable without `@unchecked`. The filters
+    /// are value types and must be `var` so we can call their mutating
+    /// `process(_:)` methods inside `state.withLock { s in ... }`.
+    private struct State: Sendable {
         var running = true
         var sampleCounter = 0
         /// Wall-clock time of the most recent successful report. The watchdog
@@ -491,8 +496,8 @@ private final class ReportContext: Sendable {
         /// keeping the SPU sensor warm in the App Store sandbox after sleep).
         var lastReportAt: Date = Date()
         let continuation: AsyncThrowingStream<SensorImpact, Error>.Continuation
-        let hpFilter: HighPassFilter
-        let lpFilter: LowPassFilter
+        var hpFilter: HighPassFilter
+        var lpFilter: LowPassFilter
         let detector: ImpactDetector
     }
     private let state: OSAllocatedUnfairLock<State>

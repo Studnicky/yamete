@@ -4,7 +4,11 @@ import Foundation
 
 /// First-order IIR high-pass filter for 3-axis accelerometer data.
 /// Removes DC offset (gravity) and low-frequency vibrations.
-public final class HighPassFilter {
+///
+/// Value-typed (`struct`) so it is `Sendable` by construction. Each owner
+/// holds an independent filter state; `process` is `mutating`. This mirrors
+/// the physical design: one filter per sensor stream, never shared.
+public struct HighPassFilter: Sendable {
     private let alpha: Float
     private var prev: Vec3 = .zero
     private var prevFiltered: Vec3 = .zero
@@ -18,7 +22,7 @@ public final class HighPassFilter {
         alpha = rc / (rc + dt)
     }
 
-    public func process(_ sample: Vec3) -> Vec3 {
+    public mutating func process(_ sample: Vec3) -> Vec3 {
         let filtered = Vec3(
             x: alpha * (prevFiltered.x + sample.x - prev.x),
             y: alpha * (prevFiltered.y + sample.y - prev.y),
@@ -34,7 +38,11 @@ public final class HighPassFilter {
 
 /// First-order IIR low-pass filter for 3-axis accelerometer data.
 /// Removes high-frequency noise and electronic interference.
-public final class LowPassFilter {
+///
+/// Value-typed (`struct`) so it is `Sendable` by construction. Each owner
+/// holds an independent filter state; `process` is `mutating`. This mirrors
+/// the physical design: one filter per sensor stream, never shared.
+public struct LowPassFilter: Sendable {
     private let alpha: Float
     private var prevFiltered: Vec3 = .zero
 
@@ -47,7 +55,7 @@ public final class LowPassFilter {
         alpha = dt / (rc + dt)
     }
 
-    public func process(_ sample: Vec3) -> Vec3 {
+    public mutating func process(_ sample: Vec3) -> Vec3 {
         let filtered = Vec3(
             x: prevFiltered.x + alpha * (sample.x - prevFiltered.x),
             y: prevFiltered.y + alpha * (sample.y - prevFiltered.y),
