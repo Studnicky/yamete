@@ -9,6 +9,8 @@ Uses the built-in BMI286 accelerometer via IOKit public APIs (IOHIDEventSystemCl
 ## Requirements
 
 - macOS 14.0+ (Sonoma)
+- Built with Swift 6 (complete strict concurrency)
+- Latest release: 1.3.1
 
 ### Sensor compatibility
 
@@ -90,7 +92,7 @@ All settings are in the menu bar dropdown. Main controls use range sliders where
 
 ## Distribution
 
-The repo now ships two distinct products:
+The repo ships two distinct products:
 
 - **Yamete**: Mac App Store build, bundle id `com.studnicky.yamete`, sandboxed with `device.usb` and `device.audio-input` entitlements.
 - **Yamete Direct**: direct-download build, bundle id `com.studnicky.yamete.direct`, unsandboxed, signed and notarized separately.
@@ -143,7 +145,7 @@ App/
     faces/                    Face images (any SVG/PNG/JPG, loaded recursively)
     sounds/                   Sound clips (any MP3/WAV/M4A, sorted by duration at startup)
 
-Tests/                        117 tests (unit, integration, E2E)
+Tests/                        Unit, integration, and E2E test suites
 ```
 
 ## Privacy
