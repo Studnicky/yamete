@@ -19,7 +19,7 @@ final class HighPassFilterTests: XCTestCase {
                   settleCount: 100, expectNearZero: false),
         ]
         for c in cases {
-            let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: 50.0)
+            var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: 50.0)
             var last = Vec3.zero
             for sample in c.signal { last = hpf.process(sample) }
             if c.expectNearZero {
