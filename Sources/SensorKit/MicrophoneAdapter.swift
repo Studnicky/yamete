@@ -49,6 +49,20 @@ public final class MicrophoneAdapter: SensorAdapter, Sendable {
         let engine = AVAudioEngine()
         let inputNode = engine.inputNode
         let format = inputNode.outputFormat(forBus: 0)
+
+        // Input format validity gate. A freshly-constructed AVAudioEngine on
+        // a host with no real audio input (headless CI runner, container,
+        // virtualized macOS) can report a zero-channel or zero-sample-rate
+        // format. Calling `installTap` with such a format produces undefined
+        // behavior in CoreAudio — observed as SIGSEGV during `swift test`
+        // teardown on CI run 24548266785. Fail fast with a typed error
+        // instead of touching the tap machinery at all.
+        guard format.channelCount > 0, format.sampleRate > 0 else {
+            log.error("activity:SensorReading wasInvalidatedBy agent:MicrophoneAdapter — invalid input format (channels=\(format.channelCount) sampleRate=\(format.sampleRate))")
+            continuation.finish(throwing: SensorError.deviceNotFound)
+            return stream
+        }
+
         let bufferSize = AVAudioFrameCount(format.sampleRate / Detection.Mic.targetHz)
 
         var prevRaw: Float = 0
@@ -85,6 +99,10 @@ public final class MicrophoneAdapter: SensorAdapter, Sendable {
             log.info("activity:SensorReading wasStartedBy agent:MicrophoneAdapter")
         } catch {
             log.error("activity:SensorReading wasInvalidatedBy agent:MicrophoneAdapter — \(error.localizedDescription)")
+            // engine.start() failed — we already have a tap installed. Pair
+            // the removal with the start-failure branch so we don't leak a
+            // tap + continue into an undefined state.
+            inputNode.removeTap(onBus: 0)
             continuation.finish(throwing: SensorError.permissionDenied)
             return stream
         }
@@ -92,8 +110,14 @@ public final class MicrophoneAdapter: SensorAdapter, Sendable {
         let cleanup = OnceCleanup((engine: engine, node: inputNode))
         continuation.onTermination = { @Sendable _ in
             cleanup.perform { r in
-                r.node.removeTap(onBus: 0)
+                // Teardown order matters. `engine.stop()` blocks until the
+                // audio unit has drained in-flight tap callbacks; removing
+                // the tap first can race with a buffer still being processed
+                // on the audio thread and dereference state captured by the
+                // tap closure after it's been torn down. Observed as SIGSEGV
+                // during `swift test` on CI run 24548266785.
                 r.engine.stop()
+                r.node.removeTap(onBus: 0)
             }
             log.info("activity:SensorReading wasEndedBy agent:MicrophoneAdapter")
         }
