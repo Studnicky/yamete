@@ -7,6 +7,20 @@ on:
 permissions:
   contents: write
 
+# Node.js 20 is scheduled to be removed from GitHub Actions runners
+# on 2026-09-16. softprops/action-gh-release currently ships on Node 20,
+# so opt this workflow into Node 24 ahead of the forced migration.
+# Remove this env block once every action in the workflow ships on
+# Node 24 (or later) by default.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+# Releases are singletons per tag — never cancel a tagged build. Use the
+# concurrency group for observability but keep `cancel-in-progress: false`.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Build & Release
@@ -48,10 +62,12 @@ jobs:
         id: changelog
         run: |
           version="${{ steps.version.outputs.version }}"
-          awk "/^## \[${version}\]/{found=1; next} /^## \[/{found=0} found" CHANGELOG.md > /tmp/release_notes.md
-          echo "" >> /tmp/release_notes.md
-          echo "---" >> /tmp/release_notes.md
-          echo "SHA256: ${{ steps.checksum.outputs.sha256 }}" >> /tmp/release_notes.md
+          {
+            awk "/^## \[${version}\]/{found=1; next} /^## \[/{found=0} found" CHANGELOG.md
+            echo ""
+            echo "---"
+            echo "SHA256: ${{ steps.checksum.outputs.sha256 }}"
+          } > /tmp/release_notes.md
           cat /tmp/release_notes.md
 
       - name: Create GitHub Release

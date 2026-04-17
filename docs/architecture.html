@@ -537,7 +537,7 @@ flowchart LR
           </div>
         </div>
 
-        <div class="callout"><p>The patch in 1.1.1 fixed a recursive lock crash here: <code>continuation.finish()</code> and <code>continuation.yield()</code> were being called inside <code>state.withLock {}</code>. <code>AsyncThrowingStream._Storage</code> acquires its own <code>os_unfair_lock</code> inside those methods. Non-reentrant lock, double-acquisition, abort cause 89859. The fix captures the continuation reference as the lock's return value, releases the lock, then calls the method.</p></div>
+        <div class="callout"><p>A subtle constraint lives here: <code>continuation.finish()</code> and <code>continuation.yield()</code> must be called <em>outside</em> the adapter's <code>OSAllocatedUnfairLock</code>. <code>AsyncThrowingStream._Storage</code> acquires its own <code>os_unfair_lock</code> inside those methods, and <code>os_unfair_lock</code> is non-reentrant — calling yield or finish while already holding an unfair lock abort-traps with cause 89859. Each adapter captures the continuation reference as the critical section's return value, releases the lock, then calls the stream method outside the lock.</p></div>
       </section>
 
       <section id="lifecycle">
