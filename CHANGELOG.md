@@ -13,6 +13,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [1.3.0] - 2026-04-17
+
+### Changed
+- **Swift 6 language mode + complete strict concurrency checking** — PR #34.
+  `project.yml` now sets `SWIFT_VERSION: "6"` and
+  `SWIFT_STRICT_CONCURRENCY: complete`; `Package.swift` declares
+  `swiftLanguageModes: [.v6]`. The codebase was already clean under
+  `-strict-concurrency=complete` (the Makefile's `lint` target has been
+  running with that flag for some time), so the bump produced no new
+  compiler diagnostics — but it locks the contract going forward.
+- **`@unchecked Sendable` surface shrunk from five app-type-level sites
+  to two narrow framework-handle wrappers** — PR #34.
+  - `AccelResources` is now a real `Sendable`; the unavoidable IOKit
+    handle escape is isolated in a tiny private `IOKitHandles` struct
+    whose soundness is justified by the phased construction → single-move
+    publish → once-teardown lifecycle enforced by `OnceCleanup`.
+  - `ReportContext.State` is now genuinely `Sendable`: its contained
+    `HighPassFilter` and `LowPassFilter` were converted from `final class`
+    to `struct: Sendable` with `mutating process(_:)`.
+  - `HeadphoneConnectionTracker` drops `@unchecked`; under Swift 6,
+    `OSAllocatedUnfairLock<Bool>` in a final-class NSObject subclass
+    synthesizes `Sendable` correctly when every field qualifies.
+  - `LogStore.State` drops `@unchecked`; the culprit was
+    `ISO8601DateFormatter` (still non-Sendable under Swift 6), replaced
+    with a `DateFormatter` using `yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX` +
+    `en_US_POSIX` + GMT that produces byte-identical output.
+  - `HIDRunLoopThread.State` retains `@unchecked` because `Thread` and
+    `CFRunLoop` handles cannot be escaped without redesigning the HID
+    thread itself. The rationale comment now cites the concrete
+    invariants (every access through `OSAllocatedUnfairLock<State>`,
+    documented thread-safety of `Thread.cancel`/`CFRunLoopStop`,
+    phased lifecycle) that make it sound.
+- **`HighPassFilter` / `LowPassFilter` are now Sendable structs with
+  `mutating process(_:)`** — PR #34. API note for any out-of-tree callers:
+  these were previously final classes, so callers that held them by `let`
+  must now use `var`. All in-tree call sites (AccelerometerReader + the
+  test suite) have been updated.
+
+### Fixed
+- **`SensorManager` dropped terminal `adaptersChanged([])` snapshot under
+  concurrent cancellation** — PR #33.
+  `Sources/SensorKit/SensorAdapter.swift`'s per-adapter task body caught
+  `CancellationError` and returned immediately, skipping the subsequent
+  `activeTracker.remove(adapter) + adaptersChanged(...)` yield at the
+  bottom of the task body. Under concurrent cancellation (two adapters
+  terminating near-simultaneously) the tracker retained a stale active
+  entry and the terminal empty-snapshot the consumer expects was never
+  emitted. Surfaced by a flaky CI run on PR #30 where
+  `SensorManagerTests.testEventsPublishesAdapterLifecycle` saw
+  `snapshots.last == ["B"]` instead of `[]`. Cancellation is a normal
+  adapter termination signal, not a failure, so it now falls through to
+  the shared lifecycle emission.
+
 ## [1.2.0] - 2026-04-16
 
 ### Added
