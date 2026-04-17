@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Architecture: Yamete</title>
+  <meta name="description" content="How Yamete works under the hood: sensor pipelines, detection gates, fusion engine, and response dispatch. With Mermaid diagrams.">
+  <link rel="stylesheet" href="assets/sidebar.css">
+  <style>
+    :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --accent-soft: #ffb3c4; --muted: #888; --card: #1a1a1a; --sidebar-w: 200px; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif; background: var(--bg); color: var(--fg); line-height: 1.7; }
+    a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+    code { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 0.9em; background: #1f1f1f; color: var(--accent-soft); padding: 0.1rem 0.4rem; border-radius: 4px; }
+    pre { background: #1f1f1f; border-radius: 6px; padding: 0.75rem 0.9rem; overflow-x: auto; font-size: 0.82rem; margin: 0.6rem 0; border-left: 3px solid var(--accent); }
+    pre code { background: transparent; padding: 0; color: #ddd; }
+    .layout { display: flex; max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; gap: 3rem; }
+    .main { flex: 1; min-width: 0; padding: 3rem 0 3rem 3rem; border-left: 1px solid #1e1e1e; }
+    .main h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .subtitle { color: var(--muted); margin-bottom: 2rem; font-style: italic; font-size: 0.9rem; }
+    section { margin-bottom: 3rem; scroll-margin-top: 2rem; }
+    section h2 { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.75rem; border-bottom: 1px solid #2a2a2a; padding-bottom: 0.4rem; }
+    section h2 .qual { font-weight: 400; color: var(--muted); font-size: 0.88rem; }
+    p { margin-bottom: 0.75rem; color: #ccc; }
+    p:last-child { margin-bottom: 0; }
+    ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+    li { color: #ccc; padding: 0.1rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.88rem; }
+    th { text-align: left; padding: 0.5rem 0.75rem; background: #1a1a1a; color: var(--accent-soft); font-weight: 600; border-bottom: 1px solid #2a2a2a; }
+    td { padding: 0.45rem 0.75rem; border-bottom: 1px solid #1e1e1e; color: #ccc; }
+    tr:last-child td { border-bottom: none; }
+    .diagram-wrap { background: #0f0f0f; border: 1px solid #2a2a2a; border-radius: 10px; padding: 2rem 1.5rem; margin: 1.25rem 0; overflow-x: auto; }
+    .diagram-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.75rem; display: block; font-weight: 600; }
+    .mermaid { display: flex; justify-content: center; }
+    .mermaid svg { max-width: 100%; height: auto; }
+    .callout { background: #141414; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; margin: 0.75rem 0; }
+    .callout p { color: #bbb; font-size: 0.9rem; margin: 0; }
+    footer { border-top: 1px solid #1e1e1e; margin-top: 3rem; padding: 1.75rem 0 2rem; color: var(--muted); font-size: 0.82rem; }
+    footer a { color: var(--muted); } footer a:hover { color: var(--accent); }
+    @media (max-width: 700px) {
+      .layout { flex-direction: column; gap: 0; padding: 0 1.25rem; }
+      .sidebar { width: 100%; padding: 2rem 0 0; }
+      .sidebar-inner { position: static; }
+      .main { border-left: none; border-top: 1px solid #1e1e1e; padding-left: 0; padding-top: 2rem; margin-top: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="sidebar-inner" id="sidebar-placeholder"></div>
+    </aside>
+
+    <main class="main">
+      <h1>Architecture</h1>
+      <p class="subtitle">How Yamete actually does what it does. For people who would rather read a diagram than trust a privacy policy.</p>
+
+      <p>Yamete is more engineered than the concept deserves. Three parallel sensor pipelines, a six-gate per-adapter detector, a consensus fusion engine, and three response modalities. All of it Swift strict concurrency, all of it offline, all of it firing in under 50ms from impact to sound.</p>
+
+      <p>What follows is the real code path, annotated for a technical audience. The diagrams are generated from the actual class and method structure, not a marketing approximation of it.</p>
+
+      <section id="modules">
+        <h2>Module graph <span class="qual">(four SPM targets, one direction)</span></h2>
+        <p>The codebase is split into four Swift Package Manager targets with a strictly unidirectional dependency graph. <code>YameteApp</code> sees everything. <code>IOHIDPublic</code> sees nothing.</p>
+
+        <div class="diagram-wrap">
+          <span class="diagram-label">SPM dependency graph</span>
+          <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1a1a1a",
+    "primaryTextColor": "#e8e8e8",
+    "primaryBorderColor": "#ff6b8a",
+    "lineColor": "#ff6b8a",
+    "secondaryColor": "#141414",
+    "tertiaryColor": "#0f0f0f",
+    "edgeLabelBackground": "#0d0d0d",
+    "clusterBkg": "#111111",
+    "clusterBorder": "#2a2a2a",
+    "titleColor": "#ffb3c4",
+    "nodeTextColor": "#e8e8e8",
+    "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
+  }
+}}%%
+graph LR
+  A["<b>IOHIDPublic</b><br/><small>IOKit HID headers<br/>C interop layer</small>"]:::iokit
+  B["<b>SensorKit</b><br/><small>Adapters, filters,<br/>ImpactDetector</small>"]:::sensor
+  C["<b>YameteCore</b><br/><small>Types, constants,<br/>SettingsStore, Logging</small>"]:::core
+  D["<b>ResponseKit</b><br/><small>AudioPlayer, ScreenFlash,<br/>NotificationResponder</small>"]:::response
+  E["<b>YameteApp</b><br/><small>ImpactController,<br/>SwiftUI shell</small>"]:::app
+
+  A --> B
+  C --> B
+  C --> D
+  B --> E
+  D --> E
+  C --> E
+
+  classDef iokit fill:#1a0a0e,stroke:#ff6b8a,color:#ffb3c4
+  classDef sensor fill:#1a1220,stroke:#c084fc,color:#e8e8e8
+  classDef core fill:#0a1a15,stroke:#34d399,color:#e8e8e8
+  classDef response fill:#1a1500,stroke:#fbbf24,color:#e8e8e8
+  classDef app fill:#1a0a0e,stroke:#ff6b8a,color:#ffb3c4,stroke-width:2px
+          </div>
+        </div>
+
+        <ul>
+          <li><code>IOHIDPublic</code> -- C header shim exposing private IOKit HID types Apple doesn't publish. Read-only; never changes.</li>
+          <li><code>SensorKit</code> -- the entire sensor abstraction: HID reader, mic tap, AirPods motion, signal filters, per-sample detector, fan-in task group.</li>
+          <li><code>YameteCore</code> -- shared types and settings. No sensor knowledge, no UI. Imported by everything.</li>
+          <li><code>ResponseKit</code> -- audio playback, screen overlay, notification dispatch. Knows about impact intensity; knows nothing about where that intensity came from.</li>
+          <li><code>YameteApp</code> -- the orchestrator. Connects pipeline to response. Also the SwiftUI menu bar shell.</li>
+        </ul>
+      </section>
+
+      <section id="pipeline">
+        <h2>Full signal pipeline <span class="qual">(sensor to speaker)</span></h2>
+        <p>Three sensor streams run concurrently in a Swift task group. Each produces <code>SensorImpact</code> events independently. A fan-in layer collects them. The fusion engine gates consensus and rearm timing. <code>ImpactController</code> maps the fused intensity through a user sensitivity window and dispatches response.</p>
+
+        <div class="diagram-wrap">
+          <span class="diagram-label">End-to-end signal flow</span>
+          <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1a1a1a",
+    "primaryTextColor": "#e8e8e8",
+    "primaryBorderColor": "#ff6b8a",
+    "lineColor": "#555",
+    "secondaryColor": "#141414",
+    "edgeLabelBackground": "#0d0d0d",
+    "nodeTextColor": "#e8e8e8",
+    "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
+  }
+}}%%
+flowchart TD
+  subgraph SENSORS["SENSORS  (parallel AsyncThrowingStream per adapter)"]
+    direction LR
+    ACC["<b>AccelerometerReader</b><br/>BMI286 via IOKit HID<br/>100 Hz decimated to 50 Hz<br/>HID run-loop thread"]:::sensor
+    MIC["<b>MicrophoneAdapter</b><br/>AVAudioEngine tap<br/>~50 Hz buffer peak<br/>audio I/O thread"]:::sensor
+    HP["<b>HeadphoneMotionAdapter</b><br/>CMHeadphoneMotionManager<br/>~100 Hz userAcceleration<br/>OperationQueue"]:::sensor
+  end
+
+  subgraph FILTER["PREPROCESSING  (per adapter, off main thread)"]
+    direction LR
+    AFILT["HP filter 20 Hz<br/>LP filter 25 Hz<br/>Vec3 magnitude"]:::filter
+    MFILT["DC-block HP<br/>alpha=0.95<br/>scalar peak"]:::filter
+    HFILT["Vec3 magnitude<br/>from userAcceleration"]:::filter
+  end
+
+  subgraph DETECT["IMPACT DETECTION  (ImpactDetector, 6 gates)"]
+    direction LR
+    ADET["Accel detector<br/>spike / rise / crest<br/>confirmations x3"]:::detect
+    MDET["Mic detector<br/>spike / rise / crest<br/>confirmations x2"]:::detect
+    HDET["Headphone detector<br/>spike / rise / crest<br/>confirmations x2"]:::detect
+  end
+
+  SM["<b>SensorManager</b><br/>withTaskGroup fan-in<br/>SensorEvent stream"]:::fanin
+
+  FE["<b>ImpactFusionEngine</b><br/>150 ms window<br/>consensus gate<br/>500 ms rearm"]:::fusion
+
+  SG["<b>Sensitivity gate</b><br/>map intensity through<br/>user sensitivity window"]:::gate
+
+  subgraph RESPONSE["RESPONSE DISPATCH  (MainActor)"]
+    direction LR
+    AUD["<b>AudioPlayer</b><br/>select clip by intensity<br/>play on chosen devices"]:::resp
+    FACE["<b>Menu bar face</b><br/>11 SVG expressions<br/>duration-gated"]:::resp
+    VIS["<b>ScreenFlash or<br/>NotificationResponder</b><br/>mode-routed"]:::resp
+  end
+
+  ACC --> AFILT
+  MIC --> MFILT
+  HP  --> HFILT
+
+  AFILT --> ADET
+  MFILT --> MDET
+  HFILT --> HDET
+
+  ADET -->|"SensorImpact(accel)"| SM
+  MDET -->|"SensorImpact(mic)"| SM
+  HDET -->|"SensorImpact(hp)"| SM
+
+  SM -->|"SensorEvent.impact"| FE
+  FE -->|"FusedImpact or nil"| SG
+  SG -->|"remapped intensity"| AUD
+  SG -->|"remapped intensity"| FACE
+  SG -->|"remapped intensity"| VIS
+
+  classDef sensor fill:#1a0a14,stroke:#ff6b8a,color:#e8e8e8
+  classDef filter fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
+  classDef detect fill:#0f1a10,stroke:#34d399,color:#e8e8e8
+  classDef fanin fill:#1a1520,stroke:#c084fc,color:#e8e8e8,stroke-width:2px
+  classDef fusion fill:#1a1500,stroke:#fbbf24,color:#e8e8e8,stroke-width:2px
+  classDef gate fill:#1a0f00,stroke:#f97316,color:#e8e8e8
+  classDef resp fill:#1a0a0e,stroke:#ff6b8a,color:#ffb3c4
+          </div>
+        </div>
+      </section>
+
+      <section id="detection-gates">
+        <h2>Per-sensor detection gates <span class="qual">(ImpactDetector, all six)</span></h2>
+        <p>Every adapter runs an <code>ImpactDetector</code> independently. Each sample passes through six gates in order. All six must pass to produce an intensity value. Any gate failure returns nil for that sample -- no event emitted, no noise downstream.</p>
+
+        <div class="diagram-wrap">
+          <span class="diagram-label">ImpactDetector.process() -- per-sample gate chain</span>
+          <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1a1a1a",
+    "primaryTextColor": "#e8e8e8",
+    "primaryBorderColor": "#ff6b8a",
+    "lineColor": "#555",
+    "edgeLabelBackground": "#0d0d0d",
+    "nodeTextColor": "#e8e8e8",
+    "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
+  }
+}}%%
+flowchart TD
+  IN(["new sample<br/>magnitude: Float"]):::io
+
+  WRMP{"warmupSamples<br/>elapsed?"}:::gate
+  WRMF(["nil -- skip<br/>filter settling"]):::drop
+
+  EMA["update background RMS<br/>EMA alpha = 0.02"]:::proc
+  WIN["append to sliding window<br/>prune entries older than 120ms"]:::proc
+
+  SPK{"magnitude &gt;=<br/>spikeThreshold?"}:::gate
+  SPKF(["nil -- too quiet"]):::drop
+
+  RISE{"max consecutive rise<br/>in window &gt;= minRiseRate?"}:::gate
+  RISEF(["nil -- not a<br/>sharp transient"]):::drop
+
+  CREST{"peak / backgroundRMS<br/>&gt;= minCrestFactor?"}:::gate
+  CRESTF(["nil -- ambient noise<br/>matches peak"]):::drop
+
+  CONF{"above-threshold count<br/>in window &gt;= minConfirmations?"}:::gate
+  CONFF(["nil -- not sustained<br/>enough to confirm"]):::drop
+
+  INTENS["compute intensity<br/>clamp (mag - floor) / ceiling to [0,1]"]:::proc
+
+  OUT(["SensorImpact<br/>source, timestamp, intensity"]):::io
+
+  IN --> WRMP
+  WRMP -->|"no"| WRMF
+  WRMP -->|"yes"| EMA
+  EMA --> WIN
+  WIN --> SPK
+  SPK -->|"no"| SPKF
+  SPK -->|"yes"| RISE
+  RISE -->|"no"| RISEF
+  RISE -->|"yes"| CREST
+  CREST -->|"no"| CRESTF
+  CREST -->|"yes"| CONF
+  CONF -->|"no"| CONFF
+  CONF -->|"yes"| INTENS
+  INTENS --> OUT
+
+  classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
+  classDef gate fill:#141414,stroke:#fbbf24,color:#e8e8e8
+  classDef proc fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
+  classDef drop fill:#1a0a0a,stroke:#555,color:#888
+          </div>
+        </div>
+
+        <p>The combination of these gates is what makes Yamete usable at a desk. Typing produces magnitude but no sharp rise. Footsteps produce a rise but the crest factor is too low (ambient RMS is already elevated). A real smack produces all six: a clean spike, a fast transient, a high crest, and multiple samples above threshold in the window.</p>
+
+        <table>
+          <thead><tr><th>Gate</th><th>What it rejects</th><th>Accel default</th><th>Mic default</th><th>Headphone default</th></tr></thead>
+          <tbody>
+            <tr><td><code>warmupSamples</code></td><td>Filter transients on startup (IIR settling)</td><td>50 samples</td><td>50 samples</td><td>50 samples</td></tr>
+            <tr><td><code>spikeThreshold</code></td><td>Ambient vibration, background noise</td><td>0.020 g</td><td>0.020 PCM</td><td>0.10 g</td></tr>
+            <tr><td><code>minRiseRate</code></td><td>Slow drifts, HVAC, sustained rumble</td><td>0.010</td><td>0.010</td><td>0.05</td></tr>
+            <tr><td><code>minCrestFactor</code></td><td>Noisy rooms, street noise (peak/RMS too low)</td><td>1.5</td><td>1.5</td><td>1.5</td></tr>
+            <tr><td><code>minConfirmations</code></td><td>One-sample spikes, electrical interference</td><td>3 samples</td><td>2 samples</td><td>2 samples</td></tr>
+            <tr><td>intensity mapping</td><td>(output stage) maps passing magnitude to 0-1</td><td>0.002-0.060 g</td><td>0.005-0.300</td><td>0.05-2.0 g</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="fusion">
+        <h2>Fusion engine <span class="qual">(ImpactFusionEngine, consensus + rearm)</span></h2>
+        <p>Individual sensor impacts feed into a fusion engine that enforces two additional constraints before allowing a response to fire: consensus (enough sensors must agree within a time window) and rearm (minimum gap between consecutive responses).</p>
+
+        <div class="diagram-wrap">
+          <span class="diagram-label">ImpactFusionEngine.ingest() -- one call per SensorImpact</span>
+          <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1a1a1a",
+    "primaryTextColor": "#e8e8e8",
+    "primaryBorderColor": "#ff6b8a",
+    "lineColor": "#555",
+    "edgeLabelBackground": "#0d0d0d",
+    "nodeTextColor": "#e8e8e8",
+    "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
+  }
+}}%%
+flowchart TD
+  IN(["SensorImpact arrives<br/>source, timestamp, intensity"]):::io
+
+  PRUNE["prune impacts older than<br/>fusionWindow (default 150ms)"]:::proc
+
+  APPEND["append new impact<br/>to time window"]:::proc
+
+  REARM{"now &gt;= lastTriggerAt<br/>+ rearmDuration (500ms)?"}:::gate
+  REARMF(["nil -- too soon<br/>cooldown active"]):::drop
+
+  CONS{"unique sources in window<br/>&gt;= consensusRequired?"}:::gate
+  CONSF(["nil -- not enough<br/>sensors agree yet"]):::drop
+
+  FUSE["best impact per source<br/>average intensity across sources<br/>confidence = participants / active"]:::proc
+
+  MARK["lastTriggerAt = now<br/>clear window"]:::proc
+
+  OUT(["FusedImpact<br/>intensity, confidence, sources"]):::io
+
+  IN --> PRUNE
+  PRUNE --> APPEND
+  APPEND --> REARM
+  REARM -->|"no"| REARMF
+  REARM -->|"yes"| CONS
+  CONS -->|"no"| CONSF
+  CONS -->|"yes"| FUSE
+  FUSE --> MARK
+  MARK --> OUT
+
+  classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
+  classDef gate fill:#141414,stroke:#fbbf24,color:#e8e8e8
+  classDef proc fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
+  classDef drop fill:#1a0a0a,stroke:#555,color:#888
+          </div>
+        </div>
+
+        <div class="callout"><p>The default <code>consensusRequired = 1</code> means any single sensor can trigger a response. Set it to 2 and both the accelerometer and microphone have to agree within 150ms before anything fires -- eliminates most false positives at the cost of some missed detections on very clean impacts.</p></div>
+
+        <table>
+          <thead><tr><th>Parameter</th><th>Default</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td><code>fusionWindow</code></td><td>150 ms</td><td>Time window within which multiple sensors must all fire to count as consensus</td></tr>
+            <tr><td><code>consensusRequired</code></td><td>1</td><td>Minimum distinct sensor sources in window before firing</td></tr>
+            <tr><td><code>rearmDuration</code></td><td>500 ms</td><td>Minimum gap between consecutive responses (combined with user debounce)</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="sensitivity">
+        <h2>Sensitivity gate <span class="qual">(ImpactController, pre-response)</span></h2>
+        <p>After fusion, intensity passes through one more mapping before dispatch. The user's sensitivity sliders define a window over the [0,1] intensity range. The gate rejects impacts below the lower edge and linearly rescales survivors to fill [0,1] for the response layer. This is what makes "sensitivity" feel like a threshold rather than a volume knob.</p>
+
+        <div class="diagram-wrap">
+          <span class="diagram-label">Sensitivity window mapping</span>
+          <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1a1a1a",
+    "primaryTextColor": "#e8e8e8",
+    "primaryBorderColor": "#ff6b8a",
+    "lineColor": "#555",
+    "edgeLabelBackground": "#0d0d0d",
+    "nodeTextColor": "#e8e8e8",
+    "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
+  }
+}}%%
+flowchart LR
+  FI(["FusedImpact<br/>intensity [0,1]"]):::io
+
+  COMP["thresholdLow  = 1 - sensitivityMax<br/>thresholdHigh = 1 - sensitivityMin<br/>band = thresholdHigh - thresholdLow"]:::proc
+
+  GATE{"intensity &gt;=<br/>thresholdLow?"}:::gate
+  GATEF(["nil -- below<br/>sensitivity floor"]):::drop
+
+  MAP["mappedIntensity =<br/>(intensity - thresholdLow) / band<br/>clamped to [0,1]"]:::proc
+
+  RARM{"now &gt;=<br/>rearmUntil?"}:::gate
+  RARMF(["nil -- still<br/>in cooldown"]):::drop
+
+  OUT(["dispatch response<br/>intensity: mappedIntensity"]):::io
+
+  FI --> COMP
+  COMP --> GATE
+  GATE -->|"no"| GATEF
+  GATE -->|"yes"| MAP
+  MAP --> RARM
+  RARM -->|"no"| RARMF
+  RARM -->|"yes"| OUT
+
+  classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
+  classDef gate fill:#141414,stroke:#fbbf24,color:#e8e8e8
+  classDef proc fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
+  classDef drop fill:#1a0a0a,stroke:#555,color:#888
+          </div>
+        </div>
+      </section>
+
+      <section id="response">
+        <h2>Response dispatch <span class="qual">(three paths, all MainActor)</span></h2>
+        <p>A confirmed, sensitivity-gated impact triggers three parallel response paths. All three run on the main actor. Audio and face always fire if enabled. Visual is routed to either the overlay or notification path based on the user's Flash Mode setting.</p>
+
+        <div class="diagram-wrap">
+          <span class="diagram-label">Response dispatch -- after sensitivity gate</span>
+          <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1a1a1a",
+    "primaryTextColor": "#e8e8e8",
+    "primaryBorderColor": "#ff6b8a",
+    "lineColor": "#555",
+    "edgeLabelBackground": "#0d0d0d",
+    "nodeTextColor": "#e8e8e8",
+    "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
+  }
+}}%%
+flowchart TD
+  IN(["impact dispatched<br/>intensity [0,1]"]):::io
+
+  subgraph AUDIO["AUDIO PATH"]
+    A1{"soundEnabled?"}:::gate
+    A2["select clip by intensity<br/>avoid last 2 clips"]:::proc
+    A3["NSSound.play() on<br/>enabled Core Audio devices<br/>volume = min + intensity * range"]:::proc
+    A4["return clip duration"]:::proc
+    A1 -->|"yes"| A2 --> A3 --> A4
+    A1 -->|"no"| A1E(["skip"]):::drop
+  end
+
+  subgraph FACE["FACE PATH  (always active)"]
+    F1["pick random face<br/>from 11 SVG cache"]:::proc
+    F2["show in menu bar<br/>for max(clipDuration, debounce)"]:::proc
+    F3["Task.sleep → restore<br/>default icon"]:::proc
+    F1 --> F2 --> F3
+  end
+
+  subgraph VISUAL["VISUAL PATH"]
+    V1{"visualResponseMode?"}:::gate
+    V1 -->|"off"| V1E(["skip"]):::drop
+
+    subgraph OVERLAY["Overlay mode  (ScreenFlash)"]
+      V2["opacity = opacityMin + intensity * range"]:::proc
+      V3["select face per display<br/>recency dedup"]:::proc
+      V4["borderless NSWindow over screen<br/>FlashOverlayView radial gradient"]:::proc
+      V5["animate: fadeIn → hold → fadeOut<br/>timing scaled to intensity"]:::proc
+      V6["Task.sleep(clipDuration) → orderOut"]:::proc
+      V2 --> V3 --> V4 --> V5 --> V6
+    end
+
+    subgraph NOTIF["Notification mode  (NotificationResponder)"]
+      N1["resolve locale<br/>user pref or system fallback"]:::proc
+      N2["pick phrase from tier pool<br/>ImpactTier: tap/light/medium/firm/hard"]:::proc
+      N3["post UNMutableNotificationContent"]:::proc
+      N4["Task.sleep(dismissAfter) →<br/>removeDeliveredNotifications"]:::proc
+      N1 --> N2 --> N3 --> N4
+    end
+
+    V1 -->|"overlay"| V2
+    V1 -->|"notification"| N1
+  end
+
+  REARM["rearmUntil = now +<br/>max(clipDuration, debounce)"]:::proc
+
+  IN --> A1
+  IN --> F1
+  IN --> V1
+  A4 --> REARM
+  V6 --> REARM
+  N3 --> REARM
+
+  classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
+  classDef gate fill:#141414,stroke:#fbbf24,color:#e8e8e8
+  classDef proc fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
+  classDef drop fill:#1a0a0a,stroke:#555,color:#888
+          </div>
+        </div>
+      </section>
+
+      <section id="concurrency">
+        <h2>Concurrency model <span class="qual">(threads, locks, actors)</span></h2>
+        <p>Three different thread contexts produce sensor data. A single lock per adapter serializes state. The fan-in task group bridges to Swift concurrency. The main actor serializes all response work.</p>
+
+        <div class="diagram-wrap">
+          <span class="diagram-label">Thread and actor boundaries</span>
+          <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1a1a1a",
+    "primaryTextColor": "#e8e8e8",
+    "primaryBorderColor": "#ff6b8a",
+    "lineColor": "#555",
+    "edgeLabelBackground": "#0d0d0d",
+    "nodeTextColor": "#e8e8e8",
+    "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
+  }
+}}%%
+flowchart LR
+  subgraph THREADS["OFF-MAIN THREADS"]
+    T1["HID run-loop thread<br/>IOHIDManager callbacks<br/>AccelerometerReader"]:::thread
+    T2["audio I/O thread<br/>AVAudioEngine tap<br/>MicrophoneAdapter"]:::thread
+    T3["OperationQueue<br/>CoreMotion updates<br/>HeadphoneMotionAdapter"]:::thread
+  end
+
+  subgraph LOCKS["OSAllocatedUnfairLock per adapter"]
+    L1["serialize: running flag<br/>continuation ref<br/>detector state"]:::lock
+  end
+
+  subgraph BRIDGE["AsyncThrowingStream bridge"]
+    B1["continuation.yield()<br/>called OUTSIDE lock<br/>(avoids recursive os_unfair_lock)"]:::bridge
+  end
+
+  subgraph SWIFT["Swift Concurrency"]
+    TG["withTaskGroup<br/>SensorManager<br/>one child task per adapter"]:::swift
+    MC["for await in sensorManager.events()<br/>MainActor<br/>ImpactController"]:::main
+  end
+
+  subgraph MAIN["MainActor"]
+    R1["ImpactController<br/>FusionEngine<br/>response dispatch"]:::mainactor
+  end
+
+  T1 --> L1
+  T2 --> L1
+  T3 --> L1
+  L1 --> B1
+  B1 --> TG
+  TG --> MC
+  MC --> R1
+
+  classDef thread fill:#1a0a14,stroke:#ff6b8a,color:#e8e8e8
+  classDef lock fill:#1a1500,stroke:#fbbf24,color:#e8e8e8
+  classDef bridge fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
+  classDef swift fill:#0a1a15,stroke:#34d399,color:#e8e8e8
+  classDef main fill:#1a1520,stroke:#c084fc,color:#e8e8e8,stroke-width:2px
+  classDef mainactor fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,stroke-width:2px
+          </div>
+        </div>
+
+        <div class="callout"><p>The patch in 1.1.1 fixed a recursive lock crash here: <code>continuation.finish()</code> and <code>continuation.yield()</code> were being called inside <code>state.withLock {}</code>. <code>AsyncThrowingStream._Storage</code> acquires its own <code>os_unfair_lock</code> inside those methods. Non-reentrant lock, double-acquisition, abort cause 89859. The fix captures the continuation reference as the lock's return value, releases the lock, then calls the method.</p></div>
+      </section>
+
+      <section id="lifecycle">
+        <h2>Pipeline lifecycle <span class="qual">(ImpactController state machine)</span></h2>
+        <p><code>ImpactController</code> manages a start/stop pipeline keyed to whether any response output is enabled. If both sound and visual are off, the pipeline stops entirely. Settings changes rebuild the pipeline from scratch with fresh adapters.</p>
+
+        <div class="diagram-wrap">
+          <span class="diagram-label">ImpactController pipeline state machine</span>
+          <div class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#1a1a1a",
+    "primaryTextColor": "#e8e8e8",
+    "primaryBorderColor": "#ff6b8a",
+    "lineColor": "#555",
+    "edgeLabelBackground": "#0d0d0d",
+    "nodeTextColor": "#e8e8e8",
+    "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
+  }
+}}%%
+stateDiagram-v2
+  [*] --> Stopped : app launch
+
+  Stopped --> Starting : shouldBeEnabled = true
+  Starting --> Running : adapters built\ntask group started
+
+  Running --> Stopping : settings changed\nor shouldBeEnabled = false
+  Stopping --> Stopped : sensorTask cancelled\nfusion engine reset
+
+  Stopped --> [*] : app quit
+
+  Running --> Running : settings change triggers\nrebuildPipeline()\nstop then start
+
+  note right of Running
+    Adapter set determined by:
+    - enabledSensorIDs
+    - isAvailable probe
+    - current threshold settings
+  end note
+
+  note right of Stopping
+    OnceCleanup ensures\nHID device and run loop\nreleased exactly once
+  end note
+          </div>
+        </div>
+      </section>
+
+      <section id="files">
+        <h2>Source map <span class="qual">(every file, one line)</span></h2>
+        <table>
+          <thead><tr><th>File</th><th>Module</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td><code>AccelerometerReader.swift</code></td><td>SensorKit</td><td>BMI286 HID reader, bandpass filters, ImpactDetector, watchdog</td></tr>
+            <tr><td><code>MicrophoneAdapter.swift</code></td><td>SensorKit</td><td>AVAudioEngine tap, DC-block filter, ImpactDetector</td></tr>
+            <tr><td><code>HeadphoneMotionAdapter.swift</code></td><td>SensorKit</td><td>CMHeadphoneMotionManager, connection probe, ImpactDetector</td></tr>
+            <tr><td><code>SensorAdapter.swift</code></td><td>SensorKit</td><td>SensorImpact/Event/Error types, SensorManager task group fan-in</td></tr>
+            <tr><td><code>ImpactDetection.swift</code></td><td>SensorKit</td><td>ImpactFusionEngine: window, consensus gate, rearm, intensity fusion</td></tr>
+            <tr><td><code>ImpactDetector.swift</code></td><td>SensorKit</td><td>Per-adapter 6-gate pipeline: warmup, spike, rise, crest, confirm, intensity</td></tr>
+            <tr><td><code>Constants.swift</code></td><td>YameteCore</td><td>Detection parameter ranges, hardware constants</td></tr>
+            <tr><td><code>Defaults.swift</code></td><td>YameteCore</td><td>Factory default values for all thresholds and timing</td></tr>
+            <tr><td><code>Domain.swift</code></td><td>YameteCore</td><td>Vec3, ImpactTier enum, responder protocols, OnceCleanup</td></tr>
+            <tr><td><code>SignalProcessing.swift</code></td><td>YameteCore</td><td>HighPassFilter, LowPassFilter (first-order IIR, 3-axis)</td></tr>
+            <tr><td><code>Logging.swift</code></td><td>YameteCore</td><td>AppLog dual-sink (os.Logger + file), 24-hour retention</td></tr>
+            <tr><td><code>SettingsStore.swift</code></td><td>YameteApp</td><td>UserDefaults persistence, all detection/response params, validation</td></tr>
+            <tr><td><code>ImpactController.swift</code></td><td>YameteApp</td><td>Main orchestrator: pipeline lifecycle, fusion, sensitivity gate, dispatch</td></tr>
+            <tr><td><code>AudioPlayer.swift</code></td><td>ResponseKit</td><td>Sound pool, intensity-based clip selection, NSSound multi-device playback</td></tr>
+            <tr><td><code>ScreenFlash.swift</code></td><td>ResponseKit</td><td>Borderless overlay windows, per-screen face dedup, animated envelope</td></tr>
+            <tr><td><code>NotificationResponder.swift</code></td><td>ResponseKit</td><td>UNUserNotificationCenter, tier phrases, 40-locale resolution</td></tr>
+            <tr><td><code>FaceRenderer.swift</code></td><td>ResponseKit</td><td>SVG template loader, placeholder resolution, light/dark palette</td></tr>
+            <tr><td><code>AudioDevice.swift</code></td><td>ResponseKit</td><td>Core Audio device enumeration, UID resolution, change notifications</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer>
+        <p>&copy; 2026 Studnicky &middot; <a href="index.html">Home</a> &middot; <a href="support.html">Support</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="https://github.com/Studnicky/yamete/releases">Releases</a> &middot; <a href="https://github.com/Studnicky/yamete/issues">Issues</a> &middot; <a href="https://github.com/Studnicky/yamete">GitHub</a></p>
+      </footer>
+    </main>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      securityLevel: 'loose',
+      theme: 'base',
+      themeVariables: {
+        darkMode: true,
+        background: '#0d0d0d',
+        primaryColor: '#1a1a1a',
+        primaryTextColor: '#e8e8e8',
+        primaryBorderColor: '#ff6b8a',
+        lineColor: '#555555',
+        secondaryColor: '#141414',
+        tertiaryColor: '#0f0f0f',
+        edgeLabelBackground: '#0d0d0d',
+        clusterBkg: '#111111',
+        clusterBorder: '#2a2a2a',
+        titleColor: '#ffb3c4',
+        nodeTextColor: '#e8e8e8',
+        fontFamily: 'SF Mono, ui-monospace, Menlo, monospace',
+        fontSize: '13px'
+      }
+    });
+  </script>
+  <script src="assets/sidebar.js"></script>
+  <script>
+    initSidebar([
+      { href: '#modules',     label: 'Module graph' },
+      { href: '#pipeline',    label: 'Full pipeline' },
+      { href: '#detection-gates', label: 'Detection gates' },
+      { href: '#fusion',      label: 'Fusion engine' },
+      { href: '#sensitivity', label: 'Sensitivity gate' },
+      { href: '#response',    label: 'Response dispatch' },
+      { href: '#concurrency', label: 'Concurrency model' },
+      { href: '#lifecycle',   label: 'Pipeline lifecycle' },
+      { href: '#files',       label: 'Source map' },
+    ], 'architecture.html');
+  </script>
+</body>
+</html>
