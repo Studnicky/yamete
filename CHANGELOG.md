@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
+## [1.2.0] - 2026-04-16
+
+### Added
+- **MicrophoneAdapter + HeadphoneMotionAdapter lifecycle test coverage** — PR #30.
+  New `MicrophoneAdapterLifecycleTests` and `HeadphoneMotionAdapterLifecycleTests`
+  cover open/close symmetry, repeated open/close cycles, mid-stream cancellation,
+  and typed-error propagation. Hardware-unavailable paths skip gracefully via
+  `XCTSkip` so the suite stays green on CI without real microphones or motion-
+  capable headphones. Total test count 129 → 137.
+- **Framework-list drift guard** — PR #29. `make lint-frameworks` diffs the
+  framework list across `Makefile`, `Package.swift`, and `project.yml` and
+  fails on divergence. Wired into `make lint` so CI catches any future drift.
+  Caught real drift on first run: `IOKit` was missing from the Makefile's
+  `FRAMEWORKS` variable, and `UserNotifications` was missing from both the
+  Makefile and `project.yml`. All three sources are now aligned on the same
+  eight frameworks.
+
+### Changed
+- **`MenuBarView.swift` split into per-section files** — PR #28. The 948-line
+  composition root with 14 nested view structs now lives as a 199-line
+  `MenuBarView.swift` (composition root + `HeaderSection` + a few shared
+  helpers) plus 12 files under `Sources/YameteApp/Views/MenuBar/`. Extracted
+  views flipped from `private` → `internal`; the public `MenuBarView` API
+  is unchanged. No behavior change, no renames.
+- **Version extraction via `yq` instead of `sed`** — PR #29. The Makefile and
+  the release workflow now pull `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`
+  out of `project.yml` with `yq '.settings.base.…' project.yml` instead of a
+  regex, removing the brittle dependency on a specific indent or quoting style.
+  The Makefile errors out with an install hint if `yq` is missing; the release
+  workflow installs it via `brew install yq` before the version check runs.
+- **`SWIFT_ACTIVE_COMPILATION_CONDITIONS` quoting normalized in `project.yml`.**
+  Debug, DebugDirect, and ReleaseDirect all now use double-quoted string
+  values consistently (previously two were quoted and one was bare).
+- **CI test job routed through `make test`** — PR #31. `.github/workflows/ci.yml`
+  now invokes `make test` instead of `swift test`, keeping local and CI
+  invocations in sync.
+- **`StatusBarController.showPanel()` drops `DispatchQueue.main.async`** —
+  PR #31. The class is already `@MainActor` so the dispatch hop was redundant.
+  Replaced with `Task { MainActor in await Task.yield(); … }`, preserving the
+  intentional deferral (letting SwiftUI re-layout after the
+  `.menuBarPanelDidShow` notification) with one fewer scheduling primitive.
+
+### Fixed
+- **`SettingsStore.resetToDefaults()` force-cast crash risk and duplicate
+  assignments** — PR #27. The method had 37 `as!` force-casts pulling values
+  out of an `[String: Any]` defaults dict, and assigned `accelBandpassLowHz`
+  and `accelBandpassHighHz` twice. Rewritten to assign every field directly
+  from the typed `Defaults.*` constants in `Sources/YameteCore/Defaults.swift` —
+  no `Any` round-trip, no duplicate assignments, no crash path if the defaults
+  dict is ever mistyped. All 24 SettingsStore tests remain green.
+
+### Documentation
+- `project.yml` gains a YAML comment block above `SWIFT_INCLUDE_PATHS` /
+  `HEADER_SEARCH_PATHS` explaining why both are required for the `IOHIDPublic`
+  bridging module (the Swift driver locates `module.modulemap`, the C
+  compiler resolves the headers it references — removing either breaks
+  the bridging module).
+- `project.yml` gains a comment above the `Yamete-AppStore:` scheme noting
+  that its `run` config is `Debug`, so sandbox entitlements only apply via
+  `make appstore` or archive, not via Xcode's Run button. A matching comment
+  lives above the Makefile's `appstore:` target.
+
 ## [1.1.1] - 2026-04-16
 
 ### Fixed
