@@ -59,6 +59,19 @@
 [![CFRunLoopRun parked](https://img.shields.io/badge/CFRunLoopRun-parked%20gracefully-darkorchid)](Sources/SensorKit/AccelerometerReader.swift)
 [![@unchecked Sendable: 2](https://img.shields.io/badge/unchecked%20Sendable-2%20narrow%20wrappers-lightblue)](Sources/SensorKit/AccelerometerReader.swift)
 
+<!-- ----- exclamations (CI-badge style for things that are not CI) ----- -->
+
+[![yamete](https://img.shields.io/badge/%E3%82%84%E3%82%81%E3%81%A6-stopppp-brightgreen)](https://studnicky.github.io/yamete)
+[![itai](https://img.shields.io/badge/%E3%81%84%E3%81%9F%E3%81%84-ouch-red)](App/Resources/sounds)
+[![mou](https://img.shields.io/badge/%E3%82%82%E3%81%86-enough-orange)](App/Resources/faces)
+[![yabai](https://img.shields.io/badge/%E3%82%84%E3%81%B0%E3%81%84-uh%20oh-yellow)](https://github.com/Studnicky/yamete/issues)
+[![chotto](https://img.shields.io/badge/%E3%81%A1%E3%82%87%E3%81%A3%E3%81%A8-hold%20on-blueviolet)](Sources/YameteApp/ImpactController.swift)
+[![desk-slap](https://img.shields.io/badge/desk%20slap-detected-success)](Sources/SensorKit/AccelerometerReader.swift)
+[![face](https://img.shields.io/badge/current%20face-screaming-ff4757)](App/Resources/faces)
+[![impact-tier](https://img.shields.io/badge/last%20impact-FIRM-critical)](https://studnicky.github.io/yamete/architecture.html#detection-gates)
+[![watchdog](https://img.shields.io/badge/watchdog-watching-informational)](Sources/SensorKit/AccelerometerReader.swift)
+[![omnissiah](https://img.shields.io/badge/omnissiah-pleased-blueviolet)](CLAUDE.md)
+
 <!-- ----- flavor ----- -->
 
 [![The face has seen things](https://img.shields.io/badge/the%20face-has%20seen%20things-8a2be2)](https://studnicky.github.io/yamete)
