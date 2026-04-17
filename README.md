@@ -70,7 +70,7 @@
 [![face](https://img.shields.io/badge/current%20face-screaming-ff4757)](App/Resources/faces)
 [![impact-tier](https://img.shields.io/badge/last%20impact-FIRM-critical)](https://studnicky.github.io/yamete/architecture.html#detection-gates)
 [![watchdog](https://img.shields.io/badge/watchdog-watching-informational)](Sources/SensorKit/AccelerometerReader.swift)
-[![omnissiah](https://img.shields.io/badge/omnissiah-pleased-blueviolet)](CLAUDE.md)
+[![machine spirits](https://img.shields.io/badge/machine%20spirits-appeased-blueviolet)](CLAUDE.md)
 
 <!-- ----- flavor ----- -->
 
