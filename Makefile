@@ -84,6 +84,7 @@ BUNDLE_RESOURCES := $(shell find $(RESOURCE_SRC) $(RESOURCE_DIRECT) -type f 2>/d
 # suffix, case-sensitive) to make diffs readable.
 FRAMEWORKS := AppKit AVFoundation CoreAudio CoreMotion IOKit ServiceManagement SwiftUI UserNotifications
 SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as-library \
+              -swift-version 6 \
               $(VARIANT_FLAGS) \
               $(addprefix -framework ,$(FRAMEWORKS)) \
               -I Sources/IOHIDPublic/include
