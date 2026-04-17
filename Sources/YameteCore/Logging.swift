@@ -84,12 +84,17 @@ public final class LogStore: Sendable {
     private let directory: URL
     private let maxAge: TimeInterval = 24 * 60 * 60
 
-    /// Mutable per-day rotation state. Always accessed under `state` lock,
-    /// so marking `@unchecked Sendable` is safe — the lock provides the
-    /// serialization the Sendable contract requires. The fields hold a
-    /// `FileHandle` (not Sendable) plus two formatters that are stable
-    /// after construction.
-    private struct State: @unchecked Sendable {
+    /// Mutable per-day rotation state. Every field is Sendable on its own:
+    /// `FileHandle` and `DateFormatter` gained Sendable conformance in the
+    /// Foundation concurrency annotations. `ISO8601DateFormatter` is NOT
+    /// Sendable, so we build the equivalent ISO-8601 timestamp via a
+    /// `DateFormatter` configured with the `yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX`
+    /// pattern and GMT timezone (matches the `.withInternetDateTime` +
+    /// `.withFractionalSeconds` output byte-for-byte). Access is still
+    /// serialized by the enclosing `OSAllocatedUnfairLock<State>`; we only
+    /// needed genuine Sendable conformance so no `@unchecked` escape hatch
+    /// is required at this layer.
+    private struct State: Sendable {
         var fileHandle: FileHandle?
         var currentDate = ""
         let dateFmt: DateFormatter = {
@@ -98,9 +103,11 @@ public final class LogStore: Sendable {
             f.locale = Locale(identifier: "en_US_POSIX")
             return f
         }()
-        let tsFmt: ISO8601DateFormatter = {
-            let f = ISO8601DateFormatter()
-            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let tsFmt: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(secondsFromGMT: 0)
             return f
         }()
     }

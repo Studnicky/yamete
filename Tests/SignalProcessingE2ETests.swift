@@ -58,7 +58,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     // MARK: - HighPassFilter: DC removal
 
     func testHighPassRemovesDCComponent() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
         let signal = dcSignal(value: 1.0, sampleRate: sampleRate, duration: 4.0)
 
         var filtered: [Vec3] = []
@@ -71,7 +71,7 @@ final class SignalProcessingE2ETests: XCTestCase {
 
     func testHighPassRemovesGravityOffset() {
         // Simulates accelerometer gravity: constant ~0.98g on Z
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
         let signal = dcSignal(value: 0.98, sampleRate: sampleRate, duration: 4.0)
 
         var filtered: [Vec3] = []
@@ -82,7 +82,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testHighPassPassesImpulse() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
 
         // Settle on zero
         for _ in 0..<100 { _ = hpf.process(.zero) }
@@ -93,7 +93,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testHighPassPassesHighFrequency() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
         let signal = sineWave(frequency: 15.0, amplitude: 1.0, sampleRate: sampleRate, duration: 4.0)
 
         var filtered: [Vec3] = []
@@ -107,7 +107,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testHighPassAttenuatesLowFrequency() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
         let signal = sineWave(frequency: 1.0, amplitude: 1.0, sampleRate: sampleRate, duration: 8.0)
 
         var filtered: [Vec3] = []
@@ -122,7 +122,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     // MARK: - LowPassFilter: high frequency attenuation
 
     func testLowPassAttenuatesHighFrequency() {
-        let lpf = LowPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
         // Nyquist is 25 Hz; test at 20 Hz (well above 10 Hz cutoff)
         let signal = sineWave(frequency: 20.0, amplitude: 1.0, sampleRate: sampleRate, duration: 4.0)
 
@@ -135,7 +135,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testLowPassPassesLowFrequency() {
-        let lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
         let signal = sineWave(frequency: 2.0, amplitude: 1.0, sampleRate: sampleRate, duration: 4.0)
 
         var filtered: [Vec3] = []
@@ -148,7 +148,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testLowPassPassesDC() {
-        let lpf = LowPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
         let signal = dcSignal(value: 1.0, sampleRate: sampleRate, duration: 4.0)
 
         var filtered: [Vec3] = []
@@ -161,7 +161,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testLowPassSmoothsImpulse() {
-        let lpf = LowPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
 
         // Settle at zero
         for _ in 0..<50 { _ = lpf.process(.zero) }
@@ -177,8 +177,8 @@ final class SignalProcessingE2ETests: XCTestCase {
     // MARK: - Bandpass combination (high-pass + low-pass)
 
     func testBandpassPassesMidFrequency() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
-        let lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
 
         // 12 Hz is in the passband (5-20 Hz)
         let signal = sineWave(frequency: 12.0, amplitude: 1.0, sampleRate: sampleRate, duration: 4.0)
@@ -196,8 +196,8 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testBandpassRejectsDC() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
-        let lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
 
         let signal = dcSignal(value: 1.0, sampleRate: sampleRate, duration: 4.0)
 
@@ -214,8 +214,8 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testBandpassRejectsHighFrequencyNoise() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
-        let lpf = LowPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
 
         // 22 Hz is above the low-pass cutoff
         let signal = sineWave(frequency: 22.0, amplitude: 1.0, sampleRate: sampleRate, duration: 4.0)
@@ -233,8 +233,8 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testBandpassRejectsLowFrequencyVibration() {
-        let hpf = HighPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
-        let lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
 
         // 2 Hz simulates footsteps -- below high-pass cutoff
         let signal = sineWave(frequency: 2.0, amplitude: 1.0, sampleRate: sampleRate, duration: 8.0)
@@ -254,7 +254,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     // MARK: - Mixed signal (DC + impact frequency)
 
     func testHighPassExtractsImpactFromGravity() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
 
         // Gravity (0.98g DC) + desk hit vibration (15 Hz, 0.05g)
         let signal = dcPlusSine(dc: 0.98, frequency: 15.0, amplitude: 0.05,
@@ -276,7 +276,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     // MARK: - Multi-axis processing
 
     func testHighPassProcessesAllAxes() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
 
         // Settle with constant on all axes
         for _ in 0..<200 {
@@ -291,7 +291,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testLowPassProcessesAllAxes() {
-        let lpf = LowPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 10.0, sampleRate: sampleRate)
 
         // Feed constant on all axes
         for _ in 0..<200 {
@@ -307,7 +307,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     // MARK: - Filter stability under long sequences
 
     func testHighPassStabilityUnderLongSequence() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
         let signal = sineWave(frequency: 10.0, amplitude: 1.0, sampleRate: sampleRate, duration: 60.0)
 
         var last = Vec3.zero
@@ -319,7 +319,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testLowPassStabilityUnderLongSequence() {
-        let lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
         let signal = sineWave(frequency: 10.0, amplitude: 1.0, sampleRate: sampleRate, duration: 60.0)
 
         var last = Vec3.zero
@@ -332,7 +332,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     // MARK: - Edge cases
 
     func testHighPassWithZeroInput() {
-        let hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
+        var hpf = HighPassFilter(cutoffHz: 5.0, sampleRate: sampleRate)
         for _ in 0..<100 {
             let result = hpf.process(.zero)
             XCTAssertFalse(result.z.isNaN, "Zero input should not produce NaN")
@@ -340,7 +340,7 @@ final class SignalProcessingE2ETests: XCTestCase {
     }
 
     func testLowPassWithZeroInput() {
-        let lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
+        var lpf = LowPassFilter(cutoffHz: 20.0, sampleRate: sampleRate)
         for _ in 0..<100 {
             let result = lpf.process(.zero)
             XCTAssertFalse(result.z.isNaN, "Zero input should not produce NaN")
