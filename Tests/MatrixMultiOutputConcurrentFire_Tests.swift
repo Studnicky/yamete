@@ -1,6 +1,8 @@
 import XCTest
+import AppKit
 @testable import YameteCore
 @testable import ResponseKit
+@testable import SensorKit
 
 /// System-level matrix: when ONE reaction fires, EVERY enabled output runs
 /// its full preAction → action → postAction lifecycle in parallel. Bug class:
@@ -252,6 +254,71 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
         try await Task.sleep(for: .milliseconds(180))
         XCTAssertEqual(slow.postCalls.count, 1,
             "[output=haptic scenario=slow-haptic-noblock] slow output must complete eventually")
+        await bus.close()
+    }
+
+    // MARK: - Cell 4: OS-surface drives full multi-output fanout
+
+    /// An OS-event (synthesized via `MockEventMonitor.emit(...)`) flows
+    /// through `TrackpadActivitySource`'s real detection and fans out to
+    /// every enabled output's lifecycle. Proves the full chain
+    /// (NSEvent → source detection → bus → all subscribed outputs) works,
+    /// not just the bus-publish shortcut.
+    func testOSSurfaceDrives_allOutputs_fullLifecycle() async throws {
+        let bus = await makeBus()
+        let provider = MockConfigProvider()
+        let monitor = MockEventMonitor()
+        let trackpad = TrackpadActivitySource(eventMonitor: monitor)
+        trackpad.configure(
+            windowDuration: 1.0,
+            scrollMin: 0.0, scrollMax: 1.0,
+            touchingMin: 0.0, touchingMax: 1.0,
+            slidingMin: 0.0, slidingMax: 1.0,
+            contactMin: 0.5, contactMax: 2.5,
+            tapMin: 0.5, tapMax: 6.0
+        )
+        trackpad.start(publishingTo: bus)
+        let (spies, tasks) = startRoster(slots: OutputSlot.allCases, bus: bus, provider: provider)
+        defer { tasks.forEach { $0.cancel() } }
+
+        try await Task.sleep(for: .milliseconds(20))
+
+        guard let cg = CGEvent(scrollWheelEvent2Source: nil,
+                               units: .pixel, wheelCount: 2,
+                               wheel1: 30, wheel2: 0, wheel3: 0) else {
+            throw XCTSkip("CGEvent unavailable on this host")
+        }
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: 1)
+        guard let nsEvent = NSEvent(cgEvent: cg) else {
+            throw XCTSkip("NSEvent bridge unavailable")
+        }
+        for _ in 0..<5 {
+            monitor.emit(nsEvent, ofType: .scrollWheel)
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        // Allow detection (debounce 1.5s gates can still emit on first hit) +
+        // coalesce (16ms) + action (2ms) + slack.
+        try await Task.sleep(for: .milliseconds(120))
+
+        // At least one output should have observed at least one trackpad
+        // reaction kind. Using "at least one" because RMS evaluation may
+        // pick touching, sliding, or both depending on accumulated window.
+        let trackpadKinds: Set<ReactionKind> = [.trackpadTouching, .trackpadSliding, .trackpadContact]
+        var anyOutputFired = false
+        for slot in OutputSlot.allCases {
+            let spy = spies[slot]!
+            if spy.actCalls.contains(where: { trackpadKinds.contains($0.kind) }) {
+                anyOutputFired = true
+                XCTAssertGreaterThanOrEqual(spy.preCalls.count, 1,
+                    "[scenario=os-surface output=\(slot.rawValue)] preAction must precede action")
+                XCTAssertGreaterThanOrEqual(spy.postCalls.count, 1,
+                    "[scenario=os-surface output=\(slot.rawValue)] postAction must follow action")
+            }
+        }
+        XCTAssertTrue(anyOutputFired,
+                      "[scenario=os-surface] OS-event chain must reach at least one output's action lifecycle")
+
+        trackpad.stop()
         await bus.close()
     }
 

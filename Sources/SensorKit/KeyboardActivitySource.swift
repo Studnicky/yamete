@@ -16,6 +16,14 @@ private let log = AppLog(category: "KeyboardActivitySource")
 public final class KeyboardActivitySource: StimulusSource {
     public let id: SensorID = .keyboardActivity
 
+    // Injectable seams — kept uniform across all 3 activity sources so that
+    // tests construct every source with the same signature shape. Keyboard
+    // does not actually drive NSEvent (HID-only), so the eventMonitor is
+    // retained but unused at runtime; it's there so a `MockEventMonitor`
+    // parameter can be passed in matrix tests without a special case.
+    private let eventMonitor: EventMonitor
+    private let hidMonitor: HIDDeviceMonitor
+
     nonisolated(unsafe) private var hidManager: IOHIDManager?
     private var hidRetained: Unmanaged<KeyboardActivitySource>?
     private weak var bus: ReactionBus?
@@ -30,7 +38,11 @@ public final class KeyboardActivitySource: StimulusSource {
     private weak var _testBus: ReactionBus?
     #endif
 
-    public init() {}
+    public init(eventMonitor: EventMonitor = RealEventMonitor(),
+                hidMonitor: HIDDeviceMonitor = RealHIDDeviceMonitor()) {
+        self.eventMonitor = eventMonitor
+        self.hidMonitor = hidMonitor
+    }
 
     // MARK: - Availability
 
@@ -65,12 +77,16 @@ public final class KeyboardActivitySource: StimulusSource {
         // Input Monitoring permission. Real callbacks still gate on TCC below.
         self._testBus = bus
         #endif
+        // Hold the bus reference unconditionally so the `_injectKeyPress` test
+        // seam can drive `handleKeyPress` through the real rate-window /
+        // debounce / publish pipeline even when Input Monitoring is not
+        // granted (CI). Real IOKit callbacks remain gated on TCC below.
+        self.bus = bus
         // Requires Input Monitoring TCC permission
         guard IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted else {
             log.warning("entity:KeyboardActivitySource wasInvalidatedBy activity:Start — Input Monitoring not granted")
             return
         }
-        self.bus = bus
         startHID()
         log.info("entity:KeyboardActivitySource wasGeneratedBy activity:Start")
     }
@@ -80,6 +96,19 @@ public final class KeyboardActivitySource: StimulusSource {
         guard let bus = _testBus else { return }
         guard kind == .keyboardTyped else { return }
         await bus.publish(.keyboardTyped)
+    }
+
+    /// Test seam — drives the same internal handler that the real
+    /// `IOHIDManager` input-value callback calls. Bypasses the IOKit
+    /// kernel hop but exercises the rest of the detection pipeline
+    /// (rate window, debounce, threshold, bus publish). Lets tests
+    /// drive the production rate-detection logic without requiring
+    /// Input Monitoring permission.
+    public func _injectKeyPress(at timestamp: Date = Date()) async {
+        self.handleKeyPress(timestamp: timestamp)
+        // Yield once so any spawned `Task { await bus.publish(...) }`
+        // gets a chance to run before the caller observes the bus.
+        await Task.yield()
     }
     #endif
 
@@ -92,8 +121,10 @@ public final class KeyboardActivitySource: StimulusSource {
 
     // MARK: - Key press callback target
 
-    func hidKeyPressed() {
-        let now = Date()
+    /// Internal handler called by both the real IOKit input-value callback
+    /// (`hidKeyPressed`) and the `_injectKeyPress` test seam. Owns the
+    /// rate-window, debounce gate, and bus publish.
+    func handleKeyPress(timestamp now: Date) {
         keyWindow.append(now)
         keyWindow.removeAll { now.timeIntervalSince($0) > 2.0 }
 
@@ -103,6 +134,12 @@ public final class KeyboardActivitySource: StimulusSource {
         typingGate = now.addingTimeInterval(typingDebounce)
         log.info("activity:Publish wasGeneratedBy entity:KeyboardActivity kind=keyboardTyped rate=\(String(format:"%.1f",rate))/s")
         if let bus { Task { await bus.publish(.keyboardTyped) } }
+    }
+
+    /// Real IOKit input-value callback target. Forwards to the shared
+    /// `handleKeyPress` so the test seam exercises the same pipeline.
+    func hidKeyPressed() {
+        handleKeyPress(timestamp: Date())
     }
 
     // MARK: - HID manager

@@ -1,6 +1,8 @@
 import XCTest
+import AppKit
 @testable import YameteCore
 @testable import ResponseKit
+@testable import SensorKit
 
 /// Bus-interaction matrix: for every meaningful pair of `(kindA, kindB)` and
 /// every lifecycle scenario, assert ReactionBus + ReactiveOutput honor the
@@ -207,6 +209,51 @@ final class MatrixBusInteractionTests: IntegrationTestCase {
 
         consumeTask.cancel()
         await harness.close()
+    }
+
+    // MARK: - OS-surface cell — full path through detection to subscriber
+
+    /// Bus-fanout invariant via the OS-event-routing surface. A trackpad
+    /// gesture synthesized through `MockEventMonitor.emit(...)` flows through
+    /// `TrackpadActivitySource`'s real detection (RMS, debounce, attribution)
+    /// and lands at the subscriber as a `FiredReaction`. Confirms the
+    /// OS-surface path also reaches outputs — not just `bus.publish` shortcuts.
+    func testOSSurface_trackpadGesture_reachesSubscriber() async throws {
+        let harness = BusHarness()
+        await harness.setUp()
+        let monitor = MockEventMonitor()
+        let trackpad = TrackpadActivitySource(eventMonitor: monitor)
+        trackpad.configure(
+            windowDuration: 1.0,
+            scrollMin: 0.0, scrollMax: 1.0,
+            touchingMin: 0.0, touchingMax: 1.0,
+            slidingMin: 0.0, slidingMax: 1.0,
+            contactMin: 0.5, contactMax: 2.5,
+            tapMin: 0.5, tapMax: 6.0
+        )
+        trackpad.start(publishingTo: harness.bus)
+
+        let collectTask = Task { await harness.collectFor(seconds: 0.5) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        guard let cg = CGEvent(scrollWheelEvent2Source: nil,
+                               units: .pixel, wheelCount: 2,
+                               wheel1: 30, wheel2: 0, wheel3: 0) else {
+            throw XCTSkip("CGEvent unavailable on this host")
+        }
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: 1)
+        guard let nsEvent = NSEvent(cgEvent: cg) else {
+            throw XCTSkip("NSEvent bridge unavailable")
+        }
+        for _ in 0..<5 {
+            monitor.emit(nsEvent, ofType: .scrollWheel)
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        let collected = await collectTask.value
+        let trackpadKinds: Set<ReactionKind> = [.trackpadTouching, .trackpadSliding, .trackpadContact, .trackpadCircling]
+        XCTAssertTrue(collected.contains(where: { trackpadKinds.contains($0.kind) }),
+                      "[scenario=os-surface] trackpad gesture must produce a fired reaction at subscriber; got \(collected.map(\.kind))")
+        trackpad.stop()
     }
 
     // MARK: - Helpers

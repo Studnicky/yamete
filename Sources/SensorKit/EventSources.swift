@@ -34,8 +34,14 @@ public final class USBSource: @unchecked Sendable {
     private var detachIterator: io_iterator_t = 0
     private var publishTask: Task<Void, Never>?
     private let lastEvent = OSAllocatedUnfairLock<[String: Date]>(initialState: [:])
+    /// Continuation of the AsyncStream the IOKit callbacks yield into. Stored
+    /// so the test-seam injectors can yield through the same drainer path
+    /// (which runs `shouldPublish` debounce and forwards to the bus).
+    private var streamContinuation: AsyncStream<Reaction>.Continuation?
     #if DEBUG
-    /// Test seam — weak ref to the bus, set on `start`. Used by `_testEmit`.
+    /// Weak ref to the bus, set on `start`. Used by `_testEmit` and the
+    /// IOKit-callback test seams (`_injectAttach` / `_injectDetach`) to drive
+    /// the same publish path the production stream drainer drives.
     private weak var _testBus: ReactionBus?
     #endif
 
@@ -52,6 +58,7 @@ public final class USBSource: @unchecked Sendable {
         self.notifyPort = port
 
         let (stream, continuation) = AsyncStream<Reaction>.makeStream(bufferingPolicy: .bufferingNewest(32))
+        self.streamContinuation = continuation
 
         // Drain initial replay — the matching iterator emits one event per
         // currently-connected device on first iteration. We want to ignore
@@ -152,6 +159,8 @@ public final class USBSource: @unchecked Sendable {
         attachContextHandle = nil
         detachContextHandle?.release()
         detachContextHandle = nil
+        streamContinuation?.finish()
+        streamContinuation = nil
     }
 
     private var attachContextHandle: Unmanaged<USBContext>?
@@ -182,6 +191,34 @@ public final class USBSource: @unchecked Sendable {
     public func _testEmit(_ kind: ReactionKind) async {
         guard let bus = _testBus else { return }
         await bus.publish(USBSource._reactionForTest(kind))
+    }
+
+    /// Test seam: mirrors the production `IOServiceAddMatchingNotification`
+    /// callback that IOKit invokes for `kIOFirstMatchNotification`. Bypasses
+    /// the kernel hop — pre-resolved vendor/product strings are passed in
+    /// instead of having IOKit traverse an `io_iterator_t`. Yields into the
+    /// same `AsyncStream` the production callback yields into, so the same
+    /// `shouldPublish` debounce and `bus.publish` fan-out runs.
+    /// `at:` is accepted for parity with the real callback's event time but
+    /// the production debounce uses wall-clock time — tests that need
+    /// timing-sensitive cells should sleep between calls.
+    @MainActor
+    public func _injectAttach(vendor: String, product: String, at timestamp: Date = Date()) async {
+        _ = timestamp
+        let info = USBDeviceInfo(name: product, vendorID: vendor.hashValue, productID: product.hashValue)
+        streamContinuation?.yield(.usbAttached(info))
+        // Yield to let the publishTask drainer pick it up, run shouldPublish,
+        // and forward to the bus before the test inspects the bus.
+        await Task.yield()
+    }
+
+    /// Test seam: mirrors the `kIOTerminatedNotification` callback path.
+    @MainActor
+    public func _injectDetach(vendor: String, product: String, at timestamp: Date = Date()) async {
+        _ = timestamp
+        let info = USBDeviceInfo(name: product, vendorID: vendor.hashValue, productID: product.hashValue)
+        streamContinuation?.yield(.usbDetached(info))
+        await Task.yield()
     }
 
     /// Test seam — runs the production `shouldPublish` debounce check against
@@ -281,8 +318,16 @@ public final class PowerSource: Sendable {
     }
 
     fileprivate func handlePowerChange() {
-        log.debug("activity:PowerChange detected onAC=\(Self.currentlyOnAC())")
         let onAC = Self.currentlyOnAC()
+        log.debug("activity:PowerChange detected onAC=\(onAC)")
+        handlePowerChange(onAC: onAC)
+    }
+
+    /// Edge-triggered against `lastWasOnAC` — only emits on AC-state
+    /// transitions. Called from the `IOPSNotificationCreateRunLoopSource`
+    /// callback path with the current system state, and from the
+    /// `_injectPowerChange` test seam with a synthetic state.
+    fileprivate func handlePowerChange(onAC: Bool) {
         guard onAC != lastWasOnAC else { return }
         lastWasOnAC = onAC
         let reaction: Reaction = onAC ? .acConnected : .acDisconnected
@@ -301,6 +346,24 @@ public final class PowerSource: Sendable {
         }
         await bus.publish(reaction)
     }
+
+    /// Test seam: mirrors the `IOPSNotificationCreateRunLoopSource` callback
+    /// that fires when the system AC state changes. Bypasses the IOKit hop
+    /// AND `IOPSCopyPowerSourcesInfo` — the test passes the synthetic AC
+    /// state directly. Drives the same `handlePowerChange(onAC:)` edge-trigger
+    /// path the production callback drives.
+    @MainActor
+    public func _injectPowerChange(onAC: Bool, at timestamp: Date = Date()) async {
+        _ = timestamp
+        handlePowerChange(onAC: onAC)
+        await Task.yield()
+    }
+
+    /// Test seam: exposes the host's current AC state (the same value
+    /// `start()` uses to seed `lastWasOnAC`). Lets tests determine the
+    /// baseline so they can construct deterministic-edge inject sequences
+    /// regardless of whether the host is actually plugged in.
+    public static func _currentlyOnAC() -> Bool { Self.currentlyOnAC() }
     #endif
 
     fileprivate static func currentlyOnAC() -> Bool {
@@ -403,17 +466,60 @@ public final class AudioPeripheralSource: Sendable {
         }
         await bus.publish(reaction)
     }
+
+    /// Test seam: mirrors the `AudioObjectAddPropertyListenerBlock` callback
+    /// that fires when CoreAudio's device set changes. Bypasses the
+    /// `Self.snapshot()` system query — the test passes the synthetic device
+    /// `uid` and resolved `name` directly. Adds the uid to the tracked set
+    /// and runs the production `handleChange(newDevices:names:)` diff,
+    /// publishing exactly one `.audioPeripheralAttached` if the uid is new.
+    @MainActor
+    public func _injectAttach(uid: String, name: String, at timestamp: Date = Date()) async {
+        _ = timestamp
+        var nextSet = knownDevices
+        nextSet.insert(uid)
+        handleChange(newDevices: nextSet, names: [uid: name])
+        await Task.yield()
+    }
+
+    @MainActor
+    public func _injectDetach(uid: String, name: String, at timestamp: Date = Date()) async {
+        _ = timestamp
+        _ = name
+        var nextSet = knownDevices
+        nextSet.remove(uid)
+        handleChange(newDevices: nextSet, names: [:])
+        await Task.yield()
+    }
+
+    /// Test seam: seeds the `knownDevices` baseline so subsequent injects
+    /// diff against a non-empty set. Mirrors the production `start()` snapshot.
+    @MainActor
+    public func _testSeedKnownDevices(_ uids: Set<String>) {
+        knownDevices = uids
+    }
     #endif
 
     fileprivate func handleChange() {
         log.debug("activity:AudioPeripheralChange detected devices=\(knownDevices.count)")
         let now = Self.snapshot()
-        let added = now.subtracting(knownDevices)
-        let removed = knownDevices.subtracting(now)
-        knownDevices = now
+        let names = Dictionary(uniqueKeysWithValues: now.map { uid in
+            (uid, Self.name(forUID: uid) ?? "Audio Device")
+        })
+        handleChange(newDevices: now, names: names)
+    }
+
+    /// Diff-and-emit core. The CoreAudio property-listener block reads the
+    /// current device set and forwards it through here; the test seam injects
+    /// a synthetic set directly. `names` resolves a friendly name for each
+    /// added UID — production reads them from the registry, tests pass them.
+    fileprivate func handleChange(newDevices: Set<String>, names: [String: String]) {
+        let added = newDevices.subtracting(knownDevices)
+        let removed = knownDevices.subtracting(newDevices)
+        knownDevices = newDevices
 
         for uid in added {
-            let name = Self.name(forUID: uid) ?? "Audio Device"
+            let name = names[uid] ?? "Audio Device"
             stream?.yield(.audioPeripheralAttached(.init(uid: uid, name: name)))
         }
         for uid in removed {
@@ -487,6 +593,9 @@ public final class BluetoothSource: @unchecked Sendable {
     private var attachIterator: io_iterator_t = 0
     private var detachIterator: io_iterator_t = 0
     private var publishTask: Task<Void, Never>?
+    /// Continuation of the AsyncStream the IOKit callbacks yield into. Stored
+    /// so the test-seam injectors can yield through the same drainer path.
+    private var streamContinuation: AsyncStream<Reaction>.Continuation?
     #if DEBUG
     private weak var _testBus: ReactionBus?
     #endif
@@ -504,6 +613,7 @@ public final class BluetoothSource: @unchecked Sendable {
         notifyPort = port
 
         let (stream, continuation) = AsyncStream<Reaction>.makeStream(bufferingPolicy: .bufferingNewest(8))
+        self.streamContinuation = continuation
 
         let attachContext = BluetoothContext(continuation: continuation, isInitialReplay: true)
         let detachContext = BluetoothContext(continuation: continuation, isInitialReplay: false)
@@ -582,6 +692,8 @@ public final class BluetoothSource: @unchecked Sendable {
         attachContextHandle = nil
         detachContextHandle?.release()
         detachContextHandle = nil
+        streamContinuation?.finish()
+        streamContinuation = nil
     }
 
     private var attachContextHandle: Unmanaged<BluetoothContext>?
@@ -599,6 +711,27 @@ public final class BluetoothSource: @unchecked Sendable {
         default:                     reaction = .bluetoothConnected(info)
         }
         await bus.publish(reaction)
+    }
+
+    /// Test seam: mirrors the `IOServiceAddMatchingNotification` callback for
+    /// `kIOFirstMatchNotification` on `IOBluetoothDevice`. Bypasses the
+    /// `IORegistryEntryCreateCFProperty` lookup — the test passes a synthetic
+    /// device name. Yields into the same AsyncStream the production callback
+    /// yields into.
+    @MainActor
+    public func _injectConnect(name: String, at timestamp: Date = Date()) async {
+        _ = timestamp
+        let info = BluetoothDeviceInfo(address: name, name: name)
+        streamContinuation?.yield(.bluetoothConnected(info))
+        await Task.yield()
+    }
+
+    @MainActor
+    public func _injectDisconnect(name: String, at timestamp: Date = Date()) async {
+        _ = timestamp
+        let info = BluetoothDeviceInfo(address: name, name: name)
+        streamContinuation?.yield(.bluetoothDisconnected(info))
+        await Task.yield()
     }
     #endif
 
@@ -630,6 +763,9 @@ public final class ThunderboltSource: @unchecked Sendable {
     private var attachIterator: io_iterator_t = 0
     private var detachIterator: io_iterator_t = 0
     private var publishTask: Task<Void, Never>?
+    /// Continuation of the AsyncStream the IOKit callbacks yield into. Stored
+    /// so the test-seam injectors can yield through the same drainer path.
+    private var streamContinuation: AsyncStream<Reaction>.Continuation?
     #if DEBUG
     private weak var _testBus: ReactionBus?
     #endif
@@ -647,6 +783,7 @@ public final class ThunderboltSource: @unchecked Sendable {
         notifyPort = port
 
         let (stream, continuation) = AsyncStream<Reaction>.makeStream(bufferingPolicy: .bufferingNewest(8))
+        self.streamContinuation = continuation
 
         let attachContext = ThunderboltContext(continuation: continuation, isInitialReplay: true)
         let detachContext = ThunderboltContext(continuation: continuation, isInitialReplay: false)
@@ -723,6 +860,8 @@ public final class ThunderboltSource: @unchecked Sendable {
         attachContextHandle = nil
         detachContextHandle?.release()
         detachContextHandle = nil
+        streamContinuation?.finish()
+        streamContinuation = nil
     }
 
     private var attachContextHandle: Unmanaged<ThunderboltContext>?
@@ -740,6 +879,24 @@ public final class ThunderboltSource: @unchecked Sendable {
         default:                   reaction = .thunderboltAttached(info)
         }
         await bus.publish(reaction)
+    }
+
+    /// Test seam: mirrors the `IOServiceAddMatchingNotification` callback for
+    /// `kIOFirstMatchNotification` on `IOThunderboltPort`. Bypasses the
+    /// `IORegistryEntryCreateCFProperty` lookup. Yields into the same
+    /// AsyncStream the production callback yields into.
+    @MainActor
+    public func _injectAttach(name: String, at timestamp: Date = Date()) async {
+        _ = timestamp
+        streamContinuation?.yield(.thunderboltAttached(.init(name: name)))
+        await Task.yield()
+    }
+
+    @MainActor
+    public func _injectDetach(name: String, at timestamp: Date = Date()) async {
+        _ = timestamp
+        streamContinuation?.yield(.thunderboltDetached(.init(name: name)))
+        await Task.yield()
     }
     #endif
 }
@@ -830,6 +987,18 @@ public final class DisplayHotplugSource: @unchecked Sendable {
         let afterFire = lastFire.withLock { $0 }
         return afterFire != beforeFire
     }
+
+    /// Test seam: mirrors the `CGDisplayRegisterReconfigurationCallback`
+    /// post-debounce path. Bypasses the kernel hop and the `flags`-gating
+    /// (the production callback ignores `.beginConfigurationFlag` callbacks).
+    /// Drives `dispatchDebounced` so the same 200ms window collapse applies
+    /// to rapid-fire test injections that mirror real reconfigures.
+    @MainActor
+    public func _injectReconfigure(at timestamp: Date = Date()) async {
+        _ = timestamp
+        dispatchDebounced()
+        await Task.yield()
+    }
     #endif
 
     fileprivate func dispatchDebounced() {
@@ -878,10 +1047,13 @@ public final class SleepWakeSource: @unchecked Sendable {
             let me = Unmanaged<SleepWakeSource>.fromOpaque(ctx).takeUnretainedValue()
             switch messageType {
             case kIOMessageSystemWillSleep:
-                _ = me.stream.withLock { $0?.yield(.willSleep) }
+                me.handleWillSleep()
+                // IOAllowPowerChange is a real-system call and only valid
+                // when `rootPort` was registered against the kernel — the
+                // test seam path skips this.
                 IOAllowPowerChange(me.rootPort, Int(bitPattern: messageArgument.map(UInt.init(bitPattern:)) ?? 0))
             case kIOMessageSystemHasPoweredOn:
-                _ = me.stream.withLock { $0?.yield(.didWake) }
+                me.handleDidWake()
             default:
                 break
             }
@@ -925,6 +1097,18 @@ public final class SleepWakeSource: @unchecked Sendable {
         stream.withLock { $0?.finish(); $0 = nil }
     }
 
+    /// Yields `.willSleep` to the AsyncStream the production publishTask
+    /// drains. Called from the `IORegisterForSystemPower` callback path
+    /// (alongside `IOAllowPowerChange` against the kernel rootPort) and
+    /// from the `_injectWillSleep` test seam (without the kernel call).
+    fileprivate func handleWillSleep() {
+        _ = stream.withLock { $0?.yield(.willSleep) }
+    }
+
+    fileprivate func handleDidWake() {
+        _ = stream.withLock { $0?.yield(.didWake) }
+    }
+
     #if DEBUG
     @MainActor
     public func _testEmit(_ kind: ReactionKind) async {
@@ -936,6 +1120,29 @@ public final class SleepWakeSource: @unchecked Sendable {
         default:         reaction = .didWake
         }
         await bus.publish(reaction)
+    }
+
+    /// Test seam: mirrors the `IORegisterForSystemPower` callback's
+    /// `kIOMessageSystemWillSleep` path. Bypasses the kernel hop and the
+    /// associated `IOAllowPowerChange(rootPort, ...)` reply (rootPort is 0
+    /// in tests — calling it would be a no-op at best, undefined at worst).
+    @MainActor
+    public func _injectWillSleep(at timestamp: Date = Date()) async {
+        _ = timestamp
+        handleWillSleep()
+        await Task.yield()
+    }
+
+    /// Test seam: mirrors the `kIOMessageSystemHasPoweredOn` path. The
+    /// production callback does NOT call `IOAllowPowerChange` for wake (the
+    /// kernel does not expect a reply), so this seam matches it exactly.
+    /// Repeated `didWake` without an intervening `willSleep` is the system
+    /// semantic — the source must not crash.
+    @MainActor
+    public func _injectDidWake(at timestamp: Date = Date()) async {
+        _ = timestamp
+        handleDidWake()
+        await Task.yield()
     }
     #endif
 }

@@ -1,4 +1,5 @@
 import XCTest
+import AppKit
 @testable import YameteCore
 @testable import ResponseKit
 @testable import SensorKit
@@ -123,5 +124,61 @@ final class CombinatorialRoutingTests: IntegrationTestCase {
         }
         XCTAssertEqual(assertedCells, tuples.count,
                        "every pairwise tuple must drive one assertion")
+    }
+
+    /// OS-surface variant cell. Drives a trackpad gesture through
+    /// `MockEventMonitor.emit` → `TrackpadActivitySource` real detection →
+    /// `ReactionBus` → `AudioGatedSpyOutput`. Same gating contract as the
+    /// pairwise matrix above, but every kind flows through the production
+    /// detection pipeline (debounce + RMS + attribution) before reaching
+    /// the gate. Catches: a regression where the gate's view of `kind`
+    /// drifts from what the source publishes when the OS surface is in
+    /// the loop (e.g., enricher rewrites the kind, or the bus loses the
+    /// kind in a wrap/unwrap roundtrip).
+    func testOSSurface_RoutingObservesGate() async throws {
+        let harness = BusHarness()
+        await harness.setUp()
+        let monitor = MockEventMonitor()
+        let trackpad = TrackpadActivitySource(eventMonitor: monitor)
+        trackpad.configure(
+            windowDuration: 1.0,
+            scrollMin: 0.0, scrollMax: 1.0,
+            touchingMin: 0.0, touchingMax: 1.0,
+            slidingMin: 0.0, slidingMax: 1.0,
+            contactMin: 0.5, contactMax: 2.5,
+            tapMin: 0.5, tapMax: 6.0
+        )
+        trackpad.start(publishingTo: harness.bus)
+
+        let cfg = MockConfigProvider()
+        cfg.audio.enabled = true
+        // Block trackpadTouching specifically; if RMS lands on touching, the
+        // gate must drop. Sliding stays permitted as a positive control.
+        cfg.audio.perReaction[.trackpadTouching] = false
+        let spy = AudioGatedSpyOutput()
+        let consumeTask = Task { await spy.consume(from: harness.bus, configProvider: cfg) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        guard let cg = CGEvent(scrollWheelEvent2Source: nil,
+                               units: .pixel, wheelCount: 2,
+                               wheel1: 30, wheel2: 0, wheel3: 0) else {
+            throw XCTSkip("CGEvent unavailable")
+        }
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: 1)
+        guard let nsEvent = NSEvent(cgEvent: cg) else {
+            throw XCTSkip("NSEvent bridge unavailable")
+        }
+        for _ in 0..<5 {
+            monitor.emit(nsEvent, ofType: .scrollWheel)
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        try? await Task.sleep(for: .milliseconds(150))
+
+        // .trackpadTouching is gated off — must NOT appear at the spy.
+        XCTAssertFalse(spy.actionKinds().contains(.trackpadTouching),
+                       "[OS-surface] gate on .trackpadTouching must drop the action; got \(spy.actionKinds())")
+        trackpad.stop()
+        consumeTask.cancel()
+        await harness.close()
     }
 }

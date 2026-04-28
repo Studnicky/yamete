@@ -87,7 +87,15 @@ public final class MouseActivitySource: StimulusSource {
             Task { @MainActor [weak self] in self?.handleMouseScroll(event, bus: bus) }
         }
 
-        startClickHID()
+        // Click detection requires Input Monitoring (TCC). Without the grant,
+        // skip IOHIDManager registration so test environments without the
+        // permission don't catch ambient OS clicks. Scroll path still works
+        // independently via the NSEvent global monitor above.
+        if IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted {
+            startClickHID()
+        } else {
+            log.warning("entity:MouseActivitySource startClickHID skipped — Input Monitoring not granted")
+        }
         log.info("entity:MouseActivitySource wasGeneratedBy activity:Start")
     }
 

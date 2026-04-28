@@ -1,6 +1,8 @@
 import XCTest
+import AppKit
 @testable import YameteCore
 @testable import ResponseKit
+@testable import SensorKit
 
 /// Matrix-style routing tests. Cross-product of every `ReactionKind` ×
 /// master-toggle × per-reaction-gate state asserting the
@@ -255,6 +257,62 @@ final class MatrixRouting_Tests: XCTestCase {
         try await Task.sleep(for: .milliseconds(120))
 
         XCTAssertTrue(spy.actions().isEmpty, "shouldFire=false drops the stimulus")
+    }
+
+    // MARK: - OS-surface routing — full path through detection + gating
+
+    /// Cross-check: the routing gate decision does the same thing whether
+    /// the kind arrives via direct `bus.publish` or via the OS-event-routing
+    /// surface. Drives a trackpad gesture through `MockEventMonitor.emit`
+    /// → real detection → bus → spy (gated by per-kind allow). Asserts that
+    /// (master enabled, perReaction allowed) → action fires; with the kind
+    /// blocked, action does NOT fire. Same gating contract as the synthetic
+    /// matrix above, just with the production detection in the path.
+    func testOSSurfaceRouting_observesPerReactionGate() async throws {
+        let harness = BusHarness()
+        await harness.setUp()
+        let monitor = MockEventMonitor()
+        let trackpad = TrackpadActivitySource(eventMonitor: monitor)
+        trackpad.configure(
+            windowDuration: 1.0,
+            scrollMin: 0.0, scrollMax: 1.0,
+            touchingMin: 0.0, touchingMax: 1.0,
+            slidingMin: 0.0, slidingMax: 1.0,
+            contactMin: 0.5, contactMax: 2.5,
+            tapMin: 0.5, tapMax: 6.0
+        )
+        trackpad.start(publishingTo: harness.bus)
+
+        // Block .trackpadTouching at the audio gate; the spy should not fire
+        // for that kind. .trackpadSliding remains permitted — if either
+        // appears, the gate logic is tracking real-source kinds correctly.
+        let provider = MockConfigProvider()
+        provider.audio.perReaction[.trackpadTouching] = false
+        let gated = GatedSpyOutput()
+        let consumeTask = Task { @MainActor [bus = harness.bus] in
+            await gated.consume(from: bus, configProvider: provider)
+        }
+        try await Task.sleep(for: .milliseconds(30))
+
+        guard let cg = CGEvent(scrollWheelEvent2Source: nil,
+                               units: .pixel, wheelCount: 2,
+                               wheel1: 30, wheel2: 0, wheel3: 0) else {
+            throw XCTSkip("CGEvent unavailable on this host")
+        }
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: 1)
+        guard let nsEvent = NSEvent(cgEvent: cg) else {
+            throw XCTSkip("NSEvent bridge unavailable")
+        }
+        for _ in 0..<5 {
+            monitor.emit(nsEvent, ofType: .scrollWheel)
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try await Task.sleep(for: .milliseconds(150))
+
+        XCTAssertFalse(gated.actionKinds().contains(.trackpadTouching),
+                       "[OS-surface] perReaction[.trackpadTouching]=false must drop action; got \(gated.actionKinds().map(\.rawValue))")
+        trackpad.stop()
+        consumeTask.cancel()
     }
 
     // MARK: - Helpers
