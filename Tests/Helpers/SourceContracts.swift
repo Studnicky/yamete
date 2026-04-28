@@ -50,6 +50,13 @@ struct SourceContract: Sendable {
     /// Builds a fresh, unstarted source instance for the given SensorID.
     /// Returns nil if the ID is not a stimulus source.
     @MainActor
+    /// Construct a stimulus source for matrix tests. Sources backed by real
+    /// NSEvent global monitors / IOHIDManager callbacks (Trackpad/Mouse/
+    /// Keyboard) get a `MockEventMonitor` injection so ambient OS input
+    /// during the test window doesn't double-count emissions. The test
+    /// drives every emission via `_testEmit`, which goes straight to the
+    /// bus regardless of the monitor — the mock just prevents extra
+    /// hardware callbacks from firing concurrently.
     static func makeSource(for id: SensorID) -> (any StimulusSource)? {
         switch id {
         case .usb:              return USBSource()
@@ -59,8 +66,8 @@ struct SourceContract: Sendable {
         case .thunderbolt:      return ThunderboltSource()
         case .displayHotplug:   return DisplayHotplugSource()
         case .sleepWake:        return SleepWakeSource()
-        case .trackpadActivity: return TrackpadActivitySource()
-        case .mouseActivity:    return MouseActivitySource()
+        case .trackpadActivity: return TrackpadActivitySource(eventMonitor: MockEventMonitor())
+        case .mouseActivity:    return MouseActivitySource(eventMonitor: MockEventMonitor())
         case .keyboardActivity: return KeyboardActivitySource()
         default:                return nil
         }

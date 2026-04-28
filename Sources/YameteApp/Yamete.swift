@@ -189,11 +189,16 @@ public final class Yamete {
         startSettingsObservation()
         AudioDeviceManager.startObserving()
         refreshHardwarePresence()
+        // The block runs on `.main` OperationQueue but Swift strict-concurrency
+        // can't prove that's the MainActor — hop explicitly so refreshHardwarePresence
+        // (a @MainActor method) is called from an isolated context.
         deviceChangeObserver = NotificationCenter.default.addObserver(
             forName: AudioDeviceManager.devicesDidChangeNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in self?.refreshHardwarePresence() }
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refreshHardwarePresence() }
+        }
     }
 
     /// Tears down the pipeline on app quit.
