@@ -22,14 +22,11 @@ internal struct FooterSection: View {
 
             // Left footer — System preferences
             VStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    Image(systemName: "power")
-                        .themeFooterIcon()
-                    Text(NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label"))
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
+                FooterRow(icon: "power",
+                          label: NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label")) {
                     Toggle("", isOn: $launchAtLogin)
                         .themeMiniSwitch()
+                        .accessibilityLabel(Text(NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label")))
                         .onChange(of: launchAtLogin) { _, on in
                             do {
                                 if on { try SMAppService.mainApp.register() }
@@ -37,34 +34,22 @@ internal struct FooterSection: View {
                             } catch { launchAtLogin = !on }
                         }
                 }
-                .padding(Theme.footerPadding)
 
                 if AppLog.supportsDebugLogging {
-                    HStack(spacing: 6) {
-                        Image(systemName: "ladybug")
-                            .themeFooterIcon()
-                        Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label"))
-                            .font(.caption).foregroundStyle(.secondary)
-                        Spacer()
+                    FooterRow(icon: "ladybug",
+                              label: NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label")) {
                         Toggle("", isOn: $s.debugLogging)
                             .themeMiniSwitch()
+                            .accessibilityLabel(Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label")))
                     }
-                    .padding(Theme.footerPadding)
                 }
 
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.counterclockwise")
-                        .themeFooterIcon()
-                    Text(NSLocalizedString("label_reset_settings", comment: "Reset settings label"))
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button(action: { confirmAndReset() }) {
-                        Text(NSLocalizedString("button_reset", comment: "Reset to defaults button"))
-                            .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
-                    }
-                    .buttonStyle(.plain)
+                FooterRow(icon: "arrow.counterclockwise",
+                          label: NSLocalizedString("label_reset_settings", comment: "Reset settings label")) {
+                    PillButton(title: NSLocalizedString("button_reset", comment: "Reset to defaults button"),
+                               action: { confirmAndReset() })
                 }
-                .padding(Theme.footerPadding).padding(.bottom, 4)
+                .padding(.bottom, 4)
             }
             .frame(width: Theme.columnWidth)
 
@@ -75,50 +60,26 @@ internal struct FooterSection: View {
             // Right footer — Info + actions
             VStack(spacing: 0) {
                 // Version / update status
-                HStack(spacing: 6) {
-                    #if DIRECT_BUILD
-                    updateStatusIcon
-                    updateStatusLabel
-                    #else
-                    Image(systemName: "info.circle")
-                        .themeFooterIcon()
-                    Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
-                        .font(.caption).foregroundStyle(.tertiary)
-                    #endif
-                    Spacer()
-                    #if DIRECT_BUILD
-                    updateActionButton
-                    #endif
-                }
-                .padding(Theme.footerPadding)
+                FooterRow(
+                    leading: { updateStatusLeading },
+                    label: { updateStatusLabel },
+                    trailing: { updateStatusTrailing }
+                )
 
                 // Links
-                HStack(spacing: 6) {
-                    Image(systemName: "link")
-                        .themeFooterIcon()
-                    Text(NSLocalizedString("label_links", comment: "Footer links section label"))
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button(action: { open(Self.privacyPolicyURL) }) {
-                        Text(NSLocalizedString("button_privacy", comment: "Privacy policy button"))
-                            .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
+                FooterRow(icon: "link",
+                          label: NSLocalizedString("label_links", comment: "Footer links section label")) {
+                    HStack(spacing: 6) {
+                        LinkPillButton(title: NSLocalizedString("button_privacy", comment: "Privacy policy button"),
+                                       url: Self.privacyPolicyURL)
+                        LinkPillButton(title: NSLocalizedString("button_support", comment: "Support button"),
+                                       url: Self.supportURL)
                     }
-                    .buttonStyle(.plain)
-                    Button(action: { open(Self.supportURL) }) {
-                        Text(NSLocalizedString("button_support", comment: "Support button"))
-                            .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
-                    }
-                    .buttonStyle(.plain)
                 }
-                .padding(Theme.footerPadding)
 
                 // Quit
-                HStack(spacing: 6) {
-                    Image(systemName: "power.circle")
-                        .themeFooterIcon()
-                    Text(NSLocalizedString("label_quit", comment: "Quit label"))
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
+                FooterRow(icon: "power.circle",
+                          label: NSLocalizedString("label_quit", comment: "Quit label")) {
                     Button(action: { NSApp.terminate(nil) }) {
                         Text(NSLocalizedString("button_quit", comment: "Quit application button"))
                             .themePillButton(bold: true)
@@ -126,7 +87,7 @@ internal struct FooterSection: View {
                     .buttonStyle(.plain)
                     .keyboardShortcut("q")
                 }
-                .padding(Theme.footerPadding).padding(.bottom, 4)
+                .padding(.bottom, 4)
             }
             .frame(width: Theme.columnWidth)
         }
@@ -144,63 +105,68 @@ internal struct FooterSection: View {
         }
     }
 
-    private func open(_ url: URL) {
-        NSWorkspace.shared.open(url)
-    }
+    // MARK: - Update / version row composition
+    //
+    // The version-line is uniform in shape (icon, caption, optional trailing
+    // button) but each piece varies by build flavor and update state.
+    // Splitting them into computed views keeps the FooterRow composition
+    // declarative and free of #if branching at the row level.
 
-    // MARK: - Auto-update views (Direct build only)
-
-    #if DIRECT_BUILD
     @ViewBuilder
-    private var updateStatusIcon: some View {
+    private var updateStatusLeading: some View {
+        #if DIRECT_BUILD
         switch updater.state {
         case .checking, .downloading, .installing:
-            ProgressView()
-                .controlSize(.mini)
-                .frame(width: 10, height: 10)
-        case .upToDate:
-            Image(systemName: "checkmark.circle")
-                .themeFooterIcon()
+            ProgressView().controlSize(.mini).frame(width: 10, height: 10)
         case .available:
             Image(systemName: "arrow.down.circle.fill")
                 .font(.system(size: 10))
                 .foregroundStyle(Theme.pink)
+        case .upToDate:
+            ThemedFooterIcon(symbol: "checkmark.circle")
         case .failed:
-            Image(systemName: "exclamationmark.triangle")
-                .themeFooterIcon()
+            ThemedFooterIcon(symbol: "exclamationmark.triangle")
         case .idle:
-            Image(systemName: "info.circle")
-                .themeFooterIcon()
+            ThemedFooterIcon(symbol: "info.circle")
         }
+        #else
+        ThemedFooterIcon(symbol: "info.circle")
+        #endif
     }
 
     @ViewBuilder
     private var updateStatusLabel: some View {
+        #if DIRECT_BUILD
         switch updater.state {
         case .checking:
-            Text(NSLocalizedString("update_checking", comment: "Checking for updates status"))
-                .font(.caption).foregroundStyle(.tertiary)
+            FooterCaption(text: NSLocalizedString("update_checking", comment: "Checking for updates status"),
+                          style: .tertiary)
         case .available(let version, _):
-            Text(String(format: NSLocalizedString("update_available_format", comment: "Update available label"), version))
-                .font(.caption).foregroundStyle(Theme.pink)
+            FooterCaption(text: String(format: NSLocalizedString("update_available_format", comment: "Update available label"), version),
+                          style: .pink)
         case .downloading:
-            Text(NSLocalizedString("update_downloading", comment: "Downloading update status"))
-                .font(.caption).foregroundStyle(.tertiary)
+            FooterCaption(text: NSLocalizedString("update_downloading", comment: "Downloading update status"),
+                          style: .tertiary)
         case .installing:
-            Text(NSLocalizedString("update_installing", comment: "Installing update status"))
-                .font(.caption).foregroundStyle(.tertiary)
+            FooterCaption(text: NSLocalizedString("update_installing", comment: "Installing update status"),
+                          style: .tertiary)
         case .failed(let message):
-            Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
-                .font(.caption).foregroundStyle(.tertiary)
+            FooterCaption(text: String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion),
+                          style: .tertiary)
                 .help(message)
         case .idle, .upToDate:
-            Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
-                .font(.caption).foregroundStyle(.tertiary)
+            FooterCaption(text: String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion),
+                          style: .tertiary)
         }
+        #else
+        FooterCaption(text: String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion),
+                      style: .tertiary)
+        #endif
     }
 
     @ViewBuilder
-    private var updateActionButton: some View {
+    private var updateStatusTrailing: some View {
+        #if DIRECT_BUILD
         switch updater.state {
         case .idle, .upToDate, .failed:
             Button(action: { updater.checkForUpdates() }) {
@@ -219,6 +185,8 @@ internal struct FooterSection: View {
         case .checking, .downloading, .installing:
             EmptyView()
         }
+        #else
+        EmptyView()
+        #endif
     }
-    #endif
 }

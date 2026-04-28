@@ -120,6 +120,39 @@ final class PanelLayoutTests: IntegrationTestCase {
                           "[NSHostingView] height must not exceed sane max")
     }
 
+    // MARK: - Accordion animation duration curve
+
+    /// `AccordionCard.animationDuration(forRows:)` clamps to [0.10, 0.30] and
+    /// scales linearly at 25ms per row. Tests the formula directly so the
+    /// timing contract is locked in regardless of view-body changes.
+    func testAccordionCard_animationDuration_scalesWithRowCount() {
+        XCTAssertEqual(AccordionCard<EmptyView>.animationDuration(forRows: 1),
+                       0.125, accuracy: 0.0001,
+                       "1 row → base 0.10 + 0.025 = 0.125s")
+        XCTAssertEqual(AccordionCard<EmptyView>.animationDuration(forRows: 5),
+                       0.225, accuracy: 0.0001,
+                       "5 rows → base 0.10 + 5*0.025 = 0.225s")
+        XCTAssertEqual(AccordionCard<EmptyView>.animationDuration(forRows: 20),
+                       0.30, accuracy: 0.0001,
+                       "20 rows → capped at 0.30s ceiling")
+        // Floor: 0 or negative input still yields the 0.125s minimum (max(1, rows)).
+        XCTAssertEqual(AccordionCard<EmptyView>.animationDuration(forRows: 0),
+                       0.125, accuracy: 0.0001,
+                       "0 rows clamps to row=1 → 0.125s floor")
+    }
+
+    /// `SensorAccordionCard.animationDuration(forRows:)` mirrors AccordionCard.
+    /// Both surfaces must share the formula so panels with mixed accordion
+    /// types animate consistently.
+    func testSensorAccordionCard_animationDuration_mirrorsAccordionCard() {
+        for rows in [1, 5, 20, 0, -3] {
+            XCTAssertEqual(SensorAccordionCard<EmptyView>.animationDuration(forRows: rows),
+                           AccordionCard<EmptyView>.animationDuration(forRows: rows),
+                           accuracy: 0.0001,
+                           "[rows=\(rows)] sensor and plain accordion durations must match")
+        }
+    }
+
     // MARK: - applyContentHeight clamp invariant
 
     /// The chrome subtraction inside MenuBarView caps the scrollable region

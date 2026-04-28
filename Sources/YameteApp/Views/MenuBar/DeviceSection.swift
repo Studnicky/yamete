@@ -38,14 +38,10 @@ internal struct DeviceSection: View {
         VStack(alignment: .leading, spacing: 6) {
             SettingHeader(icon: "display", title: NSLocalizedString("setting_flash_displays", comment: "Flash displays setting title"),
                          help: NSLocalizedString("help_flash_displays", comment: "Flash displays setting help text"))
-            HStack(spacing: 6) {
-                Image(systemName: "cursorarrow.rays")
-                    .font(.caption).foregroundStyle(.secondary).frame(width: 16)
-                Text(NSLocalizedString("setting_flash_active_display", comment: "Flash active display only toggle label"))
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Toggle("", isOn: $s.flashActiveDisplayOnly).themeMiniSwitch()
-            }
+            EnableToggleRow(icon: "cursorarrow.rays",
+                            title: NSLocalizedString("setting_flash_active_display", comment: "Flash active display only toggle label"),
+                            isOn: $s.flashActiveDisplayOnly,
+                            dimmed: true)
             DeviceToggleList(
                 items: sortedDisplays.map { (name: $0.localizedName, id: $0.displayID) },
                 noneSelectedMessage: NSLocalizedString("no_displays_selected", comment: "No displays selected hint"),

@@ -1,5 +1,30 @@
 import SwiftUI
 
+// MARK: - Accordion API
+//
+// `AccordionCard` and `SensorAccordionCard` accept an optional
+// `contentRowCount: Int = 1` parameter. Pass the approximate number of
+// content rows the accordion contains when expanded. The accordion derives
+// an animation duration from this hint (0.10s floor, 0.30s ceiling, ~25ms
+// per row) so large columns animate slower than small ones, keeping the
+// panel resize and the SwiftUI reveal in lockstep. Existing call sites that
+// omit the argument keep the minimum 0.125s duration — safe for tiny cards.
+//
+// The accordion publishes its current animation duration via
+// `AccordionAnimationDurationKey` (a SwiftUI PreferenceKey, MAX-reduced).
+// `MenuBarView` forwards that value into `StatusBarController` so the panel
+// resize uses the same duration as the in-flight accordion reveal.
+
+/// Preference key carrying the in-flight accordion animation duration up the
+/// view hierarchy. Reduced by `max` so the largest visible accordion's
+/// duration wins when several are present simultaneously.
+struct AccordionAnimationDurationKey: PreferenceKey {
+    static let defaultValue: Double = 0.15
+    static func reduce(value: inout Double, nextValue: () -> Double) {
+        value = max(value, nextValue())
+    }
+}
+
 /// Shared app color palette and reusable style modifiers.
 enum Theme {
     static let pink      = Color(red: 0.867, green: 0.357, blue: 0.522)  // #DD5B85
@@ -85,13 +110,36 @@ extension Theme {
 struct AccordionCard<Content: View>: View {
     let title: String
     var subtitle: String = ""
+    var contentRowCount: Int = 1
     @Binding var isExpanded: Bool
     @ViewBuilder let content: () -> Content
 
+    /// Per-instance animation duration scaled to content row count.
+    /// Mirrors the static `animationDuration(forRows:)` formula so tests
+    /// can assert the curve without instantiating a SwiftUI body.
+    private var animationDuration: Double {
+        Self.animationDuration(forRows: contentRowCount)
+    }
+
+    /// 0.10s for 1 row, scales linearly, capped at 0.30s.
+    /// Empirically: ~25ms per row of content matches the panel resize budget
+    /// without overshooting easeInOut's perceptual peak.
+    static func animationDuration(forRows rows: Int) -> Double {
+        let base = 0.10
+        let perRow = 0.025
+        let raw = base + Double(max(1, rows)) * perRow
+        return min(0.30, max(0.10, raw))
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header bar
-            Button(action: { isExpanded.toggle() }) {
+            // Header bar — toggle wraps animation at the call site (matches the
+            // SettingHeader tooltip pattern: simple in-place opacity on the
+            // conditional content, no .transition() override, no outer
+            // .animation(value:) that would re-animate sibling identity changes).
+            Button(action: {
+                withAnimation(.easeInOut(duration: animationDuration)) { isExpanded.toggle() }
+            }) {
                 HStack(spacing: 6) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.forward")
                         .font(.system(size: 9, weight: .bold))
@@ -110,13 +158,11 @@ struct AccordionCard<Content: View>: View {
             }
             .buttonStyle(.plain)
 
-            // Expanded content
             if isExpanded {
                 VStack(spacing: 0) {
                     content()
                 }
                 .padding(.top, 4)
-                .transition(.opacity)
             }
         }
         .overlay(
@@ -124,8 +170,11 @@ struct AccordionCard<Content: View>: View {
                 .stroke(Theme.deepRose.opacity(0.25), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 6))
-        .animation(.easeInOut(duration: 0.2), value: isExpanded)
         .padding(.horizontal, 8).padding(.vertical, 4)
+        // Publish the duration so the panel resize uses the same timing.
+        // Always emitted (not gated on isExpanded) so the panel sees the
+        // value during the reveal and during the subsequent collapse.
+        .preference(key: AccordionAnimationDurationKey.self, value: animationDuration)
     }
 }
 
@@ -140,14 +189,33 @@ struct SensorAccordionCard<Content: View>: View {
     @Binding var isEnabled: Bool
     @Binding var isExpanded: Bool
     var help: String = ""
+    var contentRowCount: Int = 1
     @ViewBuilder let content: () -> Content
+
+    /// Per-instance animation duration scaled to content row count.
+    /// Mirrors the static `animationDuration(forRows:)` formula so tests
+    /// can assert the curve without instantiating a SwiftUI body.
+    private var animationDuration: Double {
+        Self.animationDuration(forRows: contentRowCount)
+    }
+
+    /// 0.10s for 1 row, scales linearly, capped at 0.30s.
+    /// Mirror of `AccordionCard.animationDuration(forRows:)` — kept on the
+    /// type so call sites and tests can derive the duration without
+    /// instantiating a SwiftUI body.
+    static func animationDuration(forRows rows: Int) -> Double {
+        let base = 0.10
+        let perRow = 0.025
+        let raw = base + Double(max(1, rows)) * perRow
+        return min(0.30, max(0.10, raw))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             // Header row — never animates, stays fixed at the top
             HStack(spacing: 6) {
                 Button(action: {
-                    withAnimation(.easeOut(duration: 0.22)) { isExpanded.toggle() }
+                    withAnimation(.easeInOut(duration: animationDuration)) { isExpanded.toggle() }
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: isExpanded ? "chevron.down" : "chevron.forward")
@@ -172,13 +240,14 @@ struct SensorAccordionCard<Content: View>: View {
             .padding(.horizontal, 14).padding(.vertical, 8)
             .background(Theme.deepRose.opacity(isEnabled ? 0.14 : 0.07))
 
-            // Drop-down body: slides from the top edge (under the header) and clips
-            // so the unfolding content doesn't overflow or push siblings around.
-            // .top alignment means the height grows downward only.
+            // Drop-down body: matches the SettingHeader tooltip pattern — no
+            // explicit .transition() (default opacity, in-place), no outer
+            // .animation(value:) wrapping the whole card. The withAnimation at
+            // the toggle call site is the only animation source, which keeps
+            // sibling siblings from bouncing as their parent stack reflows.
             if isExpanded {
                 VStack(spacing: 0) { content() }
                     .frame(maxWidth: .infinity, alignment: .top)
-                    .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .overlay(
@@ -190,6 +259,10 @@ struct SensorAccordionCard<Content: View>: View {
         // never above. No outer .animation() that captures unrelated state.
         .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isEnabled)
         .padding(.horizontal, 8).padding(.vertical, 4)
+        // Publish the duration so the panel resize uses the same timing.
+        // Always emitted (not gated on isExpanded) so the panel sees the
+        // value during the reveal and during the subsequent collapse.
+        .preference(key: AccordionAnimationDurationKey.self, value: animationDuration)
     }
 }
 

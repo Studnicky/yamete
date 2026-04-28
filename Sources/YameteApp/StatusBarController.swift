@@ -8,6 +8,11 @@ extension Notification.Name {
     static let menuBarPanelDidShow = Notification.Name("menuBarPanelDidShow")
     /// Posted when the SwiftUI content tree changes height (accordion expand/collapse).
     static let menuBarContentSizeChanged = Notification.Name("menuBarContentSizeChanged")
+    /// Posted when the largest in-flight accordion animation duration changes.
+    /// The panel resize uses this duration so its NSAnimationContext matches
+    /// the SwiftUI reveal in lockstep — large columns animate slower than
+    /// small ones, but the panel and content always finish together.
+    static let menuBarAnimationDurationChanged = Notification.Name("menuBarAnimationDurationChanged")
 }
 
 /// Owns the NSStatusItem and its popover panel.
@@ -25,7 +30,12 @@ final class StatusBarController {
     private let yamete: Yamete
     private let templateIcon: NSImage?
     private var currentScreenFrame: NSRect = NSRect(x: 0, y: 0, width: 1280, height: 800)
+    /// In-flight accordion animation duration, kept in sync with the largest
+    /// visible accordion's per-row scaled duration. Defaults to the prior
+    /// hardcoded 0.15s so the panel still animates if no preference arrives.
+    private var currentAnimationDuration: Double = 0.15
     nonisolated(unsafe) private var contentSizeObserver: (any NSObjectProtocol)?
+    nonisolated(unsafe) private var animationDurationObserver: (any NSObjectProtocol)?
 
     init(settings: SettingsStore, yamete: Yamete, updater: Updater) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -66,10 +76,23 @@ final class StatusBarController {
             let h = (notification.object as? NSNumber).map { CGFloat($0.doubleValue) }
             Task { @MainActor [weak self] in self?.applyContentHeight(h) }
         }
+
+        // Track the largest in-flight accordion animation duration so the panel
+        // resize duration matches the SwiftUI reveal. The preference is reduced
+        // by max in MenuBarView, so this value is already the worst-case duration.
+        animationDurationObserver = NotificationCenter.default.addObserver(
+            forName: .menuBarAnimationDurationChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let d = (notification.object as? NSNumber).map { $0.doubleValue } ?? 0.15
+            Task { @MainActor [weak self] in self?.currentAnimationDuration = d }
+        }
     }
 
     deinit {
         if let obs = contentSizeObserver { NotificationCenter.default.removeObserver(obs) }
+        if let obs = animationDurationObserver { NotificationCenter.default.removeObserver(obs) }
         NotificationCenter.default.removeObserver(self)
         removeMonitor()
     }
@@ -180,8 +203,10 @@ final class StatusBarController {
         }
         // Anchor the top edge: bottom-left origin Y = (top constant) - new height.
         // setFrame(_:display:animate:) uses NSWindow's built-in animator, matched
-        // to the SwiftUI accordion animation (~0.22s easeOut) so resize and
-        // content reveal happen together without a visible frame snap.
+        // to the SwiftUI accordion animation (duration sourced from
+        // `currentAnimationDuration`, set by the AccordionAnimationDurationKey
+        // preference) so resize and content reveal happen together without
+        // a visible frame snap.
         let newY = max(currentScreenFrame.minY + 4, previousTop - targetH)
         let newFrame = NSRect(x: panel.frame.origin.x, y: newY,
                               width: panel.frame.width, height: targetH)
@@ -189,8 +214,8 @@ final class StatusBarController {
         // big jumps (e.g., open from .zero) snap immediately.
         if abs(panel.frame.height - targetH) < 200 && panel.frame.height > 0 {
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.22
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                ctx.duration = currentAnimationDuration
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(newFrame, display: true)
             }
         } else {

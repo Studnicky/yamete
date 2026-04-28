@@ -71,6 +71,12 @@ public struct MenuBarView: View {
             NotificationCenter.default.post(name: .menuBarContentSizeChanged,
                                             object: NSNumber(value: Double(height)))
         }
+        .onPreferenceChange(AccordionAnimationDurationKey.self) { duration in
+            // Forward the largest in-flight accordion duration to the panel
+            // resize so the NSPanel animation matches the SwiftUI reveal.
+            NotificationCenter.default.post(name: .menuBarAnimationDurationChanged,
+                                            object: NSNumber(value: duration))
+        }
         .onAppear {
             refreshAll()
         }

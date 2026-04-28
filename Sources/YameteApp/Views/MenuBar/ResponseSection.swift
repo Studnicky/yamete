@@ -75,16 +75,10 @@ internal struct ResponseSection: View {
                     }
                     #if DIRECT_BUILD
                     Divider()
-                    HStack(spacing: 6) {
-                        Image(systemName: "speaker.wave.3.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(s.volumeSpikeEnabled ? Theme.pink : Color.secondary.opacity(0.5))
-                        Text(NSLocalizedString("setting_volume_spike", comment: "Volume override sub-toggle label"))
-                            .font(.caption)
-                            .foregroundStyle(s.volumeSpikeEnabled ? .primary : .secondary)
-                        Spacer()
-                        Toggle("", isOn: $s.volumeSpikeEnabled).themeMiniSwitch()
-                    }
+                    EnableToggleRow(icon: "speaker.wave.3.fill",
+                                    title: NSLocalizedString("setting_volume_spike", comment: "Volume override sub-toggle label"),
+                                    isOn: $s.volumeSpikeEnabled,
+                                    iconColor: s.volumeSpikeEnabled ? Theme.pink : Color.secondary.opacity(0.5))
                     #endif
                 }.padding(Theme.accordionInner)
             }
@@ -117,9 +111,10 @@ internal struct ResponseSection: View {
             ) {
                 VStack(spacing: 10) {
                     HStack(spacing: 6) {
-                        Image(systemName: "globe").font(.caption).foregroundStyle(.secondary).frame(width: 16)
-                        Text(NSLocalizedString("setting_notification_locale", comment: "Notification language picker label"))
-                            .font(.caption).foregroundStyle(.secondary)
+                        IconLabel(icon: "globe",
+                                  title: NSLocalizedString("setting_notification_locale", comment: "Notification language picker label"),
+                                  dimmed: true,
+                                  iconWidth: 16)
                         Spacer()
                         NotificationLocalePicker(selection: $s.notificationLocale)
                     }
@@ -144,13 +139,10 @@ internal struct ResponseSection: View {
                         }
                         Divider()
                     }
-                    HStack(spacing: 6) {
-                        Image(systemName: "lightbulb.led").font(.caption).foregroundStyle(.secondary)
-                        Text(NSLocalizedString("setting_led_enabled", comment: "LED flash output title"))
-                            .font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Toggle("", isOn: $s.ledEnabled).themeMiniSwitch()
-                    }
+                    EnableToggleRow(icon: "lightbulb.led",
+                                    title: NSLocalizedString("setting_led_enabled", comment: "LED flash output title"),
+                                    isOn: $s.ledEnabled,
+                                    dimmed: true)
                 }.padding(Theme.accordionInner)
             }
 
