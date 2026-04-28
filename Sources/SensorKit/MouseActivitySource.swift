@@ -35,12 +35,15 @@ public final class MouseActivitySource: StimulusSource {
     private let scrollDebounce: TimeInterval = 1.0
     private let clickDebounce: TimeInterval = 0.5
 
+    private let enableHIDClickDetection: Bool
+
     public convenience init() {
         self.init(eventMonitor: RealEventMonitor())
     }
 
-    public init(eventMonitor: EventMonitor) {
+    public init(eventMonitor: EventMonitor, enableHIDClickDetection: Bool = true) {
         self.eventMonitor = eventMonitor
+        self.enableHIDClickDetection = enableHIDClickDetection
     }
 
     deinit { MainActor.assumeIsolated { stop() } }
@@ -87,12 +90,15 @@ public final class MouseActivitySource: StimulusSource {
             Task { @MainActor [weak self] in self?.handleMouseScroll(event, bus: bus) }
         }
 
-        // Click detection requires Input Monitoring (TCC). Without the grant,
-        // skip IOHIDManager registration so test environments without the
-        // permission don't catch ambient OS clicks. Scroll path still works
-        // independently via the NSEvent global monitor above.
-        if IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted {
+        // Click detection requires Input Monitoring (TCC) AND must be
+        // explicitly enabled. Tests pass `enableHIDClickDetection: false` to
+        // prevent ambient OS clicks bleeding into matrix runs even when the
+        // dev terminal has been granted Input Monitoring. Scroll path still
+        // works independently via the NSEvent global monitor above.
+        if enableHIDClickDetection && IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted {
             startClickHID()
+        } else if !enableHIDClickDetection {
+            log.debug("entity:MouseActivitySource startClickHID skipped — disabled by caller (test seam)")
         } else {
             log.warning("entity:MouseActivitySource startClickHID skipped — Input Monitoring not granted")
         }
@@ -143,14 +149,46 @@ public final class MouseActivitySource: StimulusSource {
 
     // MARK: - Click detection (IOHIDManager)
 
-    func hidMouseButtonDown() {
+    /// Shared click handler called by both the real IOHIDManager input-value
+    /// callback (`mouseClickHIDCallback` → `hidMouseButtonDown`) and the
+    /// `_injectClick(transport:product:)` test seam. Owns the production
+    /// transport/product filter, debounce gate, and bus publish.
+    func handleHIDClick(transport: String, product: String) {
+        // Production filter: drop SPI (built-in trackpad) and Bluetooth
+        // Magic-Trackpad-class devices. Keep this list aligned with the
+        // matching logic in `mouseClickHIDCallback`.
+        guard transport != "SPI", !product.lowercased().contains("trackpad") else {
+            log.debug("activity:MouseButtonDown filtered transport=\(transport) product=\(product)")
+            return
+        }
         let now = Date()
-        log.debug("activity:MouseButtonDown gateOpen=\(now >= clickGate)")
+        log.debug("activity:MouseButtonDown gateOpen=\(now >= clickGate) transport=\(transport)")
         guard now >= clickGate else { return }
         clickGate = now.addingTimeInterval(clickDebounce)
         log.info("activity:Publish wasGeneratedBy entity:MouseActivity kind=mouseClicked")
         if let bus { Task { await bus.publish(.mouseClicked) } }
     }
+
+    /// Real IOKit input-value callback target. Forwards to the shared
+    /// `handleHIDClick` so the test seam exercises the same pipeline.
+    func hidMouseButtonDown(transport: String = "USB", product: String = "") {
+        handleHIDClick(transport: transport, product: product)
+    }
+
+    #if DEBUG
+    /// Test seam — drives the same internal handler that the real
+    /// `IOHIDManager` input-value callback calls. Bypasses the IOKit
+    /// kernel hop but exercises the rest of the detection pipeline
+    /// (transport/product filter, debounce gate, bus publish). Lets tests
+    /// drive the production click logic without requiring Input Monitoring
+    /// permission or a real connected device.
+    public func _injectClick(transport: String, product: String) async {
+        self.handleHIDClick(transport: transport, product: product)
+        // Yield once so any spawned `Task { await bus.publish(...) }`
+        // gets a chance to run before the caller observes the bus.
+        await Task.yield()
+    }
+    #endif
 
     private func startClickHID() {
         let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
@@ -198,7 +236,8 @@ private func mouseClickHIDCallback(
     let device = IOHIDElementGetDevice(element)
     let transport = IOHIDDeviceGetProperty(device, kIOHIDTransportKey as CFString) as? String ?? ""
     let product   = IOHIDDeviceGetProperty(device, kIOHIDProductKey   as CFString) as? String ?? ""
-    guard transport != "SPI", !product.lowercased().contains("trackpad") else { return }
     let source = Unmanaged<MouseActivitySource>.fromOpaque(context).takeUnretainedValue()
-    Task { @MainActor in source.hidMouseButtonDown() }
+    // Hand the transport/product strings through to the shared handler so
+    // its filter runs in exactly one place (`handleHIDClick`).
+    Task { @MainActor in source.handleHIDClick(transport: transport, product: product) }
 }

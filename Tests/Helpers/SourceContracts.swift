@@ -67,8 +67,8 @@ struct SourceContract: Sendable {
         case .displayHotplug:   return DisplayHotplugSource()
         case .sleepWake:        return SleepWakeSource()
         case .trackpadActivity: return TrackpadActivitySource(eventMonitor: MockEventMonitor())
-        case .mouseActivity:    return MouseActivitySource(eventMonitor: MockEventMonitor())
-        case .keyboardActivity: return KeyboardActivitySource()
+        case .mouseActivity:    return MouseActivitySource(eventMonitor: MockEventMonitor(), enableHIDClickDetection: false)
+        case .keyboardActivity: return KeyboardActivitySource(enableHIDDetection: false)
         default:                return nil
         }
     }

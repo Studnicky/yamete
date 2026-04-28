@@ -66,7 +66,7 @@ final class MatrixActivitySourceLifecycle_Tests: XCTestCase {
 
     func testMouseStartInstallsScrollMonitor() async throws {
         let mock = MockEventMonitor()
-        let source = MouseActivitySource(eventMonitor: mock)
+        let source = MouseActivitySource(eventMonitor: mock, enableHIDClickDetection: false)
         let bus = ReactionBus()
         source.start(publishingTo: bus)
         XCTAssertEqual(mock.installedCount, 1, "running: scroll monitor only (HID for clicks)")
@@ -74,7 +74,7 @@ final class MatrixActivitySourceLifecycle_Tests: XCTestCase {
 
     func testMouseStopRemovesScrollMonitor() async throws {
         let mock = MockEventMonitor()
-        let source = MouseActivitySource(eventMonitor: mock)
+        let source = MouseActivitySource(eventMonitor: mock, enableHIDClickDetection: false)
         let bus = ReactionBus()
         source.start(publishingTo: bus)
         source.stop()
@@ -85,7 +85,7 @@ final class MatrixActivitySourceLifecycle_Tests: XCTestCase {
     func testMouseInstallFailure() async throws {
         let mock = MockEventMonitor()
         mock.shouldFailInstall = true
-        let source = MouseActivitySource(eventMonitor: mock)
+        let source = MouseActivitySource(eventMonitor: mock, enableHIDClickDetection: false)
         let bus = ReactionBus()
         source.start(publishingTo: bus)
         XCTAssertEqual(mock.installCount, 1)
@@ -96,7 +96,7 @@ final class MatrixActivitySourceLifecycle_Tests: XCTestCase {
 
     func testKeyboardStartHasNoEventMonitor() async throws {
         // Keyboard uses pure HID, no NSEvent monitor. Start shouldn't crash.
-        let source = KeyboardActivitySource()
+        let source = KeyboardActivitySource(enableHIDDetection: false)
         let bus = ReactionBus()
         source.start(publishingTo: bus)
         source.stop()

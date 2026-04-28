@@ -92,7 +92,7 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 SIGNING_ID ?= -
 
 .PHONY: all build test install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
-        appstore appstore-install appstore-lint
+        appstore appstore-install appstore-lint mutate
 
 all: build
 
@@ -240,6 +240,18 @@ appstore-lint:
 # ── Test ──────────────────────────────────────────────────────
 test:
 	@swift test
+
+# ── Mutate (mutation-test runner) ─────────────────────────────
+# Drives Tests/Mutation/mutation-catalog.json: applies each declarative
+# (search→replace) mutation to a clean Sources/ tree, runs the named XCTest
+# and asserts it FAILS with the catalogued substring, then reverts via
+# `git checkout --`. Refuses to run on a dirty tree (the revert path would
+# clobber unstaged work). Exit 0 only when total == caught, so this target
+# can be wired into release gating without further wrapping. Catalog
+# additions happen in JSON, not here — never commits, never modifies
+# Sources/ permanently.
+mutate:
+	@scripts/mutation-test.sh
 
 # ── Verify ────────────────────────────────────────────────────
 verify: build

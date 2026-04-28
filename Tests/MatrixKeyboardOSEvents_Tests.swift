@@ -60,7 +60,7 @@ final class MatrixKeyboardOSEvents_Tests: XCTestCase {
 
     private func makeSource(eventMonitor: MockEventMonitor = MockEventMonitor(),
                             hidMonitor: MockHIDDeviceMonitor = MockHIDDeviceMonitor()) -> KeyboardActivitySource {
-        KeyboardActivitySource(eventMonitor: eventMonitor, hidMonitor: hidMonitor)
+        KeyboardActivitySource(eventMonitor: eventMonitor, hidMonitor: hidMonitor, enableHIDDetection: false)
     }
 
     // MARK: - Cell 1: rate at threshold fires exactly once

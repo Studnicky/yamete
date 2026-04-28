@@ -1,0 +1,60 @@
+{
+  "$schema": "./mutation-catalog.schema.txt",
+  "_comment": "Single source of truth for Yamete's mutation-test catalog. Each entry encodes one production gate that has a corresponding behavioural test cell. The runner (scripts/mutation-test.sh) applies each mutation to a clean working tree, runs the named XCTest, asserts the test FAILS with the expected substring, then reverts via git. See Tests/Mutation/README.md for full architecture.",
+  "mutations": [
+    {
+      "id": "trackpad-gesture-recency-gate",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift",
+      "search": "guard sinceGesture <= tapAttributionWindow else {",
+      "replace": "guard sinceGesture >= -1 else {",
+      "expectedFailingTest": "MatrixDeviceAttributionTests/testExternalMouseClick_doesNotFireTrackpadTap",
+      "expectedFailureSubstring": "[scenario=external-mouse-click]",
+      "description": "TrackpadActivitySource.handleTapDown — drop tap-attribution recency gate; external mouse clicks must not be credited as trackpad taps."
+    },
+    {
+      "id": "mouse-empty-phase-guard",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift",
+      "search": "guard event.phase.isEmpty, event.momentumPhase.isEmpty else { return }",
+      "replace": "if false { return }",
+      "expectedFailingTest": "MatrixMouseOSEvents_Tests/testTrackpadScrollOnMouseSource_doesNotFireMouseScrolled",
+      "expectedFailureSubstring": "[cell=cross-attribution-trackpad-on-mouse]",
+      "description": "MouseActivitySource scrollMonitor — drop empty-phase guard; trackpad-flavoured (phased) scrolls must not be credited as mouse scrolls."
+    },
+    {
+      "id": "trackpad-mousewheel-stamp-guard",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift",
+      "search": "if !event.phase.isEmpty { lastTrackpadGestureAt = now }",
+      "replace": "lastTrackpadGestureAt = now",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testMouseWheelScrollDoesNotStampTrackpadGesture",
+      "expectedFailureSubstring": "[cell=mouse-wheel-no-gesture-stamp]",
+      "description": "TrackpadActivitySource.handleScrollEvent — drop the phase guard around lastTrackpadGestureAt stamp; mouse-wheel events must not register the user's hand as on the trackpad."
+    },
+    {
+      "id": "keyboard-rate-threshold-default",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift",
+      "search": "private var tapRateThreshold: Double = 3.0  // key presses / second",
+      "replace": "private var tapRateThreshold: Double = 0.0  // key presses / second",
+      "expectedFailingTest": "MatrixKeyboardOSEvents_Tests/testRateBelowThreshold_noReactions",
+      "expectedFailureSubstring": "[cell=rate-below-threshold]",
+      "description": "KeyboardActivitySource — change tapRateThreshold default from 3.0 to 0.0; below-threshold rates must not fire keyboardTyped."
+    },
+    {
+      "id": "trackpad-tapping-enabled-gate",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift",
+      "search": "guard tappingEnabled else { return }",
+      "replace": "if false { return }",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testTappingDisabled_noReactions",
+      "expectedFailureSubstring": "[cell=tapping-disabled]",
+      "description": "TrackpadActivitySource.handleTapDown — drop the per-mode enable gate; toggling tappingEnabled=false must suppress all .trackpadTapping reactions."
+    },
+    {
+      "id": "trackpad-scroll-empty-phase-guard",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift",
+      "search": "guard !phase.isEmpty else { return }",
+      "replace": "if false { return }",
+      "expectedFailingTest": "MatrixCrossSourceConflationTests/test_mouseWheelScroll_trackpadDoesNotFire",
+      "expectedFailureSubstring": "[cell=mouseWheel] trackpad must NOT publish",
+      "description": "TrackpadActivitySource.handleScroll — drop empty-phase guard; mouse-wheel scrolls (phase==[]) must not drive trackpad scroll RMS / contact / circle paths."
+    }
+  ]
+}

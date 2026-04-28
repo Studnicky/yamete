@@ -112,7 +112,7 @@ final class MatrixCrossSourceConflationTests: XCTestCase {
     }
 
     private func makePermissiveMouse(monitor: MockEventMonitor) -> MouseActivitySource {
-        let mouse = MouseActivitySource(eventMonitor: monitor)
+        let mouse = MouseActivitySource(eventMonitor: monitor, enableHIDClickDetection: false)
         mouse.configure(scrollThreshold: 0.0)
         return mouse
     }
@@ -434,43 +434,114 @@ final class MatrixCrossSourceConflationTests: XCTestCase {
         await bus.close()
     }
 
-    // MARK: - Cell 10 — IOHID click cells (BLOCKED on _injectClick seam)
+    // MARK: - Cell 10 — IOHID click cells (live via _injectClick seam)
 
     /// IOHIDManager click on transport=SPI device → mouse must NOT publish
-    /// `.mouseClicked` (production filter `transport != "SPI"`). This cell
-    /// requires a `_injectClick(transport:product:)` seam on
-    /// `MouseActivitySource`. Stubbed until the parallel agent lands it.
-    #if false
+    /// `.mouseClicked` (production filter `transport != "SPI"`). Drives the
+    /// `_injectClick(transport:product:)` seam directly so the production
+    /// transport filter is exercised end-to-end.
     func test_hidClick_SPI_doesNotFireMouseClicked() async {
-        // BLOCKED: requires MouseActivitySource._injectClick(transport:product:)
-        // Expected behaviour: SPI transport (built-in trackpad button) is
-        // dropped at the production filter; .mouseClicked must NOT appear.
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let mouse = makePermissiveMouse(monitor: monitor)
+        mouse.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.4) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        await mouse._injectClick(transport: "SPI", product: "Apple Internal Trackpad")
+        try? await Task.sleep(for: .milliseconds(180))
+
+        let kinds = await collectTask.value
+        XCTAssertFalse(kinds.contains(.mouseClicked),
+                       "[cell=hidClick-SPI] SPI transport must be dropped at production filter; got \(kinds)")
+        mouse.stop()
+        await bus.close()
     }
 
+    /// USB Magic Trackpad has transport=USB but product contains "trackpad".
+    /// Production filter drops it via the `product.contains("trackpad")` rule.
     func test_hidClick_USB_MagicTrackpad_doesNotFireMouseClicked() async {
-        // BLOCKED: requires MouseActivitySource._injectClick(transport:product:)
-        // Expected behaviour: USB transport but product == "Magic Trackpad 2"
-        // is dropped at the production filter; .mouseClicked must NOT appear.
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let mouse = makePermissiveMouse(monitor: monitor)
+        mouse.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.4) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        await mouse._injectClick(transport: "USB", product: "Magic Trackpad 2")
+        try? await Task.sleep(for: .milliseconds(180))
+
+        let kinds = await collectTask.value
+        XCTAssertFalse(kinds.contains(.mouseClicked),
+                       "[cell=hidClick-USB-MagicTrackpad] product-contains-trackpad must be dropped at filter; got \(kinds)")
+        mouse.stop()
+        await bus.close()
     }
 
+    /// USB Logitech mouse with no recent trackpad gesture: mouse source must
+    /// publish `.mouseClicked`. Trackpad source is started too — its NSEvent
+    /// monitor is independent and never sees the IOHID click, so it stays
+    /// silent for `.trackpadTapping`.
     func test_hidClick_USB_LogitechMouse_firesMouseClicked_noTrackpadTap() async {
-        // BLOCKED: requires MouseActivitySource._injectClick(transport:product:)
-        // Expected: USB transport with non-trackpad product → .mouseClicked
-        // fires. With NO recent trackpad gesture, trackpad source's gate
-        // drops the leftMouseDown — only .mouseClicked appears.
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let mouse = makePermissiveMouse(monitor: monitor)
+        let trackpad = makePermissiveTrackpad(monitor: monitor)
+        mouse.start(publishingTo: bus)
+        trackpad.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.5) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        await mouse._injectClick(transport: "USB", product: "Logitech USB Receiver")
+        try? await Task.sleep(for: .milliseconds(220))
+
+        let kinds = await collectTask.value
+        XCTAssertTrue(kinds.contains(.mouseClicked),
+                      "[cell=hidClick-USB-Logitech-noGesture] non-trackpad USB click must fire .mouseClicked; got \(kinds)")
+        XCTAssertFalse(kinds.contains(.trackpadTapping),
+                       "[cell=hidClick-USB-Logitech-noGesture] no recent gesture → trackpad source must NOT credit; got \(kinds)")
+        mouse.stop(); trackpad.stop()
+        await bus.close()
     }
 
-    func test_hidClick_USB_LogitechMouse_afterRecentGesture_bothFire() async {
-        // BLOCKED: requires MouseActivitySource._injectClick(transport:product:)
-        // Accepted-corner-case: when a real trackpad gesture happened within
-        // the attribution window AND a USB mouse click arrives, BOTH
-        // .mouseClicked (mouse owns the IOHIDManager click) AND
-        // .trackpadTapping (gesture-recency permits it) fire. User chose
-        // option (b)-permissive: live with double-fire when both devices
-        // are simultaneously active. This cell asserts the trade-off so a
-        // future "fix" doesn't regress silently.
+    /// Accepted corner case: when a real trackpad gesture happens within the
+    /// attribution window AND a USB mouse click arrives via a SEPARATE OS
+    /// surface (NSEvent .leftMouseDown for trackpad, IOHID for mouse),
+    /// BOTH `.mouseClicked` and `.trackpadTapping` fire. Permissive policy.
+    func test_hidClick_USB_LogitechMouse_afterRecentGesture_bothFire() async throws {
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let mouse = makePermissiveMouse(monitor: monitor)
+        let trackpad = makePermissiveTrackpad(monitor: monitor)
+        mouse.start(publishingTo: bus)
+        trackpad.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.6) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        // Trackpad gesture stamps gestureAt.
+        guard let scroll = makeTrackpadScroll(phaseRaw: 1, magnitude: 30) else {
+            throw XCTSkip("CGEvent could not synthesize a phased scroll on this host")
+        }
+        monitor.emit(scroll, ofType: .scrollWheel)
+        try? await Task.sleep(for: .milliseconds(40))
+        // NSEvent leftMouseDown reaches trackpad source's NSEvent monitor.
+        monitor.emit(makeLeftMouseDown(), ofType: .leftMouseDown)
+        // Independent IOHID click reaches mouse source via _injectClick seam.
+        await mouse._injectClick(transport: "USB", product: "Logitech USB Receiver")
+        try? await Task.sleep(for: .milliseconds(240))
+
+        let kinds = await collectTask.value
+        XCTAssertTrue(kinds.contains(.mouseClicked),
+                      "[cell=hidClick-bothFire] permissive policy: USB mouse click must fire .mouseClicked even when trackpad gesture is recent; got \(kinds)")
+        XCTAssertTrue(kinds.contains(.trackpadTapping),
+                      "[cell=hidClick-bothFire] permissive policy: trackpad NSEvent leftMouseDown after gesture must fire .trackpadTapping; got \(kinds)")
+        mouse.stop(); trackpad.stop()
+        await bus.close()
     }
-    #endif
 
     // MARK: - Cell 11 — keyboard does not consume mock-emitted leftMouseDown
 
@@ -485,7 +556,7 @@ final class MatrixCrossSourceConflationTests: XCTestCase {
     /// installs an NSEvent monitor against the mock.
     func test_keyboardSource_doesNotInstallNSEventMonitor() async {
         let monitor = MockEventMonitor()
-        let keyboard = KeyboardActivitySource()
+        let keyboard = KeyboardActivitySource(enableHIDDetection: false)
         let bus = await makeBus()
         keyboard.start(publishingTo: bus)
         try? await Task.sleep(for: .milliseconds(20))

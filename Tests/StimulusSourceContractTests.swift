@@ -33,7 +33,7 @@ final class StimulusSourceContractTests: XCTestCase {
         let harness = BusHarness()
         await harness.setUp()
 
-        let source = KeyboardActivitySource()
+        let source = KeyboardActivitySource(enableHIDDetection: false)
         source.configure(tapRateThreshold: 0.5)
         source.start(publishingTo: harness.bus)
 
@@ -108,7 +108,7 @@ final class StimulusSourceContractTests: XCTestCase {
         await harness.setUp()
 
         let monitor = MockEventMonitor()
-        let source = MouseActivitySource(eventMonitor: monitor)
+        let source = MouseActivitySource(eventMonitor: monitor, enableHIDClickDetection: false)
         source.configure(scrollThreshold: 1.0)
         source.start(publishingTo: harness.bus)
 

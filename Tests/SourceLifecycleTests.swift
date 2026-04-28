@@ -79,7 +79,7 @@ final class SourceLifecycleTests: XCTestCase {
         await harness.setUp()
 
         let monitor = MockEventMonitor()
-        let source = MouseActivitySource(eventMonitor: monitor)
+        let source = MouseActivitySource(eventMonitor: monitor, enableHIDClickDetection: false)
         source.configure(scrollThreshold: 1.0)  // low so a single event clears
         source.start(publishingTo: harness.bus)
         source.start(publishingTo: harness.bus)
@@ -122,7 +122,7 @@ final class SourceLifecycleTests: XCTestCase {
         let harness = BusHarness()
         await harness.setUp()
 
-        let source = KeyboardActivitySource()
+        let source = KeyboardActivitySource(enableHIDDetection: false)
         source.configure(tapRateThreshold: 0.1)  // any single press clears
         source.start(publishingTo: harness.bus)
         source.start(publishingTo: harness.bus)

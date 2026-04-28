@@ -38,10 +38,14 @@ public final class KeyboardActivitySource: StimulusSource {
     private weak var _testBus: ReactionBus?
     #endif
 
+    private let enableHIDDetection: Bool
+
     public init(eventMonitor: EventMonitor = RealEventMonitor(),
-                hidMonitor: HIDDeviceMonitor = RealHIDDeviceMonitor()) {
+                hidMonitor: HIDDeviceMonitor = RealHIDDeviceMonitor(),
+                enableHIDDetection: Bool = true) {
         self.eventMonitor = eventMonitor
         self.hidMonitor = hidMonitor
+        self.enableHIDDetection = enableHIDDetection
     }
 
     // MARK: - Availability
@@ -82,6 +86,12 @@ public final class KeyboardActivitySource: StimulusSource {
         // debounce / publish pipeline even when Input Monitoring is not
         // granted (CI). Real IOKit callbacks remain gated on TCC below.
         self.bus = bus
+        // Tests pass `enableHIDDetection: false` so ambient typing on the dev
+        // host doesn't bleed into matrix runs. Production stays on the TCC gate.
+        guard enableHIDDetection else {
+            log.debug("entity:KeyboardActivitySource startHID skipped — disabled by caller (test seam)")
+            return
+        }
         // Requires Input Monitoring TCC permission
         guard IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted else {
             log.warning("entity:KeyboardActivitySource wasInvalidatedBy activity:Start — Input Monitoring not granted")

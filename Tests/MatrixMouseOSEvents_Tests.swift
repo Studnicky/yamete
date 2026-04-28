@@ -101,7 +101,7 @@ final class MatrixMouseOSEvents_Tests: XCTestCase {
     func testMouseScrollAboveThreshold_firesReaction() async throws {
         let bus = await makeBus()
         let monitor = MockEventMonitor()
-        let source = MouseActivitySource(eventMonitor: monitor)
+        let source = MouseActivitySource(eventMonitor: monitor, enableHIDClickDetection: false)
         source.start(publishingTo: bus)
 
         let collectTask = Task { await self.collect(from: bus, seconds: 1.0) }
@@ -142,7 +142,7 @@ final class MatrixMouseOSEvents_Tests: XCTestCase {
     func testTrackpadScrollOnMouseSource_doesNotFireMouseScrolled() async throws {
         let bus = await makeBus()
         let monitor = MockEventMonitor()
-        let source = MouseActivitySource(eventMonitor: monitor)
+        let source = MouseActivitySource(eventMonitor: monitor, enableHIDClickDetection: false)
         source.start(publishingTo: bus)
 
         let collectTask = Task { await self.collect(from: bus, seconds: 0.8) }
@@ -171,7 +171,7 @@ final class MatrixMouseOSEvents_Tests: XCTestCase {
     func testMouseScrollBelowMagnitudeFloor_noReactions() async throws {
         let bus = await makeBus()
         let monitor = MockEventMonitor()
-        let source = MouseActivitySource(eventMonitor: monitor)
+        let source = MouseActivitySource(eventMonitor: monitor, enableHIDClickDetection: false)
         source.configure(scrollThreshold: 100.0)  // unreachable
         source.start(publishingTo: bus)
 
@@ -200,7 +200,7 @@ final class MatrixMouseOSEvents_Tests: XCTestCase {
     func testMouseScrollRapidBurst_debouncesToOne() async throws {
         let bus = await makeBus()
         let monitor = MockEventMonitor()
-        let source = MouseActivitySource(eventMonitor: monitor)
+        let source = MouseActivitySource(eventMonitor: monitor, enableHIDClickDetection: false)
         source.configure(scrollThreshold: 1.0)  // low, easy to clear
         source.start(publishingTo: bus)
 
