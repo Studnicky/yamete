@@ -10,8 +10,34 @@ final class SourceLifecycleTests: XCTestCase {
 
     // MARK: - Double-start idempotency
 
+    /// USB source: drive idempotency through `_injectAttach` (the synthetic
+    /// IOKit-callback seam — yields into the same `AsyncStream` the real
+    /// `IOServiceAddMatchingNotification` callback yields into, so the same
+    /// `shouldPublish` debounce and `bus.publish` fan-out runs). A second
+    /// `start()` must not register a second matching notification, so a single
+    /// injected attach must produce exactly one `.usbAttached`.
     func test_doubleStart_isIdempotent_USB() async throws {
-        try await assertDoubleStartIdempotent(makeSource: { USBSource() }, kind: .usbAttached)
+        let harness = BusHarness()
+        await harness.setUp()
+
+        let source = USBSource()
+        source.start(publishingTo: harness.bus)
+        // Second start must be a no-op — the IOKit notification port is already
+        // registered, so the production code's `guard notifyPort == nil` must
+        // short-circuit. A single inject must publish exactly one reaction.
+        source.start(publishingTo: harness.bus)
+
+        async let collected = harness.collectFor(seconds: 0.4)
+        try await Task.sleep(for: .milliseconds(40))
+
+        await source._injectAttach(vendor: "TestVendor", product: "TestProduct")
+
+        let fired = await collected
+        let matches = fired.filter { $0.kind == .usbAttached }
+        XCTAssertEqual(matches.count, 1,
+                       "[usb] double-start must not double-publish — got \(matches.count)")
+
+        source.stop()
     }
 
     /// Trackpad source: drive idempotency through synthetic NSEvents so the
@@ -140,37 +166,6 @@ final class SourceLifecycleTests: XCTestCase {
         source.stop()
     }
 
-    private func assertDoubleStartIdempotent<S: StimulusSource>(
-        makeSource: () -> S,
-        kind: ReactionKind
-    ) async throws {
-        let harness = BusHarness()
-        await harness.setUp()
-
-        let source = makeSource()
-        await source.start(publishingTo: harness.bus)
-        // Second start must be a no-op — the test seam targets the bus stored
-        // on the first call. Either way, _testEmit must produce exactly one
-        // FiredReaction per call.
-        await source.start(publishingTo: harness.bus)
-
-        async let collected = harness.collectFor(seconds: 0.4)
-        try await Task.sleep(for: .milliseconds(40))
-
-        guard let emitter = source as? TestEmitter else {
-            XCTFail("Source \(type(of: source)) does not conform to TestEmitter")
-            return
-        }
-        await emitter._testEmit(kind)
-
-        let fired = await collected
-        let matches = fired.filter { $0.kind == kind }
-        XCTAssertEqual(matches.count, 1,
-                       "double-start must not double-publish — got \(matches.count) for \(kind.rawValue)")
-
-        source.stop()
-    }
-
     // MARK: - Stop without start
 
     func test_stopWithoutStart_doesNotCrash_USB() {
@@ -187,13 +182,17 @@ final class SourceLifecycleTests: XCTestCase {
         await harness.setUp()
 
         let source = USBSource()
-        await source.start(publishingTo: harness.bus)
+        source.start(publishingTo: harness.bus)
 
         async let collected = harness.collectFor(seconds: 0.6)
         try await Task.sleep(for: .milliseconds(40))
 
-        for _ in 0..<10 {
-            await source._testEmit(.usbAttached)
+        // Each inject uses a unique vendor/product pair so the per-key
+        // `shouldPublish` debounce (`ReactionsConfig.usbDebounce`) does not
+        // collapse the rapid sequence — production drainer must forward all
+        // ten distinct attaches to the bus.
+        for index in 0..<10 {
+            await source._injectAttach(vendor: "vendor-\(index)", product: "product-\(index)")
         }
 
         let fired = await collected

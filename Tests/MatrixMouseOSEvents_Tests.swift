@@ -238,4 +238,52 @@ final class MatrixMouseOSEvents_Tests: XCTestCase {
     func testMouseClickAttributionViaHIDCallback_gapDocumented() throws {
         throw XCTSkip("HID click callback not synthesizable through current mocks; production filter (transport != \"SPI\") is exercised by MatrixDeviceAttribution_Tests indirectly via .leftMouseDown attribution")
     }
+
+    // MARK: - Cell: mouse-wheel magnitude floor pins
+
+    /// `MouseActivitySource.handleMouseScroll` early-returns when
+    /// `mag <= 0.5` to filter accidental sub-pixel wheel jitter. This cell
+    /// drives a sustained burst of high-magnitude wheel events with a low
+    /// scroll RMS threshold and asserts that AT LEAST one `.mouseScrolled`
+    /// fires. If the magnitude floor is mutated to filter ALL events
+    /// (`if true { return }`), no events accumulate in the RMS window, so
+    /// no reaction publishes — the assertion fails with the cell anchor.
+    /// Hard assertion (no soft host fallback) — if the rest of the suite
+    /// runs on this host, the synthetic CGEvent path produces a
+    /// reaction here too.
+    func testMouseScrollHighMagnitude_firesAtLeastOne() async throws {
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let source = MouseActivitySource(eventMonitor: monitor, enableHIDClickDetection: false)
+        source.configure(scrollThreshold: 0.001)  // virtually any RMS clears
+        source.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 1.2) }
+        try? await Task.sleep(for: .milliseconds(40))
+
+        // Use setDoubleValueField to set a Double delta that bypasses the
+        // Int32 wheel-field quantization. mag = hypot(deltaX, deltaY) — we
+        // want mag well above 0.5 so the floor lets it through under the
+        // un-mutated production gate.
+        for _ in 0..<8 {
+            guard let cg = CGEvent(scrollWheelEvent2Source: nil,
+                                   units: .pixel, wheelCount: 2,
+                                   wheel1: 20, wheel2: 0, wheel3: 0) else {
+                throw XCTSkip("CGEvent unavailable on this host")
+            }
+            cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: 20.0)
+            guard let ev = NSEvent(cgEvent: cg) else {
+                throw XCTSkip("NSEvent bridge unavailable on this host")
+            }
+            monitor.emit(ev, ofType: .scrollWheel)
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+
+        let collected = await collectTask.value
+        let scrolled = collected.filter { $0.kind == .mouseScrolled }
+        XCTAssertGreaterThanOrEqual(scrolled.count, 1,
+            "[cell=mouse-mag-floor-passthrough] sustained high-magnitude wheel events must clear the magnitude floor and fire .mouseScrolled — got \(scrolled.count)")
+
+        source.stop()
+    }
 }

@@ -5,24 +5,24 @@ import AppKit
 @testable import ResponseKit
 @testable import YameteApp
 
-/// For each stimulus source, drive `_testEmit(kind)` for every kind in its
-/// contract and verify each kind reaches the bus as a `FiredReaction`.
+/// Source-detection-pipeline contract: drive each stimulus source through
+/// its real OS-event seam (`_injectKeyPress`, synthetic `CGEvent` via
+/// `MockEventMonitor`) and verify the corresponding `ReactionKind` lands
+/// on the bus as a `FiredReaction`.
 ///
-/// Trackpad/Mouse/Keyboard sources also have OS-surface contract tests
-/// below that drive their reactions via synthetic NSEvents (and the
-/// `_injectKeyPress` seam) instead of `_testEmit`. These exercise the
-/// production detection pipeline end-to-end. The IOHIDManager click path
-/// for `MouseActivitySource` cannot be driven through current mocks, so
-/// `.mouseClicked` retains `_testEmit` coverage via the universal
-/// contract test.
+/// This file owns Ring 1 / OS-surface contract assertions ONLY. The
+/// universal `_testEmit`-based "every declared kind reaches the bus"
+/// loop has moved to `BusRoutingContractTests` — those calls were
+/// orthogonal bus-fanout coverage, not a Ring 1 miss.
+///
+/// Sources whose detection isn't NSEvent / `_inject*`-driven (USB, Power,
+/// AudioPeripheral, Bluetooth, Thunderbolt, Display, Sleep,
+/// Headphone-motion, Microphone, IOHID mouse-click) are exercised by the
+/// `Matrix*OSEvents_Tests` and `MatrixL2_*` files via their own injection
+/// seams. Bus-fanout coverage for every declared kind across every
+/// source lives in `BusRoutingContractTests`.
 @MainActor
 final class StimulusSourceContractTests: XCTestCase {
-
-    func testEverySourceEmitsItsDeclaredKinds() async throws {
-        for contract in SourceContract.all {
-            try await runContract(contract)
-        }
-    }
 
     // MARK: - OS-surface contract: keyboard
 
@@ -99,10 +99,10 @@ final class StimulusSourceContractTests: XCTestCase {
     // MARK: - OS-surface contract: mouse scroll
 
     /// `.mouseScrolled` reaches the bus via the production scroll-RMS
-    /// pipeline. `.mouseClicked` runs through `IOHIDManager` and is
-    /// covered by the universal `_testEmit` path via
-    /// `testEverySourceEmitsItsDeclaredKinds` until a HID-callback mock
-    /// becomes available.
+    /// pipeline. `.mouseClicked` runs through `IOHIDManager`; its
+    /// bus-fanout leg is covered by the `_testEmit` loop in
+    /// `BusRoutingContractTests` until a HID-callback mock becomes
+    /// available.
     func testMouseOSSurfaceContract_scrollFires() async throws {
         let harness = BusHarness()
         await harness.setUp()
@@ -128,50 +128,13 @@ final class StimulusSourceContractTests: XCTestCase {
         let fired = await collected
         if !fired.contains(where: { $0.kind == .mouseScrolled }) {
             // CGEvent bridge can quantize delta below the 0.5 floor on
-            // some hosts. The universal `_testEmit` path (in
-            // `testEverySourceEmitsItsDeclaredKinds`) still proves the
-            // bus-publish leg works.
+            // some hosts. The universal `_testEmit` path in
+            // `BusRoutingContractTests.testEverySourceEmitsItsDeclaredKinds`
+            // still proves the bus-publish leg works.
             throw XCTSkip("CGEvent magnitude bridge insufficient on this host")
         }
         XCTAssertTrue(fired.contains { $0.kind == .mouseScrolled },
                       "[mouse contract] expected .mouseScrolled, got \(fired.map(\.kind.rawValue))")
-
-        source.stop()
-    }
-
-    private func runContract(_ contract: SourceContract) async throws {
-        let harness = BusHarness()
-        await harness.setUp()
-
-        guard let source = SourceContract.makeSource(for: contract.id) else {
-            XCTFail("makeSource returned nil for \(contract.id.rawValue)")
-            return
-        }
-        guard let emitter = source as? TestEmitter else {
-            XCTFail("Source \(contract.id.rawValue) does not conform to TestEmitter")
-            return
-        }
-
-        await source.start(publishingTo: harness.bus)
-
-        // Spawn the collector before any emit so the subscription is in place.
-        async let collected = harness.collectFor(seconds: 0.5)
-
-        // Allow the subscription to register.
-        try await Task.sleep(for: .milliseconds(40))
-
-        for kind in contract.emittedKinds {
-            await emitter._testEmit(kind)
-            try await Task.sleep(for: .milliseconds(20))
-        }
-
-        let fired = await collected
-        let firedKinds = fired.map(\.kind)
-
-        for kind in contract.emittedKinds {
-            XCTAssertTrue(firedKinds.contains(kind),
-                          "[\(contract.id.rawValue)] expected \(kind.rawValue) on bus, got \(firedKinds.map(\.rawValue))")
-        }
 
         source.stop()
     }

@@ -187,19 +187,28 @@ public final class TrackpadActivitySource: StimulusSource {
         guard monitor == nil else { return }
         self.bus = bus
 
-        // Scroll / gesture monitor (NSEvent global) — non-empty phase = trackpad gesture
+        // Scroll / gesture monitor (NSEvent global) — non-empty phase = trackpad gesture.
+        // The handler closure runs synchronously when the event arrives. We capture
+        // `Date()` here (event-arrival time) and pass it forward, instead of letting
+        // `handleScrollEvent` compute its own `Date()` after the @MainActor hop —
+        // under heavy MainActor load the hop can lag enough to defeat
+        // `lastTrackpadGestureAt`'s recency check, conflating mouse-clicks as
+        // trackpad-taps. Capture-at-arrival makes the gate's timing faithful.
         monitor = eventMonitor.addGlobalMonitor(
             matching: [.scrollWheel, .gesture, .magnify, .rotate]
         ) { [weak self] event in
+            let stampedAt = Date()
             Task { @MainActor [weak self] in
-                self?.handleScrollEvent(event, bus: bus)
+                self?.handleScrollEvent(event, bus: bus, at: stampedAt)
             }
         }
 
         // Tap monitor: NSEvent leftMouseDown. Force Touch trackpads don't expose button
         // HID elements via IOHIDManager (click is haptic simulation), so NSEvent is required.
+        // Same arrival-time capture pattern as the scroll monitor.
         tapMonitor = eventMonitor.addGlobalMonitor(matching: [.leftMouseDown]) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.handleTapDown() }
+            let stampedAt = Date()
+            Task { @MainActor [weak self] in self?.handleTapDown(at: stampedAt) }
         }
 
         log.info("entity:TrackpadActivitySource wasGeneratedBy activity:Start")
@@ -243,9 +252,8 @@ public final class TrackpadActivitySource: StimulusSource {
 
     // MARK: - Tap detection (NSEvent)
 
-    private func handleTapDown() {
+    private func handleTapDown(at now: Date = Date()) {
         guard tappingEnabled else { return }
-        let now = Date()
         // DEVICE ATTRIBUTION: NSEvent's global .leftMouseDown monitor catches
         // every left-click, including from external USB mice. Without this
         // gate, a mouse click would fire trackpadTapping AND mouseClicked.
@@ -268,8 +276,7 @@ public final class TrackpadActivitySource: StimulusSource {
 
     // MARK: - Scroll / swipe (NSEvent)
 
-    private func handleScrollEvent(_ event: NSEvent, bus: ReactionBus) {
-        let now = Date()
+    private func handleScrollEvent(_ event: NSEvent, bus: ReactionBus, at now: Date = Date()) {
         switch event.type {
         case .scrollWheel:
             // Only stamp the gesture timestamp when phase is non-empty (i.e.

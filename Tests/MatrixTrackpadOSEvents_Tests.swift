@@ -143,6 +143,48 @@ final class MatrixTrackpadOSEvents_Tests: XCTestCase {
     }
 
     /// Per-mode toggle off: even with strong scroll input, no
+    /// `.trackpadSliding` if `slidingEnabled = false`. Drives high-magnitude
+    /// phased scrolls that would clear the sliding RMS threshold under the
+    /// permissive config, but the per-mode gate must veto publication.
+    func testSlidingDisabled_noReactions() async throws {
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let source = TrackpadActivitySource(eventMonitor: monitor)
+        source.configure(
+            windowDuration: 1.0,
+            scrollMin: 0.0, scrollMax: 1.0,
+            touchingMin: 100.0, touchingMax: 100.0,  // touching threshold unreachable
+            slidingMin: 0.5, slidingMax: 0.9,         // slide threshold = 23.4
+            contactMin: 100.0, contactMax: 100.0,
+            tapMin: 100.0, tapMax: 100.0,
+            touchingEnabled: false,
+            slidingEnabled: false,                    // <-- toggled off
+            contactEnabled: false,
+            tappingEnabled: false,
+            circlingEnabled: false
+        )
+        source.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.8) }
+        try? await Task.sleep(for: .milliseconds(40))
+
+        // High magnitude — would clear slide threshold under un-mutated gate.
+        for _ in 0..<6 {
+            guard let ev = makeTrackpadScroll(phase: 1, deltaY: 30) else {
+                throw XCTSkip("CGEvent could not synthesize a phased scroll on this host")
+            }
+            monitor.emit(ev, ofType: .scrollWheel)
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+
+        let collected = await collectTask.value
+        XCTAssertFalse(collected.contains { $0.kind == .trackpadSliding },
+            "[cell=sliding-disabled] toggle off must suppress all .trackpadSliding — got \(collected.map(\.kind))")
+
+        source.stop()
+    }
+
+    /// Per-mode toggle off: even with strong scroll input, no
     /// `.trackpadTouching` if `touchingEnabled = false`.
     func testTouchingDisabled_noReactions() async throws {
         let bus = await makeBus()

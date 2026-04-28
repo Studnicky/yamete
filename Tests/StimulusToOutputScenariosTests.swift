@@ -5,112 +5,28 @@ import AppKit
 @testable import ResponseKit
 @testable import YameteApp
 
-/// Headline matrix test: every (source, kind) pair drives a SpyOutput action,
-/// and per-kind blocking via the OutputConfigProvider matrix prevents action
-/// delivery for the GatedSpyOutput.
+/// Source-detection-pipeline → output coverage: drive a stimulus source
+/// through its real OS-event surface (`MockEventMonitor.emit(...)` →
+/// debounce / attribution / RMS thresholds) and assert the output sees
+/// the resulting `ReactionKind`.
+///
+/// This file owns Ring 1 / OS-surface migration cells ONLY. The legacy
+/// `_testEmit`-based "every source kind reaches output / disabled kind
+/// is blocked" loops have moved to `BusRoutingContractTests`
+/// (`test_busRoutes_everySourceKind_toSubscribedOutput` /
+/// `test_busBlocks_disabledKind_fromOutput`) — they were orthogonal
+/// bus-fanout coverage, not Ring 1 misses.
+///
+/// Sources whose detection isn't NSEvent-driven (USB, Power,
+/// AudioPeripheral, Bluetooth, Thunderbolt, Display, Sleep, Keyboard
+/// HID, IOHID mouse-click) get their OS-surface coverage in the
+/// `Matrix*OSEvents_Tests` and `MatrixL2_*` families via dedicated
+/// `_inject*` seams. Bus-fanout coverage for every declared kind across
+/// every source lives in `BusRoutingContractTests`.
 @MainActor
 final class StimulusToOutputScenariosTests: XCTestCase {
 
-    func test_everySourceKind_reachesSubscribedOutput() async throws {
-        for contract in SourceContract.all {
-            for kind in contract.emittedKinds {
-                try await runReachableCase(contract: contract, kind: kind)
-            }
-        }
-    }
-
-    private func runReachableCase(contract: SourceContract, kind: ReactionKind) async throws {
-        let harness = BusHarness()
-        await harness.setUp()
-
-        guard let source = SourceContract.makeSource(for: contract.id),
-              let emitter = source as? TestEmitter else {
-            XCTFail("Cannot build source/emitter for \(contract.id.rawValue)")
-            return
-        }
-        await source.start(publishingTo: harness.bus)
-
-        let provider = MockConfigProvider()
-        let spy = MatrixSpyOutput()
-
-        let consumeTask = Task { @MainActor [bus = harness.bus] in
-            await spy.consume(from: bus, configProvider: provider)
-        }
-        // Allow consume() to subscribe before emitting.
-        try await Task.sleep(for: .milliseconds(30))
-
-        await emitter._testEmit(kind)
-
-        // Give coalesce (16 ms) + action (~2 ms) + slack to land.
-        try await Task.sleep(for: .milliseconds(150))
-
-        XCTAssertTrue(spy.actionKinds().contains(kind),
-                      "[\(contract.id.rawValue)/\(kind.rawValue)] action did not fire — got \(spy.actionKinds().map(\.rawValue))")
-        // Strict-equal assertion: emitting a single kind must produce
-        // EXACTLY one matching action call. A regression where an emit
-        // double-fans-out or echos a different kind is caught here.
-        let matchCount = spy.actionKinds().filter { $0 == kind }.count
-        XCTAssertEqual(matchCount, 1,
-                       "[\(contract.id.rawValue)/\(kind.rawValue)] expected exactly 1 action of this kind, got \(matchCount); kinds=\(spy.actionKinds().map(\.rawValue))")
-
-        source.stop()
-        consumeTask.cancel()
-        await harness.close()
-    }
-
-    func test_disabledKind_isBlockedFromOutput() async throws {
-        for contract in SourceContract.all {
-            for kind in contract.emittedKinds {
-                try await runBlockedCase(contract: contract, kind: kind)
-            }
-        }
-    }
-
-    private func runBlockedCase(contract: SourceContract, kind: ReactionKind) async throws {
-        let harness = BusHarness()
-        await harness.setUp()
-
-        guard let source = SourceContract.makeSource(for: contract.id),
-              let emitter = source as? TestEmitter else {
-            XCTFail("Cannot build source/emitter for \(contract.id.rawValue)")
-            return
-        }
-        await source.start(publishingTo: harness.bus)
-
-        let provider = MockConfigProvider()
-        provider.block(kind: kind)
-
-        let gated = GatedSpyOutput()
-
-        let consumeTask = Task { @MainActor [bus = harness.bus] in
-            await gated.consume(from: bus, configProvider: provider)
-        }
-        try await Task.sleep(for: .milliseconds(30))
-
-        await emitter._testEmit(kind)
-        try await Task.sleep(for: .milliseconds(150))
-
-        XCTAssertFalse(gated.actionKinds().contains(kind),
-                       "[\(contract.id.rawValue)/\(kind.rawValue)] action fired despite block — got \(gated.actionKinds().map(\.rawValue))")
-
-        source.stop()
-        consumeTask.cancel()
-        await harness.close()
-    }
-
     // MARK: - OS-surface migration cells
-    //
-    // The legacy cells above use `_testEmit` to bypass detection. These
-    // cells drive the SAME reaction kind through the OS-event-routing
-    // surface (`MockEventMonitor.emit(...)`) and assert the output sees it.
-    // Proves the production detection pipeline (debounce, attribution,
-    // RMS thresholds) doesn't break delivery for happy-path inputs.
-    //
-    // Sources whose detection isn't NSEvent-driven (USB, Power,
-    // AudioPeripheral, Bluetooth, Thunderbolt, Display, Sleep, Keyboard
-    // HID) are NOT covered here — they need their own `_inject*` seams
-    // from the parallel agents. Those cells stay on `_testEmit` until
-    // those seams land.
 
     func test_trackpadGesture_OSSurface_reachesOutput() async throws {
         let harness = BusHarness()
@@ -224,8 +140,8 @@ final class StimulusToOutputScenariosTests: XCTestCase {
     //   from synthetic CGEvent magnitudes — leaving for parallel agent's _injectMouseWheel
     //   or equivalent if they add one.
     // - keyboardTyped via OS surface: needs _injectKeyPress; the seam is being added
-    //   by the keyboard-source agent. The legacy _testEmit cell remains as the
-    //   coverage stand-in until that seam compiles cleanly.
+    //   by the keyboard-source agent. Bus-fanout coverage of `.keyboardTyped`
+    //   lives in BusRoutingContractTests until that seam compiles cleanly.
     // - usbAttached / usbDetached / acConnected / acDisconnected / etc.:
     //   require _injectAttach / _injectPowerChange / _injectWillSleep seams from
     //   the IOKit-callback-source agent.

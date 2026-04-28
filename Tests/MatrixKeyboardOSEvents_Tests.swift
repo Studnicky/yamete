@@ -193,7 +193,7 @@ final class MatrixKeyboardOSEvents_Tests: XCTestCase {
         try? await Task.sleep(for: .milliseconds(40))
 
         // 4 presses, 1.0s apart — past the 0.8s debounce.
-        for i in 0..<4 {
+        for _ in 0..<4 {
             await source._injectKeyPress(at: Date())
             try? await Task.sleep(for: .milliseconds(900))
         }
