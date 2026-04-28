@@ -6,88 +6,217 @@ import ResponseKit
 #endif
 import SwiftUI
 
-// MARK: - Response (reactivity, sound, visual)
+// MARK: - Outputs
 
 internal struct ResponseSection: View {
     @Environment(SettingsStore.self) var settings
+    @Environment(Yamete.self) var yamete
+
+    @State private var audioExpanded  = false
+    @State private var flashExpanded  = false
+    @State private var notifsExpanded = false
+    @State private var ledExpanded    = false
+    @State private var hapticExpanded = false
+    @State private var brightExpanded = false
+    @State private var tintExpanded   = false
+
+    /// Identifier for each output card rendered by this section. Used by tests
+    /// to enumerate the per-output parameter keyPaths and assert independence.
+    internal enum OutputID: String, CaseIterable, Sendable {
+        case audio, flash, notification, keyboardLED, haptic, displayBrightness, displayTint
+    }
+
+    /// Pure helper exposed for tests. For an output card, returns every
+    /// `SettingsStore` keyPath the card writes through its sliders / toggles.
+    /// Single source of truth between rendering and binding-integrity tests.
+    @MainActor
+    internal static func outputTuningKeyPaths(
+        _ id: OutputID
+    ) -> [PartialKeyPath<SettingsStore>] {
+        switch id {
+        case .audio:
+            return [\SettingsStore.volumeMin, \SettingsStore.volumeMax]
+        case .flash:
+            return [\SettingsStore.flashOpacityMin, \SettingsStore.flashOpacityMax]
+        case .notification:
+            return [\SettingsStore.notificationLocale]
+        case .keyboardLED:
+            return [\SettingsStore.ledBrightnessMin, \SettingsStore.ledBrightnessMax,
+                    \SettingsStore.ledEnabled]
+        case .haptic:
+            return [\SettingsStore.hapticIntensity]
+        case .displayBrightness:
+            return [\SettingsStore.displayBrightnessBoost, \SettingsStore.displayBrightnessThreshold]
+        case .displayTint:
+            return [\SettingsStore.displayTintIntensity]
+        }
+    }
 
     public var body: some View {
         @Bindable var s = settings
+        let lw = tuningLabelWidth
 
-        Group {
-            // Reactivity — impact force response window
-            VStack(alignment: .leading, spacing: 6) {
-                SettingHeader(icon: "gauge.with.needle", title: NSLocalizedString("setting_reactivity", comment: "Reactivity setting title"),
-                              help: NSLocalizedString("help_reactivity", comment: "Reactivity setting help text"))
-                SensitivityRuler()
-                RangeSlider(low: $s.sensitivityMin, high: $s.sensitivityMax,
-                            bounds: Detection.unitRange, labelWidth: tuningLabelWidth, format: Fmt.percent)
-            }
-            .padding(Theme.sectionPadding)
-            Divider()
+        VStack(spacing: 0) {
 
-            // Sound — audio playback toggle + volume range
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    SettingHeader(icon: "speaker.wave.2", title: NSLocalizedString("setting_volume", comment: "Volume setting title"),
-                                  help: NSLocalizedString("help_volume", comment: "Volume setting help text"))
-                    Spacer()
-                    Toggle("", isOn: $s.soundEnabled)
-                        .themeMiniSwitch()
-                }
-                if s.soundEnabled {
-                    RangeSlider(low: $s.volumeMin, high: $s.volumeMax,
-                                bounds: Detection.unitRange, labelWidth: tuningLabelWidth, format: Fmt.percent)
-                }
-            }
-            .padding(Theme.sectionPadding)
-            Divider()
-
-            // Visual — three-way: off / overlay / notification
-            VStack(alignment: .leading, spacing: 6) {
-                SettingHeader(
-                    icon: s.visualResponseMode == .notification ? "bell.badge" : "sun.max",
-                    title: NSLocalizedString("setting_visual_response", comment: "Visual response setting title"),
-                    help: NSLocalizedString("help_visual_response", comment: "Visual response setting help text"))
-
-                SelectionList(
-                    items: [
-                        .init(title: NSLocalizedString("response_mode_off", comment: "Visual response off"),
-                              subtitle: nil, icon: "moon.zzz", id: VisualResponseMode.off),
-                        .init(title: NSLocalizedString("response_mode_overlay", comment: "Screen flash overlay"),
-                              subtitle: nil, icon: "sun.max", id: VisualResponseMode.overlay),
-                        .init(title: NSLocalizedString("response_mode_notification", comment: "System notification"),
-                              subtitle: nil, icon: "bell.badge", id: VisualResponseMode.notification),
-                    ],
-                    selection: $s.visualResponseMode)
-                .onChange(of: s.visualResponseMode) { _, mode in
-                    if mode == .notification { NotificationResponder.requestAuthorizationIfNeeded() }
-                }
-
-                if s.visualResponseMode == .overlay {
-                    VStack(alignment: .leading, spacing: 4) {
-                        SettingHeader(
-                            icon: "circle.lefthalf.filled",
-                            title: NSLocalizedString("setting_flash_opacity", comment: "Flash opacity slider label"),
-                            help: NSLocalizedString("help_flash_opacity", comment: "Flash opacity slider help"))
-                        RangeSlider(low: $s.flashOpacityMin, high: $s.flashOpacityMax,
-                                    bounds: Detection.unitRange, labelWidth: tuningLabelWidth, format: Fmt.percent)
+            // Audio (includes Volume Override in Direct builds)
+            SensorAccordionCard(
+                title: NSLocalizedString("setting_volume", comment: "Volume setting title"),
+                icon: "speaker.wave.2",
+                isEnabled: $s.soundEnabled,
+                isExpanded: $audioExpanded,
+                help: NSLocalizedString("help_volume", comment: "Volume setting help text")
+            ) {
+                VStack(spacing: 10) {
+                    SettingRow(icon: "speaker",
+                               title: NSLocalizedString("setting_volume", comment: "Playback volume range label"),
+                               help: NSLocalizedString("help_volume", comment: "Playback volume range help")) {
+                        RangeSlider(low: $s.volumeMin, high: $s.volumeMax,
+                                    bounds: Detection.unitRange, labelWidth: lw, format: Fmt.percent)
                     }
-                    .padding(.top, 4)
-                }
+                    #if DIRECT_BUILD
+                    Divider()
+                    HStack(spacing: 6) {
+                        Image(systemName: "speaker.wave.3.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(s.volumeSpikeEnabled ? Theme.pink : Color.secondary.opacity(0.5))
+                        Text(NSLocalizedString("setting_volume_spike", comment: "Volume override sub-toggle label"))
+                            .font(.caption)
+                            .foregroundStyle(s.volumeSpikeEnabled ? .primary : .secondary)
+                        Spacer()
+                        Toggle("", isOn: $s.volumeSpikeEnabled).themeMiniSwitch()
+                    }
+                    #endif
+                }.padding(Theme.accordionInner)
+            }
 
-                if s.visualResponseMode == .notification {
-                    VStack(alignment: .leading, spacing: 4) {
-                        SettingHeader(
-                            icon: "globe",
-                            title: NSLocalizedString("setting_notification_locale", comment: "Notification language picker label"),
-                            help: NSLocalizedString("help_notification_locale", comment: "Notification language picker help"))
+            // Screen Flash
+            SensorAccordionCard(
+                title: NSLocalizedString("setting_visual_response_flash", comment: "Screen flash output title"),
+                icon: "sun.max",
+                isEnabled: $s.flashEnabled,
+                isExpanded: $flashExpanded,
+                help: NSLocalizedString("help_visual_response_flash", comment: "Screen flash output help text")
+            ) {
+                VStack(spacing: 10) {
+                    SettingRow(icon: "circle.lefthalf.filled",
+                               title: NSLocalizedString("setting_flash_opacity", comment: "Flash opacity slider label"),
+                               help: NSLocalizedString("help_flash_opacity", comment: "Flash opacity slider help")) {
+                        RangeSlider(low: $s.flashOpacityMin, high: $s.flashOpacityMax,
+                                    bounds: Detection.unitRange, labelWidth: lw, format: Fmt.percent)
+                    }
+                }.padding(Theme.accordionInner)
+            }
+
+            // Notifications
+            SensorAccordionCard(
+                title: NSLocalizedString("setting_notifications", comment: "Notification output title"),
+                icon: "bell.badge",
+                isEnabled: $s.notificationsEnabled,
+                isExpanded: $notifsExpanded,
+                help: NSLocalizedString("help_notifications", comment: "Notification output help text")
+            ) {
+                VStack(spacing: 10) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "globe").font(.caption).foregroundStyle(.secondary).frame(width: 16)
+                        Text(NSLocalizedString("setting_notification_locale", comment: "Notification language picker label"))
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
                         NotificationLocalePicker(selection: $s.notificationLocale)
                     }
-                    .padding(.top, 4)
+                }.padding(Theme.accordionInner)
+            }
+
+            // Keyboard (brightness + Caps Lock LED)
+            SensorAccordionCard(
+                title: NSLocalizedString("setting_keyboard_leds", comment: "Keyboard LED flash output title"),
+                icon: "keyboard.badge.eye",
+                isEnabled: $s.keyboardBrightnessEnabled,
+                isExpanded: $ledExpanded,
+                help: NSLocalizedString("help_keyboard_leds", comment: "Keyboard LED flash output help text")
+            ) {
+                VStack(spacing: 10) {
+                    if yamete.keyboardBacklightAvailable {
+                        SettingRow(icon: "slider.horizontal.3",
+                                   title: NSLocalizedString("setting_led_brightness", comment: "LED brightness slider label"),
+                                   help: NSLocalizedString("help_led_brightness", comment: "LED brightness slider help")) {
+                            RangeSlider(low: $s.ledBrightnessMin, high: $s.ledBrightnessMax,
+                                        bounds: Detection.unitRange, labelWidth: lw, format: Fmt.percent)
+                        }
+                        Divider()
+                    }
+                    HStack(spacing: 6) {
+                        Image(systemName: "lightbulb.led").font(.caption).foregroundStyle(.secondary)
+                        Text(NSLocalizedString("setting_led_enabled", comment: "LED flash output title"))
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Toggle("", isOn: $s.ledEnabled).themeMiniSwitch()
+                    }
+                }.padding(Theme.accordionInner)
+            }
+
+            // Haptic
+            if yamete.hapticAvailable {
+                SensorAccordionCard(
+                    title: NSLocalizedString("setting_haptic", comment: "Haptic output title"),
+                    icon: "waveform",
+                    isEnabled: $s.hapticEnabled,
+                    isExpanded: $hapticExpanded,
+                    help: NSLocalizedString("help_haptic", comment: "Haptic output help text")
+                ) {
+                    VStack(spacing: 10) {
+                        SettingRow(icon: "slider.horizontal.3",
+                                   title: NSLocalizedString("setting_haptic_intensity", comment: "Haptic intensity slider label"),
+                                   help: NSLocalizedString("help_haptic_intensity", comment: "Haptic intensity slider help")) {
+                            SingleSlider(value: $s.hapticIntensity, bounds: 0.5...3.0, labelWidth: lw, format: Fmt.multiplier)
+                        }
+                    }.padding(Theme.accordionInner)
                 }
             }
-            .padding(Theme.sectionPadding)
+
+            // Display Brightness
+            if yamete.displayBrightnessAvailable {
+                SensorAccordionCard(
+                    title: NSLocalizedString("setting_display_brightness", comment: "Display brightness output title"),
+                    icon: "sun.max.fill",
+                    isEnabled: $s.displayBrightnessEnabled,
+                    isExpanded: $brightExpanded,
+                    help: NSLocalizedString("help_display_brightness", comment: "Display brightness output help text")
+                ) {
+                    VStack(spacing: 10) {
+                        SettingRow(icon: "arrow.up.to.line",
+                                   title: NSLocalizedString("setting_brightness_boost", comment: "Brightness boost slider label"),
+                                   help: NSLocalizedString("help_brightness_boost", comment: "Brightness boost slider help")) {
+                            SingleSlider(value: $s.displayBrightnessBoost, bounds: 0.1...1.0, labelWidth: lw, format: Fmt.percent)
+                        }
+                        Divider()
+                        SettingRow(icon: "waveform.path.ecg",
+                                   title: NSLocalizedString("setting_brightness_threshold", comment: "Brightness threshold slider label"),
+                                   help: NSLocalizedString("help_brightness_threshold", comment: "Brightness threshold slider help")) {
+                            SingleSlider(value: $s.displayBrightnessThreshold, bounds: 0.0...1.0, labelWidth: lw, format: Fmt.percent)
+                        }
+                    }.padding(Theme.accordionInner)
+                }
+            }
+
+            // Screen Tint
+            if yamete.displayTintAvailable {
+                SensorAccordionCard(
+                    title: NSLocalizedString("setting_display_tint", comment: "Display tint output title"),
+                    icon: "paintbrush.pointed.fill",
+                    isEnabled: $s.displayTintEnabled,
+                    isExpanded: $tintExpanded,
+                    help: NSLocalizedString("help_display_tint", comment: "Display tint output help text")
+                ) {
+                    VStack(spacing: 10) {
+                        SettingRow(icon: "circle.lefthalf.filled",
+                                   title: NSLocalizedString("setting_tint_intensity", comment: "Tint intensity slider label"),
+                                   help: NSLocalizedString("help_tint_intensity", comment: "Tint intensity slider help")) {
+                            SingleSlider(value: $s.displayTintIntensity, bounds: 0.0...1.0, labelWidth: lw, format: Fmt.percent)
+                        }
+                    }.padding(Theme.accordionInner)
+                }
+            }
+
         }
     }
 }

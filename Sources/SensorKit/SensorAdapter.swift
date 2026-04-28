@@ -3,30 +3,29 @@ import YameteCore
 #endif
 import Foundation
 
-// MARK: - SensorAdapter Protocol
+// MARK: - SensorSource Protocol
 
-/// Interface for adapters that detect impacts from a specific sensor.
-/// Each adapter runs its own sensor-specific detection pipeline internally
-/// (preprocessing, gating, thresholding) and emits impact events with 0–1 intensity.
-public protocol SensorAdapter: AnyObject, Sendable {
+/// A concrete sensor that produces impact events. Each implementation owns
+/// its own preprocessing (filter, decimation), gating (`ImpactDetector`), and
+/// hardware lifecycle. The fusion engine subscribes to many sources, runs
+/// consensus/rearm, and publishes `Reaction.impact` onto the bus.
+public protocol SensorSource: AnyObject, Sendable {
     var id: SensorID { get }
     var name: String { get }
     var isAvailable: Bool { get }
 
-    /// Returns a stream of detected impacts. Each adapter applies its own
-    /// sensor-specific preprocessing and detection gates internally.
-    /// Intensity is 0–1 where the scale is specific to this sensor type:
-    /// 0 = weakest detectable impact, 1 = strongest expected impact.
+    /// Stream of impacts detected by this source. Intensity is 0–1 relative
+    /// to this sensor's detection range.
     func impacts() -> AsyncThrowingStream<SensorImpact, Error>
 }
 
 // MARK: - SensorImpact
 
-/// An impact detected by a single sensor adapter.
+/// An impact detected by a single sensor source. Internal to the impact
+/// pipeline — never reaches output consumers (those see `Reaction.impact`).
 public struct SensorImpact: Sendable {
     public let source: SensorID
     public let timestamp: Date
-    /// 0–1 intensity relative to this sensor's detection range.
     public let intensity: Float
 
     public init(source: SensorID, timestamp: Date, intensity: Float) {
@@ -34,13 +33,15 @@ public struct SensorImpact: Sendable {
     }
 }
 
-// MARK: - SensorEvent
+// MARK: - StimulusSource Protocol
 
-/// Events emitted by `SensorManager`.
-public enum SensorEvent: Sendable {
-    case impact(SensorImpact)
-    case error(String)
-    case adaptersChanged(ids: Set<SensorID>, names: [String])
+/// Observes discrete system events (device attach/detach, power, sleep/wake)
+/// and publishes them as `Reaction` values to a `ReactionBus`.
+@MainActor
+public protocol StimulusSource: AnyObject {
+    var id: SensorID { get }
+    func start(publishingTo bus: ReactionBus) async
+    func stop()
 }
 
 // MARK: - SensorError
@@ -62,82 +63,5 @@ public enum SensorError: Error, LocalizedError, Sendable {
         case .noAdaptersAvailable:
             NSLocalizedString("No sensors available. Enable at least one sensor, or connect a microphone.", comment: "No adapters error")
         }
-    }
-}
-
-// MARK: - SensorManager
-
-/// Discovers adapters and fans in all impact streams concurrently.
-@MainActor
-public final class SensorManager {
-    private let adapters: [any SensorAdapter]
-    private let log = AppLog(category: "SensorManager")
-
-    public init(adapters: [any SensorAdapter]) {
-        self.adapters = adapters
-    }
-
-    public func events() -> AsyncStream<SensorEvent> {
-        let adapters = self.adapters.filter { $0.isAvailable }
-        let log = self.log
-
-        let (stream, continuation) = AsyncStream.makeStream(of: SensorEvent.self)
-        let activeTracker = ActiveAdapterTracker(adapters: adapters)
-
-        let task = Task {
-            defer { continuation.finish() }
-
-            guard !adapters.isEmpty else {
-                continuation.yield(.error(SensorError.noAdaptersAvailable.localizedDescription))
-                return
-            }
-
-            continuation.yield(.adaptersChanged(ids: Set(adapters.map(\.id)), names: adapters.map(\.name).sorted()))
-
-            await withTaskGroup(of: Void.self) { group in
-                for adapter in adapters {
-                    group.addTask {
-                        do {
-                            log.info("activity:SensorDiscovery selected entity:Adapter name=\(adapter.name)")
-                            for try await impact in adapter.impacts() {
-                                continuation.yield(.impact(impact))
-                            }
-                        } catch is CancellationError {
-                            // Cancellation is a normal adapter lifecycle termination — fall through
-                            // so the post-catch adaptersChanged emission still runs. Returning here
-                            // would leave the tracker thinking the adapter is still active, which
-                            // (under concurrent cancellation on remaining adapters) can drop the
-                            // terminal adaptersChanged([]) snapshot the consumer relies on.
-                        } catch {
-                            log.warning("entity:Adapter wasInvalidatedBy activity:SensorError name=\(adapter.name) — \(error.localizedDescription)")
-                            continuation.yield(.error("\(adapter.name): \(error.localizedDescription)"))
-                        }
-
-                        let (remainingIDs, remainingNames) = await activeTracker.remove(adapter)
-                        continuation.yield(.adaptersChanged(ids: remainingIDs, names: remainingNames.sorted()))
-                    }
-                }
-                await group.waitForAll()
-            }
-        }
-
-        continuation.onTermination = { _ in task.cancel() }
-        return stream
-    }
-}
-
-private actor ActiveAdapterTracker {
-    private var activeIDs: Set<SensorID>
-    private var namesByID: [SensorID: String]
-
-    init(adapters: [any SensorAdapter]) {
-        activeIDs = Set(adapters.map(\.id))
-        namesByID = Dictionary(uniqueKeysWithValues: adapters.map { ($0.id, $0.name) })
-    }
-
-    func remove(_ adapter: any SensorAdapter) -> (ids: Set<SensorID>, names: [String]) {
-        activeIDs.remove(adapter.id)
-        namesByID.removeValue(forKey: adapter.id)
-        return (activeIDs, Array(namesByID.values))
     }
 }

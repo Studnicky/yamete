@@ -43,14 +43,15 @@ let package = Package(
             ]
         ),
 
-        // Audio playback, device enumeration, screen flash overlay
+        // Audio playback, device enumeration, screen flash overlay, LED flash
         .target(
             name: "ResponseKit",
-            dependencies: ["YameteCore"],
+            dependencies: ["YameteCore", "IOHIDPublic"],
             path: "Sources/ResponseKit",
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("CoreAudio"),
+                .linkedFramework("IOKit"),
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("UserNotifications"),
             ]

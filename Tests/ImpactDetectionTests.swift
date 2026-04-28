@@ -59,13 +59,13 @@ final class ImpactDetectorTests: XCTestCase {
     }
 }
 
-// MARK: - ImpactFusionEngine tests
+// MARK: - ImpactFusion tests
 
 @MainActor
 final class ImpactFusionTests: XCTestCase {
 
     func testSingleSourceTriggers() {
-        let engine = ImpactFusionEngine(config: FusionConfig(consensusRequired: 1))
+        let engine = ImpactFusion(config: FusionConfig(consensusRequired: 1))
         let now = Date()
 
         let result = engine.ingest(
@@ -77,7 +77,7 @@ final class ImpactFusionTests: XCTestCase {
     }
 
     func testConsensusRequiresTwoWhenConfigured() {
-        let engine = ImpactFusionEngine(config: FusionConfig(consensusRequired: 2, fusionWindow: 0.2))
+        let engine = ImpactFusion(config: FusionConfig(consensusRequired: 2, fusionWindow: 0.2))
         let now = Date()
 
         let aOnly = engine.ingest(
@@ -96,7 +96,7 @@ final class ImpactFusionTests: XCTestCase {
     }
 
     func testConsensusClampedToActiveSources() {
-        let engine = ImpactFusionEngine(config: FusionConfig(consensusRequired: 5))
+        let engine = ImpactFusion(config: FusionConfig(consensusRequired: 5))
         let now = Date()
 
         // Only 1 active source → consensus clamped to 1 → triggers
@@ -108,7 +108,7 @@ final class ImpactFusionTests: XCTestCase {
     }
 
     func testRearmPreventsRetrigger() {
-        let engine = ImpactFusionEngine(config: FusionConfig(consensusRequired: 1, rearmDuration: 0.5))
+        let engine = ImpactFusion(config: FusionConfig(consensusRequired: 1, rearmDuration: 0.5))
         let now = Date()
 
         let first = engine.ingest(

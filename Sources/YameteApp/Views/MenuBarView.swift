@@ -7,10 +7,11 @@ import ResponseKit
 import SwiftUI
 import AppKit
 
-// MARK: - MenuBarView (composition root)
+// MARK: - MenuBarView (two-column composition root)
 
 public struct MenuBarView: View {
-    @Environment(ImpactController.self) var controller
+    @Environment(Yamete.self) var yamete
+    @Environment(MenuBarFace.self) var menuBarFace
     @Environment(SettingsStore.self) var settings
     @Environment(Updater.self) var updater
     @State private var audioDevices: [AudioOutputDevice] = []
@@ -19,42 +20,58 @@ public struct MenuBarView: View {
 
     public init() {}
 
+    // Conservative screen-height cap for the scrollable content area.
+    // Uses the smallest connected screen so the panel never overflows a laptop display.
+    private var maxScrollHeight: CGFloat {
+        let minH = NSScreen.screens.map { $0.visibleFrame.height }.min() ?? 800
+        return max(300, minH - 233)
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
             HeaderSection()
             Divider()
-            ResponseSection()
-            Divider()
-            SensorSection(availableSensors: availableSensors)
-            if settings.enabledSensorIDs.contains(SensorID.accelerometer.rawValue) {
-                Divider()
-                AccelTuningSection()
-            }
-            if settings.enabledSensorIDs.contains(SensorID.microphone.rawValue) {
-                Divider()
-                MicTuningSection()
-            }
-            if settings.enabledSensorIDs.contains(SensorID.headphoneMotion.rawValue) {
-                Divider()
-                HeadphoneTuningSection()
-            }
-            Divider()
-            DeviceSection(audioDevices: audioDevices, displays: displays)
 
-            if let error = controller.sensorError {
-                Divider()
-                Text(error)
-                    .font(.caption).foregroundStyle(Theme.mauve)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(Theme.sectionPadding)
+            // fixedSize makes the ScrollView report its content's ideal height (not the
+            // panel frame height) so NSHostingView.fittingSize is correct.
+            // frame(maxHeight:) caps it — scroll activates when content exceeds the screen.
+            // GeometryReader on the HStack (not outer VStack) reads content height directly;
+            // preferences bubble up so onPreferenceChange below triggers panel resize.
+            ScrollView(.vertical, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 0) {
+                    leftColumn
+                        .frame(width: Theme.columnWidth, alignment: .top)
+                    rightColumn
+                        .frame(width: Theme.columnWidth, alignment: .top)
+                        .overlay(
+                            Rectangle()
+                                .fill(Color.secondary.opacity(0.18))
+                                .frame(width: 1),
+                            alignment: .leading
+                        )
+                }
             }
+            .frame(maxHeight: maxScrollHeight)
 
+            Divider()
+            ImpactCounterStrip()
             Divider()
             FooterSection()
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(width: Theme.menuWidth)
+        .frame(width: Theme.twoColumnMenuWidth)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: MenuContentHeightKey.self, value: geo.size.height)
+            }
+        )
+        .onPreferenceChange(MenuContentHeightKey.self) { height in
+            // Send the natural total height (fixedSize VStack reports ideal, not panel height)
+            NotificationCenter.default.post(name: .menuBarContentSizeChanged,
+                                            object: NSNumber(value: Double(height)))
+        }
         .onAppear {
-            AudioDeviceManager.startObserving()
             refreshAll()
         }
         .onReceive(NotificationCenter.default.publisher(for: .menuBarPanelDidShow)) { _ in
@@ -68,6 +85,38 @@ public struct MenuBarView: View {
             refreshDisplays()
         }
     }
+
+    // MARK: - Left column: Detection + Stimuli
+
+    @ViewBuilder private var leftColumn: some View {
+        VStack(spacing: 0) {
+            SensitivitySection()
+            Divider()
+            SensorSection(availableSensors: availableSensors)
+            Divider()
+            StimuliSection()
+        }
+    }
+
+    // MARK: - Right column: Responses + Devices
+
+    @ViewBuilder private var rightColumn: some View {
+        VStack(spacing: 0) {
+            DeviceSection(audioDevices: audioDevices, displays: displays)
+            Divider()
+            ResponseSection()
+
+            if let error = yamete.sensorError {
+                Divider()
+                Text(error)
+                    .font(.caption).foregroundStyle(Theme.mauve)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(Theme.sectionPadding)
+            }
+        }
+    }
+
+    // MARK: - Private refresh helpers
 
     private func refreshAll() {
         refreshAudioDevices()
@@ -91,7 +140,7 @@ public struct MenuBarView: View {
     }
 
     private func refreshSensors() {
-        let latest = controller.allAdapters
+        let latest = yamete.allSensorSources
             .filter { $0.isAvailable }
             .map(\.id.rawValue)
         if latest != availableSensors {
@@ -100,12 +149,15 @@ public struct MenuBarView: View {
     }
 }
 
-// MARK: - Shared formatters
+// MARK: - Panel size change preference key
 
-/// Closure-typed value formatters used by the slider labels. Marked
-/// `@Sendable` so they satisfy `-strict-concurrency=complete`. The closures
-/// only call `NSLocalizedString` and `String(format:)`, both of which are
-/// thread-safe.
+private struct MenuContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+// MARK: - Shared formatters (used by all tuning sections)
+
 internal enum Fmt {
     static let percent: @Sendable (Double) -> String = { String(format: NSLocalizedString("unit_percent", comment: "Percentage format"), Int($0 * 100)) }
     static let gforce: @Sendable (Double) -> String = { String(format: NSLocalizedString("unit_gforce", comment: "G-force format"), $0) }
@@ -122,9 +174,6 @@ internal enum Fmt {
 
 // MARK: - Generic toggle binding for array-backed selections
 
-/// Bridges a `Binding<[T]>` and an element value into a `Binding<Bool>` for
-/// switch-row use. `@MainActor` because all call sites are inside SwiftUI
-/// view bodies and the `Binding` get/set closures fire on the main actor.
 @MainActor
 internal func arrayToggleBinding<T: Equatable & Sendable>(
     _ array: Binding<[T]>, element: T
@@ -144,33 +193,73 @@ internal func arrayToggleBinding<T: Equatable & Sendable>(
 
 internal let tuningLabelWidth: CGFloat = 50
 
-// MARK: - Header (impact counter)
+// MARK: - Header (app identity + impact counter)
 
 internal struct HeaderSection: View {
-    @Environment(ImpactController.self) var controller
+    @Environment(Yamete.self) var yamete
+    @Environment(MenuBarFace.self) var menuBarFace
 
     public var body: some View {
-        HStack {
-            Text(String(format: NSLocalizedString("impacts_today", comment: "Daily impact counter"), controller.impactCount))
-            Spacer()
-            if let tier = controller.lastImpactTier {
-                Text(verbatim: String(format: NSLocalizedString("last_impact", comment: "Last impact tier label"), String(describing: tier)))
-                    .foregroundStyle(.tertiary)
+        VStack(spacing: 0) {
+            // App identity
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(NSLocalizedString("app_title", comment: "Application name"))
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Theme.pink)
+                    Text(NSLocalizedString("app_tagline", comment: "Application tagline"))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                if !yamete.fusion.isRunning {
+                    Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
+                        .font(.caption)
+                        .foregroundStyle(Theme.mauve)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Theme.mauve.opacity(0.15))
+                        .clipShape(Capsule())
+                }
             }
-            if !controller.isEnabled {
-                Text(NSLocalizedString("status_paused", comment: "Detection paused indicator")).foregroundStyle(Theme.mauve)
-            }
+            .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 6)
+
         }
-        .font(.caption).foregroundStyle(.secondary)
-        .padding(.horizontal, 14).padding(.vertical, 6)
     }
 }
 
-// MARK: - Shared detection gate parameters (crest factor, confirmations, warmup)
+// MARK: - Impact counter strip (between content and footer)
 
-// Shared setting row builders for parameters common to all sensors.
-// `@MainActor` because the wrapped SettingRow / SingleSlider initializers
-// are SwiftUI views constructed inside a view body — always main-actor.
+internal struct ImpactCounterStrip: View {
+    @Environment(Yamete.self) var yamete
+    @Environment(MenuBarFace.self) var menuBarFace
+
+    public var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "waveform.path.ecg")
+                .font(.system(size: 9))
+                .foregroundStyle(Theme.pink.opacity(0.7))
+            Text(String(format: NSLocalizedString("impacts_today", comment: "Daily impact counter"), menuBarFace.impactCount))
+            Spacer()
+            if let tier = menuBarFace.lastImpactTier {
+                Text(verbatim: String(format: NSLocalizedString("last_impact", comment: "Last impact tier label"), String(describing: tier)))
+                    .foregroundStyle(.tertiary)
+            }
+            if !yamete.fusion.isRunning {
+                Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
+                    .foregroundStyle(Theme.mauve)
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(Theme.mauve.opacity(0.12))
+                    .clipShape(Capsule())
+            }
+        }
+        .font(.caption).foregroundStyle(.secondary)
+        .padding(.horizontal, 14).padding(.vertical, 5)
+    }
+}
+
+// MARK: - Shared detection gate parameter rows
+
 @MainActor
 internal enum GateRows {
     @ViewBuilder static func confirmations(_ binding: Binding<Int>, bounds: ClosedRange<Int>, lw: CGFloat) -> some View {

@@ -13,6 +13,11 @@ private let log = AppLog(category: "HeadphoneMotion")
 // Reads userAcceleration (gravity-subtracted) and runs the standard gate pipeline.
 // Only active when compatible headphones with motion sensors are connected.
 //
+// Hardware boundary: `HeadphoneMotionDriver`. The default produces a
+// `RealHeadphoneMotionDriver` backed by `CMHeadphoneMotionManager`. Tests
+// inject a mock driver that exposes simulate-connect / simulate-disconnect
+// hooks plus a synchronous sample emitter.
+//
 // Public API documentation:
 //   https://developer.apple.com/documentation/coremotion/cmheadphonemotionmanager
 //   https://developer.apple.com/documentation/coremotion/cmheadphonemotionmanager/3552067-startdevicemotionupdates
@@ -21,22 +26,21 @@ private let log = AppLog(category: "HeadphoneMotion")
 /// Detects impact vibrations via AirPods/Beats accelerometer using CoreMotion.
 /// Requires connected headphones with motion sensors.
 /// Thresholds calibrated for userAcceleration (gravity-subtracted) in g-force.
-public final class HeadphoneMotionAdapter: SensorAdapter, Sendable {
+public final class HeadphoneMotionSource: SensorSource, Sendable {
 
     public let id = SensorID.headphoneMotion
     public let name = "Headphone Motion"
 
-    private let manager = CMHeadphoneMotionManager()
-    private let connectionTracker: HeadphoneConnectionTracker
+    private let driver: HeadphoneMotionDriver
     private let probeStage = OSAllocatedUnfairLock<ProbeStage>(initialState: .pending)
 
     /// Tracks whether the startup connection probe is owning the
-    /// underlying `CMHeadphoneMotionManager` and whether `impacts()` has
-    /// taken it over. Required because `CMHeadphoneMotionManagerDelegate`
-    /// only fires didConnect/didDisconnect on state CHANGES while updates
-    /// are active — we have to engage the device briefly to learn its
-    /// current connection state, but we must not stomp on a real consumer
-    /// that started impacts() during the probe window.
+    /// underlying motion driver and whether `impacts()` has taken it
+    /// over. Required because connection state callbacks only fire on
+    /// state CHANGES while updates are active — we have to engage the
+    /// device briefly to learn its current connection state, but we
+    /// must not stomp on a real consumer that started impacts() during
+    /// the probe window.
     private enum ProbeStage: Sendable {
         case pending     // init done, probe not started
         case running     // probe holds the manager
@@ -48,11 +52,20 @@ public final class HeadphoneMotionAdapter: SensorAdapter, Sendable {
     /// Floor: 0.05g (normal head movement). Ceiling: 2.0g (sharp jolt).
     public let detectorConfig: ImpactDetectorConfig
 
-    public init(detectorConfig: ImpactDetectorConfig = .headphoneMotion()) {
+    public convenience init(detectorConfig: ImpactDetectorConfig = .headphoneMotion()) {
+        self.init(detectorConfig: detectorConfig, driver: RealHeadphoneMotionDriver())
+    }
+
+    public init(
+        detectorConfig: ImpactDetectorConfig = .headphoneMotion(),
+        driver: HeadphoneMotionDriver,
+        runProbe: Bool = true
+    ) {
         self.detectorConfig = detectorConfig
-        self.connectionTracker = HeadphoneConnectionTracker()
-        manager.delegate = connectionTracker
-        startConnectionProbe()
+        self.driver = driver
+        if runProbe {
+            startConnectionProbe()
+        }
     }
 
     /// True only when the framework supports headphone motion AND a
@@ -61,7 +74,7 @@ public final class HeadphoneMotionAdapter: SensorAdapter, Sendable {
     /// then maintained by the delegate callbacks while the probe or
     /// impacts() keep updates active.
     public var isAvailable: Bool {
-        manager.isDeviceMotionAvailable && connectionTracker.isConnected
+        driver.isDeviceMotionAvailable && driver.isHeadphonesConnected
     }
 
     /// Briefly starts motion updates to detect AirPods/Beats already
@@ -73,29 +86,28 @@ public final class HeadphoneMotionAdapter: SensorAdapter, Sendable {
     /// window it takes over the manager and the probe's deferred stop is
     /// suppressed via the `ProbeStage.takenOver` transition.
     private func startConnectionProbe() {
-        guard manager.isDeviceMotionAvailable else { return }
+        guard driver.isDeviceMotionAvailable else { return }
         probeStage.withLock { $0 = .running }
 
-        let tracker = connectionTracker
-        manager.startDeviceMotionUpdates(to: OperationQueue()) { motion, _ in
-            // Any non-nil sample means the headphones are physically streaming
-            // motion data, which means they're connected. The delegate's
-            // didConnect should also fire — both paths set the same flag.
-            if motion != nil { tracker.markConnected() }
+        driver.startUpdates { _, _ in
+            // The driver's real implementation flips its tracker whenever
+            // a non-nil sample arrives. We just need to keep the channel
+            // open during the probe window.
         }
 
         // Wait long enough for the first sample to arrive on connected
         // hardware (typically <100ms) without holding the device for too
         // long if nothing's there. 400ms is a comfortable margin.
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [self] in
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            guard let self else { return }
             let shouldStop = probeStage.withLock { stage -> Bool in
                 guard stage == .running else { return false }
                 stage = .complete
                 return true
             }
             if shouldStop {
-                manager.stopDeviceMotionUpdates()
-                log.info("activity:HeadphoneProbe wasEndedBy agent:HeadphoneMotionAdapter connected=\(tracker.isConnected)")
+                driver.stopUpdates()
+                log.info("activity:HeadphoneProbe wasEndedBy agent:HeadphoneMotionAdapter connected=\(driver.isHeadphonesConnected)")
             }
         }
     }
@@ -115,23 +127,33 @@ public final class HeadphoneMotionAdapter: SensorAdapter, Sendable {
             return running
         }
         if wasProbeRunning {
-            manager.stopDeviceMotionUpdates()
+            driver.stopUpdates()
         }
 
-        guard manager.isDeviceMotionAvailable else {
+        guard driver.isDeviceMotionAvailable else {
             continuation.finish(throwing: SensorError.deviceNotFound)
             return stream
         }
 
-        manager.startDeviceMotionUpdates(to: OperationQueue()) { motion, error in
+        driver.startUpdates { [driver] sample, error in
             if let error {
                 log.warning("activity:SensorReading wasInvalidatedBy agent:HeadphoneMotionAdapter — \(error.localizedDescription)")
                 continuation.finish(throwing: error)
                 return
             }
-            guard let accel = motion?.userAcceleration else { return }
+            guard let sample else { return }
 
-            let mag = sqrtf(Float(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z))
+            // Mid-stream disconnect detection — the driver's tracker
+            // may flip to disconnected while we still get tail-end
+            // samples. Drop them so the adapter behaves like the
+            // device went away.
+            guard driver.isHeadphonesConnected else { return }
+
+            let mag = sqrtf(Float(
+                sample.userAccelerationX * sample.userAccelerationX
+              + sample.userAccelerationY * sample.userAccelerationY
+              + sample.userAccelerationZ * sample.userAccelerationZ
+            ))
 
             let now = Date()
             if let intensity = detector.process(magnitude: mag, timestamp: now) {
@@ -141,47 +163,11 @@ public final class HeadphoneMotionAdapter: SensorAdapter, Sendable {
 
         log.info("activity:SensorReading wasStartedBy agent:HeadphoneMotionAdapter")
 
-        continuation.onTermination = { @Sendable [manager] _ in
-            manager.stopDeviceMotionUpdates()
+        continuation.onTermination = { @Sendable [driver] _ in
+            driver.stopUpdates()
             log.info("activity:SensorReading wasEndedBy agent:HeadphoneMotionAdapter")
         }
 
         return stream
-    }
-}
-
-// MARK: - Connection state tracker
-
-/// Tracks whether motion-capable headphones are currently connected by
-/// observing `CMHeadphoneMotionManagerDelegate` callbacks. The adapter
-/// owns one of these and the menu bar UI's sensor list reflects its state.
-///
-/// `CMHeadphoneMotionManager.isDeviceMotionAvailable` only reports framework
-/// support — it returns true on every Apple Silicon Mac regardless of whether
-/// AirPods are paired/connected. Real connection state requires the delegate.
-///
-/// Sendable: the only stored state is an `OSAllocatedUnfairLock<Bool>`.
-/// `OSAllocatedUnfairLock` is Sendable when its state type is Sendable, and
-/// `Bool` is Sendable. No unchecked escape required.
-private final class HeadphoneConnectionTracker: NSObject, CMHeadphoneMotionManagerDelegate, Sendable {
-    private let state = OSAllocatedUnfairLock<Bool>(initialState: false)
-
-    var isConnected: Bool { state.withLock { $0 } }
-
-    /// Set by the startup probe (in `HeadphoneMotionAdapter.startConnectionProbe`)
-    /// when motion data starts flowing. The delegate's didConnect callback
-    /// is also expected to fire — both paths land in the same flag.
-    func markConnected() {
-        state.withLock { $0 = true }
-    }
-
-    func headphoneMotionManagerDidConnect(_ manager: CMHeadphoneMotionManager) {
-        state.withLock { $0 = true }
-        log.info("activity:HeadphoneConnection wasStartedBy entity:Headphones")
-    }
-
-    func headphoneMotionManagerDidDisconnect(_ manager: CMHeadphoneMotionManager) {
-        state.withLock { $0 = false }
-        log.info("activity:HeadphoneConnection wasEndedBy entity:Headphones")
     }
 }

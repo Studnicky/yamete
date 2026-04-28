@@ -91,7 +91,7 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 
 SIGNING_ID ?= -
 
-.PHONY: all build test install uninstall clean dmg lint lint-frameworks verify release notarize \
+.PHONY: all build test install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
         appstore appstore-install appstore-lint
 
 all: build
@@ -154,7 +154,7 @@ build: $(BUILD_BINARY) $(BUILD)/.minified
 	 printf "  bundle    $(TARGET) ($$SIZE)\n"
 
 # ── Lint ──────────────────────────────────────────────────────
-lint: lint-frameworks
+lint: lint-frameworks docs-check
 	@printf "  lint      strict concurrency\n"
 	@swiftc -typecheck $(SWIFTFLAGS) -strict-concurrency=complete -warnings-as-errors $(SOURCES)
 
@@ -191,6 +191,17 @@ lint-frameworks:
 		exit 1; \
 	fi
 	@printf "  lint      ✓ frameworks aligned across Makefile, Package.swift, project.yml\n"
+
+# ── Docs: source reference check ─────────────────────────────
+# Validates that every Sources/**/*.swift path mentioned in docs/*.html
+# still exists. Prevents docs from silently referencing deleted files.
+docs-check:
+	@printf "  check     doc source references\n"
+	@grep -oh 'Sources/[A-Za-z]*/[A-Za-z]*\.swift' docs/*.html 2>/dev/null | \
+	  sort -u | while read f; do \
+	    test -f "$$f" || { echo "  ✗ docs references missing file: $$f"; exit 1; }; \
+	  done
+	@printf "  ok        all source references valid\n"
 
 # ── App Store build convenience targets ──────────────────────
 # These wrappers force BUILD_VARIANT=appstore so the right resources,

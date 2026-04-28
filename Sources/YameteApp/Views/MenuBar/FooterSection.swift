@@ -11,7 +11,6 @@ internal struct FooterSection: View {
     private static let privacyPolicyURL = URL(string: "https://studnicky.github.io/yamete/privacy.html")!
     private static let supportURL = URL(string: "https://studnicky.github.io/yamete/support.html")!
 
-    @Environment(ImpactController.self) var controller
     @Environment(SettingsStore.self) var settings
     @Environment(Updater.self) var updater
     @State private var launchAtLogin = (SMAppService.mainApp.status == .enabled)
@@ -19,88 +18,117 @@ internal struct FooterSection: View {
     public var body: some View {
         @Bindable var s = settings
 
-        VStack(spacing: 0) {
-            HStack(spacing: 5) {
-                Image(systemName: "power")
-                    .themeFooterIcon()
-                Text(NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label"))
-                Spacer()
-                Toggle("", isOn: $launchAtLogin)
-                    .themeMiniSwitch()
-                    .onChange(of: launchAtLogin) { _, on in
-                        do {
-                            if on { try SMAppService.mainApp.register() }
-                            else  { try SMAppService.mainApp.unregister() }
-                        } catch { launchAtLogin = !on }
-                    }
-            }
-            .font(.caption)
-            .padding(Theme.footerPadding)
+        HStack(alignment: .top, spacing: 0) {
 
-            if AppLog.supportsDebugLogging {
-                HStack(spacing: 5) {
-                    Image(systemName: "ladybug")
+            // Left footer — System preferences
+            VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    Image(systemName: "power")
                         .themeFooterIcon()
-                    Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label"))
+                    Text(NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label"))
+                        .font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Toggle("", isOn: $s.debugLogging)
+                    Toggle("", isOn: $launchAtLogin)
                         .themeMiniSwitch()
+                        .onChange(of: launchAtLogin) { _, on in
+                            do {
+                                if on { try SMAppService.mainApp.register() }
+                                else  { try SMAppService.mainApp.unregister() }
+                            } catch { launchAtLogin = !on }
+                        }
                 }
-                .font(.caption)
                 .padding(Theme.footerPadding)
-            }
 
-            HStack(spacing: 5) {
-                Image(systemName: "link")
-                    .themeFooterIcon()
-                Text(NSLocalizedString("label_links", comment: "Footer links section label"))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button(action: { open(Self.privacyPolicyURL) }) {
-                    Text(NSLocalizedString("button_privacy", comment: "Privacy policy button"))
-                        .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
+                if AppLog.supportsDebugLogging {
+                    HStack(spacing: 6) {
+                        Image(systemName: "ladybug")
+                            .themeFooterIcon()
+                        Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label"))
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Toggle("", isOn: $s.debugLogging)
+                            .themeMiniSwitch()
+                    }
+                    .padding(Theme.footerPadding)
                 }
-                .buttonStyle(.plain)
-                .help(NSLocalizedString("action_open_privacy_policy", comment: "Open privacy policy accessibility label"))
-                .accessibilityLabel(Text(NSLocalizedString("action_open_privacy_policy", comment: "Open privacy policy accessibility label")))
 
-                Button(action: { open(Self.supportURL) }) {
-                    Text(NSLocalizedString("button_support", comment: "Support button"))
-                        .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .themeFooterIcon()
+                    Text(NSLocalizedString("label_reset_settings", comment: "Reset settings label"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button(action: { confirmAndReset() }) {
+                        Text(NSLocalizedString("button_reset", comment: "Reset to defaults button"))
+                            .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                .help(NSLocalizedString("action_open_support", comment: "Open support accessibility label"))
-                .accessibilityLabel(Text(NSLocalizedString("action_open_support", comment: "Open support accessibility label")))
+                .padding(Theme.footerPadding).padding(.bottom, 4)
             }
-            .font(.caption)
-            .padding(Theme.footerPadding)
+            .frame(width: Theme.columnWidth)
 
-            HStack(spacing: 5) {
-                #if DIRECT_BUILD
-                updateStatusIcon
-                updateStatusLabel
-                Spacer()
-                updateActionButton
-                #else
-                Image(systemName: "info.circle")
-                    .themeFooterIcon()
-                Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
-                    .font(.caption).foregroundStyle(.tertiary)
-                Spacer()
-                #endif
-                Button(action: { confirmAndReset() }) {
-                    Text(NSLocalizedString("button_reset", comment: "Reset to defaults button"))
-                        .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
+            Rectangle()
+                .fill(Color.secondary.opacity(0.18))
+                .frame(width: 1)
+
+            // Right footer — Info + actions
+            VStack(spacing: 0) {
+                // Version / update status
+                HStack(spacing: 6) {
+                    #if DIRECT_BUILD
+                    updateStatusIcon
+                    updateStatusLabel
+                    #else
+                    Image(systemName: "info.circle")
+                        .themeFooterIcon()
+                    Text(String(format: NSLocalizedString("version_format", comment: "App version label"), updater.currentVersion))
+                        .font(.caption).foregroundStyle(.tertiary)
+                    #endif
+                    Spacer()
+                    #if DIRECT_BUILD
+                    updateActionButton
+                    #endif
                 }
-                .buttonStyle(.plain)
-                Button(action: { NSApp.terminate(nil) }) {
-                    Text(NSLocalizedString("button_quit", comment: "Quit application button"))
-                        .themePillButton(bold: true)
+                .padding(Theme.footerPadding)
+
+                // Links
+                HStack(spacing: 6) {
+                    Image(systemName: "link")
+                        .themeFooterIcon()
+                    Text(NSLocalizedString("label_links", comment: "Footer links section label"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button(action: { open(Self.privacyPolicyURL) }) {
+                        Text(NSLocalizedString("button_privacy", comment: "Privacy policy button"))
+                            .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
+                    }
+                    .buttonStyle(.plain)
+                    Button(action: { open(Self.supportURL) }) {
+                        Text(NSLocalizedString("button_support", comment: "Support button"))
+                            .themePillButton(background: Theme.deepRose.opacity(0.15), foreground: Theme.pink)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                .keyboardShortcut("q")
+                .padding(Theme.footerPadding)
+
+                // Quit
+                HStack(spacing: 6) {
+                    Image(systemName: "power.circle")
+                        .themeFooterIcon()
+                    Text(NSLocalizedString("label_quit", comment: "Quit label"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button(action: { NSApp.terminate(nil) }) {
+                        Text(NSLocalizedString("button_quit", comment: "Quit application button"))
+                            .themePillButton(bold: true)
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut("q")
+                }
+                .padding(Theme.footerPadding).padding(.bottom, 4)
             }
-            .padding(Theme.footerPadding).padding(.bottom, 4)
+            .frame(width: Theme.columnWidth)
         }
     }
 

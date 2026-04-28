@@ -28,6 +28,10 @@ enum Theme {
     // MARK: - Layout dimensions
 
     static let menuWidth: CGFloat = 290
+    /// Width of each column in the two-column menu layout.
+    static let columnWidth: CGFloat = 290
+    /// Total width of the two-column menu (columnWidth × 2 + 1px divider).
+    static let twoColumnMenuWidth: CGFloat = 581
     static let listCornerRadius: CGFloat = 6
     static let buttonCornerRadius: CGFloat = 5
     static let listBackground = Color.secondary.opacity(0.08)
@@ -122,6 +126,121 @@ struct AccordionCard<Content: View>: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .animation(.easeInOut(duration: 0.2), value: isExpanded)
         .padding(.horizontal, 8).padding(.vertical, 4)
+    }
+}
+
+// MARK: - Sensor / stimulus accordion with inline enable toggle
+
+/// Accordion card where the header contains both an expand/collapse chevron
+/// (left) and an independent enable/disable toggle (right). Used for both
+/// sensor cards and stimulus source cards.
+struct SensorAccordionCard<Content: View>: View {
+    let title: String
+    let icon: String
+    @Binding var isEnabled: Bool
+    @Binding var isExpanded: Bool
+    var help: String = ""
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header row — never animates, stays fixed at the top
+            HStack(spacing: 6) {
+                Button(action: {
+                    withAnimation(.easeOut(duration: 0.22)) { isExpanded.toggle() }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.forward")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Theme.mauve)
+                        Image(systemName: icon)
+                            .font(.system(size: 10))
+                            .foregroundStyle(isEnabled ? Theme.pink : Theme.pink.opacity(0.35))
+                        Text(title)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(isEnabled ? Theme.pink : Theme.pink.opacity(0.35))
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(help)
+
+                Toggle("", isOn: $isEnabled)
+                    .themeMiniSwitch()
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(Theme.deepRose.opacity(isEnabled ? 0.14 : 0.07))
+
+            // Drop-down body: slides from the top edge (under the header) and clips
+            // so the unfolding content doesn't overflow or push siblings around.
+            // .top alignment means the height grows downward only.
+            if isExpanded {
+                VStack(spacing: 0) { content() }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Theme.deepRose.opacity(isEnabled ? 0.35 : 0.18), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        // Animate only the expand state — sibling reflows happen naturally below,
+        // never above. No outer .animation() that captures unrelated state.
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isEnabled)
+        .padding(.horizontal, 8).padding(.vertical, 4)
+    }
+}
+
+// MARK: - Output matrix toggle style
+
+/// Glossy pill button used for per-output × per-reaction toggles in the
+/// stimulus section. Renders three distinct states based on routing and output:
+/// - Routed ON + Output ON:  pink fill, bright pink label, pink border — fires
+/// - Routed ON + Output OFF: transparent, dimmed pink label, pink outline — pending
+/// - Routed OFF:             grey fill, grey label, grey border — won't fire
+struct MatrixToggleStyle: ToggleStyle {
+    /// When false, the button renders in "pending" state — routing is on but
+    /// the output channel is disabled globally. The routing preference persists.
+    var outputEnabled: Bool = true
+
+    func makeBody(configuration: Configuration) -> some View {
+        Button(action: { configuration.isOn.toggle() }) {
+            configuration.label
+                .frame(maxWidth: .infinity)
+                .foregroundStyle(foreColor(configuration.isOn))
+                .padding(.horizontal, 5).padding(.vertical, 3)
+                .background(bgColor(configuration.isOn), in: RoundedRectangle(cornerRadius: 5))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(strokeColor(configuration.isOn), lineWidth: strokeWidth(configuration.isOn))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func foreColor(_ isOn: Bool) -> Color {
+        if isOn && outputEnabled  { return Theme.pink }
+        if isOn && !outputEnabled { return Theme.pink.opacity(0.45) }
+        return Color.secondary.opacity(0.40)
+    }
+
+    private func bgColor(_ isOn: Bool) -> Color {
+        if isOn && outputEnabled  { return Theme.pink.opacity(0.16) }
+        if isOn && !outputEnabled { return Color.clear }
+        return Color.secondary.opacity(0.08)
+    }
+
+    private func strokeColor(_ isOn: Bool) -> Color {
+        if isOn && outputEnabled  { return Theme.pink.opacity(0.50) }
+        if isOn && !outputEnabled { return Theme.pink.opacity(0.35) }
+        return Color.secondary.opacity(0.14)
+    }
+
+    private func strokeWidth(_ isOn: Bool) -> CGFloat {
+        // Dashed stroke isn't supported here, but thinner outline signals pending
+        isOn && !outputEnabled ? 1.0 : 1.0
     }
 }
 

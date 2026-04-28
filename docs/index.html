@@ -51,6 +51,7 @@
     <main class="main">
       <div class="intro">
         <p>Yamete sits in your menu bar and watches the built-in accelerometer, the microphone, and your AirPods if you're wearing them. When anything feels like a smack, it plays a sound, flashes a face, and posts a reaction. The face has range. The sounds have opinions. The notifications, in the Direct build, have no shame whatsoever.</p>
+        <p>It also watches your USB ports, power adapter, audio peripherals, Bluetooth, Thunderbolt, displays, and sleep/wake — because why react to only one kind of event when you can react to all of them.</p>
         <p>Built because I wanted to. Runs entirely offline, stores nothing, and will not meaningfully improve your life. <em>That's the whole point.</em></p>
       </div>
 
@@ -62,6 +63,10 @@
             <p>Built-in accelerometer, microphone transient detection, and AirPods IMU. A consensus engine fuses them before firing, so a passing truck doesn't make your laptop cry in public.</p>
           </div>
           <div class="feature">
+            <h3>Seven Event Sources</h3>
+            <p>USB attach/detach, power adapter plug/unplug, audio peripheral add/remove, Bluetooth connect/disconnect, Thunderbolt attach/detach, display hotplug, and sleep/wake. Each fires its own reaction with independent output toggles.</p>
+          </div>
+          <div class="feature">
             <h3>Sound Clips With Taste</h3>
             <p>Impact intensity picks the clip. A gentle tap gets a small "mm~". A full send gets something considerably more expressive. Both the volume and the clip pool are yours to tune.</p>
           </div>
@@ -71,7 +76,15 @@
           </div>
           <div class="feature">
             <h3>Flash Mode</h3>
-            <p>Off, full-screen overlay, or notification banner. The overlay is exactly as dramatic as it sounds. The notification is more deniable. Pick whichever keeps your job.</p>
+            <p>Full-screen overlay with a radial gradient reaction face. The overlay is exactly as dramatic as it sounds. Toggle it off if your job depends on it. The face in the menu bar still reacts either way.</p>
+          </div>
+          <div class="feature">
+            <h3>LED Flash</h3>
+            <p>The Caps Lock LED flickers and the keyboard backlight springs through a damped animation on every reaction. Separate toggles for each, configurable brightness range. No extra entitlements required.</p>
+          </div>
+          <div class="feature">
+            <h3>Per-Reaction Output Matrix</h3>
+            <p>Every output (sound, screen flash, notification, LED) has an independent per-event toggle. Sound on USB attach, LED flash on AC unplug, notification on display reconfiguration — fully orthogonal, fully yours.</p>
           </div>
           <div class="feature">
             <h3>40 Languages</h3>
@@ -79,7 +92,7 @@
           </div>
           <div class="feature">
             <h3>Knobs For Days</h3>
-            <p>Sensitivity, volume, flash opacity, per-sensor gate tuning (spike, crest, rise rate, confirmations), cooldown debounce. Dial it in until it knows you better than you know yourself.</p>
+            <p>Sensitivity, volume, flash opacity, LED brightness, per-sensor gate tuning (spike, crest, rise rate, confirmations), cooldown debounce. Dial it in until it knows you better than you know yourself.</p>
           </div>
         </div>
       </section>
@@ -93,7 +106,9 @@
 
       <section id="how-it-works">
         <h2>How it works</h2>
-        <p>Each sensor runs its own detection pipeline. Raw samples pass through bandpass filtering and a six-gate analysis: spike threshold, rise rate, crest factor, confirmation count, warmup, cooldown. When enough sensors agree within a time window, Yamete fires a sound clip and triggers the visual response, both scaled to impact intensity.</p>
+        <p>All events — impacts and system notifications alike — flow through a single <code>ReactionBus</code>. Impact sensors each run their own detection pipeline: raw samples pass through bandpass filtering and a six-gate analysis (spike threshold, rise rate, crest factor, confirmation count, warmup, cooldown). When enough sensors agree within a time window, the fused impact publishes onto the bus.</p>
+        <p>Seven IOKit and CoreAudio event sources subscribe to system notifications for USB, power, audio, Bluetooth, Thunderbolt, display, and sleep/wake and publish onto the same bus. Before any output sees a reaction, the bus stamps it once with a clip duration and face selection — so sound, screen flash, LED, and notification all see the same pre-selected face and audio clip, keeping every response in sync regardless of how many outputs are active.</p>
+        <p>Outputs subscribe independently and filter by their per-reaction toggle matrix. A reaction that has LED and sound enabled but flash disabled produces a pulse and a clip, and nothing on screen.</p>
         <p>It's a menu bar app (<code>LSUIElement</code>). No Dock icon, no app windows, no onboarding wizard asking how you heard about it. All controls live in the menu bar dropdown, because some of us have standards.</p>
       </section>
 
@@ -112,7 +127,7 @@
           <li>Any Mac with a microphone for the sound-based path, which works everywhere</li>
           <li>AirPods Pro or Beats for headphone motion (optional, but it's deeply silly and therefore recommended)</li>
         </ul>
-        <p style="margin-top: 0.6rem;">On an Intel Mac, iMac, Mac Mini, Mac Studio, or Mac Pro: microphone detection works fine. You just can't physically smack the laptop, on account of not having a laptop. Life finds a way.</p>
+        <p style="margin-top: 0.6rem;">On an Intel Mac, iMac, Mac Mini, Mac Studio, or Mac Pro: microphone detection works fine. USB, power, audio, Bluetooth, Thunderbolt, display, and sleep/wake events work on every Mac. You just can't physically smack the laptop, on account of not having a laptop. Life finds a way.</p>
       </section>
 
       <section id="two-builds">
@@ -122,7 +137,7 @@
           <li><strong>Yamete</strong>: the Mac App Store build, rated 12+, with tame notification copy ("Mm, again?", "Show off~", "OUCH"). Plausibly deniable in most workplaces.</li>
           <li><strong>Yamete Direct</strong>: a notarized direct download with considerably spicier notifications. Not submitted to the App Store. For consenting adults who specifically wanted that.</li>
         </ul>
-        <p style="margin-top: 0.6rem;">Same detection engine, same sounds, same face library, same 40 locales in both. The only difference is what your Mac says about it.</p>
+        <p style="margin-top: 0.6rem;">Same detection engine, same event sources, same sounds, same face library, same 40 locales in both. The only difference is what your Mac says about it.</p>
       </section>
 
       <section id="accelerometer">

@@ -1,8 +1,9 @@
 import XCTest
+@preconcurrency import AVFoundation
 @testable import SensorKit
 @testable import YameteCore
 
-/// Lifecycle tests for `MicrophoneAdapter`. Verifies the AVAudioEngine
+/// Lifecycle tests for `MicrophoneSource`. Verifies the AVAudioEngine
 /// tap install / remove cycle terminates cleanly under open / cancel,
 /// repeated open-close, mid-stream cancellation, and typed-error
 /// propagation when the engine cannot start.
@@ -22,14 +23,14 @@ import XCTest
 /// What's NOT observable (and therefore not asserted):
 ///   - The internal state of `OnceCleanup` (private).
 ///   - Whether specific samples arrive (hardware-dependent).
-final class MicrophoneAdapterLifecycleTests: XCTestCase {
+final class MicrophoneSourceLifecycleTests: XCTestCase {
 
     /// Open the impacts stream, cancel the consuming task immediately,
     /// and verify teardown completes without crashing. The
     /// `onTermination` closure must run `removeTap` + `engine.stop()`
     /// via `OnceCleanup` regardless of whether any sample arrived.
     func testOpenCloseSymmetry() async throws {
-        let adapter = MicrophoneAdapter()
+        let adapter = MicrophoneSource()
         try XCTSkipUnless(adapter.isAvailable, "microphone unavailable")
 
         let task = Task<Void, Error> {
@@ -51,7 +52,7 @@ final class MicrophoneAdapterLifecycleTests: XCTestCase {
     /// double-teardown via a crash / runtime warning rather than an
     /// explicit assertion (those are fatal, so absence is the signal).
     func testRepeatedOpenCloseNoLeak() async throws {
-        let adapter = MicrophoneAdapter()
+        let adapter = MicrophoneSource()
         try XCTSkipUnless(adapter.isAvailable, "microphone unavailable")
 
         let cycles = 5
@@ -77,7 +78,7 @@ final class MicrophoneAdapterLifecycleTests: XCTestCase {
     /// so a tap buffer or two can fire, then cancel. The consuming
     /// task must complete — a stuck stream would hang this test.
     func testCancellationDuringStream() async throws {
-        let adapter = MicrophoneAdapter()
+        let adapter = MicrophoneSource()
         try XCTSkipUnless(adapter.isAvailable, "microphone unavailable")
 
         let task = Task<Int, Error> {
@@ -94,46 +95,94 @@ final class MicrophoneAdapterLifecycleTests: XCTestCase {
         XCTAssertNotNil(count, "stream task terminated (possibly 0 samples)")
     }
 
-    /// If `AVAudioEngine.start()` fails — commonly because microphone
-    /// access is denied in the test environment — the adapter MUST
-    /// surface a typed `SensorError` on the first `try await`, not
-    /// swallow the error or hang. When the engine starts successfully
-    /// we can't force the failure path without mocking, so we skip.
+    /// If `AVAudioEngine.start()` fails the adapter MUST surface a
+    /// typed `SensorError.permissionDenied` on the first `try await`
+    /// rather than hang or swallow the error. Driven via a mock
+    /// engine driver so the failure path is deterministic.
+    ///
+    /// Matrix-converted: loops over multiple start-failure error types so
+    /// the adapter's error mapping is exhaustive. (`start-fails / mid-tap-
+    /// fails / restart-fails` from the original plan reduces to start-fails
+    /// here because the underlying engine driver only models a start
+    /// failure — adding the other two would require new mock surface area.)
     func testEngineErrorPropagates() async throws {
-        let adapter = MicrophoneAdapter()
+        struct Cell {
+            let label: String
+            let injectedError: Error
+        }
+        let cells: [Cell] = [
+            Cell(label: "engineStartFailed", injectedError: MockSensorError.engineStartFailed),
+            Cell(label: "midstreamFailure",  injectedError: MockSensorError.streamMidstreamFailure),
+        ]
 
-        // Consume at most one result from the stream with a time bound.
-        // If permission is denied, `continuation.finish(throwing:)` fires
-        // immediately and the for-await rethrows. If the engine starts
-        // fine we won't see a throw — skip in that case.
-        let probe = Task<SensorError?, Never> {
-            do {
-                for try await _ in adapter.impacts() {
+        for cell in cells {
+            let mock = MockMicrophoneEngineDriver()
+            mock.shouldFailStart = true
+            mock.startError = cell.injectedError
+            let adapter = MicrophoneSource(
+                detectorConfig: .microphone(),
+                driverFactory: { mock },
+                availabilityOverride: { true }
+            )
+
+            let probe = Task<SensorError?, Never> {
+                do {
+                    for try await _ in adapter.impacts() {
+                        return nil
+                    }
+                    return nil
+                } catch let error as SensorError {
+                    return error
+                } catch {
+                    XCTFail("[\(cell.label)] expected SensorError, got \(type(of: error)): \(error)")
                     return nil
                 }
-                return nil
-            } catch let error as SensorError {
-                return error
-            } catch {
-                XCTFail("expected SensorError, got \(type(of: error)): \(error)")
-                return nil
             }
-        }
 
-        // Bound the probe so we don't hang on a healthy engine.
-        try? await Task.sleep(for: .milliseconds(200))
-        probe.cancel()
-        let result = await probe.value
+            try? await Task.sleep(for: .milliseconds(100))
+            probe.cancel()
+            let result = await probe.value
 
-        guard let surfaced = result else {
-            throw XCTSkip("engine started successfully; cannot observe error path without mocks")
+            guard let surfaced = result else {
+                XCTFail("[\(cell.label)] expected the adapter to surface a SensorError when driver.start() throws")
+                continue
+            }
+            if case .permissionDenied = surfaced {
+                XCTAssertTrue(true, "[\(cell.label)] engine failure surfaced as SensorError.permissionDenied")
+            } else {
+                XCTFail("[\(cell.label)] expected SensorError.permissionDenied, got \(surfaced)")
+            }
+
+            // Tap-leak guard: a failed start must remove the tap so the
+            // node isn't left in an undefined state.
+            XCTAssertEqual(mock.installTapCalls, 1, "[\(cell.label)] tap must be installed exactly once")
+            XCTAssertEqual(mock.removeTapCalls,  1, "[\(cell.label)] tap must be removed exactly once")
         }
-        // The adapter collapses any engine-start failure onto
-        // `.permissionDenied` — see MicrophoneAdapter.impacts() catch.
-        if case .permissionDenied = surfaced {
-            XCTAssertTrue(true, "engine failure surfaced as SensorError.permissionDenied")
-        } else {
-            XCTFail("expected SensorError.permissionDenied, got \(surfaced)")
+    }
+
+    /// Successful start path: the driver's start is called, a tap is
+    /// installed, and synthesized PCM buffers driven through the mock
+    /// reach the detector. Verifies the integration without real audio.
+    func testSuccessfulStartInstallsTapAndStarts() async throws {
+        let mock = MockMicrophoneEngineDriver()
+        let adapter = MicrophoneSource(
+            detectorConfig: .microphone(),
+            driverFactory: { mock },
+            availabilityOverride: { true }
+        )
+        let stream = adapter.impacts()
+
+        let task = Task<Void, Error> {
+            for try await _ in stream {}
         }
+        try? await Task.sleep(for: .milliseconds(30))
+        task.cancel()
+        _ = try? await task.value
+        try? await Task.sleep(for: .milliseconds(20))
+
+        XCTAssertEqual(mock.startCalls,         1, "driver started exactly once")
+        XCTAssertEqual(mock.installTapCalls,    1, "tap installed exactly once")
+        XCTAssertGreaterThanOrEqual(mock.stopCalls,    1, "driver stopped on stream cancellation")
+        XCTAssertGreaterThanOrEqual(mock.removeTapCalls, 1, "tap removed on stream cancellation")
     }
 }

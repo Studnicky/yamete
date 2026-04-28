@@ -6,6 +6,8 @@ extension Notification.Name {
     /// can refresh device lists and other volatile state (mirrors the per-open
     /// `onAppear` behavior of `MenuBarExtra`).
     static let menuBarPanelDidShow = Notification.Name("menuBarPanelDidShow")
+    /// Posted when the SwiftUI content tree changes height (accordion expand/collapse).
+    static let menuBarContentSizeChanged = Notification.Name("menuBarContentSizeChanged")
 }
 
 /// Owns the NSStatusItem and its popover panel.
@@ -20,12 +22,14 @@ final class StatusBarController {
     private let statusItem: NSStatusItem
     private let panel: MenuBarPanel
     private var monitor: Any?
-    private let controller: ImpactController
+    private let yamete: Yamete
     private let templateIcon: NSImage?
+    private var currentScreenFrame: NSRect = NSRect(x: 0, y: 0, width: 1280, height: 800)
+    nonisolated(unsafe) private var contentSizeObserver: (any NSObjectProtocol)?
 
-    init(settings: SettingsStore, controller: ImpactController, updater: Updater) {
+    init(settings: SettingsStore, yamete: Yamete, updater: Updater) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        self.controller = controller
+        self.yamete = yamete
 
         templateIcon = {
             guard let path = Bundle.main.path(forResource: "menubar_icon", ofType: "png"),
@@ -39,7 +43,8 @@ final class StatusBarController {
         panel = MenuBarPanel(
             contentView: MenuBarView()
                 .environment(settings)
-                .environment(controller)
+                .environment(yamete)
+                .environment(yamete.menuBarFace)
                 .environment(updater)
         )
         panel.onDismiss = { [weak self] in self?.removeMonitor() }
@@ -50,9 +55,22 @@ final class StatusBarController {
 
         applyIcon()
         observeIcon()
+
+        // Block-based observer — StatusBarController is not an NSObject subclass so
+        // selector-based addObserver silently drops the call.
+        contentSizeObserver = NotificationCenter.default.addObserver(
+            forName: .menuBarContentSizeChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let h = (notification.object as? NSNumber).map { CGFloat($0.doubleValue) }
+            Task { @MainActor [weak self] in self?.applyContentHeight(h) }
+        }
     }
 
     deinit {
+        if let obs = contentSizeObserver { NotificationCenter.default.removeObserver(obs) }
+        NotificationCenter.default.removeObserver(self)
         removeMonitor()
     }
 
@@ -60,19 +78,19 @@ final class StatusBarController {
 
     private func applyIcon() {
         guard let button = statusItem.button else { return }
-        if let face = controller.reactionFace {
+        if let face = yamete.menuBarFace.reactionFace {
             button.image = face
             button.alphaValue = 1.0
         } else {
             button.image = templateIcon
-            button.alphaValue = controller.isEnabled ? 1.0 : 0.4
+            button.alphaValue = yamete.fusion.isRunning ? 1.0 : 0.4
         }
     }
 
     private func observeIcon() {
         withObservationTracking {
-            _ = controller.reactionFace
-            _ = controller.isEnabled
+            _ = yamete.menuBarFace.reactionFace
+            _ = yamete.fusion.isRunning
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -105,15 +123,39 @@ final class StatusBarController {
         Task { @MainActor [weak self] in
             await Task.yield()
             guard let self else { return }
-            self.panel.sizeToContent()
 
             let buttonRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
-            let panelWidth = self.panel.frame.width
-            let x = buttonRect.midX - panelWidth / 2
-            let y = buttonRect.minY - self.panel.frame.height
+            // Find the button's screen BEFORE sizing so we can pass the correct
+            // height cap — NSScreen.main may be a different (larger) display.
+            let buttonScreen = NSScreen.screens.first(where: {
+                $0.frame.contains(buttonRect.origin)
+            }) ?? NSScreen.main ?? NSScreen.screens.first
+            let screenFrame = buttonScreen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+            self.currentScreenFrame = screenFrame
+            // Cap panel height to available space on this screen (40pt margin below menu bar).
+            let maxPanelH = screenFrame.height - 40
+            self.panel.sizeToContent(maxHeight: maxPanelH)
 
-            self.panel.setFrameOrigin(NSPoint(x: x, y: y))
+            let panelSize = self.panel.frame.size
+
+            // Centre horizontally on the status item, then clamp to screen edges.
+            let rawX = buttonRect.midX - panelSize.width / 2
+            let clampedX = max(screenFrame.minX + 4, min(rawX, screenFrame.maxX - panelSize.width - 4))
+            // Position below menu bar button; if panel is taller than space below, flip above.
+            let rawY = buttonRect.minY - panelSize.height
+            let clampedY = max(screenFrame.minY + 4, rawY)
+
+            self.panel.setFrameOrigin(NSPoint(x: clampedX, y: clampedY))
             self.panel.makeKeyAndOrderFront(nil)
+
+            // Second sizing pass: intrinsicContentSize may not reflect the final
+            // SwiftUI layout until after the first render frame. Re-size after one
+            // more yield so the panel snaps to content height on open.
+            Task { @MainActor [weak self] in
+                await Task.yield()
+                await Task.yield()
+                self?.applyContentHeight(nil)
+            }
         }
 
         installMonitor()
@@ -122,6 +164,38 @@ final class StatusBarController {
     private func dismissPanel() {
         panel.orderOut(nil)
         removeMonitor()
+    }
+
+    private func applyContentHeight(_ naturalH: CGFloat?) {
+        guard panel.isVisible else { return }
+        let maxH = currentScreenFrame.height - 40
+        let previousTop = panel.frame.maxY
+        let targetH: CGFloat
+        if let naturalH, naturalH > 0 {
+            targetH = min(naturalH, maxH)
+        } else {
+            // Fallback: query the hosting view directly
+            let ideal = panel.intrinsicNaturalHeight()
+            targetH = ideal == 0 ? panel.frame.height : min(ideal, maxH)
+        }
+        // Anchor the top edge: bottom-left origin Y = (top constant) - new height.
+        // setFrame(_:display:animate:) uses NSWindow's built-in animator, matched
+        // to the SwiftUI accordion animation (~0.22s easeOut) so resize and
+        // content reveal happen together without a visible frame snap.
+        let newY = max(currentScreenFrame.minY + 4, previousTop - targetH)
+        let newFrame = NSRect(x: panel.frame.origin.x, y: newY,
+                              width: panel.frame.width, height: targetH)
+        // Animate only if the change is small enough to feel like a UI animation;
+        // big jumps (e.g., open from .zero) snap immediately.
+        if abs(panel.frame.height - targetH) < 200 && panel.frame.height > 0 {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.22
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(newFrame, display: true)
+            }
+        } else {
+            panel.setFrame(newFrame, display: false)
+        }
     }
 
     // MARK: - Outside-click monitor
@@ -193,11 +267,21 @@ private final class MenuBarPanel: NSPanel {
         self.contentView = visualEffect
     }
 
-    /// Sizes the panel frame to the SwiftUI content's intrinsic size.
-    func sizeToContent() {
-        let ideal = hostingView.fittingSize
-        let frame = NSRect(origin: frame.origin, size: ideal)
-        setFrame(frame, display: false)
+    /// Sizes the panel frame to the SwiftUI content's intrinsic size,
+    /// capped to `maxHeight` so it never overflows the screen it lives on.
+    func sizeToContent(maxHeight: CGFloat = .infinity) {
+        // intrinsicContentSize returns SwiftUI's ideal unconstrained size.
+        // fittingSize is constrained by the hosting view's current AutoLayout frame
+        // and returns the panel's current height instead of the content height.
+        let ideal = hostingView.intrinsicContentSize
+        let h = maxHeight == .infinity ? ideal.height : min(ideal.height, maxHeight)
+        setFrame(NSRect(origin: frame.origin, size: CGSize(width: ideal.width, height: h)), display: false)
+    }
+
+    /// Hosting view's intrinsic content height (SwiftUI ideal).
+    /// Used by StatusBarController as a fallback when no notification height value is available.
+    func intrinsicNaturalHeight() -> CGFloat {
+        hostingView.intrinsicContentSize.height
     }
 
     override func cancelOperation(_ sender: Any?) {

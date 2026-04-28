@@ -77,7 +77,7 @@ private let rawScale = AccelHardwareConstants.rawScale
 ///
 /// Activation: IORegistryEntrySetCFProperty on AppleSPUHIDDriver (public function, undocumented driver keys)
 /// Reading: IOHIDManager → IOHIDDeviceRegisterInputReportCallback → bandpass → ImpactDetector
-public final class SPUAccelerometerAdapter: SensorAdapter, Sendable {
+public final class AccelerometerSource: SensorSource, Sendable {
 
     public let id = SensorID.accelerometer
     public let name = "Accelerometer"
@@ -207,9 +207,24 @@ private enum SensorActivation {
             let service = IOIteratorNext(iterator)
             guard service != 0 else { break }
             defer { IOObjectRelease(service) }
+            #if DIRECT_BUILD
+            let kr1 = IORegistryEntrySetCFProperty(service, "ReportInterval" as CFString, 0 as CFNumber)
+            if kr1 != KERN_SUCCESS {
+                log.warning("activity:SensorDeactivate wasInvalidatedBy entity:IORegistry kr=0x\(String(kr1, radix: 16))")
+            }
+            let kr2 = IORegistryEntrySetCFProperty(service, "SensorPropertyReportingState" as CFString, 0 as CFNumber)
+            if kr2 != KERN_SUCCESS {
+                log.warning("activity:SensorDeactivate wasInvalidatedBy entity:IORegistry kr=0x\(String(kr2, radix: 16))")
+            }
+            let kr3 = IORegistryEntrySetCFProperty(service, "SensorPropertyPowerState" as CFString, 0 as CFNumber)
+            if kr3 != KERN_SUCCESS {
+                log.warning("activity:SensorDeactivate wasInvalidatedBy entity:IORegistry kr=0x\(String(kr3, radix: 16))")
+            }
+            #else
             IORegistryEntrySetCFProperty(service, "ReportInterval" as CFString, 0 as CFNumber)
             IORegistryEntrySetCFProperty(service, "SensorPropertyReportingState" as CFString, 0 as CFNumber)
             IORegistryEntrySetCFProperty(service, "SensorPropertyPowerState" as CFString, 0 as CFNumber)
+            #endif
         }
     }
 }
@@ -220,6 +235,8 @@ private enum AccelHardware {
 
     static func isSPUDevicePresent() -> Bool {
         let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
+        guard IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone)) == kIOReturnSuccess else { return false }
+        defer { IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone)) }
         IOHIDManagerSetDeviceMatching(manager, matchingDict)
         guard let devices = IOHIDManagerCopyDevices(manager) else { return false }
         return findSPUDevice(in: devices) != nil
@@ -326,6 +343,13 @@ private enum AccelHardware {
         log.info("entity:AccelDevice wasAssociatedWith agent:\(adapterName)")
 
         let maxSize = IOHIDDeviceGetProperty(device, kIOHIDMaxInputReportSizeKey as CFString) as? Int ?? 64
+        guard maxSize > 0 else {
+            log.error("entity:ReportBuffer wasInvalidatedBy activity:Allocate — maxSize is 0 or invalid")
+            IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
+            IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            continuation.finish(throwing: SensorError.ioKitError(String(format: "0x%08x", kIOReturnInternalError)))
+            return stream
+        }
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxSize)
         buffer.initialize(repeating: 0, count: maxSize)
 
@@ -406,9 +430,13 @@ private enum AccelHardware {
                 // never tries to surfaceStall on a torn-down context.
                 r.watchdog.task.cancel()
 
-                // Phase 1 — silence the report callback. From this point on,
-                // any in-flight HID callback that fires before the run loop
-                // exits is a no-op (running == false).
+                // Phase 1 — silence the report callback. Invalidating the
+                // context sets running = false under the state lock. Any
+                // HID callback that is in-flight at this moment will exit
+                // early at the `guard s.running` check in handleReport,
+                // guaranteeing it produces no further side effects. From
+                // this point on the callback is a documented no-op even
+                // while the HID run loop is still spinning.
                 r.ctx.invalidate()
                 SensorActivation.deactivate()
 
@@ -419,6 +447,27 @@ private enum AccelHardware {
                 // it had scheduled. Without the join, the next phase races
                 // CF data-structure modification (TSAN reports SEGV in
                 // CF_IS_OBJC during a worker-thread CF dispatch).
+                //
+                // Teardown phase ordering contract:
+                //   (1) ctx.invalidate() is called before the HID callback
+                //       is unregistered and before the run loop stops.
+                //       Invalidation is the primary guard: the callback
+                //       checks running == false and returns immediately,
+                //       so no new SensorImpact events are produced after
+                //       Phase 1 regardless of whether a callback fires
+                //       during the join window.
+                //   (2) r.thread.join() is called before ctxPtr.release()
+                //       and before any IOKit/CF handle mutation. The join
+                //       guarantees the HID worker thread has fully exited
+                //       CFRunLoopRunInMode, so no callback can be executing
+                //       when Phase 3 modifies IOHIDManager state.
+                //   (3) No callback can fire after ctxPtr.release() because
+                //       Phase 3 unregisters the callback (nil handler, nil
+                //       context) only after the join, ensuring the C-level
+                //       IOHIDDevice callback pointer is cleared while no
+                //       thread is inside the callback body. The invalidation
+                //       in Phase 1 is the invariant; the nil-registration is
+                //       belt-and-suspenders cleanup for IOKit internal state.
                 r.thread.cancel()
                 CFRunLoopStop(r.iokit.runLoop)
                 r.thread.join()

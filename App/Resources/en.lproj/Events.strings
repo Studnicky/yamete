@@ -1,0 +1,89 @@
+/* Yamete — Event reaction strings (cable / power / device).
+   Loaded by NotificationPhrase from the "Events" table.
+   Format: title_<reaction-kind>_<n> / body_<reaction-kind>_<n>
+   Where reaction-kind matches ReactionKind.rawValue. */
+
+/* USB attach */
+"title_usbAttached_1" = "Hello there~";
+"title_usbAttached_2" = "Plugged in";
+"title_usbAttached_3" = "Mm, that fits";
+"body_usbAttached_1"  = "Something just connected.";
+"body_usbAttached_2"  = "I felt that go in.";
+"body_usbAttached_3"  = "USB device attached.";
+
+/* USB detach */
+"title_usbDetached_1" = "And gone";
+"title_usbDetached_2" = "Pulled out";
+"title_usbDetached_3" = "Mm, where'd you go";
+"body_usbDetached_1"  = "Something disconnected.";
+"body_usbDetached_2"  = "Bye for now.";
+"body_usbDetached_3"  = "USB device removed.";
+
+/* AC power connected */
+"title_acConnected_1" = "Juiced up";
+"title_acConnected_2" = "Plugged into power";
+"title_acConnected_3" = "Charging~";
+"body_acConnected_1"  = "Power adapter connected.";
+"body_acConnected_2"  = "Topping me off.";
+"body_acConnected_3"  = "On the cord again.";
+
+/* AC power disconnected */
+"title_acDisconnected_1" = "Free at last";
+"title_acDisconnected_2" = "Cord pulled";
+"title_acDisconnected_3" = "Running on battery";
+"body_acDisconnected_1"  = "Power adapter disconnected.";
+"body_acDisconnected_2"  = "Going wireless.";
+"body_acDisconnected_3"  = "Untethered.";
+
+/* Audio peripheral attached */
+"title_audioPeripheralAttached_1" = "New ears";
+"title_audioPeripheralAttached_2" = "Sound device added";
+"body_audioPeripheralAttached_1"  = "Audio device connected.";
+"body_audioPeripheralAttached_2"  = "Now we can listen.";
+
+/* Audio peripheral detached */
+"title_audioPeripheralDetached_1" = "Sound off";
+"title_audioPeripheralDetached_2" = "Audio gone";
+"body_audioPeripheralDetached_1"  = "Audio device disconnected.";
+"body_audioPeripheralDetached_2"  = "Quieter now.";
+
+/* Bluetooth connected */
+"title_bluetoothConnected_1" = "Paired up";
+"title_bluetoothConnected_2" = "Bluetooth in";
+"body_bluetoothConnected_1"  = "Bluetooth device connected.";
+"body_bluetoothConnected_2"  = "We're linked.";
+
+/* Bluetooth disconnected */
+"title_bluetoothDisconnected_1" = "Disconnected";
+"title_bluetoothDisconnected_2" = "Bluetooth gone";
+"body_bluetoothDisconnected_1"  = "Bluetooth device disconnected.";
+"body_bluetoothDisconnected_2"  = "We're not linked anymore.";
+
+/* Thunderbolt attached */
+"title_thunderboltAttached_1" = "Big plug";
+"title_thunderboltAttached_2" = "Thunderbolt in";
+"body_thunderboltAttached_1"  = "Thunderbolt device connected.";
+"body_thunderboltAttached_2"  = "That's a chunky one.";
+
+/* Thunderbolt detached */
+"title_thunderboltDetached_1" = "Thunderbolt gone";
+"title_thunderboltDetached_2" = "Pulled the bolt";
+"body_thunderboltDetached_1"  = "Thunderbolt device disconnected.";
+
+/* Display reconfiguration */
+"title_displayConfigured_1" = "New view";
+"title_displayConfigured_2" = "Screens shuffled";
+"body_displayConfigured_1"  = "Display configuration changed.";
+"body_displayConfigured_2"  = "Pixels rearranged.";
+
+/* Will sleep */
+"title_willSleep_1" = "Goodnight~";
+"title_willSleep_2" = "Going to sleep";
+"body_willSleep_1"  = "Sweet dreams.";
+"body_willSleep_2"  = "See you when I wake up.";
+
+/* Did wake */
+"title_didWake_1" = "Good morning";
+"title_didWake_2" = "Mmm, awake";
+"body_didWake_1"  = "Welcome back.";
+"body_didWake_2"  = "Did you miss me?";

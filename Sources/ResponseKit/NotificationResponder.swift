@@ -8,95 +8,108 @@ import os
 private let notificationLog = AppLog(category: "NotificationResponder")
 
 /// Presents impact reactions as user notifications instead of full-screen overlays.
+///
+/// Hardware boundary: `SystemNotificationDriver`. Default initializer wires a
+/// `RealSystemNotificationDriver` (UNUserNotificationCenter). Tests inject a
+/// mock that records every post + lets a test stage authorization status.
 @MainActor
-public final class NotificationResponder: VisualResponder {
+public final class NotificationResponder: ReactiveOutput {
     private static let notificationID = "yamete-impact-response"
     private static let threadID = "yamete-impact-thread"
 
-    private var cleanupTask: Task<Void, Never>?
+    private let driver: SystemNotificationDriver
 
     /// Resolves the locale identifier used for notification body strings on
     /// every post. A closure (not a stored string) so settings changes are
     /// reflected on the next impact without rebuilding the responder.
     private let localeProvider: @MainActor () -> String
 
-    public init(localeProvider: @escaping @MainActor () -> String = { Bundle.main.preferredLocalizations.first ?? "en" }) {
+    public convenience init(localeProvider: @escaping @MainActor () -> String = { Bundle.main.preferredLocalizations.first ?? "en" }) {
+        self.init(driver: RealSystemNotificationDriver(), localeProvider: localeProvider)
+    }
+
+    public init(driver: SystemNotificationDriver,
+                localeProvider: @escaping @MainActor () -> String = { Bundle.main.preferredLocalizations.first ?? "en" }) {
+        self.driver = driver
         self.localeProvider = localeProvider
+        super.init()
     }
 
-    public static func requestAuthorizationIfNeeded() {
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            guard settings.authorizationStatus == .notDetermined else { return }
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-                if let error {
-                    notificationLog.error("activity:NotificationPermission wasInvalidatedBy entity:AuthorizationRequest — \(error.localizedDescription)")
-                    return
-                }
-                notificationLog.info("activity:NotificationPermission wasGeneratedBy entity:AuthorizationRequest granted=\(granted)")
-            }
+    // MARK: - ReactiveOutput lifecycle
+
+    override public func shouldFire(_ fired: FiredReaction, provider: OutputConfigProvider) -> Bool {
+        let c = provider.notificationConfig()
+        return c.enabled && c.perReaction[fired.kind] != false
+    }
+
+    override public func action(_ fired: FiredReaction, multiplier: Float, provider: OutputConfigProvider) async {
+        let config = provider.notificationConfig()
+        await postReaction(fired.reaction, dismissAfter: config.dismissAfter)
+        try? await Task.sleep(for: .seconds(max(0.1, config.dismissAfter)))
+    }
+
+    override public func postAction(_ fired: FiredReaction, multiplier: Float, provider: OutputConfigProvider) async {
+        driver.remove(identifier: Self.notificationID)
+    }
+
+    override public func reset() {
+        driver.remove(identifier: Self.notificationID)
+    }
+
+    private func postReaction(_ reaction: Reaction, dismissAfter: Double) async {
+        await requestAuthorizationIfNeeded()
+        let auth = await driver.currentAuthorization()
+        switch auth {
+        case .authorized, .provisional, .ephemeral:
+            await postNotification(reaction: reaction, dismissAfter: dismissAfter)
+        case .denied:
+            notificationLog.warning("activity:NotificationDelivery wasInvalidatedBy entity:NotificationPermission status=denied")
+        case .notDetermined:
+            notificationLog.info("activity:NotificationDelivery isPendingOn entity:NotificationPermission")
+        case .unknown:
+            notificationLog.warning("activity:NotificationDelivery wasInvalidatedBy entity:NotificationPermission status=unknown")
         }
     }
 
-    public func flash(intensity: Float, opacityMin _: Float, opacityMax _: Float, clipDuration _: Double, dismissAfter: Double, enabledDisplayIDs _: [Int]) {
-        Self.requestAuthorizationIfNeeded()
-
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { [weak self] settings in
-            guard let self else { return }
-
-            switch settings.authorizationStatus {
-            case .authorized, .provisional, .ephemeral:
-                Task { @MainActor in
-                    await self.postNotification(intensity: intensity, dismissAfter: dismissAfter)
-                }
-            case .denied:
-                notificationLog.warning("activity:NotificationDelivery wasInvalidatedBy entity:NotificationPermission status=denied")
-            case .notDetermined:
-                notificationLog.info("activity:NotificationDelivery isPendingOn entity:NotificationPermission")
-            @unknown default:
-                notificationLog.warning("activity:NotificationDelivery wasInvalidatedBy entity:NotificationPermission status=unknown")
-            }
-        }
-    }
-
-    private func postNotification(intensity: Float, dismissAfter: Double) async {
-        let center = UNUserNotificationCenter.current()
-        let identifier = Self.notificationID
-        let tier = ImpactTier.from(intensity: intensity)
-
-        // Single source of truth for the whole notification: resolve once to
-        // a locale that has BOTH title and moan pools, then pass that same
-        // localeID to both phrase lookups. Prevents the "English title +
-        // French body" mismatch when a locale has moans but not yet titles.
-        let localeID = NotificationPhrase.resolveLocale(preferred: localeProvider(), for: tier)
-
-        let content = UNMutableNotificationContent()
-        content.title = NotificationPhrase.title(for: tier, localeID: localeID)
-        content.body = NotificationPhrase.moan(for: tier, localeID: localeID)
-        content.threadIdentifier = Self.threadID
-        content.categoryIdentifier = Self.threadID
-        content.sound = nil
-
-        center.removePendingNotificationRequests(withIdentifiers: [identifier])
-        center.removeDeliveredNotifications(withIdentifiers: [identifier])
-
+    private func postNotification(reaction: Reaction, dismissAfter: Double) async {
+        let phrasing = NotificationPhrase.phrasing(for: reaction, preferredLocale: localeProvider())
+        let content = NotificationContent(
+            title: phrasing.title,
+            body: phrasing.body,
+            threadID: Self.threadID,
+            categoryID: Self.threadID,
+            // macOS suppresses passive notifications when the app is active or under Focus.
+            // .active forces banner display regardless. relevanceScore biases sort order so
+            // multiple rapid reactions don't get coalesced/hidden in Notification Center.
+            interruptionLevel: .active,
+            relevanceScore: 1.0
+        )
         do {
-            try await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
-            notificationLog.info("activity:NotificationDelivery wasStartedBy entity:ImpactNotification tier=\(tier)")
+            try await driver.post(content: content, identifier: Self.notificationID)
+            notificationLog.info("activity:NotificationDelivery wasStartedBy entity:ReactionNotification kind=\(reaction.kind.rawValue)")
         } catch {
-            notificationLog.error("activity:NotificationDelivery wasInvalidatedBy entity:ImpactNotification — \(error.localizedDescription)")
-            return
-        }
-
-        cleanupTask?.cancel()
-        cleanupTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(max(0.1, dismissAfter)))
-            guard !Task.isCancelled else { return }
-            center.removeDeliveredNotifications(withIdentifiers: [identifier])
-            center.removePendingNotificationRequests(withIdentifiers: [identifier])
-            notificationLog.info("activity:NotificationDelivery wasEndedBy entity:ImpactNotification")
+            notificationLog.error("activity:NotificationDelivery wasInvalidatedBy entity:ReactionNotification — \(error.localizedDescription)")
         }
     }
+
+    private func requestAuthorizationIfNeeded() async {
+        let auth = await driver.currentAuthorization()
+        guard auth == .notDetermined else { return }
+        let granted = await driver.requestAuthorization()
+        notificationLog.info("activity:NotificationPermission wasGeneratedBy entity:AuthorizationRequest granted=\(granted)")
+    }
+
+    /// Convenience for non-test callers (`Yamete.bootstrap`) that just want to
+    /// kick the system permission dialog at launch on a fresh install.
+    public static func requestAuthorizationIfNeeded() {
+        Task { @MainActor in
+            let driver = RealSystemNotificationDriver()
+            let auth = await driver.currentAuthorization()
+            guard auth == .notDetermined else { return }
+            _ = await driver.requestAuthorization()
+        }
+    }
+
 }
 
 // MARK: - Notification phrase variants
@@ -116,7 +129,67 @@ public final class NotificationResponder: VisualResponder {
 enum NotificationPhrase {
     /// Cache: localeID → "title_tap" → ["Mm, again?", "Tease~", ...]
     private static let cache = OSAllocatedUnfairLock<[String: [String: [String]]]>(initialState: [:])
+    /// Separate cache for `Events.strings` so impact-pool clears don't blow
+    /// it away (and vice-versa).
+    private static let eventCache = OSAllocatedUnfairLock<[String: [String: [String]]]>(initialState: [:])
     private static let fallbackLocaleID = "en"
+
+    /// Returns the (title, body) pair for any reaction. Impacts route through
+    /// the existing tier-based moan pools; events route through the
+    /// `Events.strings` table keyed by reaction kind.
+    static func phrasing(for reaction: Reaction, preferredLocale: String) -> (title: String, body: String) {
+        if case .impact(let fused) = reaction {
+            let tier = ImpactTier.from(intensity: fused.intensity)
+            let localeID = resolveLocale(preferred: preferredLocale, for: tier)
+            return (title: title(for: tier, localeID: localeID),
+                    body:  moan(for: tier, localeID: localeID))
+        }
+        return eventPhrasing(kind: reaction.kind, preferredLocale: preferredLocale)
+    }
+
+    static func eventPhrasing(kind: ReactionKind, preferredLocale: String) -> (title: String, body: String) {
+        let key = kind.rawValue
+        let preferredPools = eventPools(for: preferredLocale)
+        let preferredTitle = preferredPools["title_\(key)"]?.randomElement()
+        let preferredBody = preferredPools["body_\(key)"]?.randomElement()
+        if let preferredTitle, let preferredBody {
+            return (preferredTitle, preferredBody)
+        }
+        let fallbackPools = eventPools(for: fallbackLocaleID)
+        return (
+            title: preferredTitle ?? fallbackPools["title_\(key)"]?.randomElement() ?? key,
+            body:  preferredBody  ?? fallbackPools["body_\(key)"]?.randomElement() ?? ""
+        )
+    }
+
+    private static func eventPools(for localeID: String) -> [String: [String]] {
+        eventCache.withLock { cache in
+            if let cached = cache[localeID] { return cached }
+            let loaded = loadEventPools(localeID: localeID)
+            cache[localeID] = loaded
+            return loaded
+        }
+    }
+
+    /// Parses `Events.strings` for a locale into `title_<kind>` /
+    /// `body_<kind>` arrays. Same numbered-suffix convention as `Moans.strings`.
+    private static func loadEventPools(localeID: String) -> [String: [String]] {
+        guard let lprojPath = Bundle.main.path(forResource: localeID, ofType: "lproj"),
+              let stringsPath = Bundle(path: lprojPath)?.path(forResource: "Events", ofType: "strings"),
+              let dict = NSDictionary(contentsOfFile: stringsPath) as? [String: String]
+        else { return [:] }
+        var pools: [String: [String]] = [:]
+        for (key, value) in dict {
+            let parts = key.split(separator: "_")
+            guard parts.count == 3,
+                  parts[0] == "title" || parts[0] == "body",
+                  Int(parts[2]) != nil
+            else { continue }
+            let group = "\(parts[0])_\(parts[1])"
+            pools[group, default: []].append(value)
+        }
+        return pools
+    }
 
     /// Resolves a preferred locale to one that has BOTH `title_<tier>` and
     /// `moan_<tier>` pools populated. Falls back to `en` if either pool is
@@ -203,8 +276,16 @@ enum NotificationPhrase {
         cache.withLock { cache in cache[localeID] = pools }
     }
 
+    /// Injects a pre-built event-pool dictionary for a locale, bypassing the
+    /// `Events.strings` loader. Mirrors `_testInject` but for the separate
+    /// event cache used by non-impact reactions.
+    static func _testInjectEvents(pools: [String: [String]], for localeID: String) {
+        eventCache.withLock { cache in cache[localeID] = pools }
+    }
+
     /// Clears the pool cache so tests don't leak state across runs.
     static func _testClear() {
         cache.withLock { cache in cache.removeAll() }
+        eventCache.withLock { cache in cache.removeAll() }
     }
 }

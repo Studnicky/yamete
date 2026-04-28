@@ -16,6 +16,10 @@ private let log = AppLog(category: "Microphone")
 // Works on all Macs (not just Apple Silicon). Requires microphone permission
 // (com.apple.security.device.audio-input entitlement under App Sandbox).
 //
+// Hardware boundary: `MicrophoneEngineDriver`. The default factory creates a
+// `RealMicrophoneEngineDriver` (AVAudioEngine-backed). Tests inject a mock
+// driver factory that returns a recording stub.
+//
 // Public API documentation:
 //   https://developer.apple.com/documentation/avfaudio/avaudioengine
 //   https://developer.apple.com/documentation/avfaudio/avaudioinputnode
@@ -24,7 +28,7 @@ private let log = AppLog(category: "Microphone")
 
 /// Detects impact transients via microphone audio using AVAudioEngine.
 /// Works on all Macs. Requires microphone permission (audio-input entitlement).
-public final class MicrophoneAdapter: SensorAdapter, Sendable {
+public final class MicrophoneSource: SensorSource, @unchecked Sendable {
 
     public let id = SensorID.microphone
     public let name = "Microphone"
@@ -33,12 +37,40 @@ public final class MicrophoneAdapter: SensorAdapter, Sendable {
     /// Floor: quiet ambient (~0.005). Ceiling: firm desk slap (~0.300).
     public let detectorConfig: ImpactDetectorConfig
 
-    public init(detectorConfig: ImpactDetectorConfig = .microphone()) {
+    /// Driver factory. Each `impacts()` call requests a fresh driver
+    /// because AVAudioEngine instances are not reliably reusable
+    /// across stop+restart cycles on every macOS version. Default
+    /// produces a `RealMicrophoneEngineDriver`. Tests substitute a
+    /// closure that returns a mock.
+    private let driverFactory: @Sendable () -> MicrophoneEngineDriver
+
+    /// Optional availability override. When `nil` the adapter falls
+    /// back to `AVCaptureDevice.default(for: .audio)`. Tests inject a
+    /// constant via this hook so `isAvailable` can be controlled
+    /// without touching real audio hardware.
+    private let availabilityOverride: (@Sendable () -> Bool)?
+
+    public convenience init(detectorConfig: ImpactDetectorConfig = .microphone()) {
+        self.init(
+            detectorConfig: detectorConfig,
+            driverFactory: { RealMicrophoneEngineDriver() },
+            availabilityOverride: nil
+        )
+    }
+
+    public init(
+        detectorConfig: ImpactDetectorConfig = .microphone(),
+        driverFactory: @escaping @Sendable () -> MicrophoneEngineDriver,
+        availabilityOverride: (@Sendable () -> Bool)? = nil
+    ) {
         self.detectorConfig = detectorConfig
+        self.driverFactory = driverFactory
+        self.availabilityOverride = availabilityOverride
     }
 
     public var isAvailable: Bool {
-        AVCaptureDevice.default(for: .audio) != nil
+        if let availabilityOverride { return availabilityOverride() }
+        return AVCaptureDevice.default(for: .audio) != nil
     }
 
     public func impacts() -> AsyncThrowingStream<SensorImpact, Error> {
@@ -46,9 +78,8 @@ public final class MicrophoneAdapter: SensorAdapter, Sendable {
         let adapterID = self.id
         let detector = ImpactDetector(config: detectorConfig, adapterName: name)
 
-        let engine = AVAudioEngine()
-        let inputNode = engine.inputNode
-        let format = inputNode.outputFormat(forBus: 0)
+        let driver = driverFactory()
+        let format = driver.inputFormat
 
         // Input format validity gate. A freshly-constructed AVAudioEngine on
         // a host with no real audio input (headless CI runner, container,
@@ -63,13 +94,11 @@ public final class MicrophoneAdapter: SensorAdapter, Sendable {
             return stream
         }
 
-        let bufferSize = AVAudioFrameCount(format.sampleRate / Detection.Mic.targetHz)
-
-        var prevRaw: Float = 0
-        var prevFiltered: Float = 0
+        // Per-stream filter state captured by the tap handler.
+        let filterState = FilterState()
         let hpAlpha = Detection.Mic.hpAlpha
 
-        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: format) { buffer, _ in
+        driver.installTap { buffer in
             guard let channelData = buffer.floatChannelData?[0] else { return }
             let frameLength = Int(buffer.frameLength)
             guard frameLength > 0 else { return }
@@ -81,10 +110,7 @@ public final class MicrophoneAdapter: SensorAdapter, Sendable {
             }
 
             // DC-blocking high-pass
-            let filtered = hpAlpha * (prevFiltered + peak - prevRaw)
-            prevRaw = peak
-            prevFiltered = filtered
-
+            let (filtered, _) = filterState.step(peak: peak, alpha: hpAlpha)
             let magnitude = Swift.abs(filtered)
 
             // Run detector — returns 0-1 intensity if impact detected
@@ -95,33 +121,53 @@ public final class MicrophoneAdapter: SensorAdapter, Sendable {
         }
 
         do {
-            try engine.start()
+            try driver.start()
             log.info("activity:SensorReading wasStartedBy agent:MicrophoneAdapter")
         } catch {
             log.error("activity:SensorReading wasInvalidatedBy agent:MicrophoneAdapter — \(error.localizedDescription)")
             // engine.start() failed — we already have a tap installed. Pair
             // the removal with the start-failure branch so we don't leak a
             // tap + continue into an undefined state.
-            inputNode.removeTap(onBus: 0)
+            driver.removeTap()
             continuation.finish(throwing: SensorError.permissionDenied)
             return stream
         }
 
-        let cleanup = OnceCleanup((engine: engine, node: inputNode))
+        let cleanup = OnceCleanup(driver)
         continuation.onTermination = { @Sendable _ in
-            cleanup.perform { r in
+            cleanup.perform { d in
                 // Teardown order matters. `engine.stop()` blocks until the
                 // audio unit has drained in-flight tap callbacks; removing
                 // the tap first can race with a buffer still being processed
                 // on the audio thread and dereference state captured by the
                 // tap closure after it's been torn down. Observed as SIGSEGV
                 // during `swift test` on CI run 24548266785.
-                r.engine.stop()
-                r.node.removeTap(onBus: 0)
+                d.stop()
+                d.removeTap()
             }
             log.info("activity:SensorReading wasEndedBy agent:MicrophoneAdapter")
         }
 
         return stream
+    }
+}
+
+// MARK: - Per-stream filter state
+//
+// The HP filter holds two `Float`s of state across consecutive tap
+// callbacks. CoreAudio invokes the tap on a real-time audio thread,
+// so the state lives behind a `OSAllocatedUnfairLock` to satisfy
+// strict concurrency. Lock contention is irrelevant here because the
+// tap thread is the only writer.
+private final class FilterState: @unchecked Sendable {
+    private let state = OSAllocatedUnfairLock<(prevRaw: Float, prevFiltered: Float)>(initialState: (0, 0))
+
+    func step(peak: Float, alpha: Float) -> (filtered: Float, prevRaw: Float) {
+        state.withLock { s in
+            let filtered = alpha * (s.prevFiltered + peak - s.prevRaw)
+            s.prevRaw = peak
+            s.prevFiltered = filtered
+            return (filtered, s.prevRaw)
+        }
     }
 }

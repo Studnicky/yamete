@@ -1,6 +1,9 @@
 #if canImport(YameteCore)
 import YameteCore
 #endif
+#if canImport(ResponseKit)
+import ResponseKit
+#endif
 import Foundation
 import Observation
 
@@ -27,6 +30,39 @@ public final class SettingsStore {
         case micSpikeThreshold, micCrestFactor, micRiseRate, micConfirmations, micWarmupSamples
         // Headphone motion detection
         case hpSpikeThreshold, hpCrestFactor, hpRiseRate, hpConfirmations, hpWarmupSamples
+        // LED flash output (Caps Lock LED PWM dither)
+        case ledEnabled, ledBrightnessMin, ledBrightnessMax, keyboardBrightnessEnabled
+        // Cable / power / device event sources
+        case enabledStimulusSourceIDs = "enabledEventSourceIDs"
+        // Per-output × per-reaction toggle matrix (JSON-encoded Data)
+        case soundReactionMatrix, flashReactionMatrix, notificationReactionMatrix, ledReactionMatrix
+        // Independent output master toggles (replaces 3-way visualResponseMode gate)
+        case flashEnabled
+        case flashActiveDisplayOnly
+        case notificationsEnabled
+        // Haptic output
+        case hapticEnabled, hapticIntensity
+        // Display brightness output
+        case displayBrightnessEnabled, displayBrightnessBoost, displayBrightnessThreshold
+        // Display tint output
+        case displayTintEnabled, displayTintIntensity
+        // Volume spike output
+        case volumeSpikeEnabled, volumeSpikeTarget, volumeSpikeThreshold
+        // Trackpad source
+        case trackpadWindowDuration
+        case trackpadScrollMin, trackpadScrollMax  // legacy shared scroll thresholds (kept for back-compat)
+        case trackpadTouchingMin, trackpadTouchingMax
+        case trackpadSlidingMin, trackpadSlidingMax
+        case trackpadContactMin, trackpadContactMax
+        case trackpadTapMin, trackpadTapMax
+        case trackpadTouchingEnabled, trackpadSlidingEnabled
+        case trackpadContactEnabled, trackpadTappingEnabled, trackpadCirclingEnabled
+        // Mouse source
+        case mouseScrollThreshold
+        // First-launch drama flag
+        case firstLaunchDramaFired
+        // Per-output reaction matrices for new outputs
+        case hapticReactionMatrix, displayBrightnessReactionMatrix, displayTintReactionMatrix, volumeSpikeReactionMatrix
     }
 
     // MARK: - Defaults
@@ -68,6 +104,61 @@ public final class SettingsStore {
         Key.hpRiseRate.rawValue:        Defaults.hpRiseRate,
         Key.hpConfirmations.rawValue:   Defaults.hpConfirmations,
         Key.hpWarmupSamples.rawValue:   Defaults.hpWarmup,
+        // LED flash defaults
+        Key.ledEnabled.rawValue:           false,
+        Key.ledBrightnessMin.rawValue:     0.30,
+        Key.ledBrightnessMax.rawValue:     1.00,
+        Key.keyboardBrightnessEnabled.rawValue: false,
+        // Event sources default on across the board
+        Key.enabledStimulusSourceIDs.rawValue: StimulusSourceDefaults.allStimulusSourceIDs,
+        // Per-output toggle matrices empty → defaults to "enabled"
+        Key.soundReactionMatrix.rawValue:        Data(),
+        Key.flashReactionMatrix.rawValue:        Data(),
+        Key.notificationReactionMatrix.rawValue: Data(),
+        Key.ledReactionMatrix.rawValue:          Data(),
+        // Independent output toggles — flash on by default, notifications opt-in
+        Key.flashEnabled.rawValue:              true,
+        Key.flashActiveDisplayOnly.rawValue:    false,
+        Key.notificationsEnabled.rawValue:      false,
+        // Haptic output
+        Key.hapticEnabled.rawValue:                false,
+        Key.hapticIntensity.rawValue:              1.0,
+        // Display brightness output
+        Key.displayBrightnessEnabled.rawValue:     false,
+        Key.displayBrightnessBoost.rawValue:       0.5,
+        Key.displayBrightnessThreshold.rawValue:   0.4,
+        // Display tint output
+        Key.displayTintEnabled.rawValue:           false,
+        Key.displayTintIntensity.rawValue:         0.5,
+        // Volume spike output
+        Key.volumeSpikeEnabled.rawValue:           false,
+        Key.volumeSpikeTarget.rawValue:            0.9,
+        Key.volumeSpikeThreshold.rawValue:         0.7,
+        // Trackpad source
+        Key.trackpadWindowDuration.rawValue:  1.5,
+        Key.trackpadScrollMin.rawValue:       0.1,
+        Key.trackpadScrollMax.rawValue:       0.8,
+        Key.trackpadTouchingMin.rawValue:     0.1,
+        Key.trackpadTouchingMax.rawValue:     0.5,
+        Key.trackpadSlidingMin.rawValue:      0.5,
+        Key.trackpadSlidingMax.rawValue:      0.9,
+        Key.trackpadContactMin.rawValue:      0.5,
+        Key.trackpadContactMax.rawValue:      2.5,
+        Key.trackpadTapMin.rawValue:          2.0,
+        Key.trackpadTapMax.rawValue:          6.0,
+        Key.trackpadTouchingEnabled.rawValue: true,
+        Key.trackpadSlidingEnabled.rawValue:  true,
+        Key.trackpadContactEnabled.rawValue:  true,
+        Key.trackpadTappingEnabled.rawValue:  true,
+        Key.trackpadCirclingEnabled.rawValue: true,
+        Key.mouseScrollThreshold.rawValue:    3.0,
+        // First-launch drama flag
+        Key.firstLaunchDramaFired.rawValue:        false,
+        // New output reaction matrices empty → defaults to "enabled"
+        Key.hapticReactionMatrix.rawValue:               Data(),
+        Key.displayBrightnessReactionMatrix.rawValue:    Data(),
+        Key.displayTintReactionMatrix.rawValue:          Data(),
+        Key.volumeSpikeReactionMatrix.rawValue:          Data(),
     ]
 
     // MARK: - Reactivity (inverted sensitivity: higher value = lower force threshold)
@@ -247,7 +338,7 @@ public final class SettingsStore {
         }
     }
 
-    /// SensorAdapter IDs to enable. Empty = all available adapters.
+    /// SensorSource IDs to enable. Empty = all available sources.
     public var enabledSensorIDs: [String] {
         didSet {
             guard enabledSensorIDs != oldValue else { return }
@@ -416,6 +507,367 @@ public final class SettingsStore {
         }
     }
 
+    // MARK: - LED flash output
+
+    public var ledEnabled: Bool {
+        didSet {
+            guard ledEnabled != oldValue else { return }
+            persist(ledEnabled, .ledEnabled)
+        }
+    }
+
+    public var ledBrightnessMin: Double {
+        didSet {
+            guard ledBrightnessMin != oldValue else { return }
+            let c = ledBrightnessMin.clamped(to: 0.0...1.0)
+            if c != ledBrightnessMin { ledBrightnessMin = c; return }
+            persist(ledBrightnessMin, .ledBrightnessMin)
+            if ledBrightnessMin > ledBrightnessMax { ledBrightnessMax = ledBrightnessMin }
+        }
+    }
+
+    public var ledBrightnessMax: Double {
+        didSet {
+            guard ledBrightnessMax != oldValue else { return }
+            let c = ledBrightnessMax.clamped(to: 0.0...1.0)
+            if c != ledBrightnessMax { ledBrightnessMax = c; return }
+            persist(ledBrightnessMax, .ledBrightnessMax)
+            if ledBrightnessMax < ledBrightnessMin { ledBrightnessMin = ledBrightnessMax }
+        }
+    }
+
+    public var keyboardBrightnessEnabled: Bool {
+        didSet {
+            guard keyboardBrightnessEnabled != oldValue else { return }
+            persist(keyboardBrightnessEnabled, .keyboardBrightnessEnabled)
+        }
+    }
+
+    // MARK: - Independent output master toggles
+
+    /// Flash overlay independent of the notification toggle.
+    public var flashEnabled: Bool {
+        didSet {
+            guard flashEnabled != oldValue else { return }
+            persist(flashEnabled, .flashEnabled)
+            // Keep visualResponseMode in sync for legacy code paths / tests.
+            if flashEnabled && visualResponseMode == .off { visualResponseMode = .overlay }
+            if !flashEnabled && visualResponseMode == .overlay { visualResponseMode = .off }
+        }
+    }
+
+    /// When true, flash fires only on NSScreen.main (key-focus screen) at impact time,
+    /// ignoring the enabled-display list.
+    public var flashActiveDisplayOnly: Bool {
+        didSet {
+            guard flashActiveDisplayOnly != oldValue else { return }
+            persist(flashActiveDisplayOnly, .flashActiveDisplayOnly)
+        }
+    }
+
+    public var notificationsEnabled: Bool {
+        didSet {
+            guard notificationsEnabled != oldValue else { return }
+            persist(notificationsEnabled, .notificationsEnabled)
+            if notificationsEnabled { NotificationResponder.requestAuthorizationIfNeeded() }
+        }
+    }
+
+    // MARK: - Event sources
+
+    /// Event-source SensorIDs to enable. Empty array means "use defaults".
+    public var enabledStimulusSourceIDs: [String] {
+        didSet {
+            guard enabledStimulusSourceIDs != oldValue else { return }
+            persist(enabledStimulusSourceIDs, .enabledStimulusSourceIDs)
+        }
+    }
+
+    // MARK: - Per-output × per-reaction toggle matrices
+
+    public var soundReactionMatrix: ReactionToggleMatrix {
+        didSet {
+            guard soundReactionMatrix != oldValue else { return }
+            persist(ReactionToggleMatrix.encoded(soundReactionMatrix), .soundReactionMatrix)
+        }
+    }
+
+    public var flashReactionMatrix: ReactionToggleMatrix {
+        didSet {
+            guard flashReactionMatrix != oldValue else { return }
+            persist(ReactionToggleMatrix.encoded(flashReactionMatrix), .flashReactionMatrix)
+        }
+    }
+
+    public var notificationReactionMatrix: ReactionToggleMatrix {
+        didSet {
+            guard notificationReactionMatrix != oldValue else { return }
+            persist(ReactionToggleMatrix.encoded(notificationReactionMatrix), .notificationReactionMatrix)
+        }
+    }
+
+    public var ledReactionMatrix: ReactionToggleMatrix {
+        didSet {
+            guard ledReactionMatrix != oldValue else { return }
+            persist(ReactionToggleMatrix.encoded(ledReactionMatrix), .ledReactionMatrix)
+        }
+    }
+
+    public var hapticReactionMatrix: ReactionToggleMatrix {
+        didSet {
+            guard hapticReactionMatrix != oldValue else { return }
+            persist(ReactionToggleMatrix.encoded(hapticReactionMatrix), .hapticReactionMatrix)
+        }
+    }
+
+    public var displayBrightnessReactionMatrix: ReactionToggleMatrix {
+        didSet {
+            guard displayBrightnessReactionMatrix != oldValue else { return }
+            persist(ReactionToggleMatrix.encoded(displayBrightnessReactionMatrix), .displayBrightnessReactionMatrix)
+        }
+    }
+
+    public var displayTintReactionMatrix: ReactionToggleMatrix {
+        didSet {
+            guard displayTintReactionMatrix != oldValue else { return }
+            persist(ReactionToggleMatrix.encoded(displayTintReactionMatrix), .displayTintReactionMatrix)
+        }
+    }
+
+    public var volumeSpikeReactionMatrix: ReactionToggleMatrix {
+        didSet {
+            guard volumeSpikeReactionMatrix != oldValue else { return }
+            persist(ReactionToggleMatrix.encoded(volumeSpikeReactionMatrix), .volumeSpikeReactionMatrix)
+        }
+    }
+
+    // MARK: - New output properties
+
+    public var hapticEnabled: Bool {
+        didSet {
+            guard hapticEnabled != oldValue else { return }
+            persist(hapticEnabled, .hapticEnabled)
+        }
+    }
+
+    public var hapticIntensity: Double {
+        didSet {
+            guard hapticIntensity != oldValue else { return }
+            let c = hapticIntensity.clamped(to: 0.5...3.0)
+            if c != hapticIntensity { hapticIntensity = c; return }
+            persist(hapticIntensity, .hapticIntensity)
+        }
+    }
+
+    public var displayBrightnessEnabled: Bool {
+        didSet {
+            guard displayBrightnessEnabled != oldValue else { return }
+            persist(displayBrightnessEnabled, .displayBrightnessEnabled)
+        }
+    }
+
+    public var displayBrightnessBoost: Double {
+        didSet {
+            guard displayBrightnessBoost != oldValue else { return }
+            let c = displayBrightnessBoost.clamped(to: 0.1...1.0)
+            if c != displayBrightnessBoost { displayBrightnessBoost = c; return }
+            persist(displayBrightnessBoost, .displayBrightnessBoost)
+        }
+    }
+
+    public var displayBrightnessThreshold: Double {
+        didSet {
+            guard displayBrightnessThreshold != oldValue else { return }
+            let c = displayBrightnessThreshold.clamped(to: 0.0...1.0)
+            if c != displayBrightnessThreshold { displayBrightnessThreshold = c; return }
+            persist(displayBrightnessThreshold, .displayBrightnessThreshold)
+        }
+    }
+
+    public var displayTintEnabled: Bool {
+        didSet {
+            guard displayTintEnabled != oldValue else { return }
+            persist(displayTintEnabled, .displayTintEnabled)
+        }
+    }
+
+    public var displayTintIntensity: Double {
+        didSet {
+            guard displayTintIntensity != oldValue else { return }
+            let c = displayTintIntensity.clamped(to: 0.0...1.0)
+            if c != displayTintIntensity { displayTintIntensity = c; return }
+            persist(displayTintIntensity, .displayTintIntensity)
+        }
+    }
+
+    public var volumeSpikeEnabled: Bool {
+        didSet {
+            guard volumeSpikeEnabled != oldValue else { return }
+            persist(volumeSpikeEnabled, .volumeSpikeEnabled)
+        }
+    }
+
+    public var volumeSpikeTarget: Double {
+        didSet {
+            guard volumeSpikeTarget != oldValue else { return }
+            let c = volumeSpikeTarget.clamped(to: 0.5...1.0)
+            if c != volumeSpikeTarget { volumeSpikeTarget = c; return }
+            persist(volumeSpikeTarget, .volumeSpikeTarget)
+        }
+    }
+
+    public var volumeSpikeThreshold: Double {
+        didSet {
+            guard volumeSpikeThreshold != oldValue else { return }
+            let c = volumeSpikeThreshold.clamped(to: 0.0...1.0)
+            if c != volumeSpikeThreshold { volumeSpikeThreshold = c; return }
+            persist(volumeSpikeThreshold, .volumeSpikeThreshold)
+        }
+    }
+
+    public var trackpadWindowDuration: Double {
+        didSet {
+            guard trackpadWindowDuration != oldValue else { return }
+            let c = trackpadWindowDuration.clamped(to: 0.5...5.0)
+            if c != trackpadWindowDuration { trackpadWindowDuration = c; return }
+            persist(trackpadWindowDuration, .trackpadWindowDuration)
+        }
+    }
+    public var trackpadScrollMin: Double {
+        didSet {
+            guard trackpadScrollMin != oldValue else { return }
+            let c = trackpadScrollMin.clamped(to: 0.0...1.0)
+            if c != trackpadScrollMin { trackpadScrollMin = c; return }
+            persist(trackpadScrollMin, .trackpadScrollMin)
+            if trackpadScrollMin > trackpadScrollMax { trackpadScrollMax = trackpadScrollMin }
+        }
+    }
+    public var trackpadScrollMax: Double {
+        didSet {
+            guard trackpadScrollMax != oldValue else { return }
+            let c = trackpadScrollMax.clamped(to: 0.0...1.0)
+            if c != trackpadScrollMax { trackpadScrollMax = c; return }
+            persist(trackpadScrollMax, .trackpadScrollMax)
+        }
+    }
+    public var trackpadTouchingMin: Double {
+        didSet {
+            guard trackpadTouchingMin != oldValue else { return }
+            let c = trackpadTouchingMin.clamped(to: 0.0...1.0)
+            if c != trackpadTouchingMin { trackpadTouchingMin = c; return }
+            persist(trackpadTouchingMin, .trackpadTouchingMin)
+            if trackpadTouchingMin > trackpadTouchingMax { trackpadTouchingMax = trackpadTouchingMin }
+        }
+    }
+    public var trackpadTouchingMax: Double {
+        didSet {
+            guard trackpadTouchingMax != oldValue else { return }
+            let c = trackpadTouchingMax.clamped(to: 0.0...1.0)
+            if c != trackpadTouchingMax { trackpadTouchingMax = c; return }
+            persist(trackpadTouchingMax, .trackpadTouchingMax)
+            if trackpadTouchingMax < trackpadTouchingMin { trackpadTouchingMin = trackpadTouchingMax }
+        }
+    }
+    public var trackpadSlidingMin: Double {
+        didSet {
+            guard trackpadSlidingMin != oldValue else { return }
+            let c = trackpadSlidingMin.clamped(to: 0.0...1.0)
+            if c != trackpadSlidingMin { trackpadSlidingMin = c; return }
+            persist(trackpadSlidingMin, .trackpadSlidingMin)
+            if trackpadSlidingMin > trackpadSlidingMax { trackpadSlidingMax = trackpadSlidingMin }
+        }
+    }
+    public var trackpadSlidingMax: Double {
+        didSet {
+            guard trackpadSlidingMax != oldValue else { return }
+            let c = trackpadSlidingMax.clamped(to: 0.0...1.0)
+            if c != trackpadSlidingMax { trackpadSlidingMax = c; return }
+            persist(trackpadSlidingMax, .trackpadSlidingMax)
+            if trackpadSlidingMax < trackpadSlidingMin { trackpadSlidingMin = trackpadSlidingMax }
+        }
+    }
+    public var trackpadContactMin: Double {
+        didSet {
+            guard trackpadContactMin != oldValue else { return }
+            let c = trackpadContactMin.clamped(to: 0.1...5.0)
+            if c != trackpadContactMin { trackpadContactMin = c; return }
+            persist(trackpadContactMin, .trackpadContactMin)
+            if trackpadContactMin > trackpadContactMax { trackpadContactMax = trackpadContactMin }
+        }
+    }
+    public var trackpadContactMax: Double {
+        didSet {
+            guard trackpadContactMax != oldValue else { return }
+            let c = trackpadContactMax.clamped(to: 0.5...10.0)
+            if c != trackpadContactMax { trackpadContactMax = c; return }
+            persist(trackpadContactMax, .trackpadContactMax)
+        }
+    }
+    public var trackpadTapMin: Double {
+        didSet {
+            guard trackpadTapMin != oldValue else { return }
+            let c = trackpadTapMin.clamped(to: 0.5...10.0)
+            if c != trackpadTapMin { trackpadTapMin = c; return }
+            persist(trackpadTapMin, .trackpadTapMin)
+            if trackpadTapMin > trackpadTapMax { trackpadTapMax = trackpadTapMin }
+        }
+    }
+    public var trackpadTapMax: Double {
+        didSet {
+            guard trackpadTapMax != oldValue else { return }
+            let c = trackpadTapMax.clamped(to: 1.0...15.0)
+            if c != trackpadTapMax { trackpadTapMax = c; return }
+            persist(trackpadTapMax, .trackpadTapMax)
+        }
+    }
+
+    public var trackpadTouchingEnabled: Bool {
+        didSet {
+            guard trackpadTouchingEnabled != oldValue else { return }
+            persist(trackpadTouchingEnabled, .trackpadTouchingEnabled)
+        }
+    }
+    public var trackpadSlidingEnabled: Bool {
+        didSet {
+            guard trackpadSlidingEnabled != oldValue else { return }
+            persist(trackpadSlidingEnabled, .trackpadSlidingEnabled)
+        }
+    }
+    public var trackpadContactEnabled: Bool {
+        didSet {
+            guard trackpadContactEnabled != oldValue else { return }
+            persist(trackpadContactEnabled, .trackpadContactEnabled)
+        }
+    }
+    public var trackpadTappingEnabled: Bool {
+        didSet {
+            guard trackpadTappingEnabled != oldValue else { return }
+            persist(trackpadTappingEnabled, .trackpadTappingEnabled)
+        }
+    }
+    public var trackpadCirclingEnabled: Bool {
+        didSet {
+            guard trackpadCirclingEnabled != oldValue else { return }
+            persist(trackpadCirclingEnabled, .trackpadCirclingEnabled)
+        }
+    }
+
+    public var mouseScrollThreshold: Double {
+        didSet {
+            guard mouseScrollThreshold != oldValue else { return }
+            let c = mouseScrollThreshold.clamped(to: 1.0...15.0)
+            if c != mouseScrollThreshold { mouseScrollThreshold = c; return }
+            persist(mouseScrollThreshold, .mouseScrollThreshold)
+        }
+    }
+
+    public var firstLaunchDramaFired: Bool {
+        didSet {
+            guard firstLaunchDramaFired != oldValue else { return }
+            persist(firstLaunchDramaFired, .firstLaunchDramaFired)
+        }
+    }
+
     // MARK: - Init
 
     public init() {
@@ -429,21 +881,6 @@ public final class SettingsStore {
         debounce        = d.double(forKey: Key.debounce.rawValue)
         soundEnabled    = d.bool(forKey:   Key.soundEnabled.rawValue)
         debugLogging    = d.bool(forKey:   Key.debugLogging.rawValue)
-        visualResponseMode = VisualResponseMode(
-            rawValue: d.string(forKey: Key.visualResponseMode.rawValue) ?? Defaults.visualResponseMode.rawValue
-        ) ?? Defaults.visualResponseMode
-        // Legacy migration: old builds persisted a separate `screenFlash` Bool.
-        // If an existing user had screenFlash=false (explicitly disabled visual
-        // response) but visualResponseMode defaulted to .overlay, unify them by
-        // forcing visualResponseMode=.off, then delete the legacy key.
-        let legacyScreenFlashKey = "screenFlash"
-        if d.object(forKey: legacyScreenFlashKey) != nil {
-            if d.bool(forKey: legacyScreenFlashKey) == false {
-                visualResponseMode = .off
-                d.set(VisualResponseMode.off.rawValue, forKey: Key.visualResponseMode.rawValue)
-            }
-            d.removeObject(forKey: legacyScreenFlashKey)
-        }
         notificationLocale = d.string(forKey: Key.notificationLocale.rawValue) ?? ""
         flashOpacityMin = d.double(forKey: Key.flashOpacityMin.rawValue)
         flashOpacityMax = d.double(forKey: Key.flashOpacityMax.rawValue)
@@ -474,6 +911,125 @@ public final class SettingsStore {
         hpRiseRate        = d.double(forKey: Key.hpRiseRate.rawValue)
         hpConfirmations   = d.integer(forKey: Key.hpConfirmations.rawValue)
         hpWarmupSamples   = d.integer(forKey: Key.hpWarmupSamples.rawValue)
+
+        // LED flash
+        ledEnabled               = d.bool(forKey: Key.ledEnabled.rawValue)
+        ledBrightnessMin         = d.double(forKey: Key.ledBrightnessMin.rawValue)
+        ledBrightnessMax         = d.double(forKey: Key.ledBrightnessMax.rawValue)
+        keyboardBrightnessEnabled = d.bool(forKey: Key.keyboardBrightnessEnabled.rawValue)
+
+        // flashEnabled and visualResponseMode must remain adjacent in init.
+        // The flashEnabled didSet syncs visualResponseMode; both must be set
+        // before any observer can read either property.
+        visualResponseMode = VisualResponseMode(
+            rawValue: d.string(forKey: Key.visualResponseMode.rawValue) ?? Defaults.visualResponseMode.rawValue
+        ) ?? Defaults.visualResponseMode
+        // Legacy migration: old builds persisted a separate `screenFlash` Bool.
+        // If an existing user had screenFlash=false (explicitly disabled visual
+        // response) but visualResponseMode defaulted to .overlay, unify them by
+        // forcing visualResponseMode=.off, then delete the legacy key.
+        let legacyScreenFlashKey = "screenFlash"
+        if d.object(forKey: legacyScreenFlashKey) != nil {
+            if d.bool(forKey: legacyScreenFlashKey) == false {
+                visualResponseMode = .off
+                d.set(VisualResponseMode.off.rawValue, forKey: Key.visualResponseMode.rawValue)
+            }
+            d.removeObject(forKey: legacyScreenFlashKey)
+        }
+        // Independent output toggles
+        // Migrate: if there's no persisted flashEnabled, derive from visualResponseMode.
+        if d.object(forKey: Key.flashEnabled.rawValue) != nil {
+            flashEnabled = d.bool(forKey: Key.flashEnabled.rawValue)
+        } else {
+            let mode = VisualResponseMode(
+                rawValue: d.string(forKey: Key.visualResponseMode.rawValue) ?? Defaults.visualResponseMode.rawValue
+            ) ?? Defaults.visualResponseMode
+            flashEnabled = (mode == .overlay)
+        }
+        flashActiveDisplayOnly = d.bool(forKey: Key.flashActiveDisplayOnly.rawValue)
+        notificationsEnabled = d.bool(forKey: Key.notificationsEnabled.rawValue)
+
+        // Event sources
+        enabledStimulusSourceIDs = (d.array(forKey: Key.enabledStimulusSourceIDs.rawValue) as? [String])
+            ?? StimulusSourceDefaults.allStimulusSourceIDs
+
+        // Reaction matrices
+        soundReactionMatrix        = ReactionToggleMatrix.decoded(from: (d.data(forKey: Key.soundReactionMatrix.rawValue) ?? Data()))
+        flashReactionMatrix        = ReactionToggleMatrix.decoded(from: (d.data(forKey: Key.flashReactionMatrix.rawValue) ?? Data()))
+        notificationReactionMatrix = ReactionToggleMatrix.decoded(from: (d.data(forKey: Key.notificationReactionMatrix.rawValue) ?? Data()))
+        ledReactionMatrix          = ReactionToggleMatrix.decoded(from: (d.data(forKey: Key.ledReactionMatrix.rawValue) ?? Data()))
+
+        // New output reaction matrices
+        hapticReactionMatrix               = ReactionToggleMatrix.decoded(from: (d.data(forKey: Key.hapticReactionMatrix.rawValue) ?? Data()))
+        displayBrightnessReactionMatrix    = ReactionToggleMatrix.decoded(from: (d.data(forKey: Key.displayBrightnessReactionMatrix.rawValue) ?? Data()))
+        displayTintReactionMatrix          = ReactionToggleMatrix.decoded(from: (d.data(forKey: Key.displayTintReactionMatrix.rawValue) ?? Data()))
+        volumeSpikeReactionMatrix          = ReactionToggleMatrix.decoded(from: (d.data(forKey: Key.volumeSpikeReactionMatrix.rawValue) ?? Data()))
+
+        // New output properties — init assignments
+        hapticEnabled              = false
+        hapticIntensity            = 1.0
+        displayBrightnessEnabled   = false
+        displayBrightnessBoost     = 0.5
+        displayBrightnessThreshold = 0.4
+        displayTintEnabled         = false
+        displayTintIntensity       = 0.5
+        volumeSpikeEnabled         = false
+        volumeSpikeTarget          = 0.9
+        volumeSpikeThreshold       = 0.7
+        trackpadWindowDuration     = 1.5
+        trackpadScrollMin          = 0.1
+        trackpadScrollMax          = 0.8
+        trackpadTouchingMin        = 0.1
+        trackpadTouchingMax        = 0.5
+        trackpadSlidingMin         = 0.5
+        trackpadSlidingMax         = 0.9
+        trackpadContactMin         = 0.5
+        trackpadContactMax         = 2.5
+        trackpadTapMin             = 2.0
+        trackpadTapMax             = 6.0
+        trackpadTouchingEnabled    = true
+        trackpadSlidingEnabled     = true
+        trackpadContactEnabled     = true
+        trackpadTappingEnabled     = true
+        trackpadCirclingEnabled    = true
+        firstLaunchDramaFired      = false
+
+        // New output properties — UserDefaults loads.
+        // Use (d.object(forKey:) as? Double) ?? default so that keys that have
+        // never been written keep their init default rather than receiving 0.0
+        // from d.double(forKey:), which would be clamped to the minimum and
+        // then persisted — corrupting every subsequent launch.
+        // Bool keys are safe: d.bool returns false for unset keys, matching all
+        // new-output defaults (all disabled by default).
+        hapticEnabled              = d.bool(forKey: Key.hapticEnabled.rawValue)
+        hapticIntensity            = (d.object(forKey: Key.hapticIntensity.rawValue) as? Double) ?? 1.0
+        displayBrightnessEnabled   = d.bool(forKey: Key.displayBrightnessEnabled.rawValue)
+        displayBrightnessBoost     = (d.object(forKey: Key.displayBrightnessBoost.rawValue) as? Double) ?? 0.5
+        displayBrightnessThreshold = (d.object(forKey: Key.displayBrightnessThreshold.rawValue) as? Double) ?? 0.4
+        displayTintEnabled         = d.bool(forKey: Key.displayTintEnabled.rawValue)
+        displayTintIntensity       = (d.object(forKey: Key.displayTintIntensity.rawValue) as? Double) ?? 0.5
+        volumeSpikeEnabled         = d.bool(forKey: Key.volumeSpikeEnabled.rawValue)
+        volumeSpikeTarget          = (d.object(forKey: Key.volumeSpikeTarget.rawValue) as? Double) ?? 0.9
+        volumeSpikeThreshold       = (d.object(forKey: Key.volumeSpikeThreshold.rawValue) as? Double) ?? 0.7
+        trackpadWindowDuration = (d.object(forKey: Key.trackpadWindowDuration.rawValue) as? Double) ?? 1.5
+        trackpadScrollMin      = (d.object(forKey: Key.trackpadScrollMin.rawValue) as? Double) ?? 0.1
+        trackpadScrollMax      = (d.object(forKey: Key.trackpadScrollMax.rawValue) as? Double) ?? 0.8
+        trackpadTouchingMin    = (d.object(forKey: Key.trackpadTouchingMin.rawValue) as? Double) ?? 0.1
+        trackpadTouchingMax    = (d.object(forKey: Key.trackpadTouchingMax.rawValue) as? Double) ?? 0.5
+        trackpadSlidingMin     = (d.object(forKey: Key.trackpadSlidingMin.rawValue) as? Double) ?? 0.5
+        trackpadSlidingMax     = (d.object(forKey: Key.trackpadSlidingMax.rawValue) as? Double) ?? 0.9
+        trackpadContactMin     = (d.object(forKey: Key.trackpadContactMin.rawValue) as? Double) ?? 0.5
+        trackpadContactMax     = (d.object(forKey: Key.trackpadContactMax.rawValue) as? Double) ?? 2.5
+        trackpadTapMin         = (d.object(forKey: Key.trackpadTapMin.rawValue) as? Double) ?? 2.0
+        trackpadTapMax         = (d.object(forKey: Key.trackpadTapMax.rawValue) as? Double) ?? 6.0
+        // Bool keys registered in defaults so d.bool returns true for unset keys as expected.
+        trackpadTouchingEnabled = d.bool(forKey: Key.trackpadTouchingEnabled.rawValue)
+        trackpadSlidingEnabled  = d.bool(forKey: Key.trackpadSlidingEnabled.rawValue)
+        trackpadContactEnabled  = d.bool(forKey: Key.trackpadContactEnabled.rawValue)
+        trackpadTappingEnabled  = d.bool(forKey: Key.trackpadTappingEnabled.rawValue)
+        trackpadCirclingEnabled = d.bool(forKey: Key.trackpadCirclingEnabled.rawValue)
+        mouseScrollThreshold    = (d.object(forKey: Key.mouseScrollThreshold.rawValue) as? Double) ?? 3.0
+        firstLaunchDramaFired      = d.bool(forKey: Key.firstLaunchDramaFired.rawValue)
 
         if !AppLog.supportsDebugLogging {
             debugLogging = false
@@ -518,11 +1074,131 @@ public final class SettingsStore {
         hpRiseRate            = Defaults.hpRiseRate
         hpConfirmations       = Defaults.hpConfirmations
         hpWarmupSamples       = Defaults.hpWarmup
+        ledEnabled               = false
+        ledBrightnessMin         = 0.30
+        ledBrightnessMax         = 1.00
+        keyboardBrightnessEnabled = false
+        flashEnabled             = true
+        flashActiveDisplayOnly   = false
+        notificationsEnabled  = false
+        enabledStimulusSourceIDs = StimulusSourceDefaults.allStimulusSourceIDs
+        soundReactionMatrix        = ReactionToggleMatrix()
+        flashReactionMatrix        = ReactionToggleMatrix()
+        notificationReactionMatrix = ReactionToggleMatrix()
+        ledReactionMatrix          = ReactionToggleMatrix()
+        hapticEnabled              = false
+        hapticIntensity            = 1.0
+        displayBrightnessEnabled   = false
+        displayBrightnessBoost     = 0.5
+        displayBrightnessThreshold = 0.4
+        displayTintEnabled         = false
+        displayTintIntensity       = 0.5
+        volumeSpikeEnabled         = false
+        volumeSpikeTarget          = 0.9
+        volumeSpikeThreshold       = 0.7
+        trackpadWindowDuration = 1.5
+        trackpadScrollMin      = 0.1
+        trackpadScrollMax      = 0.8
+        trackpadTouchingMin    = 0.1
+        trackpadTouchingMax    = 0.5
+        trackpadSlidingMin     = 0.5
+        trackpadSlidingMax     = 0.9
+        trackpadContactMin     = 0.5
+        trackpadContactMax     = 2.5
+        trackpadTapMin         = 2.0
+        trackpadTapMax         = 6.0
+        trackpadTouchingEnabled = true
+        trackpadSlidingEnabled  = true
+        trackpadContactEnabled  = true
+        trackpadTappingEnabled  = true
+        trackpadCirclingEnabled = true
+        mouseScrollThreshold    = 3.0
+        firstLaunchDramaFired      = false
+        hapticReactionMatrix               = ReactionToggleMatrix()
+        displayBrightnessReactionMatrix    = ReactionToggleMatrix()
+        displayTintReactionMatrix          = ReactionToggleMatrix()
+        volumeSpikeReactionMatrix          = ReactionToggleMatrix()
     }
 
     // MARK: - Private
 
     private func persist<T>(_ value: T, _ key: Key) {
         UserDefaults.standard.set(value, forKey: key.rawValue)
+    }
+}
+
+// MARK: - Output config snapshots (consumed by ResponseKit outputs)
+
+extension SettingsStore: OutputConfigProvider {
+    public func audioConfig() -> AudioOutputConfig {
+        AudioOutputConfig(
+            enabled: soundEnabled,
+            volumeMin: Float(volumeMin),
+            volumeMax: Float(volumeMax),
+            deviceUIDs: enabledAudioDevices,
+            perReaction: soundReactionMatrix.asDictionary()
+        )
+    }
+
+    public func flashConfig() -> FlashOutputConfig {
+        FlashOutputConfig(
+            enabled: flashEnabled,
+            opacityMin: Float(flashOpacityMin),
+            opacityMax: Float(flashOpacityMax),
+            enabledDisplayIDs: enabledDisplays,
+            perReaction: flashReactionMatrix.asDictionary(),
+            dismissAfter: debounce,
+            activeDisplayOnly: flashActiveDisplayOnly
+        )
+    }
+
+    public func notificationConfig() -> NotificationOutputConfig {
+        NotificationOutputConfig(
+            enabled: notificationsEnabled,
+            perReaction: notificationReactionMatrix.asDictionary(),
+            dismissAfter: max(0.5, debounce),
+            localeID: resolvedNotificationLocale
+        )
+    }
+
+    public func ledConfig() -> LEDOutputConfig {
+        LEDOutputConfig(
+            enabled: ledEnabled,
+            brightnessMin: Float(ledBrightnessMin),
+            brightnessMax: Float(ledBrightnessMax),
+            keyboardBrightnessEnabled: keyboardBrightnessEnabled,
+            perReaction: ledReactionMatrix.asDictionary()
+        )
+    }
+
+    public func hapticConfig() -> HapticOutputConfig {
+        HapticOutputConfig(enabled: hapticEnabled, intensity: hapticIntensity,
+                           perReaction: hapticReactionMatrix.asDictionary())
+    }
+
+    public func displayBrightnessConfig() -> DisplayBrightnessOutputConfig {
+        DisplayBrightnessOutputConfig(enabled: displayBrightnessEnabled, boost: displayBrightnessBoost,
+                                      threshold: displayBrightnessThreshold,
+                                      perReaction: displayBrightnessReactionMatrix.asDictionary())
+    }
+
+    public func displayTintConfig() -> DisplayTintOutputConfig {
+        DisplayTintOutputConfig(enabled: displayTintEnabled, intensity: displayTintIntensity,
+                                perReaction: displayTintReactionMatrix.asDictionary())
+    }
+
+    public func volumeSpikeConfig() -> VolumeSpikeOutputConfig {
+        VolumeSpikeOutputConfig(enabled: volumeSpikeEnabled, targetVolume: volumeSpikeTarget,
+                                threshold: volumeSpikeThreshold,
+                                perReaction: volumeSpikeReactionMatrix.asDictionary())
+    }
+
+    public func trackpadSourceConfig() -> TrackpadSourceConfig {
+        TrackpadSourceConfig(
+            windowDuration: trackpadWindowDuration,
+            scrollMin: trackpadScrollMin, scrollMax: trackpadScrollMax,
+            contactMin: trackpadContactMin, contactMax: trackpadContactMax,
+            tapMin: trackpadTapMin, tapMax: trackpadTapMax
+        )
     }
 }
