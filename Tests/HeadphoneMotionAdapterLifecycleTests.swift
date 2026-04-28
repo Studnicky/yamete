@@ -218,4 +218,64 @@ final class HeadphoneMotionSourceLifecycleTests: XCTestCase {
         let surfaced = await probe.value
         XCTAssertNotNil(surfaced, "mid-stream error must terminate the stream with a throw")
     }
+
+    /// Mutation-anchor cell for `HeadphoneMotionAdapter.swift` line 150
+    /// (`guard driver.isHeadphonesConnected else { return }`). Removing
+    /// the gate would let post-disconnect samples reach the detector
+    /// even after the connection tracker flips. Distinct from
+    /// `testDisconnectMidStreamPrunes` in two ways:
+    ///   1. Pre-disconnect, the detector is primed through its warmup
+    ///      window (50 samples) with a permissive detector config so
+    ///      the warmup gate cannot mask the prune behaviour.
+    ///   2. Post-disconnect samples use a magnitude well above the
+    ///      configured spike threshold so removing the prune gate
+    ///      WOULD let an impact through.
+    func testDisconnectPostWarmup_postDisconnectSamplesPruned() async throws {
+        let mock = MockHeadphoneMotionDriver()
+        mock.setDeviceMotionAvailable(true)
+        mock.setHeadphonesConnected(true)
+        // Permissive detector config: sub-threshold pre-warmup samples,
+        // very low spike threshold, no rise/crest/confirmation gating.
+        let permissive = ImpactDetectorConfig(
+            spikeThreshold: 0.05,
+            minRiseRate: 0,
+            minCrestFactor: 0,
+            minConfirmations: 1,
+            warmupSamples: 5,
+            intensityFloor: 0.05,
+            intensityCeiling: 1.0
+        )
+        let adapter = HeadphoneMotionSource(detectorConfig: permissive, driver: mock, runProbe: false)
+
+        let stream = adapter.impacts()
+        try await Task.sleep(for: .milliseconds(20))
+
+        // Prime: feed 10 above-warmup quiet samples to clear the
+        // warmup gate. Background RMS settles low.
+        for _ in 0..<10 { mock.emitImpact(magnitude: 0.001) }
+
+        // Disconnect — line 150's job is to prune everything that
+        // arrives from now on.
+        mock.setHeadphonesConnected(false)
+        // Post-disconnect: 20 high-magnitude samples that WOULD trigger
+        // detection if the prune gate was removed (>> 0.05 spike,
+        // huge crest factor against the quiet-RMS baseline).
+        for _ in 0..<20 { mock.emitImpact(magnitude: 1.0) }
+
+        let probe = Task<Int, Error> {
+            var seen = 0
+            for try await _ in stream {
+                seen += 1
+                if seen >= 1 { break }
+            }
+            return seen
+        }
+        try? await Task.sleep(for: .milliseconds(80))
+        probe.cancel()
+        let count = (try? await probe.value) ?? 0
+        XCTAssertEqual(
+            count, 0,
+            "[hp-gate=disconnect-prune] post-disconnect high-magnitude samples must be pruned (got \(count))"
+        )
+    }
 }

@@ -506,4 +506,61 @@ final class MatrixTrackpadOSEvents_Tests: XCTestCase {
 
         source.stop()
     }
+
+    // MARK: - Idempotency: double-start must not double-install monitors
+
+    /// `start(publishingTo:)` is guarded by `guard monitor == nil else { return }`.
+    /// Removing that guard lets a second `start()` call install a parallel
+    /// pair of NSEvent global monitors (scroll + tap), so every emitted
+    /// event is processed twice — `tapWindow.append(now)` runs twice per
+    /// click, doubling the rate-window count.
+    ///
+    /// Cell strategy: configure `tapMin: 1.5/s`. Stamp a trackpad gesture,
+    /// then emit exactly two clicks 100ms apart. Under the un-mutated
+    /// guard: tapWindow=[t1,t2], rate=1.0/s < 1.5/s → no fire. Under the
+    /// mutated path: tapWindow=[t1,t1,t2,t2], rate=2.0/s ≥ 1.5/s → fires.
+    /// Asserting NO `.trackpadTapping` pins the guard.
+    func testDoubleStart_doesNotDoubleInstallMonitors() async throws {
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let source = TrackpadActivitySource(eventMonitor: monitor)
+        source.configure(
+            windowDuration: 1.0,
+            scrollMin: 0.0, scrollMax: 1.0,
+            touchingMin: 100.0, touchingMax: 100.0,  // unreachable
+            slidingMin: 100.0, slidingMax: 100.0,
+            contactMin: 100.0, contactMax: 100.0,
+            tapMin: 1.5, tapMax: 6.0,                 // boundary: 1 click=0.5/s, 2=1.0/s, 4=2.0/s
+            touchingEnabled: false,
+            slidingEnabled: false,
+            contactEnabled: false,
+            tappingEnabled: true,
+            circlingEnabled: false
+        )
+        // Call start TWICE. Un-mutated guard: second call is a no-op.
+        // Mutated guard: second call installs a duplicate monitor pair.
+        source.start(publishingTo: bus)
+        source.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.6) }
+        try? await Task.sleep(for: .milliseconds(40))
+
+        // Stamp gesture so subsequent clicks fall inside the attribution window.
+        if let scroll = makeTrackpadScroll(phase: 1, deltaY: 1) {
+            monitor.emit(scroll, ofType: .scrollWheel)
+        }
+        try? await Task.sleep(for: .milliseconds(40))
+
+        // Exactly two clicks. Single-install rate=1.0/s; double-install rate=2.0/s.
+        monitor.emit(makeLeftMouseDown(), ofType: .leftMouseDown)
+        try? await Task.sleep(for: .milliseconds(100))
+        monitor.emit(makeLeftMouseDown(), ofType: .leftMouseDown)
+        try? await Task.sleep(for: .milliseconds(150))
+
+        let collected = await collectTask.value
+        XCTAssertFalse(collected.contains { $0.kind == .trackpadTapping },
+            "[cell=double-start-idempotency] start() twice must not double-install monitors; 2 clicks at tapMin=1.5/s must NOT fire .trackpadTapping — got \(collected.map(\.kind))")
+
+        source.stop()
+    }
 }

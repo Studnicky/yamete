@@ -238,4 +238,35 @@ final class MatrixKeyboardOSEvents_Tests: XCTestCase {
 
         source.stop()
     }
+
+    // MARK: - Cell 7: _testEmit kind guard rejects non-.keyboardTyped kinds
+
+    /// `_testEmit(_:)` is the bus-publish test seam. Its first guard
+    /// (`guard kind == .keyboardTyped else { return }`) is the only
+    /// surface that prevents unrelated `ReactionKind` values from
+    /// publishing a `.keyboardTyped` reaction (the publish call below
+    /// the guard is hardcoded to `.keyboardTyped`). Mutating the guard
+    /// away lets `_testEmit(.mouseScrolled)` produce a spurious
+    /// `.keyboardTyped` event on the bus, which this cell pins.
+    func test_testEmit_nonKeyboardKind_doesNotPublish() async throws {
+        let bus = await makeBus()
+        let source = makeSource()
+        source.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.4) }
+        try? await Task.sleep(for: .milliseconds(40))
+
+        // Pass a non-keyboard kind. Production guard returns immediately;
+        // mutated code falls through and publishes `.keyboardTyped`.
+        await source._testEmit(.mouseScrolled)
+        await source._testEmit(.trackpadTapping)
+        try? await Task.sleep(for: .milliseconds(80))
+
+        let collected = await collectTask.value
+        let typed = collected.filter { $0.kind == .keyboardTyped }
+        XCTAssertEqual(typed.count, 0,
+                       "[cell=testEmit-kind-guard] _testEmit(non-keyboard kind) must NOT publish .keyboardTyped — got \(typed.count)")
+
+        source.stop()
+    }
 }

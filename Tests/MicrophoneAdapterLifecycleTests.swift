@@ -160,6 +160,70 @@ final class MicrophoneSourceLifecycleTests: XCTestCase {
         }
     }
 
+    /// Mutation-anchor cell for `MicrophoneAdapter.swift` line 91: the
+    /// input-format validity gate (`channelCount > 0, sampleRate > 0`).
+    /// A driver reporting a zero-channel format must surface
+    /// `SensorError.deviceNotFound` AND must not install a tap. Removing
+    /// the gate would let `installTap` proceed with the bogus format
+    /// and crash CoreAudio.
+    func testInvalidInputFormat_throwsDeviceNotFound_doesNotInstallTap() async throws {
+        let mock = MockMicrophoneEngineDriver()
+        // Construct a zero-channel format the gate is designed to reject.
+        // AVAudioFormat refuses 0 channels at construction, so we use the
+        // canonical "no real input" stand-in: build a 1-channel format and
+        // drop sampleRate to 0 via channelLayout-less construction. The
+        // simplest deterministic failure is a sampleRate=0 format, which
+        // the standardFormatWithSampleRate initializer accepts.
+        guard let bogusFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: 0,
+            channels: 1,
+            interleaved: false
+        ) else {
+            // AVAudioFormat may refuse sampleRate=0 outright on some OS
+            // versions — in which case the gate's defensive purpose is
+            // already satisfied by the framework. Skip rather than
+            // false-positive.
+            throw XCTSkip("[mic-gate=invalid-format] AVAudioFormat refused sampleRate=0 — gate not exercisable on this OS")
+        }
+        mock.setInputFormat(bogusFormat)
+        let adapter = MicrophoneSource(
+            detectorConfig: .microphone(),
+            driverFactory: { mock },
+            availabilityOverride: { true }
+        )
+
+        let probe = Task<SensorError?, Never> {
+            do {
+                for try await _ in adapter.impacts() { return nil }
+                return nil
+            } catch let error as SensorError {
+                return error
+            } catch {
+                XCTFail("[mic-gate=invalid-format] expected SensorError, got \(error)")
+                return nil
+            }
+        }
+        try? await Task.sleep(for: .milliseconds(50))
+        probe.cancel()
+        let surfaced = await probe.value
+
+        guard let typed = surfaced, case .deviceNotFound = typed else {
+            XCTFail(
+                "[mic-gate=invalid-format] expected SensorError.deviceNotFound, got \(String(describing: surfaced))"
+            )
+            return
+        }
+        XCTAssertEqual(
+            mock.installTapCalls, 0,
+            "[mic-gate=invalid-format] tap MUST NOT be installed when format is invalid (got \(mock.installTapCalls) installs)"
+        )
+        XCTAssertEqual(
+            mock.startCalls, 0,
+            "[mic-gate=invalid-format] driver MUST NOT be started when format is invalid (got \(mock.startCalls) starts)"
+        )
+    }
+
     /// Successful start path: the driver's start is called, a tap is
     /// installed, and synthesized PCM buffers driven through the mock
     /// reach the detector. Verifies the integration without real audio.

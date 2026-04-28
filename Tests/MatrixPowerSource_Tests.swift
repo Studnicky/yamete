@@ -105,6 +105,54 @@ final class MatrixPowerSourceTests: XCTestCase {
         await bus.close()
     }
 
+    // MARK: - Cell: idempotent start — second start preserves edge-baseline state
+
+    /// `start` is gated by `runLoopSource == nil` so a second call is a no-op.
+    /// The observable consequence: the second start must NOT re-seed
+    /// `lastWasOnAC` from `currentlyOnAC()`. If the gate regresses (second
+    /// start runs through and resets `lastWasOnAC`), an inject that was
+    /// previously a no-op (because it matched the post-first-edge state)
+    /// becomes a fresh edge again and publishes redundantly.
+    ///
+    /// Sequence:
+    ///   1. start → `lastWasOnAC = baseline`.
+    ///   2. inject(!baseline) → real edge, publishes #1, `lastWasOnAC=!baseline`.
+    ///   3. start (must be no-op).
+    ///   4. inject(!baseline) → with gate intact `lastWasOnAC` is still
+    ///      `!baseline` → no edge → no publish. With gate removed
+    ///      `lastWasOnAC` was reset to `baseline` → edge → publishes #2.
+    /// Production must hold the count at 1.
+    func testStartIsIdempotent_preservesEdgeBaseline() async {
+        let bus = await makeBus()
+        let source = PowerSource()
+        source.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.5) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        let baseline = PowerSource._currentlyOnAC()
+        // Step 2 — first edge, publishes.
+        await source._injectPowerChange(onAC: !baseline)
+        try? await Task.sleep(for: .milliseconds(20))
+
+        // Step 3 — second start must be a no-op. With the idempotency gate
+        // removed, this would re-seed `lastWasOnAC` back to `baseline`.
+        source.start(publishingTo: bus)
+        try? await Task.sleep(for: .milliseconds(20))
+
+        // Step 4 — inject the SAME post-edge state. Gate intact → no edge.
+        // Gate removed → fresh edge → second publish leaks through.
+        await source._injectPowerChange(onAC: !baseline)
+        try? await Task.sleep(for: .milliseconds(150))
+
+        let collected = await collectTask.value
+        let acEvents = collected.filter { $0.kind == .acConnected || $0.kind == .acDisconnected }
+        XCTAssertEqual(acEvents.count, 1,
+            "[scenario=idempotent-start-baseline] second start must not reset lastWasOnAC; expected 1 publish, got \(acEvents.count)")
+        source.stop()
+        await bus.close()
+    }
+
     // MARK: - Cell: no-change — first inject matching the snapshotted baseline drops
 
     /// On `start`, `lastWasOnAC` is seeded to `Self.currentlyOnAC()`. An

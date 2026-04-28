@@ -118,6 +118,168 @@
       "replace": "if true { return }",
       "search": "guard mag > 0.01 else { return }",
       "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.handleKeyPress — slam the rate/debounce gate shut; an at-threshold keypress burst must still fire .keyboardTyped exactly once.",
+      "expectedFailingTest": "MatrixKeyboardOSEvents_Tests/testRateAtThreshold_firesExactlyOneReaction",
+      "expectedFailureSubstring": "[cell=rate-at-threshold]",
+      "id": "keyboard-rate-floor-guard",
+      "replace": "if true { return }",
+      "search": "guard rate >= tapRateThreshold, now >= typingGate else { return }",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource._testEmit — drop the kind-guard so non-.keyboardTyped kinds incorrectly publish .keyboardTyped (the unconditional publish below the guard is hardcoded).",
+      "expectedFailingTest": "MatrixKeyboardOSEvents_Tests/test_testEmit_nonKeyboardKind_doesNotPublish",
+      "expectedFailureSubstring": "[cell=testEmit-kind-guard]",
+      "id": "keyboard-testEmit-kind-guard",
+      "replace": "if false { return }",
+      "search": "guard kind == .keyboardTyped else { return }",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.handleMouseScroll — slam the RMS/debounce gate shut; sustained high-magnitude wheel events must still fire .mouseScrolled.",
+      "expectedFailingTest": "MatrixMouseOSEvents_Tests/testMouseScrollHighMagnitude_firesAtLeastOne",
+      "expectedFailureSubstring": "[cell=mouse-mag-floor-passthrough]",
+      "id": "mouse-rms-threshold-gate",
+      "replace": "if true { return }",
+      "search": "guard rms > scrollThreshold, now >= scrollGate else { return }",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.start — drop the monitor-idempotency guard; a second start() must not double-install NSEvent monitors. Without the guard, every click is processed twice, doubling the tap-rate count and firing .trackpadTapping at half the configured tapMin.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testDoubleStart_doesNotDoubleInstallMonitors",
+      "expectedFailureSubstring": "[cell=double-start-idempotency]",
+      "id": "trackpad-start-monitor-idempotency",
+      "replace": "if false { return }",
+      "search": "guard monitor == nil else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "PowerSource.handlePowerChange(onAC:) — drop the edge-trigger guard against lastWasOnAC; same-state IOPS callbacks (battery percent, charge state, time-remaining estimates) must NOT republish .acConnected / .acDisconnected.",
+      "expectedFailingTest": "MatrixPowerSourceTests/testRepeatedSameState_publishesOnce",
+      "expectedFailureSubstring": "[scenario=repeated-same-state]",
+      "id": "power-edge-trigger-gate",
+      "replace": "if false { return }",
+      "search": "guard onAC != lastWasOnAC else { return }",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "PowerSource.start — drop the runLoopSource-nil idempotency guard; a second start() call must NOT re-seed lastWasOnAC from currentlyOnAC(), or a previously-no-op inject becomes a fresh edge and the bus republishes the AC state.",
+      "expectedFailingTest": "MatrixPowerSourceTests/testStartIsIdempotent_preservesEdgeBaseline",
+      "expectedFailureSubstring": "[scenario=idempotent-start-baseline]",
+      "id": "power-start-idempotency-gate",
+      "replace": "if false { return }",
+      "search": "guard runLoopSource == nil else { return }",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "DisplayHotplugSource.dispatchDebounced — drop the 200ms shouldFire window guard; the 3-4 callbacks macOS emits per real reconfigure must collapse to 1 .displayConfigured publish, not 4.",
+      "expectedFailingTest": "MatrixDisplayHotplugSourceTests/testRapidFourCallbacks_debouncedToOne",
+      "expectedFailureSubstring": "[scenario=rapid-four-callbacks]",
+      "id": "display-hotplug-debounce-gate",
+      "replace": "if false { return }",
+      "search": "guard shouldFire else { return }",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "ImpactDetector.process — drop the warmup gate; samples processed before sampleCount reaches warmupSamples must be rejected so filter state can settle.",
+      "expectedFailingTest": "MatrixImpactDetector_Tests/testWarmupGate_belowSampleCount_returnsNil",
+      "expectedFailureSubstring": "[gate=warmup]",
+      "id": "impact-detector-warmup-gate",
+      "replace": "guard s.sampleCount >= 0 else { return nil }",
+      "search": "guard s.sampleCount >= config.warmupSamples else { return nil }",
+      "targetFile": "Sources/SensorKit/ImpactDetector.swift"
+    },
+    {
+      "description": "ImpactDetector.process — drop the spike threshold gate; magnitudes below the configured spikeThreshold must NOT detect.",
+      "expectedFailingTest": "MatrixImpactDetector_Tests/testSpikeGate_belowThreshold_returnsNil",
+      "expectedFailureSubstring": "[gate=spike]",
+      "id": "impact-detector-spike-threshold-gate",
+      "replace": "guard magnitude >= 0 else { return nil }",
+      "search": "guard magnitude >= config.spikeThreshold else { return nil }",
+      "targetFile": "Sources/SensorKit/ImpactDetector.swift"
+    },
+    {
+      "description": "ImpactDetector.process — drop the rise rate gate; a slow ramp whose peak consecutive rise is below minRiseRate must NOT detect (separates impacts from gradual changes).",
+      "expectedFailingTest": "MatrixImpactDetector_Tests/testRiseRateGate_gradualRamp_returnsNil",
+      "expectedFailureSubstring": "[gate=riseRate]",
+      "id": "impact-detector-rise-rate-gate",
+      "replace": "guard windowPeakRise >= 0 else {",
+      "search": "guard windowPeakRise >= config.minRiseRate else {",
+      "targetFile": "Sources/SensorKit/ImpactDetector.swift"
+    },
+    {
+      "description": "ImpactDetector.process — drop the crest factor gate; a sample marginally above an elevated background RMS must NOT detect (separates impacts from sustained noise).",
+      "expectedFailingTest": "MatrixImpactDetector_Tests/testCrestFactorGate_elevatedBackground_returnsNil",
+      "expectedFailureSubstring": "[gate=crestFactor]",
+      "id": "impact-detector-crest-factor-gate",
+      "replace": "guard crest >= 0 else {",
+      "search": "guard crest >= config.minCrestFactor else {",
+      "targetFile": "Sources/SensorKit/ImpactDetector.swift"
+    },
+    {
+      "description": "ImpactDetector.process — drop the confirmations gate; a single above-threshold sample must NOT meet a multi-confirmation requirement (one-shot transients are noise).",
+      "expectedFailingTest": "MatrixImpactDetector_Tests/testConfirmationsGate_singleSample_returnsNil",
+      "expectedFailureSubstring": "[gate=confirmations]",
+      "id": "impact-detector-confirmations-gate",
+      "replace": "guard confirmed >= 0 else {",
+      "search": "guard confirmed >= config.minConfirmations else {",
+      "targetFile": "Sources/SensorKit/ImpactDetector.swift"
+    },
+    {
+      "description": "ImpactFusion.start — drop the empty-availability gate; calling start() with zero available sources must invoke onError with noAdaptersAvailable and NOT mark the engine running.",
+      "expectedFailingTest": "ImpactFusionAvailabilityGateTests/testStartWithNoAvailableSources_invokesOnError_doesNotMarkRunning",
+      "expectedFailureSubstring": "[fusion-gate=empty-available]",
+      "id": "impact-fusion-empty-available-gate",
+      "replace": "if false {",
+      "search": "guard !available.isEmpty else {",
+      "targetFile": "Sources/SensorKit/ImpactDetection.swift"
+    },
+    {
+      "description": "ImpactFusion.ingest — drop the rearm-duration gate; an impact arriving inside the configured rearmDuration after a prior trigger must NOT re-trigger.",
+      "expectedFailingTest": "ImpactFusionTests/testFusionRearmGate_withinRearm_returnsNil",
+      "expectedFailureSubstring": "[fusion-gate=rearm]",
+      "id": "impact-fusion-rearm-gate",
+      "replace": "guard now.timeIntervalSince(lastTriggerAt) >= -1 else { return nil }",
+      "search": "guard now.timeIntervalSince(lastTriggerAt) >= config.rearmDuration else { return nil }",
+      "targetFile": "Sources/SensorKit/ImpactDetection.swift"
+    },
+    {
+      "description": "ImpactFusion.ingest — drop the participating-sources consensus gate; one source reporting against a 2-of-2 consensus requirement must NOT trigger.",
+      "expectedFailingTest": "ImpactFusionTests/testFusionConsensusGate_singleSource_belowRequired_returnsNil",
+      "expectedFailureSubstring": "[fusion-gate=consensus]",
+      "id": "impact-fusion-consensus-gate",
+      "replace": "guard participatingSources.count >= 0 else { return nil }",
+      "search": "guard participatingSources.count >= required else { return nil }",
+      "targetFile": "Sources/SensorKit/ImpactDetection.swift"
+    },
+    {
+      "description": "HeadphoneMotionSource.impacts — drop the framework-availability gate; opening the stream when CMHeadphoneMotionManager reports motion unavailable must throw SensorError.deviceNotFound, not silently start updates.",
+      "expectedFailingTest": "HeadphoneMotionSourceLifecycleTests/testFrameworkUnavailableThrowsDeviceNotFound",
+      "expectedFailureSubstring": "expected SensorError.deviceNotFound",
+      "id": "headphone-motion-framework-available-gate",
+      "replace": "        if false {\n            continuation.finish(throwing: SensorError.deviceNotFound)\n            return stream\n        }",
+      "search": "        guard driver.isDeviceMotionAvailable else {\n            continuation.finish(throwing: SensorError.deviceNotFound)\n            return stream\n        }",
+      "targetFile": "Sources/SensorKit/HeadphoneMotionAdapter.swift"
+    },
+    {
+      "description": "HeadphoneMotionSource.impacts — drop the mid-stream connection check; samples arriving after the headphones disconnect must be pruned (not delivered to the impact detector).",
+      "expectedFailingTest": "HeadphoneMotionSourceLifecycleTests/testDisconnectPostWarmup_postDisconnectSamplesPruned",
+      "expectedFailureSubstring": "[hp-gate=disconnect-prune]",
+      "id": "headphone-motion-disconnect-prune-gate",
+      "replace": "if false { return }",
+      "search": "guard driver.isHeadphonesConnected else { return }",
+      "targetFile": "Sources/SensorKit/HeadphoneMotionAdapter.swift"
+    },
+    {
+      "description": "MicrophoneSource.impacts — drop the input-format validity gate; a driver reporting a zero-channel or zero-sample-rate format must surface SensorError.deviceNotFound and MUST NOT install a tap.",
+      "expectedFailingTest": "MicrophoneSourceLifecycleTests/testInvalidInputFormat_throwsDeviceNotFound_doesNotInstallTap",
+      "expectedFailureSubstring": "[mic-gate=invalid-format]",
+      "id": "microphone-invalid-format-gate",
+      "replace": "guard format.channelCount >= 0, format.sampleRate >= 0 else {",
+      "search": "guard format.channelCount > 0, format.sampleRate > 0 else {",
+      "targetFile": "Sources/SensorKit/MicrophoneAdapter.swift"
     }
   ]
 }

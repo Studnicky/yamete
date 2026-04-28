@@ -1,4 +1,5 @@
 import XCTest
+import os
 @testable import YameteCore
 @testable import SensorKit
 @testable import ResponseKit
@@ -122,5 +123,129 @@ final class ImpactFusionTests: XCTestCase {
             activeSources: [SensorID("A")]
         )
         XCTAssertNil(blocked)
+    }
+
+    // MARK: - Mutation-anchor cells
+    //
+    // These cells exist specifically to anchor mutation-catalog entries
+    // for `ImpactDetection.swift`. Each cell pins ONE production guard
+    // to a deterministic synthetic input, and the failure messages
+    // embed `[fusion-gate=...]` coordinates that the catalog substrings
+    // pin to.
+
+    /// `ImpactDetection.swift` line 161: rearmDuration guard. Removing
+    /// it would let an impact within the rearm window re-trigger.
+    func testFusionRearmGate_withinRearm_returnsNil() {
+        let engine = ImpactFusion(config: FusionConfig(
+            consensusRequired: 1,
+            rearmDuration: 1.0
+        ))
+        let now = Date()
+        let active: Set<SensorID> = [SensorID("A")]
+
+        // First impact triggers — drains state.
+        let first = engine.ingest(
+            SensorImpact(source: SensorID("A"), timestamp: now, intensity: 0.8),
+            activeSources: active
+        )
+        XCTAssertNotNil(first, "[fusion-gate=rearm] first impact must trigger to arm rearm window")
+
+        // Second impact at +0.10s is well inside the 1.0s rearm — must
+        // be blocked. Removing the rearm guard would let it through.
+        let blocked = engine.ingest(
+            SensorImpact(source: SensorID("A"), timestamp: now.addingTimeInterval(0.10), intensity: 0.9),
+            activeSources: active
+        )
+        XCTAssertNil(
+            blocked,
+            "[fusion-gate=rearm] impact within 1.0s rearm window must NOT re-trigger"
+        )
+    }
+
+    /// `ImpactDetection.swift` line 168: consensus participating-sources
+    /// gate. Removing it would let one source meet a 2-source consensus
+    /// requirement.
+    func testFusionConsensusGate_singleSource_belowRequired_returnsNil() {
+        let engine = ImpactFusion(config: FusionConfig(
+            consensusRequired: 2,
+            fusionWindow: 0.30
+        ))
+        let now = Date()
+        // Two active sensors but only ONE reports — consensus 2/2 unmet.
+        let active: Set<SensorID> = [SensorID("A"), SensorID("B")]
+
+        let r1 = engine.ingest(
+            SensorImpact(source: SensorID("A"), timestamp: now, intensity: 0.9),
+            activeSources: active
+        )
+        XCTAssertNil(
+            r1,
+            "[fusion-gate=consensus] single participating source must NOT meet 2-of-2 consensus"
+        )
+
+        // Same source again — still 1 unique participating source.
+        let r2 = engine.ingest(
+            SensorImpact(source: SensorID("A"), timestamp: now.addingTimeInterval(0.05), intensity: 0.8),
+            activeSources: active
+        )
+        XCTAssertNil(
+            r2,
+            "[fusion-gate=consensus] repeated impacts from same source must NOT meet 2-of-2 consensus"
+        )
+    }
+}
+
+// MARK: - ImpactFusion start() availability gate
+
+/// `ImpactDetection.swift` line 85: empty-availability gate inside
+/// `start(sources:bus:)`. Removing it would silently mark the fusion
+/// engine running with zero sources and never surface the no-adapters
+/// error to the UI.
+@MainActor
+final class ImpactFusionAvailabilityGateTests: XCTestCase {
+
+    /// Stub source whose `isAvailable` is configurable. Used to drive
+    /// the empty-available branch of `ImpactFusion.start(...)`.
+    private final class StubSource: SensorSource, @unchecked Sendable {
+        let id: SensorID
+        let name: String
+        let isAvailable: Bool
+        init(id: SensorID, available: Bool) {
+            self.id = id
+            self.name = id.rawValue
+            self.isAvailable = available
+        }
+        func impacts() -> AsyncThrowingStream<SensorImpact, Error> {
+            AsyncThrowingStream { continuation in
+                continuation.finish()
+            }
+        }
+    }
+
+    func testStartWithNoAvailableSources_invokesOnError_doesNotMarkRunning() async {
+        let engine = ImpactFusion()
+        let bus = ReactionBus()
+        let source = StubSource(id: SensorID("A"), available: false)
+
+        let captured = OSAllocatedUnfairLock<String?>(initialState: nil)
+        engine.onError = { @MainActor message in
+            captured.withLock { $0 = message }
+        }
+
+        engine.start(sources: [source], bus: bus)
+
+        let surfaced = captured.withLock { $0 }
+        XCTAssertNotNil(
+            surfaced,
+            "[fusion-gate=empty-available] start() with no available sources must invoke onError"
+        )
+        XCTAssertFalse(
+            engine.isRunning,
+            "[fusion-gate=empty-available] start() with no available sources must NOT mark engine running"
+        )
+        XCTAssertEqual(
+            engine.activeSources.count, 0,
+            "[fusion-gate=empty-available] activeSources must remain empty when no sources are available"
+        )
     }
 }
