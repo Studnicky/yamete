@@ -56,6 +56,23 @@ public final class TrackpadActivitySource: StimulusSource {
 
     private var touchingEnabled: Bool = true
     private var slidingEnabled: Bool = true
+    /// Most recent trackpad gesture timestamp (scroll/swipe with non-empty
+    /// phase, or magnify/rotate). NSEvent's `.leftMouseDown` global monitor
+    /// fires for ANY mouse click — built-in trackpad, Magic Trackpad, OR an
+    /// external USB mouse. There's no public API to attribute a click to a
+    /// specific input device. We use gesture recency as a proxy: a tap is
+    /// only credited to the trackpad if a confirmed trackpad gesture
+    /// happened within `tapAttributionWindow` seconds before it. Otherwise
+    /// the click came from somewhere else (mouse, virtual click) and we
+    /// drop it. This stops external-mouse clicks from being double-counted
+    /// as trackpad taps. The trade-off: pure tap-only-no-scroll users get
+    /// no taps registered until they touch the trackpad surface — a known
+    /// false negative we accept to eliminate the false positive.
+    private var lastTrackpadGestureAt: Date = .distantPast
+    /// Click → trackpad attribution window. A leftMouseDown within this
+    /// many seconds after a confirmed trackpad gesture is credited to the
+    /// trackpad; outside it, dropped (the click came from elsewhere).
+    private let tapAttributionWindow: TimeInterval = 0.5
     private var contactEnabled: Bool = true
     private var tappingEnabled: Bool = true
     private var circlingEnabled: Bool = true
@@ -229,6 +246,16 @@ public final class TrackpadActivitySource: StimulusSource {
     private func handleTapDown() {
         guard tappingEnabled else { return }
         let now = Date()
+        // DEVICE ATTRIBUTION: NSEvent's global .leftMouseDown monitor catches
+        // every left-click, including from external USB mice. Without this
+        // gate, a mouse click would fire trackpadTapping AND mouseClicked.
+        // Only count clicks as trackpad taps if a confirmed trackpad gesture
+        // happened recently — proxy for "the user's hand is on the trackpad."
+        let sinceGesture = now.timeIntervalSince(lastTrackpadGestureAt)
+        guard sinceGesture <= tapAttributionWindow else {
+            log.debug("activity:TrackpadTapDown dropped — \(String(format:"%.2f",sinceGesture))s since last trackpad gesture > \(tapAttributionWindow)s window; click attributed to other device")
+            return
+        }
         tapWindow.append(now)
         tapWindow.removeAll { now.timeIntervalSince($0) > 2.0 }
         let rate = Double(tapWindow.count) / 2.0
@@ -245,12 +272,22 @@ public final class TrackpadActivitySource: StimulusSource {
         let now = Date()
         switch event.type {
         case .scrollWheel:
+            // Only stamp the gesture timestamp when phase is non-empty (i.e.
+            // a confirmed trackpad gesture, not a mouse wheel — which has
+            // empty phase). Mouse-wheel scroll must NOT register the user's
+            // hand as being on the trackpad.
+            if !event.phase.isEmpty { lastTrackpadGestureAt = now }
             handleScroll(event, bus: bus, now: now)
         case .magnify:
+            // Magnify and rotate are trackpad-only gestures (or Magic Mouse;
+            // Magic Mouse counts as a trackpad-class touch surface for
+            // attribution purposes — it's the same pattern of finger-on-glass).
+            lastTrackpadGestureAt = now
             let mag = Float(abs(event.magnification)) * 10
             appendScroll(mag, now: now)
             evaluateScroll(bus: bus, now: now)
         case .rotate:
+            lastTrackpadGestureAt = now
             let mag = Float(abs(event.rotation)) / 10
             appendScroll(mag, now: now)
             evaluateScroll(bus: bus, now: now)
