@@ -82,6 +82,29 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
     private static let perceptualPrecision: Float = 0.98
     private static let recordMode: SnapshotTestingConfiguration.Record = .missing
 
+    /// Per-build-variant snapshot directory.
+    ///
+    /// This whole file is `#if DIRECT_BUILD`-gated, so the variant
+    /// branch always resolves to `Direct`. The selection still flows
+    /// through `#if DIRECT_BUILD` for symmetry with `SnapshotUI_Tests`'s
+    /// helper — keeping both files structurally identical means a
+    /// future contributor can copy-paste the helper to a third
+    /// snapshot suite without rethinking path layout.
+    private static func snapshotDirectory(filePath: StaticString) -> String {
+        let testFileURL = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
+        let testsDir = testFileURL.deletingLastPathComponent()
+        #if DIRECT_BUILD
+        let variant = "Direct"
+        #else
+        let variant = "AppStore"
+        #endif
+        return testsDir
+            .appendingPathComponent("__Snapshots__")
+            .appendingPathComponent(variant)
+            .appendingPathComponent("SnapshotUI_Direct_Tests")
+            .path
+    }
+
     private func assertImageSnapshot<V: View>(
         of view: V,
         named name: String? = nil,
@@ -94,13 +117,11 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
         host.frame = NSRect(origin: .zero, size: size)
         host.layoutSubtreeIfNeeded()
 
-        // `#file` under SwiftPM Swift 6 reports `<module>/<basename>.swift`,
-        // which would steer the default snapshot directory at the module
-        // name (e.g. `YameteTests/__Snapshots__/`) instead of the file's
-        // actual on-disk neighbour. Forward `#filePath` (the real
-        // filesystem path) into `verifySnapshot`'s `file:` argument so
-        // baselines land at `Tests/__Snapshots__/SnapshotUI_Direct_Tests/*.png`
-        // next to this file, mirroring `SnapshotUI_Tests`'s layout.
+        // Baselines land at
+        // `Tests/__Snapshots__/Direct/SnapshotUI_Direct_Tests/*.png`
+        // — Direct-only cells live exclusively in the Direct variant
+        // tree, mirroring the AppStore/Direct split applied to the
+        // shared `SnapshotUI_Tests` suite.
         withSnapshotTesting(record: Self.recordMode) {
             let failure = verifySnapshot(
                 of: host as NSView,
@@ -110,6 +131,7 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
                     size: size
                 ),
                 named: name,
+                snapshotDirectory: Self.snapshotDirectory(filePath: filePath),
                 file: filePath,
                 testName: testName,
                 line: line

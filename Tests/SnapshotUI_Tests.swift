@@ -74,6 +74,34 @@ final class SnapshotUI_Tests: XCTestCase {
     /// to `.missing` before pushing.
     private static let recordMode: SnapshotTestingConfiguration.Record = .missing
 
+    /// Per-build-variant snapshot directory.
+    ///
+    /// Phase 3 split: shared cells render subtly differently under
+    /// `DIRECT_BUILD` (e.g. `FooterSection`'s right column composes a
+    /// version + chevron pill instead of skipping, `ResponseSection`'s
+    /// audio card surfaces a Direct-only `EnableToggleRow`). To keep
+    /// both builds covered by pixel-baselines without one variant
+    /// overwriting the other's, baselines live in build-variant
+    /// subdirectories under `__Snapshots__/`.
+    ///
+    /// `#filePath` resolves to the absolute path of this test file at
+    /// compile time. We strip the file basename and append the variant
+    /// directory + the test class's snapshot subdirectory.
+    private static func snapshotDirectory(filePath: StaticString) -> String {
+        let testFileURL = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
+        let testsDir = testFileURL.deletingLastPathComponent()
+        #if DIRECT_BUILD
+        let variant = "Direct"
+        #else
+        let variant = "AppStore"
+        #endif
+        return testsDir
+            .appendingPathComponent("__Snapshots__")
+            .appendingPathComponent(variant)
+            .appendingPathComponent("SnapshotUI_Tests")
+            .path
+    }
+
     private func assertImageSnapshot<V: View>(
         of view: V,
         named name: String? = nil,
@@ -86,13 +114,12 @@ final class SnapshotUI_Tests: XCTestCase {
         host.frame = NSRect(origin: .zero, size: size)
         host.layoutSubtreeIfNeeded()
 
-        // `#file` under SwiftPM Swift 6 reports `<module>/<basename>.swift`,
-        // which would steer the default snapshot directory at the module
-        // name (e.g. `YameteTests/__Snapshots__/`) instead of the file's
-        // actual on-disk neighbour. We forward `#filePath` (the real
-        // filesystem path) into `verifySnapshot`'s `file:` argument so
-        // baselines land at `Tests/__Snapshots__/SnapshotUI_Tests/*.png`
-        // next to this file, the conventional snapshot-testing layout.
+        // Baselines land at
+        // `Tests/__Snapshots__/{AppStore,Direct}/SnapshotUI_Tests/*.png`
+        // depending on whether `DIRECT_BUILD` is defined at compile
+        // time (see `snapshotDirectory(filePath:)`). The library's
+        // default `__Snapshots__/<class>/` layout next to the test
+        // file would clobber one variant's baselines with the other's.
         withSnapshotTesting(record: Self.recordMode) {
             let failure = verifySnapshot(
                 of: host as NSView,
@@ -102,6 +129,7 @@ final class SnapshotUI_Tests: XCTestCase {
                     size: size
                 ),
                 named: name,
+                snapshotDirectory: Self.snapshotDirectory(filePath: filePath),
                 file: filePath,
                 testName: testName,
                 line: line

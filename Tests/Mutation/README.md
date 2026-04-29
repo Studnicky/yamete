@@ -1119,7 +1119,14 @@ menu UI's structural composition. These cells render real SwiftUI
 views into `NSHostingView`, capture the bitmap via the
 `pointfreeco/swift-snapshot-testing` `image` strategy, and compare
 against committed PNG baselines under
-`Tests/__Snapshots__/SnapshotUI_Tests/`.
+`Tests/__Snapshots__/{AppStore,Direct}/SnapshotUI_Tests/` —
+per-build-variant subdirectories selected at compile time via
+`#if DIRECT_BUILD` inside the suite's `snapshotDirectory(filePath:)`
+helper. Phase 3 added the variant split because shared cells could
+render subtly differently under DIRECT_BUILD (extra DIRECT-only
+widgets, different `Updater.currentVersion` resolution, different
+feature-gate visibility); without per-build baselines one variant's
+recording would clobber the other.
 
 The bug class targeted: regressions in `AccordionCard` row-height
 geometry, `PillButton` framing, accordion expand/collapse layout,
@@ -1165,11 +1172,20 @@ Determinism strategy:
    reads `Bundle.main.infoDictionary`, which differs between
    `swift test` (xctest bundle) and the shipped app.
 
-To regenerate baselines locally: flip `recordMode` in
-`SnapshotUI_Tests.swift` from `.missing` to `.all`, run
-`swift test --filter SnapshotUI_Tests`, commit the resulting
-`Tests/__Snapshots__/SnapshotUI_Tests/*.png`, then revert
-`recordMode` back to `.missing`.
+To regenerate baselines locally: leave `recordMode` at `.missing`
+and delete the existing PNGs you want re-recorded — the suite
+auto-records anything missing on the next run. For App Store
+baselines run `swift test --filter SnapshotUI_Tests`; for the
+DIRECT_BUILD variant run
+`swift test -Xswiftc -DDIRECT_BUILD --filter SnapshotUI_Tests`.
+Commit both
+`Tests/__Snapshots__/AppStore/SnapshotUI_Tests/*.png` and
+`Tests/__Snapshots__/Direct/SnapshotUI_Tests/*.png` so each build
+variant has its own ground truth. Phase 3's initial recording
+showed every shared cell rendering byte-identical between AppStore
+and Direct (the `FooterSection` cell skips under DIRECT_BUILD per
+its own `XCTSkip`); the split is forward-compat infrastructure for
+when DIRECT-only widgets land in shared sections.
 
 These cells are NOT in `mutation-catalog.json`. They are visual
 regression nets, not per-gate behaviour anchors — a single mutation
@@ -1183,7 +1199,11 @@ catalog-anchor drift under `make mutate`'s strict
 adds surface that never ships on the Store and therefore never gets
 exercised by the App Store snapshot suite. Phase 5 adds a parallel,
 `#if DIRECT_BUILD`-gated suite at `Tests/SnapshotUI_Direct_Tests.swift`
-with baselines under `Tests/__Snapshots__/SnapshotUI_Direct_Tests/`.
+with baselines under
+`Tests/__Snapshots__/Direct/SnapshotUI_Direct_Tests/` (the
+DIRECT-variant slot of Phase 3's per-build subdirectory split — there
+is no `AppStore/SnapshotUI_Direct_Tests/` because the entire suite is
+gated out under default builds).
 
 Direct-only surface covered:
 
@@ -1244,12 +1264,11 @@ explicit). The new wrinkle:
   `MenuBarView` to avoid the `NSScreen.screens`-driven
   `maxScrollHeight` host dependency.
 
-To regenerate baselines locally: flip `recordMode` in
-`SnapshotUI_Direct_Tests.swift` from `.missing` to `.all`, run
-`swift test -Xswiftc -DDIRECT_BUILD --filter SnapshotUI_Direct_Tests`,
-commit the resulting
-`Tests/__Snapshots__/SnapshotUI_Direct_Tests/*.png`, then revert
-`recordMode` back to `.missing`.
+To regenerate baselines locally: leave `recordMode` at `.missing`,
+delete the PNGs you want re-recorded under
+`Tests/__Snapshots__/Direct/SnapshotUI_Direct_Tests/`, and run
+`swift test -Xswiftc -DDIRECT_BUILD --filter SnapshotUI_Direct_Tests`.
+Missing baselines auto-record on the next run; commit the PNGs.
 
 These cells are NOT in `mutation-catalog.json` for the same reason
 as the App Store snapshot cells — they're visual regression nets,
