@@ -1212,6 +1212,117 @@ un-covered punch-list. Trace-log lines (`log.{debug,info,warning,
 error,trace,notice}`) are skipped — keywords like `threshold` /
 `debounce` appear in log format strings, not in control flow.
 
+## UI gate cells (Phase 7b)
+
+Phase 7 promoted 14 UI gates and explicitly deferred four files whose
+gates live inside SwiftUI bodies / `Layout` protocol implementations:
+`RangeSlider.swift`, `FlowLayout.swift`, `SensitivityRuler.swift`,
+`Updater.swift`. Phase 7b closes that defer for the three files whose
+gates are reachable through an offscreen `NSHostingView` render and
+documents the production seam each remaining gate would need.
+
+### `Sources/YameteApp/Views/FlowLayout.swift` — five caught gates
+
+`FlowLayout` is a `Layout` protocol implementation; its decisions
+(wrap, row-spacing accumulation, row-height max, nil-proposal
+fallback, empty-row fallback) all surface as differences in the
+`NSHostingView` intrinsic content size when a controlled set of
+fixed-size children is rendered through it. Cells live in
+`Tests/Integration/UIGatesPhase7B_Tests.swift` and pin:
+
+- `ui-flowLayout-wrap-row-full` — three 60×30 children proposed into a
+  100pt row must wrap to multiple rows (≥ 60pt height). Mutating the
+  wrap predicate to always-true collapses to one row of 30pt.
+- `ui-flowLayout-empty-row-fallback` — oversized first item (100×30 in
+  a 20pt row) must NOT leave the initial empty `Row()` orphaned.
+  Mutating `|| lastRow.indices.isEmpty` to `|| false` adds an extra
+  inter-row spacing to the rendered total.
+- `ui-flowLayout-inter-row-spacing` — three-row layout's height must
+  include `spacing × (rows − 1)`. Dropping the accumulator drops the
+  height by 40pt at spacing=20.
+- `ui-flowLayout-nil-proposal-infinity` — under
+  `.fixedSize(horizontal: true)` the parent proposes `nil` width; the
+  `?? .infinity` fallback keeps everything on one row. Flipping to
+  `?? 0` puts every item on its own row (5 children × 30pt → 166pt).
+- `ui-flowLayout-row-height-max` — a row containing a 30pt-tall child
+  followed by a 60pt-tall child must report the 60pt height. Dropping
+  the running max collapses the row to the first child's 30pt.
+
+### `Sources/YameteApp/Views/RangeSlider.swift` — one caught gate
+
+The clamp / swap branches inside the `DragGesture.onChanged` closure
+(value-overshoot → swap, position-clamp to `half...half+usable`,
+`.clamped(to: 0...1)` projection) cannot be invoked from a unit test
+without either pumping a synthetic `NSEvent` stream or extracting the
+math into a `static` helper. Phase 7b is additive on the test side
+only — the gesture-resident gates remain un-pinned and need a
+production seam (a static `clamp(low:high:bounds:locationX:width:)`
+helper exposed at internal visibility). One observable gate IS reached
+without refactor:
+
+- `ui-rangeSlider-default-labelWidth` — the struct's default
+  `labelWidth: CGFloat = 40` adds 80pt to the rendered intrinsic
+  width when no caller overrides it. Cell renders with
+  `.fixedSize(horizontal: true, vertical: true)` so the natural
+  HStack width is reported; mutating the default to 0 collapses the
+  label columns.
+
+### `Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift` — two caught gates
+
+`SensitivityRuler` is a small static-content view (5-element ticks
+array, hardcoded localized labels, hardcoded gutter widths). Cells
+pin the two surface-level constants whose mutation produces an
+observable intrinsic-size delta:
+
+- `ui-sensitivityRuler-intrinsic-height` — the inner GeometryReader
+  has no intrinsic height; `.frame(height: 16)` is what gives the
+  ruler its 16pt vertical footprint. Zeroing the frame collapses the
+  rendered intrinsic height.
+- `ui-sensitivityRuler-left-gutter-width` — the leading
+  `Spacer().frame(width: 50)` provides a 50pt gutter between the
+  panel edge and the tick region. The right gutter has identical
+  surface text, so the catalog `search` is multi-line, anchored on
+  the `GeometryReader` directly following the LEFT gutter, to ensure
+  uniqueness.
+
+The `tick.position * w` per-tick placement formula and the 5-element
+ticks-array contents (positions 0.0/0.25/0.5/0.75/1.0, labels
+`tier_hard`/`firm`/`medium`/`light`/`tap`) live in a `private static`
+constant inside a SwiftUI `body` `ForEach`. Mutating any single
+position or label key produces a bitmap-level delta that is not
+exposed through `intrinsicContentSize` — pinning these gates would
+require either bitmap-fingerprint snapshots (heavy, host-sensitive)
+or a production seam (e.g. `internal static var ticks`) so the array
+is directly inspectable from a test. Both options are deferred until
+a regression motivates the cost.
+
+### `Sources/YameteApp/Updater.swift` — gates deferred (production seam required)
+
+Two distinct gates surveyed; both are unreachable from this harness
+without modifying production:
+
+1. `Updater.isNewer(remote:local:)` is `private static` and lives
+   inside the `#if DIRECT_BUILD` branch. Testing the semver compare
+   directly requires either widening visibility (`internal`) or
+   extracting the function as a stand-alone helper that compiles
+   under both build configurations.
+
+2. The App-Store stub init's `?? "1.0.0"` fallback is non-observable
+   under SPM `swift test`. `Bundle.main` resolves to the `xctest`
+   runner whose Info.plist already supplies a non-nil
+   `CFBundleShortVersionString` ("16.0" on macOS 16), so the
+   left-hand side of the `??` always wins. A mutation flipping the
+   fallback string never reaches the observable `currentVersion`.
+   Closing this gap requires a production seam that injects `Bundle`
+   (or a static helper resolving the version from a passed-in
+   dictionary) so the test can drive the nil-info-key path
+   deterministically.
+
+Until either seam exists, no Updater catalog entry is filed. The
+ESCAPE shape is documented here so a future contributor adding the
+seam can find this section, add the missing cell, and remove this
+note in the same PR.
+
 ## Performance baseline (Phase 6)
 
 Functional pass/fail in `Tests/Performance_Tests.swift` already asserts

@@ -838,6 +838,78 @@
       "replace": "if false { visualResponseMode = .overlay }",
       "search": "if flashEnabled && visualResponseMode == .off { visualResponseMode = .overlay }",
       "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "FlowLayout.makeRows — flatten the wrap predicate so every item joins row 0; multi-row layouts must NOT collapse to a single row when ideal width exceeds the proposal.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_wrapsWhenRowFull",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-wrap-row-full]",
+      "id": "ui-flowLayout-wrap-row-full",
+      "replace": "if true || lastRow.indices.isEmpty {",
+      "search": "if proposed <= maxWidth || lastRow.indices.isEmpty {",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.makeRows — drop the empty-row fallback so an oversized first item lands in a fresh row, leaving the initial Row() orphaned and inflating total height by one inter-row spacing.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_emptyRowFallback",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-empty-row-fallback]",
+      "id": "ui-flowLayout-empty-row-fallback",
+      "replace": "if proposed <= maxWidth || false {",
+      "search": "if proposed <= maxWidth || lastRow.indices.isEmpty {",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.sizeThatFits — drop the inter-row spacing accumulator; multi-row totalHeight must include spacing * (rows - 1).",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_interRowSpacingAccumulator",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-inter-row-spacing]",
+      "id": "ui-flowLayout-inter-row-spacing",
+      "replace": "+ 0.0",
+      "search": "+ spacing * CGFloat(max(0, rows.count - 1))",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.sizeThatFits — flip the nil-proposal-width fallback from .infinity to 0; rendering with no parent width constraint must NOT force every item onto its own row.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_nilProposalFallsBackToInfinity",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-nil-proposal-infinity]",
+      "id": "ui-flowLayout-nil-proposal-infinity",
+      "replace": "let maxWidth = proposal.width ?? 0",
+      "search": "let maxWidth = proposal.width ?? .infinity",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.makeRows — stop tracking the running max child height per row; rows containing a tall child after a short child must report the tall height, not the short one.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_rowHeightTakesMaxOfChildren",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-row-height-max]",
+      "id": "ui-flowLayout-row-height-max",
+      "replace": "rows[lastIdx].height = rows[lastIdx].height",
+      "search": "rows[lastIdx].height = max(rows[lastIdx].height, h)",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "RangeSlider — collapse the default labelWidth from 40 to 0; default-call sites lose all label real estate and the slider's intrinsic width drops by 80pt.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_defaultLabelWidth",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-default-labelWidth]",
+      "id": "ui-rangeSlider-default-labelWidth",
+      "replace": "var labelWidth: CGFloat = 0",
+      "search": "var labelWidth: CGFloat = 40",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "SensitivityRuler — zero out the GeometryReader's vertical frame; the ruler must retain its 16pt vertical footprint so the menu-bar layout stays stable.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_intrinsicHeight",
+      "expectedFailureSubstring": "[ui-gate=sensitivityRuler-intrinsic-height]",
+      "id": "ui-sensitivityRuler-intrinsic-height",
+      "replace": ".frame(height: 0)",
+      "search": ".frame(height: 16)",
+      "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
+    },
+    {
+      "description": "SensitivityRuler — collapse the LEFT-gutter Spacer width from 50 to 0; the menu-bar tick region must keep its left padding so labels never crowd the panel edge. Multi-line search disambiguates the left gutter (followed by the GeometryReader) from the right gutter (followed by the HStack close).",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_leftGutterWidth",
+      "expectedFailureSubstring": "[ui-gate=sensitivityRuler-left-gutter-width]",
+      "id": "ui-sensitivityRuler-left-gutter-width",
+      "replace": "Spacer().frame(width: 0)\n            GeometryReader",
+      "search": "Spacer().frame(width: 50)\n            GeometryReader",
+      "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
     }
   ]
 }
