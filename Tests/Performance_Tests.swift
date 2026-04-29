@@ -63,6 +63,20 @@ final class Performance_Tests: XCTestCase {
         return ProcessInfo.processInfo.systemUptime
     }
 
+    /// Emit a machine-readable PERFMETRIC line that `scripts/perf-baseline.sh`
+    /// greps from `swift test` stdout to extract per-cell wallclock + memory
+    /// measurements. The prefix is stable; the parser anchors on it. Format:
+    ///   PERFMETRIC: cell=<name> wallclock=<seconds> memory=<bytes>
+    /// Cells call this once at the end of their measurement block. Memory is
+    /// the resident-set delta since the cell's measurement baseline; wallclock
+    /// is the cell's primary timed loop. The driver does NOT inspect XCTest
+    /// pass/fail — that's handled by the existing assertions. PERFMETRIC is a
+    /// pure observability emit; unrelated to whether the cell asserts pass.
+    private func emitPerfMetric(cell: String, wallclock: TimeInterval, memory: Int) {
+        // Stable single-line format. Driver greps for "PERFMETRIC: cell=".
+        print("PERFMETRIC: cell=\(cell) wallclock=\(wallclock) memory=\(memory)")
+    }
+
     // MARK: - Bus helper
 
     private func makeBus() async -> ReactionBus {
@@ -92,6 +106,7 @@ final class Performance_Tests: XCTestCase {
         var maxDeltaBytes = 0
         var imbalanceCycle = -1
         var firstImbalance: (installs: Int, removals: Int) = (0, 0)
+        let cellStart = wallclockNow()
 
         for cycle in 0..<cycles {
             let monitor = MockEventMonitor()
@@ -124,6 +139,9 @@ final class Performance_Tests: XCTestCase {
         // capture but enough to flag a real retention).
         XCTAssertLessThan(maxDeltaBytes, 5 * 1024 * 1024,
             "[scenario=trackpad-cycle cell=memory-bound] consumed \(maxDeltaBytes) bytes over \(cycles) cycles; >5MB suggests per-cycle retention")
+        emitPerfMetric(cell: "testTrackpadStartStopCycleLeakGuard",
+                       wallclock: wallclockNow() - cellStart,
+                       memory: maxDeltaBytes)
     }
 
     // MARK: - Cell 2: MouseActivitySource N-cycle leak guard
@@ -137,6 +155,7 @@ final class Performance_Tests: XCTestCase {
         let memBaseline = availableMemory()
         var maxDeltaBytes = 0
         var imbalanceCycle = -1
+        let cellStart = wallclockNow()
 
         for cycle in 0..<cycles {
             let monitor = MockEventMonitor()
@@ -159,6 +178,9 @@ final class Performance_Tests: XCTestCase {
         if finalDelta > maxDeltaBytes { maxDeltaBytes = finalDelta }
         XCTAssertLessThan(maxDeltaBytes, 5 * 1024 * 1024,
             "[scenario=mouse-cycle cell=memory-bound] consumed \(maxDeltaBytes) bytes over \(cycles) cycles")
+        emitPerfMetric(cell: "testMouseStartStopCycleLeakGuard",
+                       wallclock: wallclockNow() - cellStart,
+                       memory: maxDeltaBytes)
     }
 
     // MARK: - Cell 3: ReactionBus N-emit retention
@@ -175,6 +197,7 @@ final class Performance_Tests: XCTestCase {
         let total = 10_000
 
         let memBaseline = availableMemory()
+        let cellStart = wallclockNow()
 
         // Consumer drains aggressively in parallel with publishes.
         let consumerTask = Task<Int, Never> {
@@ -214,6 +237,9 @@ final class Performance_Tests: XCTestCase {
         // every reaction would blow past this.
         XCTAssertLessThan(consumed, 10 * 1024 * 1024,
             "[scenario=bus-fanout cell=memory-bound] consumed=\(consumed) bytes over \(total) publishes — bus must drop oldest at busBufferDepth")
+        emitPerfMetric(cell: "testReactionBusHighPublishVolumeRetention",
+                       wallclock: wallclockNow() - cellStart,
+                       memory: consumed)
     }
 
     // MARK: - Cell 4: Per-source `_inject*` sustained throughput
@@ -242,6 +268,8 @@ final class Performance_Tests: XCTestCase {
         let chunks = 10
         let perChunk = 500
         let identityModulus = 50  // see header note
+        let memBaseline = availableMemory()
+        let cellStart = wallclockNow()
 
         // USB
         try await assertSustainedThroughput(name: "USBSource", chunks: chunks, perChunk: perChunk) {
@@ -299,6 +327,10 @@ final class Performance_Tests: XCTestCase {
                 }
             }
         }
+
+        emitPerfMetric(cell: "testIOKitSourceInjectSustainedThroughput",
+                       wallclock: wallclockNow() - cellStart,
+                       memory: bytesConsumedSince(memBaseline))
     }
 
     /// Drive a `_inject` loop in N chunks, time each, and assert the
@@ -363,6 +395,7 @@ final class Performance_Tests: XCTestCase {
 
         let memBaseline = availableMemory()
         let count = 20_000
+        let cellStart = wallclockNow()
 
         for i in 0..<count {
             // Mix transports: USB clicks pass production filter; SPI
@@ -386,6 +419,9 @@ final class Performance_Tests: XCTestCase {
         // so the regression target is the next order of magnitude).
         XCTAssertLessThan(consumed, 20 * 1024 * 1024,
             "[scenario=mouse-coalesce cell=memory-bound] \(count) injectClick calls consumed \(consumed) bytes; >20MB suggests orphan Task accumulation")
+        emitPerfMetric(cell: "testMouseInjectClickCoalescePressure",
+                       wallclock: wallclockNow() - cellStart,
+                       memory: consumed)
     }
 
     // MARK: - Cell 6: Bus close + reopen cycle
@@ -399,6 +435,7 @@ final class Performance_Tests: XCTestCase {
         let memBaseline = availableMemory()
         var maxDelta = 0
         var maxLiveSubscriberCount = 0
+        let cellStart = wallclockNow()
 
         for cycle in 0..<cycles {
             let bus = await makeBus()
@@ -430,6 +467,9 @@ final class Performance_Tests: XCTestCase {
         // its own bus.)
         XCTAssertLessThanOrEqual(maxLiveSubscriberCount, 1,
             "[scenario=bus-cycle cell=subscriber-bound] max live subscriber count was \(maxLiveSubscriberCount); per-cycle bus must not accumulate subscribers")
+        emitPerfMetric(cell: "testBusOpenSubscribeCloseCycle",
+                       wallclock: wallclockNow() - cellStart,
+                       memory: maxDelta)
     }
 
     // MARK: - Cell 7: CPU upper bound check (smoke)
@@ -451,14 +491,19 @@ final class Performance_Tests: XCTestCase {
         source.start(publishingTo: bus)
 
         let calls = 1_000
+        let memBaseline = availableMemory()
         let start = wallclockNow()
         for i in 0..<calls {
             await source._injectAttach(vendor: "v\(i)", product: "p\(i)")
         }
         let elapsed = wallclockNow() - start
+        let consumed = bytesConsumedSince(memBaseline)
         await bus.close()
 
         XCTAssertLessThan(elapsed, 5.0,
             "[scenario=usb-cpu-smoke cell=upper-bound] \(calls) injectAttach calls took \(elapsed)s; >5s suggests ~7x regression vs ~700ms baseline")
+        emitPerfMetric(cell: "testUSBInjectThroughputCPUUpperBound",
+                       wallclock: elapsed,
+                       memory: consumed)
     }
 }

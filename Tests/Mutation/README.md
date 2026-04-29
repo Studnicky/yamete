@@ -1211,3 +1211,88 @@ Coverage scan: `bash scripts/mutation-test.sh --coverage` walks both
 un-covered punch-list. Trace-log lines (`log.{debug,info,warning,
 error,trace,notice}`) are skipped — keywords like `threshold` /
 `debounce` appear in log format strings, not in control flow.
+
+## Performance baseline (Phase 6)
+
+Functional pass/fail in `Tests/Performance_Tests.swift` already asserts
+RATIO bounds inside each cell (e.g. second-half median wallclock ≤ 3×
+first-half median; resident-set delta < N MB). What it could not catch
+on its own: a uniform 2× CPU regression that stays within the per-cell
+internal ratio, or slow drift across releases. Phase 6 adds an
+absolute-baseline layer on top.
+
+### Files
+
+- `Tests/Performance/baselines.json` — committed per-cell baselines
+  (wallclock seconds, memory delta bytes, host arch, ISO 8601 capture
+  timestamp, tolerance factor). Schema:
+
+  ```json
+  {
+    "cells": {
+      "<test_method_name>": {
+        "wallclock_seconds": 0.0,
+        "memory_delta_bytes": 0,
+        "captured_at": "2026-04-29T00:00:00Z",
+        "host_arch": "arm64",
+        "tolerance_factor": 2.0
+      }
+    }
+  }
+  ```
+
+- `scripts/perf-baseline.sh` — runs `swift test --filter
+  Performance_Tests`, parses the `PERFMETRIC: cell=… wallclock=…
+  memory=…` lines each cell prints, compares each measurement against
+  the baseline file with that cell's `tolerance_factor` (default 2.0×).
+  Pre-flight refuses a dirty `Sources/` tree (uncommitted production
+  edits would muddy a measurement) and verifies `swift build` succeeds
+  before the run. Reports per-cell PASS / FAIL plus an aggregate
+  `total / passed / regressed / missing` summary.
+
+- `scripts/perf-baseline-record.sh` — overwrites `baselines.json` with
+  fresh measurements. Foot-gun guarded behind `YAMETE_BASELINE_RECORD=1`
+  so a dropped tolerance can't silently re-bless a regression.
+
+### Make targets
+
+```
+make perf-baseline                                   # check vs baselines.json
+YAMETE_BASELINE_RECORD=1 make perf-baseline-record   # capture fresh
+```
+
+### Cell wiring
+
+Each cell in `Performance_Tests.swift` calls `emitPerfMetric(cell:
+wallclock: memory:)` once at the end of its measurement block. The
+helper prints a single stable line:
+
+```
+PERFMETRIC: cell=<test_method_name> wallclock=<seconds> memory=<bytes>
+```
+
+The driver greps these lines from `swift test` stdout — XCTest pass /
+fail is independent of baseline comparison. A cell that fails its
+internal ratio assertion still emits the line, which lets the perf
+driver report both signals separately.
+
+### Workflow
+
+1. Land a perf-relevant change. Run `make perf-baseline`.
+2. If the script reports PASS for every cell → no action.
+3. If it reports a regression → diagnose: real regression in your
+   change, host noise, or a legitimate methodology change.
+   - Real regression → fix the production code.
+   - Host noise → re-run; if persistent, investigate environment.
+   - Legitimate improvement (cell got faster or uses less memory) →
+     run `YAMETE_BASELINE_RECORD=1 make perf-baseline-record`,
+     review `git diff Tests/Performance/baselines.json`, commit the
+     update alongside the change.
+4. CI runs `make perf-baseline` on every PR (Phase 2 wiring).
+
+### Per-cell tolerance overrides
+
+The default `tolerance_factor` is 2.0× (a 2× drift fires). Cells that
+are inherently noisy (e.g. ones dominated by `Task.yield()` cost) can
+have their factor bumped per-entry in `baselines.json` — the recorder
+preserves any non-default value when re-writing.

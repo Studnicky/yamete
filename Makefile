@@ -92,7 +92,7 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 SIGNING_ID ?= -
 
 .PHONY: all build test install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
-        appstore appstore-install appstore-lint mutate
+        appstore appstore-install appstore-lint mutate perf-baseline perf-baseline-record
 
 all: build
 
@@ -240,6 +240,27 @@ appstore-lint:
 # ── Test ──────────────────────────────────────────────────────
 test:
 	@swift test
+
+# ── Performance baseline regression detection ────────────────
+# `Tests/Performance_Tests.swift` cells assert RATIO bounds (second-half
+# median ≤ 3× first-half median) inside each cell, but a 2× CPU
+# regression that stays within that ratio slips through. The
+# perf-baseline pair adds absolute-baseline tracking on top:
+#
+#   make perf-baseline         compare current run vs Tests/Performance/baselines.json
+#                              fails on any cell exceeding its tolerance_factor
+#                              (default 2.0×). Use in PR/CI gates.
+#
+#   make perf-baseline-record  capture a fresh baselines.json. Foot-gun
+#                              guarded behind YAMETE_BASELINE_RECORD=1
+#                              so accidental "blessing" of a regression
+#                              is impossible. Use only after a deliberate
+#                              perf-improving change has landed.
+perf-baseline:
+	@scripts/perf-baseline.sh
+
+perf-baseline-record:
+	@scripts/perf-baseline-record.sh
 
 # ── Mutate (mutation-test runner) ─────────────────────────────
 # Drives Tests/Mutation/mutation-catalog.json: applies each declarative
