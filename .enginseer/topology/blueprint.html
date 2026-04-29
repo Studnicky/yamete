@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project - TypeScript Architecture Topology</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #e2e8f0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .header {
+      max-width: 1200px;
+      margin: 0 auto 40px;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      color: #f1f5f9;
+    }
+
+    .header p {
+      color: #94a3b8;
+      font-size: 1.1rem;
+    }
+
+    .stats {
+      display: flex;
+      gap: 30px;
+      margin-top: 20px;
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #60a5fa;
+    }
+
+    .stat-label {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 20px;
+    }
+
+    .module {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .module:hover {
+      border-color: #475569;
+      background: rgba(30, 41, 59, 1);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.5);
+    }
+
+    .module h3 {
+      color: #f1f5f9;
+      margin-bottom: 8px;
+      font-size: 1.2rem;
+    }
+
+    .module code {
+      display: block;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 8px 12px;
+      border-radius: 4px;
+      color: #7dd3fc;
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .symbols {
+      margin-top: 12px;
+    }
+
+    .symbols ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .symbols li {
+      padding: 6px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cbd5e1;
+      font-size: 0.95rem;
+    }
+
+    .symbols em {
+      color: #64748b;
+      font-style: italic;
+    }
+
+    .kind {
+      display: inline-block;
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 0.8rem;
+      font-family: 'Courier New', monospace;
+    }
+
+    .footer {
+      max-width: 1200px;
+      margin: 40px auto 0;
+      padding-top: 20px;
+      border-top: 1px solid #334155;
+      color: #64748b;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Project</h1>
+    <p>TypeScript Architecture Topology</p>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">53</div>
+        <div class="stat-label">Modules</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">109</div>
+        <div class="stat-label">Symbols</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    
+        <div class="module">
+          <h3>@media (max-width: 700px)</h3>
+          <code>docs/architecture.html#@media (max-width: 700px)</code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>@media (max-width: 700px)</h3>
+          <code>docs/index.html#@media (max-width: 700px)</code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>@media (max-width: 700px)</h3>
+          <code>docs/privacy.html#@media (max-width: 700px)</code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>@media (max-width: 700px)</h3>
+          <code>docs/support.html#@media (max-width: 700px)</code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>info</h3>
+          <code>App/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json#info</code>
+          <div class="symbols">
+            <ul><li>author <span class="kind">constant</span></li><li>version <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>docs/_includes/what-it-does</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>CLAUDE</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>docs/sensor-kickstart/README</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>docs/_includes/under-the-hood</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>LICENSES-CONTENT</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>Tests/README</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>ARCHITECTURE</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>README</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>docs/INSTALLATION</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>CHANGELOG</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>PRIVACY</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>docs/REMEDIATION</h3>
+          <code></code>
+          <div class="symbols">
+            <em>No symbols exported</em>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>options</h3>
+          <code>project.yml#options</code>
+          <div class="symbols">
+            <ul><li>bundleIdPrefix <span class="kind">constant</span></li><li>deploymentTarget <span class="kind">module</span></li><li>xcodeVersion <span class="kind">constant</span></li><li>createIntermediateGroups <span class="kind">constant</span></li><li>defaultConfig <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>deploymentTarget</h3>
+          <code>project.yml#deploymentTarget</code>
+          <div class="symbols">
+            <ul><li>macOS <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>configs</h3>
+          <code>project.yml#configs</code>
+          <div class="symbols">
+            <ul><li>Debug <span class="kind">constant</span></li><li>DebugDirect <span class="kind">constant</span></li><li>ReleaseAppStore <span class="kind">constant</span></li><li>ReleaseDirect <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>settings</h3>
+          <code>project.yml#settings</code>
+          <div class="symbols">
+            <ul><li>base <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>base</h3>
+          <code>project.yml#base</code>
+          <div class="symbols">
+            <ul><li>SWIFT_VERSION <span class="kind">constant</span></li><li>SWIFT_STRICT_CONCURRENCY <span class="kind">constant</span></li><li>MACOSX_DEPLOYMENT_TARGET <span class="kind">constant</span></li><li>ARCHS <span class="kind">constant</span></li><li>DEVELOPMENT_LANGUAGE <span class="kind">constant</span></li><li>PRODUCT_BUNDLE_IDENTIFIER <span class="kind">constant</span></li><li>MARKETING_VERSION <span class="kind">constant</span></li><li>CURRENT_PROJECT_VERSION <span class="kind">constant</span></li><li>ENABLE_HARDENED_RUNTIME <span class="kind">constant</span></li><li>CODE_SIGN_STYLE <span class="kind">constant</span></li><li>DEVELOPMENT_TEAM <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>packages</h3>
+          <code>project.yml#packages</code>
+          <div class="symbols">
+            <ul><li>Yamete <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>Yamete</h3>
+          <code>project.yml#Yamete</code>
+          <div class="symbols">
+            <ul><li>path <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>targets</h3>
+          <code>project.yml#targets</code>
+          <div class="symbols">
+            <ul><li>Yamete <span class="kind">module</span></li><li>YameteTests <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>Yamete</h3>
+          <code>project.yml#Yamete</code>
+          <div class="symbols">
+            <ul><li>type <span class="kind">constant</span></li><li>platform <span class="kind">constant</span></li><li>sources <span class="kind">variable</span></li><li>dependencies <span class="kind">variable</span></li><li>settings <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>settings</h3>
+          <code>project.yml#settings</code>
+          <div class="symbols">
+            <ul><li>base <span class="kind">module</span></li><li>configs <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>base</h3>
+          <code>project.yml#base</code>
+          <div class="symbols">
+            <ul><li>PRODUCT_NAME <span class="kind">constant</span></li><li>EXECUTABLE_NAME <span class="kind">constant</span></li><li>PRODUCT_BUNDLE_IDENTIFIER <span class="kind">constant</span></li><li>INFOPLIST_FILE <span class="kind">constant</span></li><li>ASSETCATALOG_COMPILER_APPICON_NAME <span class="kind">constant</span></li><li>CODE_SIGN_ENTITLEMENTS <span class="kind">constant</span></li><li>LD_RUNPATH_SEARCH_PATHS <span class="kind">constant</span></li><li>SWIFT_INCLUDE_PATHS <span class="kind">constant</span></li><li>HEADER_SEARCH_PATHS <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>configs</h3>
+          <code>project.yml#configs</code>
+          <div class="symbols">
+            <ul><li>Debug <span class="kind">module</span></li><li>DebugDirect <span class="kind">module</span></li><li>ReleaseAppStore <span class="kind">module</span></li><li>ReleaseDirect <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>Debug</h3>
+          <code>project.yml#Debug</code>
+          <div class="symbols">
+            <ul><li>SWIFT_OPTIMIZATION_LEVEL <span class="kind">constant</span></li><li>SWIFT_ACTIVE_COMPILATION_CONDITIONS <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>DebugDirect</h3>
+          <code>project.yml#DebugDirect</code>
+          <div class="symbols">
+            <ul><li>SWIFT_OPTIMIZATION_LEVEL <span class="kind">constant</span></li><li>SWIFT_ACTIVE_COMPILATION_CONDITIONS <span class="kind">constant</span></li><li>PRODUCT_NAME <span class="kind">constant</span></li><li>EXECUTABLE_NAME <span class="kind">constant</span></li><li>PRODUCT_BUNDLE_IDENTIFIER <span class="kind">constant</span></li><li>CODE_SIGN_ENTITLEMENTS <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>ReleaseAppStore</h3>
+          <code>project.yml#ReleaseAppStore</code>
+          <div class="symbols">
+            <ul><li>SWIFT_OPTIMIZATION_LEVEL <span class="kind">constant</span></li><li>SWIFT_COMPILATION_MODE <span class="kind">constant</span></li><li>DEAD_CODE_STRIPPING <span class="kind">constant</span></li><li>STRIP_INSTALLED_PRODUCT <span class="kind">constant</span></li><li>STRIP_SWIFT_SYMBOLS <span class="kind">constant</span></li><li>CODE_SIGN_ENTITLEMENTS <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>ReleaseDirect</h3>
+          <code>project.yml#ReleaseDirect</code>
+          <div class="symbols">
+            <ul><li>SWIFT_OPTIMIZATION_LEVEL <span class="kind">constant</span></li><li>SWIFT_COMPILATION_MODE <span class="kind">constant</span></li><li>SWIFT_ACTIVE_COMPILATION_CONDITIONS <span class="kind">constant</span></li><li>DEAD_CODE_STRIPPING <span class="kind">constant</span></li><li>STRIP_INSTALLED_PRODUCT <span class="kind">constant</span></li><li>STRIP_SWIFT_SYMBOLS <span class="kind">constant</span></li><li>PRODUCT_NAME <span class="kind">constant</span></li><li>EXECUTABLE_NAME <span class="kind">constant</span></li><li>PRODUCT_BUNDLE_IDENTIFIER <span class="kind">constant</span></li><li>CODE_SIGN_ENTITLEMENTS <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>YameteTests</h3>
+          <code>project.yml#YameteTests</code>
+          <div class="symbols">
+            <ul><li>type <span class="kind">constant</span></li><li>platform <span class="kind">constant</span></li><li>sources <span class="kind">variable</span></li><li>dependencies <span class="kind">variable</span></li><li>settings <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>settings</h3>
+          <code>project.yml#settings</code>
+          <div class="symbols">
+            <ul><li>base <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>base</h3>
+          <code>project.yml#base</code>
+          <div class="symbols">
+            <ul><li>PRODUCT_BUNDLE_IDENTIFIER <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>schemes</h3>
+          <code>project.yml#schemes</code>
+          <div class="symbols">
+            <ul><li>Yamete-AppStore <span class="kind">module</span></li><li>Yamete-Direct <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>Yamete-AppStore</h3>
+          <code>project.yml#Yamete-AppStore</code>
+          <div class="symbols">
+            <ul><li>build <span class="kind">module</span></li><li>run <span class="kind">module</span></li><li>test <span class="kind">module</span></li><li>profile <span class="kind">module</span></li><li>analyze <span class="kind">module</span></li><li>archive <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>build</h3>
+          <code>project.yml#build</code>
+          <div class="symbols">
+            <ul><li>targets <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>targets</h3>
+          <code>project.yml#targets</code>
+          <div class="symbols">
+            <ul><li>Yamete <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>run</h3>
+          <code>project.yml#run</code>
+          <div class="symbols">
+            <ul><li>config <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>test</h3>
+          <code>project.yml#test</code>
+          <div class="symbols">
+            <ul><li>config <span class="kind">constant</span></li><li>targets <span class="kind">variable</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>profile</h3>
+          <code>project.yml#profile</code>
+          <div class="symbols">
+            <ul><li>config <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>analyze</h3>
+          <code>project.yml#analyze</code>
+          <div class="symbols">
+            <ul><li>config <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>archive</h3>
+          <code>project.yml#archive</code>
+          <div class="symbols">
+            <ul><li>config <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>Yamete-Direct</h3>
+          <code>project.yml#Yamete-Direct</code>
+          <div class="symbols">
+            <ul><li>build <span class="kind">module</span></li><li>run <span class="kind">module</span></li><li>test <span class="kind">module</span></li><li>profile <span class="kind">module</span></li><li>analyze <span class="kind">module</span></li><li>archive <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>build</h3>
+          <code>project.yml#build</code>
+          <div class="symbols">
+            <ul><li>targets <span class="kind">module</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>targets</h3>
+          <code>project.yml#targets</code>
+          <div class="symbols">
+            <ul><li>Yamete <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>run</h3>
+          <code>project.yml#run</code>
+          <div class="symbols">
+            <ul><li>config <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>test</h3>
+          <code>project.yml#test</code>
+          <div class="symbols">
+            <ul><li>config <span class="kind">constant</span></li><li>targets <span class="kind">variable</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>profile</h3>
+          <code>project.yml#profile</code>
+          <div class="symbols">
+            <ul><li>config <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>analyze</h3>
+          <code>project.yml#analyze</code>
+          <div class="symbols">
+            <ul><li>config <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+        <div class="module">
+          <h3>archive</h3>
+          <code>project.yml#archive</code>
+          <div class="symbols">
+            <ul><li>config <span class="kind">constant</span></li></ul>
+          </div>
+        </div>
+      
+  </div>
+
+  <div class="footer">
+    <p>Generated by @hammer-media/topology · TypeScript Language Server powered</p>
+  </div>
+</body>
+</html>

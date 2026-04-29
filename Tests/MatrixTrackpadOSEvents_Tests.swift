@@ -626,8 +626,11 @@ final class MatrixTrackpadOSEvents_Tests: XCTestCase {
         let collectTask = Task { await self.collect(from: bus, seconds: 0.3) }
         try? await Task.sleep(for: .milliseconds(20))
 
-        // 30 sub-floor samples around a circle.
-        for i in 0..<30 {
+        // 40 sub-floor samples spanning ~1.33× around (40 deltas of 2π/30 ≈ 8.38 rad >> 2π).
+        // With the mag floor present, the very first guard rejects every sample so
+        // accumulation stays at zero. Removing the floor lets samples through and
+        // the rotation+event-count gate now passes — `.trackpadCircling` would fire.
+        for i in 0..<40 {
             let angle = Double(i) * (2.0 * .pi / 30.0)
             source._injectCircleSample(dx: Float(cos(angle) * 1.0), dy: Float(sin(angle) * 1.0))  // mag=1.0 < 2.0
         }
@@ -693,8 +696,9 @@ final class MatrixTrackpadOSEvents_Tests: XCTestCase {
         let collectTask = Task { await self.collect(from: bus, seconds: 0.3) }
         try? await Task.sleep(for: .milliseconds(20))
 
-        // 30 samples covering 2π radians at mag=5 (above floor).
-        for i in 0..<30 {
+        // 40 samples spanning ~1.33× around at mag=5 — accumulator clears 2π
+        // by sample ~33 (33 deltas of 2π/30 ≈ 6.91 rad > 2π).
+        for i in 0..<40 {
             let angle = Double(i) * (2.0 * .pi / 30.0)
             source._injectCircleSample(dx: Float(cos(angle) * 5.0), dy: Float(sin(angle) * 5.0))
         }
