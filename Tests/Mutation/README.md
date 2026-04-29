@@ -650,3 +650,64 @@ cells are kept out of the catalog because each one runs 50–200 trials
 per invocation; co-opting them as mutation anchors would inflate
 `make mutate` runtime without adding catch-coverage beyond the
 example-based cells already linked from the catalog.
+
+## Concurrent / interleaved cells
+
+`Tests/MatrixConcurrentInterleaved_Tests.swift` complements the
+serial example-based matrix and the loop-based property suite with
+eight cells that drive ≥ 2 production paths CONCURRENTLY via plain
+`Task` spawning, then assert cross-source invariants on the resulting
+bus traffic. The bug class addressed: existing matrix cells exercise
+ONE source at a time. Real users drive many at once — typing while
+plugging USB while the system goes to sleep. Concurrency-related
+races (cross-source state corruption, debounce gate bleed-through,
+bus-publish ordering under contention, close-during-publish crashes,
+fan-out skew across subscribers) cannot be exercised by serial cells.
+
+Each cell asserts a SPECIFIC invariant tagged with a
+`[concurrent-cell=<name>]` substring anchor for grep-friendly
+failure triage. Each cell is budgeted at ≤ 200 ms wallclock.
+
+| Cell | Invariant |
+|------|-----------|
+| `test_concurrent_cell_cross_source_debounce_sanity` | concurrent USB attach + BT connect → both fire exactly once on the bus, total = 2 deliveries |
+| `test_concurrent_cell_trackpad_gesture_during_external_click_burst` | 5 USB-mouse clicks debounce to 1 `.mouseClicked`; interleaved phased trackpad scrolls fire `.trackpadTouching` ≥ 1; no cross-source pollination |
+| `test_concurrent_cell_usb_attach_mid_keyboard_burst` | 10 above-threshold key injects fire ≥ 1 `.keyboardTyped`; mid-burst USB attach fires exactly 1 `.usbAttached`; no cross-source pollination |
+| `test_concurrent_cell_sleep_mid_trackpad_tap` | sleep injection mid-trackpad-gesture emits exactly 1 `.willSleep` and does not crash the trackpad pipeline |
+| `test_concurrent_cell_bus_close_mid_publish_race` | 100 mixed injects raced against `bus.close()` produce no crash, exactly one stream terminator per subscriber, and bounded delivery (≤ 100, never duplicated) |
+| `test_concurrent_cell_coalesce_window_stress` | 50 same-key `_injectClick` calls back-to-back collapse to exactly 1 `.mouseClicked` (within debounce window) |
+| `test_concurrent_cell_multi_output_fanout_under_producer_race` | 5 independent subscribers attached to the SAME bus see identical per-kind multisets when concurrent producers (USB / BT / keyboard) drive injects in parallel — no fan-out skew across subscribers |
+| `test_concurrent_cell_stable_interleaving_fuzz` | for seeds 42 / 7 / 31 (200 random injects each across 5 sources): no crash, no kind cross-pollination, deliveries upper-bounded by injections (no amplification), and every producer that fired ≥ 1 inject delivers ≥ 1 event (no total starvation) |
+
+Determinism: the fuzz cell uses the same hand-rolled xorshift64
+generator pattern as the property suite. Same seed N produces the
+same inject plan on every host, every run, every CI shard. The
+inject plan is pre-rolled BEFORE the concurrent task spawn so the
+expected counts are derived from the plan, not from the race.
+
+Concurrency strategy: plain `Task { @MainActor in ... }` spawning
+plus `await task.value` per child. `withTaskGroup` was tried first
+but the strict-concurrency region-based isolation checker rejects
+the pattern when `addTask` closures re-enter `@MainActor` and
+capture source variables — see the matching pattern in
+`Tests/MatrixMultiOutputConcurrentFire_Tests.swift`. The plain-Task
+pattern compiles clean against `-strict-concurrency=complete`
+`-warnings-as-errors`.
+
+Why `≤ injections` (not strict equality) on the fuzz cell: under
+200-burst pressure, the `ReactionBus` subscriber buffer
+(`bufferingNewest(8)`) and the upstream source streams
+(`bufferingNewest(32)` for USB / BT / SleepWake) legitimately drop
+oldest entries — this is the documented backpressure policy, not a
+bug. The cell asserts `delivered ≤ injected` (no amplification) and
+liveness (every producer that fired delivers ≥ 1) without committing
+to strict equality the buffer policy explicitly does not promise.
+
+These cells are NOT in `mutation-catalog.json` for the same reason
+property cells aren't: they are integrative invariants that span
+multiple gates simultaneously, so a single mutation typically
+manifests as a SUBSET of cells failing — which would produce
+catalog-anchor drift under `make mutate`'s strict
+`expectedFailureSubstring` matching. The existing 69 catalog
+entries already pin the per-gate behaviour; the concurrent suite is
+a regression net for cross-gate races, not a per-gate anchor.
