@@ -615,3 +615,38 @@ cannot be exercised by `swift test`.
 
 Total: 2 truly unreachable gates across the four files in scope. 0
 degenerate gates remain.
+
+## Property-based cells
+
+`Tests/PropertyBased_Tests.swift` complements the example-based matrix
+cells with eight invariant cells driven by a hand-rolled deterministic
+xorshift64 generator (`SeededGenerator`). Every cell loops over a fixed
+seed range, constructs a random input within the property's domain
+from the seed, and asserts the post-condition. Failure messages cite
+the seed + observed values so any regression is locally reproducible:
+`swift test --filter PropertyBased_Tests/test_property_<name>` plus the
+emitted `seed=N` reproduces the exact failure.
+
+| Cell | Invariant | Trials |
+|------|-----------|--------|
+| `test_property_keyboard_rate_debounce_invariant` | rate < 3.0/s → 0 fires; rate ≥ 3.0/s → ≤ ⌈duration / debounce⌉ + 1 fires | 200 |
+| `test_property_mouse_scroll_rms_invariant` | RMS far below threshold → 0 fires; RMS far above → ≥ 1 fire (CGEvent quantization tolerated as a documented synthetic-event limitation) | 50 below × 50 above |
+| `test_property_trackpad_attribution_invariant` | clicks WITHOUT a recent trackpad gesture (lastTrackpadGestureAt = .distantPast) → never fire `.trackpadTapping` regardless of click count / spacing | 200 |
+| `test_property_usb_debounce_per_key_invariant` | for distinct (vendor, product) pairs interleaved with repeats: distinctCount ≤ fires ≤ totalCalls (every distinct key fires at least once; debounce never synthesizes fires beyond injections) | 200 |
+| `test_property_bus_delivery_order_invariant` | for a single producer's `_injectAttach` / `_injectDetach` sequence with distinct keys: bus delivery order matches publish order | 200 |
+| `test_property_bus_delivery_completeness_invariant` | for accept-by-gate sequences with distinct keys: bus emissions == issued publishes | 200 |
+| `test_property_coalesce_window_monotonicity_invariant` | for same-key bursts within debounce: emissions ≤ injections AND ≥ 1 | 200 |
+| `test_property_per_mode_disabled_invariant` | for each disabled trackpad mode (touching/sliding/contact/tapping/circling): no fires of that kind under any random input shape | 40 outer × 5 modes |
+
+Determinism: the generator is hand-rolled xorshift64 with seed-as-state
+(no `SystemRandomNumberGenerator`, no `arc4random`, no `Foundation`
+random APIs). Same seed N produces the same sequence on every host,
+every run, every CI shard.
+
+The existing 69 catalog entries already pin the gates these properties
+exercise (see e.g. `keyboard-rate-threshold-default`,
+`trackpad-gesture-recency-gate`, `usb-debounce` family). Property
+cells are kept out of the catalog because each one runs 50–200 trials
+per invocation; co-opting them as mutation anchors would inflate
+`make mutate` runtime without adding catch-coverage beyond the
+example-based cells already linked from the catalog.
