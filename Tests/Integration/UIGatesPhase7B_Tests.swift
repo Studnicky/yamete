@@ -284,4 +284,349 @@ final class UIGatesPhase7B_Tests: XCTestCase {
             "HStack spacing); got \(s.width) — production left-gutter " +
             "Spacer().frame(width: 50) likely collapsed to 0")
     }
+
+    // MARK: - Phase 7c — production seam closures
+    //
+    // These cells drive the helpers extracted in Phase 7c directly,
+    // bypassing the SwiftUI gesture / render path. Each pins one of the
+    // gates that Phase 7b documented as un-pinnable without a production
+    // refactor.
+
+    // MARK: RangeSlider clamp / pair-swap
+
+    /// Cell I — `RangeSlider.clamp(position:half:usable:)` clamps an
+    /// overshoot-left x-coordinate up to `half`. Mutating the lower bound
+    /// (e.g. dropping the `max(half, …)`) lets the position run negative
+    /// and downstream value math goes below `bounds.lowerBound`.
+    func testUIGate_rangeSlider_clampLowerBound() {
+        let clamped = RangeSlider.clamp(position: -50, half: 10, usable: 100)
+        XCTAssertEqual(clamped, 10, accuracy: 0.0001,
+            "[ui-gate=rangeSlider-clamp-lower-bound] expected x clamped " +
+            "up to half=10 for overshoot-left; got \(clamped) — production " +
+            "`max(half, x)` clamp likely removed")
+    }
+
+    /// Cell J — `RangeSlider.clamp(position:half:usable:)` clamps an
+    /// overshoot-right x-coordinate down to `half + usable`. Mutating the
+    /// upper bound (e.g. dropping the `min(…, half+usable)`) lets the
+    /// position run past the track and downstream value math exceeds
+    /// `bounds.upperBound`.
+    func testUIGate_rangeSlider_clampUpperBound() {
+        let clamped = RangeSlider.clamp(position: 999, half: 10, usable: 100)
+        XCTAssertEqual(clamped, 110, accuracy: 0.0001,
+            "[ui-gate=rangeSlider-clamp-upper-bound] expected x clamped " +
+            "down to half+usable=110 for overshoot-right; got \(clamped) " +
+            "— production `min(x, half+usable)` clamp likely removed")
+    }
+
+    /// Cell K — `RangeSlider.applyDrag` low→high swap. Dragging the low
+    /// thumb past the high thumb must hand control to .high and place
+    /// the new value into `high`, not `low`. Mutating the swap branch
+    /// (e.g. removing the `value > high` check) leaves low > high — an
+    /// invalid invariant.
+    func testUIGate_rangeSlider_applyDrag_lowOvershootSwapsToHigh() {
+        // Track: half=10, usable=100. User has already grabbed the low
+        // thumb (active=.low) and continues dragging right past the
+        // high thumb. x=110 → value=1.0 > high=0.5 → swap.
+        let result = RangeSlider.applyDrag(
+            locationX: 110,
+            lowX: 30,    // low at x=30 (~0.2)
+            highX: 60,   // high at x=60 (~0.5)
+            translationWidth: 80,
+            half: 10,
+            usable: 100,
+            bounds: 0.0...1.0,
+            low: 0.2,
+            high: 0.5,
+            active: .low
+        )
+        XCTAssertEqual(result.low, 0.5, accuracy: 0.0001,
+            "[ui-gate=rangeSlider-applyDrag-low-overshoot-swap] expected " +
+            "low=0.5 (the previous high) after low overshoots; got " +
+            "\(result.low) — pair-swap branch likely removed")
+        XCTAssertEqual(result.high, 1.0, accuracy: 0.0001,
+            "[ui-gate=rangeSlider-applyDrag-low-overshoot-swap] expected " +
+            "high=1.0 (the dragged value); got \(result.high)")
+        XCTAssertEqual(result.active, .high,
+            "[ui-gate=rangeSlider-applyDrag-low-overshoot-swap] expected " +
+            "active to flip to .high after swap; got \(result.active)")
+    }
+
+    /// Cell L — `RangeSlider.applyDrag` high→low swap. Dragging the high
+    /// thumb past the low thumb must hand control to .low and place the
+    /// new value into `low`, not `high`. The mirror of cell K.
+    func testUIGate_rangeSlider_applyDrag_highOvershootSwapsToLow() {
+        // User has already grabbed the high thumb (active=.high) and
+        // continues dragging left past the low thumb. x=10 → value=0.0
+        // < low=0.4 → swap.
+        let result = RangeSlider.applyDrag(
+            locationX: 10,
+            lowX: 50,    // low at x=50 (~0.4)
+            highX: 90,   // high at x=90 (~0.8)
+            translationWidth: -80,
+            half: 10,
+            usable: 100,
+            bounds: 0.0...1.0,
+            low: 0.4,
+            high: 0.8,
+            active: .high
+        )
+        XCTAssertEqual(result.low, 0.0, accuracy: 0.0001,
+            "[ui-gate=rangeSlider-applyDrag-high-overshoot-swap] expected " +
+            "low=0.0 (the dragged value); got \(result.low)")
+        XCTAssertEqual(result.high, 0.4, accuracy: 0.0001,
+            "[ui-gate=rangeSlider-applyDrag-high-overshoot-swap] expected " +
+            "high=0.4 (the previous low) after high overshoots; got " +
+            "\(result.high) — pair-swap branch likely removed")
+        XCTAssertEqual(result.active, .low,
+            "[ui-gate=rangeSlider-applyDrag-high-overshoot-swap] expected " +
+            "active to flip to .low after swap; got \(result.active)")
+    }
+
+    /// Cell M — `RangeSlider.applyDrag` overlap-disambiguation: when both
+    /// thumb x-positions sit within 2pt of each other, the gesture uses
+    /// the drag translation sign to pick which thumb to move. Positive
+    /// translation → grab `.high`; negative → grab `.low`. Mutating the
+    /// sign comparator flips the behaviour and the wrong thumb takes the
+    /// lead.
+    ///
+    /// Cell decouples the THUMB positions (passed equal at x=60) from the
+    /// VALUE pair (low=0.3, high=0.7) so the post-disambiguation switch
+    /// arms produce different (low, high) outputs depending on which
+    /// thumb the disambiguation picked. If the disambiguation is correct
+    /// (.high under positive translation), the .high arm runs and only
+    /// `result.high` changes. Under the mutation (.low picked), the .low
+    /// arm runs and only `result.low` changes — fully observable in the
+    /// returned tuple regardless of any subsequent overshoot-swap.
+    func testUIGate_rangeSlider_applyDrag_overlapPicksByTranslation() {
+        // Thumb x-positions overlap (lowX == highX == 60), values spread
+        // (low=0.3, high=0.7). Drag location x=70 → value=0.6, which
+        // sits BETWEEN low and high so neither switch arm fires its
+        // overshoot-swap branch — the disambiguation choice survives
+        // intact in the returned (low, high) tuple.
+        let resultPositive = RangeSlider.applyDrag(
+            locationX: 70,
+            lowX: 60,
+            highX: 60,
+            translationWidth: 10,
+            half: 10,
+            usable: 100,
+            bounds: 0.0...1.0,
+            low: 0.3,
+            high: 0.7,
+            active: .none
+        )
+        // Original: disambiguation picks .high → switch .high → no
+        // overshoot (value=0.6 not < low=0.3) → result.high updates
+        // to 0.6, result.low stays 0.3.
+        XCTAssertEqual(resultPositive.low, 0.3, accuracy: 0.0001,
+            "[ui-gate=rangeSlider-applyDrag-overlap-translation] expected " +
+            "result.low=0.3 (unchanged) under positive translation; got " +
+            "\(resultPositive.low) — disambiguation picked the wrong thumb")
+        XCTAssertEqual(resultPositive.high, 0.6, accuracy: 0.0001,
+            "[ui-gate=rangeSlider-applyDrag-overlap-translation] expected " +
+            "result.high=0.6 (updated) under positive translation; got " +
+            "\(resultPositive.high) — disambiguation picked the wrong thumb")
+
+        // Mirror with negative translation: original picks .low →
+        // switch .low → no overshoot (value=0.4 not > high=0.7) →
+        // result.low updates to 0.4, result.high stays 0.7.
+        let resultNegative = RangeSlider.applyDrag(
+            locationX: 50,
+            lowX: 60,
+            highX: 60,
+            translationWidth: -10,
+            half: 10,
+            usable: 100,
+            bounds: 0.0...1.0,
+            low: 0.3,
+            high: 0.7,
+            active: .none
+        )
+        XCTAssertEqual(resultNegative.low, 0.4, accuracy: 0.0001,
+            "[ui-gate=rangeSlider-applyDrag-overlap-translation] expected " +
+            "result.low=0.4 (updated) under negative translation; got " +
+            "\(resultNegative.low) — disambiguation picked the wrong thumb")
+        XCTAssertEqual(resultNegative.high, 0.7, accuracy: 0.0001,
+            "[ui-gate=rangeSlider-applyDrag-overlap-translation] expected " +
+            "result.high=0.7 (unchanged) under negative translation; got " +
+            "\(resultNegative.high) — disambiguation picked the wrong thumb")
+    }
+
+    // MARK: SensitivityRuler ticks + position
+
+    /// Cell N — `SensitivityRuler.ticks` array length and ordering. The
+    /// menu-bar ruler is built around exactly five tier marks; mutating
+    /// the array (dropping a tier, reordering, breaking the unit-interval
+    /// progression) breaks the visual alignment with the
+    /// SettingsStore tier thresholds.
+    func testUIGate_sensitivityRuler_ticksArrayShape() {
+        let ticks = SensitivityRuler.ticks
+        XCTAssertEqual(ticks.count, 5,
+            "[ui-gate=sensitivityRuler-ticks-count] expected 5 tier ticks " +
+            "(Hard / Firm / Medium / Light / Tap); got \(ticks.count)")
+        let positions = ticks.map(\.position)
+        XCTAssertEqual(positions, [0.0, 0.25, 0.5, 0.75, 1.0],
+            "[ui-gate=sensitivityRuler-ticks-positions] expected " +
+            "[0.0, 0.25, 0.5, 0.75, 1.0] (uniform unit-interval " +
+            "progression); got \(positions)")
+        // First and last must hit the rail bounds exactly so the ruler
+        // visually aligns with the slider track endpoints.
+        XCTAssertEqual(ticks.first?.position, 0.0,
+            "[ui-gate=sensitivityRuler-ticks-positions] first tick must " +
+            "anchor at 0.0")
+        XCTAssertEqual(ticks.last?.position, 1.0,
+            "[ui-gate=sensitivityRuler-ticks-positions] last tick must " +
+            "anchor at 1.0")
+        // Every position must lie in [0, 1].
+        for tick in ticks {
+            XCTAssertTrue((0.0...1.0).contains(tick.position),
+                "[ui-gate=sensitivityRuler-ticks-positions] tick at " +
+                "\(tick.position) outside [0, 1]")
+            XCTAssertFalse(tick.label.isEmpty,
+                "[ui-gate=sensitivityRuler-ticks-labels] tick at " +
+                "\(tick.position) has an empty label")
+        }
+    }
+
+    /// Cell O — `SensitivityRuler.position(for:in:)` per-tick placement.
+    /// Pins the multiplication formula `tick.position * width`. Mutating
+    /// to a division or a constant zero collapses every tick to one x.
+    func testUIGate_sensitivityRuler_positionFormula() {
+        let width = 200.0
+        let leftmost = SensitivityRuler.position(
+            for: SensitivityRuler.Tick(position: 0.0, label: "L"),
+            in: width)
+        let middle = SensitivityRuler.position(
+            for: SensitivityRuler.Tick(position: 0.5, label: "M"),
+            in: width)
+        let rightmost = SensitivityRuler.position(
+            for: SensitivityRuler.Tick(position: 1.0, label: "R"),
+            in: width)
+        XCTAssertEqual(leftmost, 0.0, accuracy: 0.0001,
+            "[ui-gate=sensitivityRuler-position-formula] expected 0.0 for " +
+            "leftmost tick at 0.0×200; got \(leftmost)")
+        XCTAssertEqual(middle, 100.0, accuracy: 0.0001,
+            "[ui-gate=sensitivityRuler-position-formula] expected 100.0 " +
+            "for middle tick at 0.5×200; got \(middle) — production " +
+            "`tick.position * w` likely mutated")
+        XCTAssertEqual(rightmost, 200.0, accuracy: 0.0001,
+            "[ui-gate=sensitivityRuler-position-formula] expected 200.0 " +
+            "for rightmost tick at 1.0×200; got \(rightmost)")
+    }
+
+    // MARK: Updater — version fallback (App Store + Direct branches)
+
+    /// Cell P — `Updater.currentVersion(bundle:)` fallback string. When
+    /// the supplied bundle's `infoDictionary` is nil (the on-disk
+    /// scenario where `CFBundleShortVersionString` is missing), the
+    /// helper must return the literal "1.0.0". Mutating the literal
+    /// silently changes the version string the menu-bar footer renders
+    /// in degraded environments.
+    func testUIGate_updater_currentVersion_fallbackWhenInfoDictionaryNil() {
+        let stub = NilInfoBundle()
+        let resolved = Updater.currentVersion(bundle: stub)
+        XCTAssertEqual(resolved, "1.0.0",
+            "[ui-gate=updater-currentVersion-fallback] expected " +
+            "\"1.0.0\" when bundle.infoDictionary is nil; got " +
+            "\"\(resolved)\" — production fallback literal likely mutated")
+    }
 }
+
+/// Test stub: a `Bundle` subclass whose `infoDictionary` returns nil so
+/// the Updater fallback path engages. Real `Bundle.main` under the SPM
+/// `xctest` runner always supplies a non-nil version.
+private final class NilInfoBundle: Bundle, @unchecked Sendable {
+    override var infoDictionary: [String: Any]? { nil }
+}
+
+#if DIRECT_BUILD
+/// Phase 7c Direct-only cells — exercise `Updater.isNewer(remote:local:)`,
+/// which is `internal static` inside the `#if DIRECT_BUILD` branch.
+/// Compiled only when SPM is invoked with `-Xswiftc -DDIRECT_BUILD`.
+@MainActor
+final class UIGatesPhase7C_DirectOnly_Tests: XCTestCase {
+
+    /// Cell Q — equal versions are NOT newer. `isNewer` returns false
+    /// when remote and local are identical.
+    func testUIGate_updater_isNewer_equalReturnsFalse() {
+        XCTAssertFalse(Updater.isNewer(remote: "1.2.3", local: "1.2.3"),
+            "[ui-gate=updater-isNewer-equal] expected isNewer=false for " +
+            "equal versions; production comparator likely flipped")
+    }
+
+    /// Cell R — remote-newer cases (major / minor / patch) all return
+    /// true. Mutating the comparator (e.g. `rv > lv` → `rv < lv`) would
+    /// flip every available-update detection to false.
+    func testUIGate_updater_isNewer_remoteNewerReturnsTrue() {
+        XCTAssertTrue(Updater.isNewer(remote: "2.0.0", local: "1.9.9"),
+            "[ui-gate=updater-isNewer-remote-newer] major bump must " +
+            "register as newer")
+        XCTAssertTrue(Updater.isNewer(remote: "1.3.0", local: "1.2.9"),
+            "[ui-gate=updater-isNewer-remote-newer] minor bump must " +
+            "register as newer")
+        XCTAssertTrue(Updater.isNewer(remote: "1.2.4", local: "1.2.3"),
+            "[ui-gate=updater-isNewer-remote-newer] patch bump must " +
+            "register as newer")
+    }
+
+    /// Cell S — remote-older cases all return false. The dual of cell R.
+    func testUIGate_updater_isNewer_remoteOlderReturnsFalse() {
+        XCTAssertFalse(Updater.isNewer(remote: "1.0.0", local: "2.0.0"),
+            "[ui-gate=updater-isNewer-remote-older] downgraded major " +
+            "must NOT register as newer")
+        XCTAssertFalse(Updater.isNewer(remote: "1.2.0", local: "1.3.0"),
+            "[ui-gate=updater-isNewer-remote-older] downgraded minor " +
+            "must NOT register as newer")
+        XCTAssertFalse(Updater.isNewer(remote: "1.2.2", local: "1.2.3"),
+            "[ui-gate=updater-isNewer-remote-older] downgraded patch " +
+            "must NOT register as newer")
+    }
+
+    /// Cell T — short-vs-long version padding. A 2-segment "1.2" must
+    /// compare as 1.2.0 against a 3-segment "1.2.0" (equal — neither
+    /// newer). And "1.2.1" must register as newer than "1.2".
+    /// Pins the `i < r.count ? r[i] : 0` zero-padding fallback.
+    func testUIGate_updater_isNewer_segmentPadding() {
+        XCTAssertFalse(Updater.isNewer(remote: "1.2", local: "1.2.0"),
+            "[ui-gate=updater-isNewer-segment-padding] missing segment " +
+            "must be treated as 0; \"1.2\" must NOT be newer than \"1.2.0\"")
+        XCTAssertTrue(Updater.isNewer(remote: "1.2.1", local: "1.2"),
+            "[ui-gate=updater-isNewer-segment-padding] \"1.2.1\" must be " +
+            "newer than \"1.2\" via zero-pad of local")
+    }
+
+    /// Cell U — pre-release suffix handling (KNOWN LIMITATION, pinned).
+    /// `compactMap { Int($0) }` drops any segment that fails to parse
+    /// as Int, so `"1.2.3-rc1"` becomes [1, 2] and compares equal to
+    /// `"1.2"`. This is documented in production as a known limitation;
+    /// the cell pins the current behaviour so a future "fix" doesn't
+    /// silently regress without an accompanying catalog update.
+    func testUIGate_updater_isNewer_preReleaseSuffixDropped() {
+        // "1.2.3-rc1" parses as [1, 2] (the "3-rc1" segment is dropped
+        // because Int("3-rc1") is nil and compactMap discards it).
+        // Compared against "1.2" (which parses as [1, 2]), the result
+        // is "equal" → not newer.
+        XCTAssertFalse(Updater.isNewer(remote: "1.2.3-rc1", local: "1.2"),
+            "[ui-gate=updater-isNewer-prerelease-dropped] KNOWN " +
+            "LIMITATION: `1.2.3-rc1` drops the pre-release segment via " +
+            "compactMap and compares equal to `1.2`. If this assertion " +
+            "fires, the comparator semantics changed — update the " +
+            "catalog and the production limitation note in lock-step.")
+        // Local "1.2.3-rc1" drops to [1, 2]. Remote "1.2.3" parses as
+        // [1, 2, 3]. Padding makes the comparator see (3 vs 0) at i=2 →
+        // remote registers as newer. This is the visible artefact of
+        // the dropped-suffix bug: a release (`1.2.3`) appears strictly
+        // newer than its own rc (`1.2.3-rc1`), which happens to be the
+        // direction we want — but only by accident. Pinning here so
+        // any future fix that changes this answer is forced to update
+        // the catalog and the production limitation note.
+        XCTAssertTrue(Updater.isNewer(remote: "1.2.3", local: "1.2.3-rc1"),
+            "[ui-gate=updater-isNewer-prerelease-dropped] release " +
+            "\"1.2.3\" parses as [1,2,3]; rc \"1.2.3-rc1\" parses as " +
+            "[1,2] (suffix dropped). Padding compares (3 vs 0) at i=2 → " +
+            "release registers as newer — accidental but pinned.")
+    }
+}
+#endif
+

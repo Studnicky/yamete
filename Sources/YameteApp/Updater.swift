@@ -44,8 +44,19 @@ public final class Updater {
     // MARK: - Init
 
     public init() {
-        currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        currentVersion = Self.currentVersion(bundle: .main)
         lastCheckDate = UserDefaults.standard.object(forKey: Self.lastCheckKey) as? Date
+    }
+
+    /// Resolve `CFBundleShortVersionString` from the supplied bundle,
+    /// falling back to `"1.0.0"` when the key is missing. Pulled out as
+    /// an internal static so unit tests can inject a stub `Bundle`
+    /// (whose `infoDictionary` returns nil) to drive the fallback path
+    /// — the SPM `xctest` runner's own `Bundle.main` always supplies
+    /// a non-nil version, so without the seam the `?? "1.0.0"` branch
+    /// is unreachable from tests.
+    internal static func currentVersion(bundle: Bundle = .main) -> String {
+        bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
 
     // MARK: - Public API
@@ -212,7 +223,15 @@ public final class Updater {
     // MARK: - Helpers
 
     /// Semantic version comparison: true when remote is strictly newer.
-    private static func isNewer(remote: String, local: String) -> Bool {
+    ///
+    /// Limitation (pinned, not fixed): pre-release suffixes like
+    /// `1.2.3-rc1` are silently dropped because `compactMap { Int($0) }`
+    /// fails on `"3-rc1"` and discards the segment. Two versions with
+    /// the same numeric prefix and different suffixes therefore compare
+    /// equal. A future fix should explicitly parse the suffix and
+    /// follow SemVer 2.0.0 ordering rules; this comparison is pinned
+    /// in the test catalog so a silent regression won't slip through.
+    internal static func isNewer(remote: String, local: String) -> Bool {
         let r = remote.split(separator: ".").compactMap { Int($0) }
         let l = local.split(separator: ".").compactMap { Int($0) }
         for i in 0..<max(r.count, l.count) {
@@ -289,7 +308,17 @@ public final class Updater {
     let currentVersion: String
 
     public init() {
-        currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        currentVersion = Self.currentVersion(bundle: .main)
+    }
+
+    /// Resolve `CFBundleShortVersionString` from the supplied bundle,
+    /// falling back to `"1.0.0"` when the key is missing. Pulled out as
+    /// an internal static so unit tests can inject a stub `Bundle`
+    /// whose `infoDictionary` returns nil — the SPM `xctest` runner's
+    /// own `Bundle.main` always supplies a non-nil version, so without
+    /// the seam the `?? "1.0.0"` branch would be unreachable.
+    internal static func currentVersion(bundle: Bundle = .main) -> String {
+        bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
 
     /// No-op for App Store builds (updates come through the Store).

@@ -910,6 +910,78 @@
       "replace": "Spacer().frame(width: 0)\n            GeometryReader",
       "search": "Spacer().frame(width: 50)\n            GeometryReader",
       "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
+    },
+    {
+      "description": "RangeSlider.clamp(position:half:usable:) — drop the lower-bound max() so an overshoot-left x-coordinate runs negative; clamp must hold the position at `half` regardless of how far left the user drags.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_clampLowerBound",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-clamp-lower-bound]",
+      "id": "ui-rangeSlider-clamp-lower-bound",
+      "replace": "min(x, half + usable)",
+      "search": "min(max(half, x), half + usable)",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "RangeSlider.clamp(position:half:usable:) — drop the upper-bound min() so an overshoot-right x-coordinate runs past the track; clamp must hold the position at `half + usable` regardless of how far right the user drags.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_clampUpperBound",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-clamp-upper-bound]",
+      "id": "ui-rangeSlider-clamp-upper-bound",
+      "replace": "max(half, x)",
+      "search": "min(max(half, x), half + usable)",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "RangeSlider.applyDrag — disable the low-overshoots-high pair-swap branch so a drag of the low thumb past the high thumb leaves the (low, high) pair in an invalid low > high state.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_applyDrag_lowOvershootSwapsToHigh",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-applyDrag-low-overshoot-swap]",
+      "id": "ui-rangeSlider-applyDrag-low-overshoot-swap",
+      "replace": "if false {\n                return DragResult(low: high, high: value, active: .high)",
+      "search": "if value > high {\n                return DragResult(low: high, high: value, active: .high)",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "RangeSlider.applyDrag — disable the high-overshoots-low pair-swap branch so a drag of the high thumb past the low thumb leaves the (low, high) pair in an invalid high < low state.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_applyDrag_highOvershootSwapsToLow",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-applyDrag-high-overshoot-swap]",
+      "id": "ui-rangeSlider-applyDrag-high-overshoot-swap",
+      "replace": "if false {\n                return DragResult(low: value, high: low, active: .low)",
+      "search": "if value < low {\n                return DragResult(low: value, high: low, active: .low)",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "RangeSlider.applyDrag — flip the overlap-disambiguation translation-sign comparator so a positive-direction drag on overlapped thumbs grabs the LOW thumb instead of HIGH (and vice versa); the wrong thumb leads under thumb overlap.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_applyDrag_overlapPicksByTranslation",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-applyDrag-overlap-translation]",
+      "id": "ui-rangeSlider-applyDrag-overlap-translation",
+      "replace": "active = translationWidth < 0 ? .high : .low",
+      "search": "active = translationWidth >= 0 ? .high : .low",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "SensitivityRuler.ticks — mutate the medium-tier position from 0.50 to 0.40; the five tier marks must lie at the canonical [0.0, 0.25, 0.5, 0.75, 1.0] unit-interval positions so the ruler aligns with the slider track endpoints and SettingsStore tier thresholds.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_ticksArrayShape",
+      "expectedFailureSubstring": "[ui-gate=sensitivityRuler-ticks-positions]",
+      "id": "ui-sensitivityRuler-ticks-positions",
+      "replace": "Tick(position: 0.40, label: NSLocalizedString(\"tier_medium\", comment: \"Ruler label: medium impact (abbreviated)\")),",
+      "search": "Tick(position: 0.50, label: NSLocalizedString(\"tier_medium\", comment: \"Ruler label: medium impact (abbreviated)\")),",
+      "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
+    },
+    {
+      "description": "SensitivityRuler.position(for:in:) — collapse the per-tick placement formula to 0; every tick must sit at `tick.position * width` so the five tier marks spread across the available width instead of piling up at the origin.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_positionFormula",
+      "expectedFailureSubstring": "[ui-gate=sensitivityRuler-position-formula]",
+      "id": "ui-sensitivityRuler-position-formula",
+      "replace": "0.0",
+      "search": "tick.position * width",
+      "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
+    },
+    {
+      "description": "Updater.currentVersion(bundle:) — mutate the App-Store-stub fallback literal from \"1.0.0\" to \"0.0.0\"; when Bundle.infoDictionary is nil the helper must return the canonical \"1.0.0\" so the menu-bar footer never displays a degraded version. Multi-line search anchors on the App-Store-branch doc comment to disambiguate from the identical literal in the DIRECT_BUILD branch.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_updater_currentVersion_fallbackWhenInfoDictionaryNil",
+      "expectedFailureSubstring": "[ui-gate=updater-currentVersion-fallback]",
+      "id": "ui-updater-currentVersion-fallback",
+      "replace": "own `Bundle.main` always supplies a non-nil version, so without\n    /// the seam the `?? \"1.0.0\"` branch would be unreachable.\n    internal static func currentVersion(bundle: Bundle = .main) -> String {\n        bundle.infoDictionary?[\"CFBundleShortVersionString\"] as? String ?? \"0.0.0\"",
+      "search": "own `Bundle.main` always supplies a non-nil version, so without\n    /// the seam the `?? \"1.0.0\"` branch would be unreachable.\n    internal static func currentVersion(bundle: Bundle = .main) -> String {\n        bundle.infoDictionary?[\"CFBundleShortVersionString\"] as? String ?? \"1.0.0\"",
+      "targetFile": "Sources/YameteApp/Updater.swift"
     }
   ]
 }

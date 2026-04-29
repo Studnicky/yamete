@@ -1248,17 +1248,19 @@ fixed-size children is rendered through it. Cells live in
   followed by a 60pt-tall child must report the 60pt height. Dropping
   the running max collapses the row to the first child's 30pt.
 
-### `Sources/YameteApp/Views/RangeSlider.swift` — one caught gate
+### `Sources/YameteApp/Views/RangeSlider.swift` — one caught gate (Phase 7b — Phase 7c added five more, see below)
 
 The clamp / swap branches inside the `DragGesture.onChanged` closure
 (value-overshoot → swap, position-clamp to `half...half+usable`,
 `.clamped(to: 0...1)` projection) cannot be invoked from a unit test
 without either pumping a synthetic `NSEvent` stream or extracting the
-math into a `static` helper. Phase 7b is additive on the test side
-only — the gesture-resident gates remain un-pinned and need a
-production seam (a static `clamp(low:high:bounds:locationX:width:)`
-helper exposed at internal visibility). One observable gate IS reached
-without refactor:
+math into a `static` helper. Phase 7b was additive on the test side
+only — the gesture-resident gates were un-pinned. **Phase 7c closes
+this defer**: the gestural math now lives in
+`RangeSlider.applyDrag(...)` and `RangeSlider.clamp(position:half:usable:)`,
+both `internal static`. See the Phase 7c section below for the five
+new caught gates. One observable gate is reached without the
+extracted helpers:
 
 - `ui-rangeSlider-default-labelWidth` — the struct's default
   `labelWidth: CGFloat = 40` adds 80pt to the rendered intrinsic
@@ -1287,41 +1289,135 @@ observable intrinsic-size delta:
 
 The `tick.position * w` per-tick placement formula and the 5-element
 ticks-array contents (positions 0.0/0.25/0.5/0.75/1.0, labels
-`tier_hard`/`firm`/`medium`/`light`/`tap`) live in a `private static`
-constant inside a SwiftUI `body` `ForEach`. Mutating any single
-position or label key produces a bitmap-level delta that is not
-exposed through `intrinsicContentSize` — pinning these gates would
-require either bitmap-fingerprint snapshots (heavy, host-sensitive)
-or a production seam (e.g. `internal static var ticks`) so the array
-is directly inspectable from a test. Both options are deferred until
-a regression motivates the cost.
+`tier_hard`/`firm`/`medium`/`light`/`tap`) lived in a `private static`
+constant inside a SwiftUI `body` `ForEach` and were Phase 7b deferred
+because mutating any single position or label key produces a
+bitmap-level delta that is not exposed through `intrinsicContentSize`
+— pinning these gates would have required either bitmap-fingerprint
+snapshots (heavy, host-sensitive) or a production seam. **Phase 7c
+took the production-seam path**: `ticks` is now `internal static let`
+and `tick.position * w` is now
+`SensitivityRuler.position(for:in:) -> Double`. See the Phase 7c
+section below for the two new caught gates.
 
-### `Sources/YameteApp/Updater.swift` — gates deferred (production seam required)
+### `Sources/YameteApp/Updater.swift` — gates deferred (Phase 7b) — closed in Phase 7c
 
-Two distinct gates surveyed; both are unreachable from this harness
-without modifying production:
+Two distinct gates surveyed; both were Phase 7b deferred because
+they were unreachable from the test harness without modifying
+production. **Phase 7c closes both defers** by promoting visibility
+and adding a `Bundle` injection seam:
 
-1. `Updater.isNewer(remote:local:)` is `private static` and lives
-   inside the `#if DIRECT_BUILD` branch. Testing the semver compare
-   directly requires either widening visibility (`internal`) or
-   extracting the function as a stand-alone helper that compiles
-   under both build configurations.
+1. `Updater.isNewer(remote:local:)` was `private static` inside the
+   `#if DIRECT_BUILD` branch. Phase 7c promotes it to `internal static`
+   (still gated `#if DIRECT_BUILD`) so cells can drive the semver
+   compare directly under `swift test -Xswiftc -DDIRECT_BUILD`.
 
-2. The App-Store stub init's `?? "1.0.0"` fallback is non-observable
-   under SPM `swift test`. `Bundle.main` resolves to the `xctest`
-   runner whose Info.plist already supplies a non-nil
-   `CFBundleShortVersionString` ("16.0" on macOS 16), so the
-   left-hand side of the `??` always wins. A mutation flipping the
-   fallback string never reaches the observable `currentVersion`.
-   Closing this gap requires a production seam that injects `Bundle`
-   (or a static helper resolving the version from a passed-in
-   dictionary) so the test can drive the nil-info-key path
-   deterministically.
+2. The App-Store stub init's `?? "1.0.0"` fallback was non-observable
+   under SPM `swift test` because the `xctest` runner's `Bundle.main`
+   always supplies a non-nil `CFBundleShortVersionString`. Phase 7c
+   pulls the version resolution into
+   `Updater.currentVersion(bundle: Bundle = .main) -> String` and adds
+   the seam in BOTH branches so a stub `Bundle` (subclass overriding
+   `infoDictionary` to nil) drives the fallback.
 
-Until either seam exists, no Updater catalog entry is filed. The
-ESCAPE shape is documented here so a future contributor adding the
-seam can find this section, add the missing cell, and remove this
-note in the same PR.
+See the Phase 7c section below for the catalog entries that now pin
+both gates.
+
+## Phase 7c — production seam closures
+
+Phase 7b explicitly deferred three classes of UI gate behind
+"production refactor required". The user rejected the defer; Phase 7c
+authors the seams, retains public API, and adds catalog entries
+pinning each gate. All Phase 7c cells live in
+`Tests/Integration/UIGatesPhase7B_Tests.swift` (extending the existing
+file; the DIRECT_BUILD-gated cells live in a sibling
+`UIGatesPhase7C_DirectOnly_Tests` class in the same file). The
+mutation runner (`scripts/mutation-test.sh`) verifies CAUGHT under
+bare `swift test`; DIRECT_BUILD-only cells run under
+`swift test -Xswiftc -DDIRECT_BUILD` only and are NOT catalogued (the
+runner does not pass `-DDIRECT_BUILD` so the cells would not link at
+filter time).
+
+### `Sources/YameteApp/Views/RangeSlider.swift` — five caught gates (Phase 7c)
+
+The gesture-resident clamp / pair-swap math is extracted into two
+internal statics that the cells drive directly:
+
+- `RangeSlider.clamp(position:half:usable:) -> CGFloat` — `min(max(half, x), half + usable)`.
+- `RangeSlider.applyDrag(...)` — pure projection of the gesture
+  closure's body, returning a `DragResult { low, high, active }`.
+
+Catalog entries:
+
+- `ui-rangeSlider-clamp-lower-bound` — overshoot-left coordinate must
+  clamp UP to `half`. Mutation drops the `max(half, x)` outer wrap.
+- `ui-rangeSlider-clamp-upper-bound` — overshoot-right coordinate must
+  clamp DOWN to `half + usable`. Mutation drops the `min(...)` outer
+  wrap.
+- `ui-rangeSlider-applyDrag-low-overshoot-swap` — when low overshoots
+  high, control flips to `.high` and the values swap. Mutation
+  disables the swap branch (`if false`), leaving low > high.
+- `ui-rangeSlider-applyDrag-high-overshoot-swap` — mirror of the
+  above for high overshooting low.
+- `ui-rangeSlider-applyDrag-overlap-translation` — when both thumbs
+  sit at the same x (within 2pt), translation sign picks which thumb
+  to lead. Mutation flips the comparator and the wrong thumb takes
+  the lead.
+
+### `Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift` — two caught gates (Phase 7c)
+
+The previously private `ticks` array is promoted to
+`internal static let ticks: [Tick]` (with a public `Tick` struct), and
+the `tick.position * w` placement is factored into
+`internal static func position(for:in:) -> Double`.
+
+Catalog entries:
+
+- `ui-sensitivityRuler-ticks-positions` — the five tier marks must
+  lie at the canonical `[0.0, 0.25, 0.5, 0.75, 1.0]` unit-interval
+  progression. Mutation moves the medium-tier position from 0.50 to
+  0.40 and the array-shape assertion catches it.
+- `ui-sensitivityRuler-position-formula` — every tick must place at
+  `tick.position * width`. Mutation collapses the formula to `0.0`
+  and every tick piles up at the origin; the cell asserts the middle
+  tick at 100pt for a 200pt width.
+
+### `Sources/YameteApp/Updater.swift` — one caught gate (Phase 7c) + 5 DIRECT_BUILD cells (un-catalogued)
+
+`Updater.currentVersion(bundle: Bundle = .main) -> String` is the new
+seam in BOTH `#if DIRECT_BUILD` branches; tests inject a `NilInfoBundle`
+(a `Bundle` subclass overriding `infoDictionary` to nil) to drive the
+fallback. `Updater.isNewer(remote:local:)` is promoted to
+`internal static` (still inside `#if DIRECT_BUILD`).
+
+Catalog entries (running under bare `swift test`):
+
+- `ui-updater-currentVersion-fallback` — when `bundle.infoDictionary`
+  is nil, the helper must return `"1.0.0"`. Mutation flips the literal
+  to `"0.0.0"`. Multi-line search anchors on the App-Store-branch doc
+  comment to disambiguate from the identical literal in the
+  DIRECT_BUILD branch.
+
+DIRECT_BUILD-only cells (driven by `swift test -Xswiftc -DDIRECT_BUILD`,
+NOT catalogued — the mutation runner does not pass `-DDIRECT_BUILD`,
+so the named test wouldn't link at filter time):
+
+- `testUIGate_updater_isNewer_equalReturnsFalse` — equal versions
+  compare false.
+- `testUIGate_updater_isNewer_remoteNewerReturnsTrue` — major / minor
+  / patch bumps register as newer.
+- `testUIGate_updater_isNewer_remoteOlderReturnsFalse` — downgrade
+  cases never register.
+- `testUIGate_updater_isNewer_segmentPadding` — short version
+  `"1.2"` zero-pads to `[1, 2, 0]` for comparison.
+- `testUIGate_updater_isNewer_preReleaseSuffixDropped` — pins the
+  KNOWN LIMITATION that pre-release suffixes (`"1.2.3-rc1"`) are
+  silently dropped by `compactMap { Int($0) }`. Documented in
+  production as a known limitation. The cell pins the current
+  artefact (release `"1.2.3"` registers as newer than rc
+  `"1.2.3-rc1"`, accidentally in the right direction) so a future
+  fix that changes the answer must update the production note in
+  lock-step.
 
 ## Performance baseline (Phase 6)
 
