@@ -220,18 +220,38 @@ public final class MouseActivitySource: StimulusSource {
     }
 }
 
+extension MouseActivitySource {
+    /// Pure-data predicate extracted from the C-callback shell so tests
+    /// can drive the result/context/usage-page/usage/value gates directly
+    /// without synthesizing IOHIDValue objects. Returns true iff the
+    /// callback's three guards all admit the dispatch.
+    nonisolated public static func shouldDispatchClick(
+        result: IOReturn,
+        contextIsNil: Bool,
+        usagePage: UInt32,
+        usage: UInt32,
+        value: Int
+    ) -> Bool {
+        guard result == kIOReturnSuccess, !contextIsNil else { return false }
+        guard usagePage == 0x09, usage == 0x01, value != 0 else { return false }
+        return true
+    }
+}
+
 private func mouseClickHIDCallback(
     context: UnsafeMutableRawPointer?,
     result: IOReturn,
     sender: UnsafeMutableRawPointer?,
     value: IOHIDValue
 ) {
-    guard result == kIOReturnSuccess, let context else { return }
-    // Only care about button-1 presses (usage page 0x09, usage 0x01)
     let element = IOHIDValueGetElement(value)
-    guard IOHIDElementGetUsagePage(element) == 0x09,
-          IOHIDElementGetUsage(element) == 0x01,
-          IOHIDValueGetIntegerValue(value) != 0 else { return }
+    guard MouseActivitySource.shouldDispatchClick(
+        result: result,
+        contextIsNil: context == nil,
+        usagePage: IOHIDElementGetUsagePage(element),
+        usage: IOHIDElementGetUsage(element),
+        value: IOHIDValueGetIntegerValue(value)
+    ), let context else { return }
     // Check that this device is not a trackpad (exclude SPI and Trackpad names)
     let device = IOHIDElementGetDevice(element)
     let transport = IOHIDDeviceGetProperty(device, kIOHIDTransportKey as CFString) as? String ?? ""

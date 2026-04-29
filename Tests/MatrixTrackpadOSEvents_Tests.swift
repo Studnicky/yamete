@@ -563,4 +563,148 @@ final class MatrixTrackpadOSEvents_Tests: XCTestCase {
 
         source.stop()
     }
+
+    // MARK: - Contact-timer max-duration gate (`dur <= contactMax`)
+
+    /// Pins `TrackpadActivitySource.swift:331` `guard dur <= contactMax`.
+    /// Drive a `.began` scroll to set `contactStart`, then call the
+    /// `_testTriggerContactFire` seam with a synthesized `now` that's
+    /// PAST `contactMax`. The production gate must drop; mutation that
+    /// removes the gate fires `.trackpadContact` regardless of duration.
+    /// Configure with very large `contactMin` so the natural async
+    /// contactTimer can't fire inside the collect window — only our
+    /// explicit `_testTriggerContactFire(at:)` reaches the gate.
+    func testContactMaxDurationGate_pastMaxDur_doesNotFire() async {
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let source = TrackpadActivitySource(eventMonitor: monitor)
+        source.configure(
+            windowDuration: 1.0,
+            scrollMin: 0.0, scrollMax: 1.0,
+            touchingMin: 100.0, touchingMax: 200.0,  // suppress incidental touching
+            slidingMin: 100.0, slidingMax: 200.0,
+            contactMin: 30.0, contactMax: 2.5,        // long min, natural timer won't fire
+            tapMin: 100.0, tapMax: 200.0,
+            touchingEnabled: true, slidingEnabled: true,
+            contactEnabled: true, tappingEnabled: true,
+            circlingEnabled: true
+        )
+        source.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.4) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        // Drive a .began scroll so contactStart gets set.
+        if let scroll = makeTrackpadScroll(phase: 1, deltaY: 5) {
+            monitor.emit(scroll, ofType: .scrollWheel)
+        }
+        try? await Task.sleep(for: .milliseconds(40))
+
+        // Synthesize a `now` 10s past contactStart — well over contactMax (2.5s).
+        source._testTriggerContactFire(at: Date().addingTimeInterval(10.0))
+        try? await Task.sleep(for: .milliseconds(80))
+
+        let collected = await collectTask.value
+        XCTAssertFalse(
+            collected.contains { $0.kind == .trackpadContact },
+            "[cell=contact-max-duration] dur > contactMax must NOT fire .trackpadContact — got \(collected.map(\.kind))"
+        )
+        source.stop()
+    }
+
+    // MARK: - Circle-detection gates
+
+    /// Pins `TrackpadActivitySource.swift:390` `guard mag > 2.0` (tiny-movement floor).
+    /// Drives many small samples below the floor; circling must never
+    /// accumulate, so no `.trackpadCircling` fires.
+    func testCircleMagFloor_belowFloor_doesNotAccumulate() async {
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let source = makeSource(eventMonitor: monitor)
+        source.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.3) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        // 30 sub-floor samples around a circle.
+        for i in 0..<30 {
+            let angle = Double(i) * (2.0 * .pi / 30.0)
+            source._injectCircleSample(dx: Float(cos(angle) * 1.0), dy: Float(sin(angle) * 1.0))  // mag=1.0 < 2.0
+        }
+        try? await Task.sleep(for: .milliseconds(80))
+
+        let collected = await collectTask.value
+        XCTAssertFalse(
+            collected.contains { $0.kind == .trackpadCircling },
+            "[cell=circle-mag-floor] sub-floor samples (mag=1.0 < 2.0) must NOT accumulate; got \(collected.map(\.kind))"
+        )
+        source.stop()
+    }
+
+    /// Pins `TrackpadActivitySource.swift:404` (rotation+event-count gate).
+    /// Drives just under threshold (10 samples covering ~π radians).
+    /// Must not fire — full revolution requires both 2π radians and ≥15 events.
+    func testCircleRotationGate_belowThreshold_doesNotFire() async {
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let source = makeSource(eventMonitor: monitor)
+        source.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.3) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        // 10 samples covering only π radians (half circle).
+        for i in 0..<10 {
+            let angle = Double(i) * (.pi / 10.0)
+            source._injectCircleSample(dx: Float(cos(angle) * 5.0), dy: Float(sin(angle) * 5.0))
+        }
+        try? await Task.sleep(for: .milliseconds(80))
+
+        let collected = await collectTask.value
+        XCTAssertFalse(
+            collected.contains { $0.kind == .trackpadCircling },
+            "[cell=circle-rotation-gate] half-revolution must NOT fire — got \(collected.map(\.kind))"
+        )
+        source.stop()
+    }
+
+    /// Pins `TrackpadActivitySource.swift:405` `guard circlingEnabled, now >= circlingGate`.
+    /// Drives a full clean revolution (≥2π over 30 samples, mag>2) but with
+    /// circlingEnabled=false. Must not fire.
+    func testCircleEnabledGate_disabled_doesNotFire() async {
+        let bus = await makeBus()
+        let monitor = MockEventMonitor()
+        let source = TrackpadActivitySource(eventMonitor: monitor)
+        source.configure(
+            windowDuration: 1.0,
+            scrollMin: 0.0, scrollMax: 1.0,
+            touchingMin: 0.1, touchingMax: 1.0,
+            slidingMin: 0.5, slidingMax: 0.9,
+            contactMin: 0.3, contactMax: 2.5,
+            tapMin: 0.5, tapMax: 6.0,
+            touchingEnabled: true,
+            slidingEnabled: true,
+            contactEnabled: true,
+            tappingEnabled: true,
+            circlingEnabled: false  // <-- disabled
+        )
+        source.start(publishingTo: bus)
+
+        let collectTask = Task { await self.collect(from: bus, seconds: 0.3) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        // 30 samples covering 2π radians at mag=5 (above floor).
+        for i in 0..<30 {
+            let angle = Double(i) * (2.0 * .pi / 30.0)
+            source._injectCircleSample(dx: Float(cos(angle) * 5.0), dy: Float(sin(angle) * 5.0))
+        }
+        try? await Task.sleep(for: .milliseconds(80))
+
+        let collected = await collectTask.value
+        XCTAssertFalse(
+            collected.contains { $0.kind == .trackpadCircling },
+            "[cell=circle-enabled-gate] disabled circling must NOT fire — got \(collected.map(\.kind))"
+        )
+        source.stop()
+    }
 }

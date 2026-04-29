@@ -270,3 +270,51 @@ final class MatrixKeyboardOSEvents_Tests: XCTestCase {
         source.stop()
     }
 }
+
+/// Cells anchoring the C-callback predicate gates extracted from
+/// `keyboardHIDCallback`. The predicate is pure, so the cells call it
+/// directly with synthetic primitives.
+final class KeyboardHIDCallbackPredicateTests: XCTestCase {
+
+    func test_callback_resultFailure_doesNotDispatch() {
+        let admit = KeyboardActivitySource.shouldDispatchKeyPress(
+            result: kIOReturnError, contextIsNil: false,
+            usagePage: 0x07, usage: 0x04, value: 1)
+        XCTAssertFalse(admit, "[keyboard-callback=result-failure] non-success IOReturn must NOT dispatch")
+    }
+
+    func test_callback_contextNil_doesNotDispatch() {
+        let admit = KeyboardActivitySource.shouldDispatchKeyPress(
+            result: kIOReturnSuccess, contextIsNil: true,
+            usagePage: 0x07, usage: 0x04, value: 1)
+        XCTAssertFalse(admit, "[keyboard-callback=context-nil] nil context must NOT dispatch")
+    }
+
+    func test_callback_wrongUsagePage_doesNotDispatch() {
+        let admit = KeyboardActivitySource.shouldDispatchKeyPress(
+            result: kIOReturnSuccess, contextIsNil: false,
+            usagePage: 0x09, usage: 0x04, value: 1)
+        XCTAssertFalse(admit, "[keyboard-callback=usage-page] wrong usage page must NOT dispatch")
+    }
+
+    func test_callback_zeroUsage_doesNotDispatch() {
+        let admit = KeyboardActivitySource.shouldDispatchKeyPress(
+            result: kIOReturnSuccess, contextIsNil: false,
+            usagePage: 0x07, usage: 0, value: 1)
+        XCTAssertFalse(admit, "[keyboard-callback=usage-zero] zero usage code must NOT dispatch")
+    }
+
+    func test_callback_keyRelease_doesNotDispatch() {
+        let admit = KeyboardActivitySource.shouldDispatchKeyPress(
+            result: kIOReturnSuccess, contextIsNil: false,
+            usagePage: 0x07, usage: 0x04, value: 0)
+        XCTAssertFalse(admit, "[keyboard-callback=value-zero] key release (value=0) must NOT dispatch")
+    }
+
+    func test_callback_validKeyPress_dispatches() {
+        let admit = KeyboardActivitySource.shouldDispatchKeyPress(
+            result: kIOReturnSuccess, contextIsNil: false,
+            usagePage: 0x07, usage: 0x04, value: 1)
+        XCTAssertTrue(admit, "valid key press must dispatch")
+    }
+}

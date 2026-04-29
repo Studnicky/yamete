@@ -286,8 +286,8 @@
       "expectedFailingTest": "ImpactFusionStopIdempotencyGateTests/testStopWhenNotRunning_isNoOp",
       "expectedFailureSubstring": "[fusion-gate=stop-idempotency]",
       "id": "impact-fusion-stop-idempotency-gate",
-      "replace": "if false {",
-      "search": "guard isRunning else {",
+      "replace": "if false {\n            #if DEBUG\n            _testHooks.lastStopWasNoOp = true",
+      "search": "guard isRunning else {\n            #if DEBUG\n            _testHooks.lastStopWasNoOp = true",
       "targetFile": "Sources/SensorKit/ImpactDetection.swift"
     },
     {
@@ -487,6 +487,141 @@
       "replace": "        guard let port else {\n            log.warning(\"activity:SleepWakeSource wasInvalidatedBy entity:IORegisterForSystemPower\")\n            return\n        }\n        _ = connect",
       "search": "        guard connect != 0, let port else {\n            log.warning(\"activity:SleepWakeSource wasInvalidatedBy entity:IORegisterForSystemPower\")\n            return\n        }",
       "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "MouseActivitySource.shouldDispatchClick \u2014 drop the result-success half of the result/context guard. Predicate now admits non-success IOReturns; cell asserts admit==false.",
+      "expectedFailingTest": "MouseHIDCallbackPredicateTests/test_callback_resultFailure_doesNotDispatch",
+      "expectedFailureSubstring": "[mouse-callback=result-failure]",
+      "id": "mouse-callback-result-failure",
+      "replace": "guard !contextIsNil else { return false }\n        guard usagePage == 0x09",
+      "search": "guard result == kIOReturnSuccess, !contextIsNil else { return false }\n        guard usagePage == 0x09",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.shouldDispatchClick \u2014 drop the contextIsNil half of the result/context guard. Predicate now admits nil-context; cell asserts admit==false.",
+      "expectedFailingTest": "MouseHIDCallbackPredicateTests/test_callback_contextNil_doesNotDispatch",
+      "expectedFailureSubstring": "[mouse-callback=context-nil]",
+      "id": "mouse-callback-context-nil",
+      "replace": "guard result == kIOReturnSuccess else { return false }",
+      "search": "guard result == kIOReturnSuccess, !contextIsNil else { return false }",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.shouldDispatchClick \u2014 drop the usagePage==0x09 guard. Predicate now admits non-mouse usage pages.",
+      "expectedFailingTest": "MouseHIDCallbackPredicateTests/test_callback_wrongUsagePage_doesNotDispatch",
+      "expectedFailureSubstring": "[mouse-callback=usage-page]",
+      "id": "mouse-callback-usage-page",
+      "replace": "guard usage == 0x01, value != 0 else { return false }",
+      "search": "guard usagePage == 0x09, usage == 0x01, value != 0 else { return false }",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.shouldDispatchClick \u2014 drop the usage==0x01 button-1 guard. Predicate now admits non-button-1 usages.",
+      "expectedFailingTest": "MouseHIDCallbackPredicateTests/test_callback_wrongButton_doesNotDispatch",
+      "expectedFailureSubstring": "[mouse-callback=usage-button]",
+      "id": "mouse-callback-usage-button",
+      "replace": "guard usagePage == 0x09, value != 0 else { return false }\n        return true",
+      "search": "guard usagePage == 0x09, usage == 0x01, value != 0 else { return false }\n        return true",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.shouldDispatchClick \u2014 drop the value!=0 guard so button releases (value=0) also dispatch.",
+      "expectedFailingTest": "MouseHIDCallbackPredicateTests/test_callback_buttonRelease_doesNotDispatch",
+      "expectedFailureSubstring": "[mouse-callback=value-zero]",
+      "id": "mouse-callback-value-zero",
+      "replace": "guard usagePage == 0x09, usage == 0x01 else { return false }\n        return true\n    }\n}",
+      "search": "guard usagePage == 0x09, usage == 0x01, value != 0 else { return false }\n        return true\n    }\n}",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.start \u2014 drop the double-start idempotency guard. Calling start() twice now installs the scrollWheel monitor twice; MockEventMonitor.installCount catches it.",
+      "expectedFailingTest": "MouseScrollMonitorIdempotencyTests/test_doubleStart_doesNotDoubleInstallScrollMonitor",
+      "expectedFailureSubstring": "[mouse-gate=scroll-monitor-idempotency]",
+      "id": "mouse-scroll-monitor-idempotency",
+      "replace": "if false { return }",
+      "search": "guard scrollMonitor == nil else { return }",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.shouldDispatchKeyPress \u2014 drop the result-success half. Predicate now admits non-success IOReturns.",
+      "expectedFailingTest": "KeyboardHIDCallbackPredicateTests/test_callback_resultFailure_doesNotDispatch",
+      "expectedFailureSubstring": "[keyboard-callback=result-failure]",
+      "id": "keyboard-callback-result-failure",
+      "replace": "guard !contextIsNil else { return false }\n        guard usagePage == 0x07",
+      "search": "guard result == kIOReturnSuccess, !contextIsNil else { return false }\n        guard usagePage == 0x07",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.shouldDispatchKeyPress \u2014 drop the contextIsNil half.",
+      "expectedFailingTest": "KeyboardHIDCallbackPredicateTests/test_callback_contextNil_doesNotDispatch",
+      "expectedFailureSubstring": "[keyboard-callback=context-nil]",
+      "id": "keyboard-callback-context-nil",
+      "replace": "guard result == kIOReturnSuccess else { return false }",
+      "search": "guard result == kIOReturnSuccess, !contextIsNil else { return false }",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.shouldDispatchKeyPress \u2014 drop the usagePage==0x07 keyboard-page guard.",
+      "expectedFailingTest": "KeyboardHIDCallbackPredicateTests/test_callback_wrongUsagePage_doesNotDispatch",
+      "expectedFailureSubstring": "[keyboard-callback=usage-page]",
+      "id": "keyboard-callback-usage-page",
+      "replace": "guard usage > 0, value != 0 else { return false }",
+      "search": "guard usagePage == 0x07, usage > 0, value != 0 else { return false }",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.shouldDispatchKeyPress \u2014 drop the usage>0 guard so zero-usage keys dispatch.",
+      "expectedFailingTest": "KeyboardHIDCallbackPredicateTests/test_callback_zeroUsage_doesNotDispatch",
+      "expectedFailureSubstring": "[keyboard-callback=usage-zero]",
+      "id": "keyboard-callback-usage-zero",
+      "replace": "guard usagePage == 0x07, value != 0 else { return false }\n        return true",
+      "search": "guard usagePage == 0x07, usage > 0, value != 0 else { return false }\n        return true",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.shouldDispatchKeyPress \u2014 drop the value!=0 guard so key releases dispatch.",
+      "expectedFailingTest": "KeyboardHIDCallbackPredicateTests/test_callback_keyRelease_doesNotDispatch",
+      "expectedFailureSubstring": "[keyboard-callback=value-zero]",
+      "id": "keyboard-callback-value-zero",
+      "replace": "guard usagePage == 0x07, usage > 0 else { return false }\n        return true\n    }\n}",
+      "search": "guard usagePage == 0x07, usage > 0, value != 0 else { return false }\n        return true\n    }\n}",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.attemptFireContact \u2014 drop the dur<=contactMax gate. Test seam fires with a synthesized `now` 10s past contactStart; mutation lets it through and publishes .trackpadContact.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testContactMaxDurationGate_pastMaxDur_doesNotFire",
+      "expectedFailureSubstring": "[cell=contact-max-duration]",
+      "id": "trackpad-contact-max-duration-gate",
+      "replace": "if false { return }",
+      "search": "guard dur <= contactMax else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.evaluateCircle \u2014 drop the mag>2.0 floor. Tiny samples now accumulate and a sub-floor full revolution fires .trackpadCircling.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testCircleMagFloor_belowFloor_doesNotAccumulate",
+      "expectedFailureSubstring": "[cell=circle-mag-floor]",
+      "id": "trackpad-circle-mag-floor",
+      "replace": "if false { return }  // ignore tiny movements",
+      "search": "guard mag > 2.0 else { return }  // ignore tiny movements",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.evaluateCircle \u2014 drop the rotation+event-count threshold. Half-revolutions now fire .trackpadCircling.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testCircleRotationGate_belowThreshold_doesNotFire",
+      "expectedFailureSubstring": "[cell=circle-rotation-gate]",
+      "id": "trackpad-circle-rotation-gate",
+      "replace": "if false { return }",
+      "search": "guard abs(circleAngleAccum) > 2 * .pi, circleEventCount >= 15 else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.evaluateCircle \u2014 drop the circlingEnabled+gate guard. Disabled circling now fires when a full revolution accumulates.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testCircleEnabledGate_disabled_doesNotFire",
+      "expectedFailureSubstring": "[cell=circle-enabled-gate]",
+      "id": "trackpad-circle-enabled-gate",
+      "replace": "if false {",
+      "search": "guard circlingEnabled, now >= circlingGate else {",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
     }
   ]
 }

@@ -319,19 +319,12 @@ public final class TrackpadActivitySource: StimulusSource {
                 log.debug("activity:TrackpadContactStart phase=\(phase.rawValue)")
                 // Start a timer — fire contact after contactMin seconds while still held
                 let minDur = contactMin
-                let maxDur = contactMax
                 contactTimer?.cancel()
                 contactTimer = Task { [weak self] in
                     try? await Task.sleep(for: .seconds(minDur))
                     guard !Task.isCancelled else { return }
                     await MainActor.run { [weak self] in
-                        guard let self, self.contactStart != nil else { return }
-                        guard let bus = self.bus, self.contactEnabled else { return }
-                        let dur = Date().timeIntervalSince(self.contactStart ?? Date())
-                        guard dur <= maxDur else { return }
-                        self.log_contactFired(dur: dur)
-                        log.info("activity:Publish wasGeneratedBy entity:TrackpadActivity kind=trackpadContact dur=\(String(format:"%.2f",dur))s")
-                        Task { await bus.publish(.trackpadContact) }
+                        self?.attemptFireContact(at: Date())
                     }
                 }
             }
@@ -416,6 +409,38 @@ public final class TrackpadActivitySource: StimulusSource {
     }
 
     // MARK: - Helpers
+
+    /// Body of the contactTimer's MainActor block, extracted so tests
+    /// can drive it with a synthesized `now` (skipping the real wallclock
+    /// wait) and assert the `dur <= contactMax` gate.
+    fileprivate func attemptFireContact(at now: Date) {
+        guard self.contactStart != nil else { return }
+        guard let bus = self.bus, self.contactEnabled else { return }
+        let dur = now.timeIntervalSince(self.contactStart ?? now)
+        guard dur <= contactMax else { return }
+        self.log_contactFired(dur: dur)
+        log.info("activity:Publish wasGeneratedBy entity:TrackpadActivity kind=trackpadContact dur=\(String(format:"%.2f",dur))s")
+        Task { await bus.publish(.trackpadContact) }
+    }
+
+    #if DEBUG
+    /// Test seam — drives `attemptFireContact` with a synthesized `now`
+    /// so cells can assert the `dur <= contactMax` gate without waiting
+    /// real time. `contactStart` must already be set (drive a `.began`
+    /// scroll first).
+    public func _testTriggerContactFire(at now: Date) {
+        attemptFireContact(at: now)
+    }
+
+    /// Test seam — drives `evaluateCircle` directly so cells can assert
+    /// the magnitude floor (`mag > 2.0`), the rotation+event-count gate
+    /// (`abs(circleAngleAccum) > 2π && circleEventCount >= 15`), and
+    /// the circling enable + debounce gate.
+    public func _injectCircleSample(dx: Float, dy: Float) {
+        guard let bus = self.bus else { return }
+        evaluateCircle(dx: dx, dy: dy, bus: bus, now: Date())
+    }
+    #endif
 
     private func log_contactFired(dur: Double) {
         log.debug("activity:TrackpadContact duration=\(String(format:"%.2f",dur))s")

@@ -287,3 +287,99 @@ final class MatrixMouseOSEvents_Tests: XCTestCase {
         source.stop()
     }
 }
+
+/// Cells anchoring the C-callback predicate gates extracted from
+/// `mouseClickHIDCallback`. The predicate is pure, so the cells call it
+/// directly with synthetic primitives — no IOHIDValue synthesis needed.
+final class MouseHIDCallbackPredicateTests: XCTestCase {
+
+    /// Pins `result == kIOReturnSuccess` half of MouseActivitySource.swift:229.
+    func test_callback_resultFailure_doesNotDispatch() {
+        let admit = MouseActivitySource.shouldDispatchClick(
+            result: kIOReturnError,
+            contextIsNil: false,
+            usagePage: 0x09,
+            usage: 0x01,
+            value: 1
+        )
+        XCTAssertFalse(admit, "[mouse-callback=result-failure] non-success IOReturn must NOT dispatch")
+    }
+
+    /// Pins `let context` half of MouseActivitySource.swift:229.
+    func test_callback_contextNil_doesNotDispatch() {
+        let admit = MouseActivitySource.shouldDispatchClick(
+            result: kIOReturnSuccess,
+            contextIsNil: true,
+            usagePage: 0x09,
+            usage: 0x01,
+            value: 1
+        )
+        XCTAssertFalse(admit, "[mouse-callback=context-nil] nil context must NOT dispatch")
+    }
+
+    /// Pins `usagePage == 0x09` of MouseActivitySource.swift:232.
+    func test_callback_wrongUsagePage_doesNotDispatch() {
+        let admit = MouseActivitySource.shouldDispatchClick(
+            result: kIOReturnSuccess,
+            contextIsNil: false,
+            usagePage: 0x07,  // keyboard page
+            usage: 0x01,
+            value: 1
+        )
+        XCTAssertFalse(admit, "[mouse-callback=usage-page] wrong usage page must NOT dispatch")
+    }
+
+    /// Pins `usage == 0x01` of MouseActivitySource.swift:232.
+    func test_callback_wrongButton_doesNotDispatch() {
+        let admit = MouseActivitySource.shouldDispatchClick(
+            result: kIOReturnSuccess,
+            contextIsNil: false,
+            usagePage: 0x09,
+            usage: 0x02,  // not button-1
+            value: 1
+        )
+        XCTAssertFalse(admit, "[mouse-callback=usage-button] non-button-1 usage must NOT dispatch")
+    }
+
+    /// Pins `value != 0` of MouseActivitySource.swift:232.
+    func test_callback_buttonRelease_doesNotDispatch() {
+        let admit = MouseActivitySource.shouldDispatchClick(
+            result: kIOReturnSuccess,
+            contextIsNil: false,
+            usagePage: 0x09,
+            usage: 0x01,
+            value: 0  // release
+        )
+        XCTAssertFalse(admit, "[mouse-callback=value-zero] button release (value=0) must NOT dispatch")
+    }
+
+    /// Positive case — all predicates admit dispatch.
+    func test_callback_validButtonPress_dispatches() {
+        let admit = MouseActivitySource.shouldDispatchClick(
+            result: kIOReturnSuccess,
+            contextIsNil: false,
+            usagePage: 0x09,
+            usage: 0x01,
+            value: 1
+        )
+        XCTAssertTrue(admit, "valid button-1 press must dispatch")
+    }
+}
+
+/// Pins `MouseActivitySource.swift:84` `guard scrollMonitor == nil else { return }`.
+/// `start()` must be idempotent — double-calling must not double-install.
+@MainActor
+final class MouseScrollMonitorIdempotencyTests: XCTestCase {
+    func test_doubleStart_doesNotDoubleInstallScrollMonitor() async {
+        let bus = ReactionBus()
+        let monitor = MockEventMonitor()
+        let source = MouseActivitySource(eventMonitor: monitor, enableHIDClickDetection: false)
+        source.start(publishingTo: bus)
+        source.start(publishingTo: bus)
+        XCTAssertEqual(
+            monitor.installCount, 1,
+            "[mouse-gate=scroll-monitor-idempotency] double-start must NOT double-install scrollWheel monitor; got \(monitor.installCount) installs"
+        )
+        source.stop()
+    }
+}

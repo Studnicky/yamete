@@ -185,18 +185,38 @@ public final class KeyboardActivitySource: StimulusSource {
     }
 }
 
+extension KeyboardActivitySource {
+    /// Pure-data predicate extracted from the C-callback shell so tests
+    /// can drive the result/context/usage-page/usage/value gates directly
+    /// without synthesizing IOHIDValue objects. Returns true iff the
+    /// callback's three guards all admit the dispatch.
+    nonisolated public static func shouldDispatchKeyPress(
+        result: IOReturn,
+        contextIsNil: Bool,
+        usagePage: UInt32,
+        usage: UInt32,
+        value: Int
+    ) -> Bool {
+        guard result == kIOReturnSuccess, !contextIsNil else { return false }
+        guard usagePage == 0x07, usage > 0, value != 0 else { return false }
+        return true
+    }
+}
+
 private func keyboardHIDCallback(
     context: UnsafeMutableRawPointer?,
     result: IOReturn,
     sender: UnsafeMutableRawPointer?,
     value: IOHIDValue
 ) {
-    guard result == kIOReturnSuccess, let context else { return }
     let element = IOHIDValueGetElement(value)
-    // Only keyboard usage page (0x07) key press events (value > 0 = pressed)
-    guard IOHIDElementGetUsagePage(element) == 0x07,
-          IOHIDElementGetUsage(element) > 0,
-          IOHIDValueGetIntegerValue(value) != 0 else { return }
+    guard KeyboardActivitySource.shouldDispatchKeyPress(
+        result: result,
+        contextIsNil: context == nil,
+        usagePage: IOHIDElementGetUsagePage(element),
+        usage: IOHIDElementGetUsage(element),
+        value: IOHIDValueGetIntegerValue(value)
+    ), let context else { return }
     let source = Unmanaged<KeyboardActivitySource>.fromOpaque(context).takeUnretainedValue()
     Task { @MainActor in source.hidKeyPressed() }
 }
