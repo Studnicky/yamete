@@ -749,6 +749,47 @@ catalog-anchor drift under `make mutate`'s strict
 entries already pin the per-gate behaviour; the concurrent suite is
 a regression net for cross-gate races, not a per-gate anchor.
 
+## Cross-boundary fault cells
+
+`Tests/CrossBoundaryFaultInjection_Tests.swift` complements the
+per-source `_force*` mutation cells with eight cells that drive ≥ 2
+production fault paths SIMULTANEOUSLY. Bug class addressed: existing
+seams (USB / Bluetooth / Thunderbolt `_forceKernelFailureKr`,
+AudioPeripheral `_forceListenerStatus`, SleepWake
+`_forceRegistrationFailure`, AccelerometerKernelDriver
+`setForceManagerOpenFailure`, etc.) drive ONE source's failure path
+in isolation. Real systems fail across boundaries simultaneously
+(USB hot-unplug while microphone is starting; sleep
+mid-`IORegisterForSystemPower`; AudioPeripheral listener install
+rejected during a USB attach storm). A regression where one source's
+failure path corrupts a sibling's state would slip through the
+per-source cells.
+
+Each cell asserts a SPECIFIC invariant tagged with a
+`[crossfault-cell=<name>]` substring anchor. Each cell is budgeted
+at ≤ 500ms wallclock.
+
+| Cell | Invariant |
+|------|-----------|
+| `test_crossfault_cell_usb_fail_during_bt_fail_simultaneous` | concurrent USB + BT kernel-failure injection → both `_testInstallationCount` stay 0; bus has no emissions; neither source crashes |
+| `test_crossfault_cell_accel_open_fail_during_mic_start` | `MockAccelerometerKernelDriver.setForceManagerOpenFailure` while `MicrophoneSource` starts → 0 accelerometer impacts, microphone tap installed exactly once independent of accelerometer fault |
+| `test_crossfault_cell_sleepwake_fail_during_iohid_flood` | 100 USB attaches concurrent with `SleepWakeSource._forceRegistrationFailure` → SleepWake installCount=0, no `.willSleep` / `.didWake`, USB attaches still publish |
+| `test_crossfault_cell_audio_listener_fail_during_usb_flood` | AudioPeripheral `_forceListenerStatus` non-noErr during 30-attach USB burst → AudioPeripheral installCount=0, no audio emissions, USB attaches still publish |
+| `test_crossfault_cell_all_iokit_sources_fail` | every IOKit source (USB / BT / TB / Audio / SleepWake) faulted simultaneously → all installCount=0, bus total=0, no crash |
+| `test_crossfault_cell_recovery_after_fault` | source faulted then knob cleared then restarted → installCount=1 after recovery, follow-up `_injectAttach` lands at the bus |
+| `test_crossfault_cell_concurrent_fault_during_in_flight_subscription` | 3 subscribers attached, healthy injects flow, faults flipped during in-flight subscription → all subscribers see identical per-kind multisets (no fan-out skew under fault) |
+| `test_crossfault_cell_stable_interleaved_fault_fuzz` | for seeds 42 / 7 / 31: 2-5 random IOKit faults from the 5-source pool with 30 random injects → no crash, no kind cross-pollination, delivered ≤ injected (no amplification) |
+
+These cells are NOT in `mutation-catalog.json` for the same reason
+the concurrent / property cells aren't: they are integrative
+invariants that span multiple gates simultaneously, so a single
+mutation typically manifests as a SUBSET of cells failing — which
+produces catalog-anchor drift under strict
+`expectedFailureSubstring` matching. The existing per-source
+`_force*` catalog entries already pin per-gate behaviour; the
+cross-boundary suite is a regression net for cross-source state
+corruption under simultaneous fault, not a per-gate anchor.
+
 ## Settings fuzz cells
 
 `Tests/SettingsFuzz_Tests.swift` complements the example-based
