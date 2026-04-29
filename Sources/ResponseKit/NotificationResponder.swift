@@ -101,7 +101,23 @@ public final class NotificationResponder: ReactiveOutput {
 
     /// Convenience for non-test callers (`Yamete.bootstrap`) that just want to
     /// kick the system permission dialog at launch on a fresh install.
+    /// Skips when running under `swift test` / `xctest` because
+    /// `UNUserNotificationCenter.currentNotificationCenter` raises
+    /// `NSInternalInconsistencyException` ("bundleProxyForCurrentProcess is
+    /// nil") whenever `Bundle.main.bundleURL` resolves to the xctest
+    /// runner instead of an app bundle. The exception cannot be caught
+    /// from Swift and crashes the entire process — including any other
+    /// test that happens to be running when the dispatched Task fires
+    /// (the call is async fire-and-forget). Skipping under the runner
+    /// is the production-safe fix; the integration surface is exercised
+    /// via `xcodebuild test` against the YameteTests scheme bundled
+    /// inside the host app.
     public static func requestAuthorizationIfNeeded() {
+        let bundleURL = Bundle.main.bundleURL.path
+        let isUnderXctestRunner = bundleURL.contains("/Xcode.app/")
+            || bundleURL.contains("/usr/bin")
+            || Bundle.main.bundleIdentifier == nil
+        guard !isUnderXctestRunner else { return }
         Task { @MainActor in
             let driver = RealSystemNotificationDriver()
             let auth = await driver.currentAuthorization()

@@ -1035,6 +1035,69 @@ public final class SettingsStore {
             debugLogging = false
             d.set(false, forKey: Key.debugLogging.rawValue)
         }
+
+        // Corruption-resistance pass: a hostile / corrupt UserDefaults can
+        // hold NaN, ±∞, or pair-inverted values (e.g., low > high) that the
+        // production read paths would otherwise propagate into the live
+        // settings graph. Restore each non-finite Double to its default and
+        // re-order any inverted low/high pair. This runs once at boot; the
+        // didSet clamps on every subsequent mutation.
+        Self.sanitizeNonFiniteAndPairings(self)
+    }
+
+    /// Restore non-finite Double properties to their defaults and re-order
+    /// any inverted low/high pair. Called from `init()` so a corrupt
+    /// UserDefaults can't deliver NaN/Inf to detection thresholds nor an
+    /// inverted bandpass interval.
+    private static func sanitizeNonFiniteAndPairings(_ store: SettingsStore) {
+        if !store.sensitivityMin.isFinite       { store.sensitivityMin       = Defaults.sensitivityMin }
+        if !store.sensitivityMax.isFinite       { store.sensitivityMax       = Defaults.sensitivityMax }
+        if !store.debounce.isFinite             { store.debounce             = Defaults.debounce }
+        if !store.flashOpacityMin.isFinite      { store.flashOpacityMin      = Defaults.flashOpacityMin }
+        if !store.flashOpacityMax.isFinite      { store.flashOpacityMax      = Defaults.flashOpacityMax }
+        if !store.volumeMin.isFinite            { store.volumeMin            = Defaults.volumeMin }
+        if !store.volumeMax.isFinite            { store.volumeMax            = Defaults.volumeMax }
+        if !store.hapticIntensity.isFinite      { store.hapticIntensity      = 1.0 }
+        if !store.displayBrightnessBoost.isFinite     { store.displayBrightnessBoost     = 0.5 }
+        if !store.displayBrightnessThreshold.isFinite { store.displayBrightnessThreshold = 0.4 }
+        if !store.displayTintIntensity.isFinite { store.displayTintIntensity = 0.5 }
+        if !store.volumeSpikeTarget.isFinite    { store.volumeSpikeTarget    = 0.9 }
+        if !store.volumeSpikeThreshold.isFinite { store.volumeSpikeThreshold = 0.7 }
+        if !store.trackpadWindowDuration.isFinite { store.trackpadWindowDuration = 1.5 }
+        if !store.trackpadScrollMin.isFinite    { store.trackpadScrollMin    = 0.1 }
+        if !store.trackpadScrollMax.isFinite    { store.trackpadScrollMax    = 0.8 }
+        if !store.trackpadTouchingMin.isFinite  { store.trackpadTouchingMin  = 0.1 }
+        if !store.trackpadTouchingMax.isFinite  { store.trackpadTouchingMax  = 0.5 }
+        if !store.trackpadSlidingMin.isFinite   { store.trackpadSlidingMin   = 0.5 }
+        if !store.trackpadSlidingMax.isFinite   { store.trackpadSlidingMax   = 0.9 }
+        if !store.trackpadContactMin.isFinite   { store.trackpadContactMin   = 0.5 }
+        if !store.trackpadContactMax.isFinite   { store.trackpadContactMax   = 2.5 }
+        if !store.trackpadTapMin.isFinite       { store.trackpadTapMin       = 2.0 }
+        if !store.trackpadTapMax.isFinite       { store.trackpadTapMax       = 6.0 }
+        if !store.mouseScrollThreshold.isFinite { store.mouseScrollThreshold = 3.0 }
+        if !store.accelSpikeThreshold.isFinite  { store.accelSpikeThreshold  = Defaults.accelSpikeThreshold }
+        if !store.accelCrestFactor.isFinite     { store.accelCrestFactor     = Defaults.accelCrestFactor }
+        if !store.accelRiseRate.isFinite        { store.accelRiseRate        = Defaults.accelRiseRate }
+        if !store.accelReportInterval.isFinite  { store.accelReportInterval  = Defaults.accelReportInterval }
+        if !store.accelBandpassLowHz.isFinite   { store.accelBandpassLowHz   = Defaults.accelBandpassLow }
+        if !store.accelBandpassHighHz.isFinite  { store.accelBandpassHighHz  = Defaults.accelBandpassHigh }
+        if !store.micSpikeThreshold.isFinite    { store.micSpikeThreshold    = Defaults.micSpikeThreshold }
+        if !store.micCrestFactor.isFinite       { store.micCrestFactor       = Defaults.micCrestFactor }
+        if !store.micRiseRate.isFinite          { store.micRiseRate          = Defaults.micRiseRate }
+        if !store.hpSpikeThreshold.isFinite     { store.hpSpikeThreshold     = Defaults.hpSpikeThreshold }
+        if !store.hpCrestFactor.isFinite        { store.hpCrestFactor        = Defaults.hpCrestFactor }
+        if !store.hpRiseRate.isFinite           { store.hpRiseRate           = Defaults.hpRiseRate }
+        if !store.ledBrightnessMin.isFinite     { store.ledBrightnessMin     = 0.30 }
+        if !store.ledBrightnessMax.isFinite     { store.ledBrightnessMax     = 1.00 }
+        // Pair invariant: bandpass low must not exceed high after corrupt-
+        // input sanitization. The didSet handlers preserve this on writes,
+        // but cold-load can deliver an inverted pair.
+        if store.accelBandpassLowHz > store.accelBandpassHighHz {
+            let lo = store.accelBandpassHighHz
+            let hi = store.accelBandpassLowHz
+            store.accelBandpassLowHz = lo
+            store.accelBandpassHighHz = hi
+        }
     }
 
     // MARK: - Reset

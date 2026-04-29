@@ -711,3 +711,390 @@ catalog-anchor drift under `make mutate`'s strict
 `expectedFailureSubstring` matching. The existing 69 catalog
 entries already pin the per-gate behaviour; the concurrent suite is
 a regression net for cross-gate races, not a per-gate anchor.
+
+## Settings fuzz cells
+
+`Tests/SettingsFuzz_Tests.swift` complements the example-based
+`Tests/MatrixSettingsMigration_Tests.swift` matrix with eight cells
+that generate arbitrary plist shapes and corrupted settings inputs,
+asserting `SettingsStore.init()` survives them without throwing,
+crashing, or handing back NaN. Bug class addressed: the migration
+matrix only covers the *known* type-mismatch paths the example
+author thought of; a fuzzer that generates random key shapes
+catches the boot-time crash classes that random user upgrades —
+including version skew across multiple major releases — can
+produce.
+
+| Cell | Inputs | Trials |
+|------|--------|--------|
+| `test_fuzz_cell1_emptyDictPlist_usesDefaults` | empty `[String: Any]()` plist (every key missing) | 1 |
+| `test_fuzz_cell2_typeMismatchAllKeys_usesDefaults` | every `Key.allCases` entry written with the wrong type (Bool→String, Double→String, Int→String, Array→Int, Data→String, String→Int) | 1 |
+| `test_fuzz_cell3_truncatedPlist_partialKeys_useDefaultsForMissing` | first half of `Key.allCases` written with type-correct sentinels, second half absent | 1 |
+| `test_fuzz_cell4_randomBlobPlist_200trials_noCrash` | per-trial random `[String: Any]` of 0..N real keys + 0..10 garbage keys with type-roulette values (String, Int, Double incl. NaN/±∞, Bool, Array, Data) | 200 |
+| `test_fuzz_cell5_migrationFromFutureVersion_doesNotCrash` | `version: 99` + `settingsSchemaVersion: 99` + `schemaVersion: "99.0.0-future"` markers under the current schema (no version field) | 1 |
+| `test_fuzz_cell6_migrationFromCorruptVersion_doesNotCrash` | corrupt version markers: `-1`, `"broken"`, `""`, `Double.nan`, `[1,2,3]` | 5 |
+| `test_fuzz_cell7_serializationRoundTrip_100trials` | per-trial coherent in-band settings configuration; assert write→fresh-store→read round-trip is bijective for the in-clamp domain | 100 |
+| `test_fuzz_cell8_maliciousMatrixData_doesNotCrash` | 6 garbage `Data` blobs (empty, 1-byte, 4 KiB zeros, broken JSON, fake bplist magic, pseudo-random) driven through every `*ReactionMatrix` key plus the throwing `NSKeyedUnarchiver.unarchivedObject(ofClasses:from:)` API | 6 |
+
+Determinism: the random-blob and round-trip cells use the same
+hand-rolled xorshift64 `SeededGenerator` pattern as the property
+suite, inlined locally to keep the file self-contained. Same seed
+N produces the same plist shape on every host, every run, every CI
+shard. Failure messages cite `seed=N` so any regression is locally
+reproducible: `swift test --filter SettingsFuzz_Tests/test_fuzz_cell4_*`
+plus the emitted seed reproduces the exact failure.
+
+Isolation: SettingsStore reads only from `UserDefaults.standard`
+(no suiteName injection in production), so each cell wipes every
+`Key.allCases` entry plus the legacy `screenFlash`, `version`, and
+`settingsSchemaVersion` aliases before running. Mirrors the wipe
+pattern from `MatrixSettingsMigration_Tests`.
+
+SIGSEGV note: `XCTest` cannot trap SIGSEGV in-process — the runner
+reports "test crashed" rather than a failed assertion. Cell 8
+asserts only that `ReactionToggleMatrix.decoded(from:)` and
+`NSKeyedUnarchiver.unarchivedObject(ofClasses:from:)` return
+nil-or-throw on garbage bytes, both of which ARE catchable. A
+genuine SIGSEGV-class regression in the JSON / NSKeyedUnarchiver
+path would surface as a CI crash report, not a per-assertion
+failure.
+
+These cells are NOT in `mutation-catalog.json` because they are
+boot-time / corruption-resistance regression nets, not per-gate
+anchors — the catalog's `expectedFailureSubstring` machinery
+matches against single-gate mutations on `Sources/SensorKit/*`,
+and `SettingsStore` lives in `Sources/YameteApp/`.
+
+## State-machine cells
+
+`Tests/StateMachine_Tests.swift` is a model-based companion to the
+example-by-example lifecycle tests scattered across the matrix /
+lifecycle suites. Each cell encodes the production state machine
+exactly (states + reachable transitions), drives every transition
+in a small table, asserts the post-state with a coordinate-tagged
+message (`[state-machine=<Name>] from=... action=... expected=... got=...`),
+and — critically — asserts that *illegal* transitions are rejected
+(state unchanged, no extra side-effect counter increments).
+
+| Cell | Production type | Transitions covered | Counters / observables |
+|---|---|---|---|
+| 1 | `HeadphoneMotionSource.ProbeStage` | pending → running, running → complete, running → takenOver | `_testCurrentProbeStage`, `MockHeadphoneMotionDriver.stopUpdatesCalls` |
+| 2 | `HeadphoneMotionSource.ProbeStage` (illegal) | complete →* (no-op), takenOver →* (no-op) — terminal states | same |
+| 3 | `ImpactFusion` | start@stopped, start@running (re-entrant), stop@running, stop@stopped (idempotent), interleaved | `isRunning`, `_testHooks.{stopInvocationCount, stopTeardownCount, lastStopWasNoOp}` |
+| 4 | `ReactionBus` | open(0) → open(1) → open(2) → closed → open(1); publish-before-subscribe (no replay), close-then-publish (no-op), close-then-subscribe (re-open) | `_testSubscriberCount()` |
+| 5 | `MicrophoneSource.OnceCleanup` (per-stream) | open / cancel / re-open across 5 cycles; AT MOST ONCE invariant | `MockMicrophoneEngineDriver.{stopCalls, removeTapCalls, installTapCalls}` |
+| 6 | `TrackpadActivitySource` | start@stopped, double-start@running (no-op via `guard monitor == nil`), stop@running, double-stop@stopped, restart | `MockEventMonitor.{installCount, removalCount}` |
+
+These cells are NOT in `mutation-catalog.json` because they are
+model-check regression nets — they exercise transition graphs as
+a whole rather than individual `guard` clauses. A specific gate
+within a state-machine type (e.g., the `guard stage == .running`
+in `finishProbeIfRunning`) still gets its own per-gate entry in
+the catalog when one is added; the model-check cell catches the
+broader "transition graph regressed" failure mode.
+
+## Locale rendering cells
+
+`Tests/LocaleRendering_Tests.swift` complements the existing
+`MatrixLocalization_Tests` (pool injection + fallback) /
+`MatrixLocalizationKeyCoverage_Tests` (key parity per locale) /
+`MatrixLocalizationFormatSpecifiers_Tests` (format-specifier shape
+parity per locale) with eight cells that actually RENDER strings
+under each locale's CLDR plural-rule and number / date-formatter
+context. The bug class addressed: a `Localizable.stringsdict`
+regression that drops a CLDR plural category (e.g., Polish loses
+its `few` or `many` form) would slip through the existing key /
+specifier coverage tests because they never resolve a count
+through Foundation's plural machinery.
+
+Strategy:
+
+- Discover locales from `App/Resources/*.lproj/`, same convention
+  as the other matrix-localization cells. Yamete ships 40 locales,
+  each with `Localizable.stringsdict`.
+- Load each locale's stringsdict via `NSDictionary(contentsOf:)`
+  directly (the SPM test bundle does NOT include `App/Resources/*.lproj`
+  strings — those are bundled into the `.app` only by the Makefile,
+  same constraint `MatrixLocalization_Tests` documents).
+- Resolve the CLDR plural category for `count` ∈ {0, 1, 2, 17}
+  using a hand-coded CLDR 44 rule table (Foundation does not expose
+  plural rules as public API on `Locale`). The table covers every
+  Yamete-supported language family.
+- For RTL: probe `Locale.characterDirection(forLanguage:)` for
+  `ar` / `he` / `en` and assert correct direction. Glyph probe:
+  the Arabic stringsdict's `one` form must contain Arabic Unicode
+  (U+0600..U+06FF) and the Hebrew form must contain Hebrew Unicode
+  (U+0590..U+05FF); English form must contain neither (guards
+  against bundle-load mixup).
+- Date / numeric: drive `DateFormatter` (`.full` style, UTC TZ,
+  fixed instant 2026-01-15 10:30 UTC) and `NumberFormatter`
+  (`.decimal`, value 1234.56) under each locale; assert non-empty,
+  cross-locale divergence (≥ 25 of 40 must differ from en-US),
+  must-diverge-set (`ja`, `zh_CN`, `zh_TW`, `ko`, `ar`, `he`, `ru`,
+  `th`, `hi` MUST differ from en-US — different scripts), and
+  per-locale glyph signatures (German `1.234,56`, French `1 234,56`,
+  English `1,234.56`).
+
+| Cell | Axis tested |
+|------|-------------|
+| `testPluralRenderingCountZeroForEveryLocale` | plural count=0 |
+| `testPluralRenderingCountOneForEveryLocale` | plural count=1 |
+| `testPluralRenderingCountTwoForEveryLocale` | plural count=2 (pins Slovenian/Arabic `two`, Polish/Russian `few`) |
+| `testPluralRenderingCountManyForEveryLocale` | plural count=17 (pins Polish/Russian/Ukrainian/Arabic `many`) |
+| `testPolishPluralCategoriesReachableAndCorrect` | Polish-specific: drives counts 0/1/2/3/5/12/22/25 across all 4 CLDR categories (one/few/many/other); asserts category resolution AND on-disk stem (uderzenie / uderzenia / uderzeń) |
+| `testRTLLocaleLayoutAndGlyphs` | RTL: `Locale.characterDirection(forLanguage:)` + Arabic/Hebrew glyph presence + LTR-locale negative |
+| `testDateFormatRenderingForEveryLocale` | `DateFormatter` `.full` style under every locale; non-empty + cross-locale divergence + must-diverge set |
+| `testNumericFormatRenderingForEveryLocale` | `NumberFormatter` `.decimal` under every locale; decimal separator parity + per-locale German/French/English signatures |
+
+These cells are NOT in `mutation-catalog.json` because they
+exercise CLDR-rule + Foundation-formatter behaviour, not a Yamete
+production guard — there is no `Sources/SensorKit/*.swift` gate to
+mutate. They are a regression net for resource-file drift
+(stringsdict losing categories, locale dirs disappearing) and
+Foundation API drift (plural rule selection changing across
+macOS releases), not a per-gate anchor.
+
+## Performance / soak cells
+
+`Tests/Performance_Tests.swift` is a soak / leak / throughput
+regression net that complements the functional matrix. The functional
+suite asserts that the right reaction fires for the right input;
+none of those cells assert anything about *cost*. A regression that
+re-installed an `EventMonitor` on every gesture, leaked a `Task` per
+`_injectClick`, or grew the bus subscriber dictionary without bound
+would pass the functional suite for hours and only show up as
+degraded user experience after sustained use.
+
+Each cell runs lifecycle / fan-out / inject loops at counts large
+enough to surface unbounded growth, then asserts:
+
+- process resident-set size (`task_info` with `MACH_TASK_BASIC_INFO`,
+  the macOS-supported equivalent of iOS's `os_proc_available_memory`)
+  stays within a documented byte envelope
+- mock counters (e.g. `MockEventMonitor.installCount` /
+  `removalCount`) stay balanced — every install matched by a removal
+- second-half-median wallclock per chunk stays within 3x first-half
+  median (catches per-iter cost growing with iteration index)
+
+| Cell | Invariant | Counters / observables |
+|---|---|---|
+| 1 | `TrackpadActivitySource` 1000 start/stop cycles: `installCount == removalCount` per cycle, RSS delta < 5 MB | `MockEventMonitor.installCount`, `removalCount`, `task_info.resident_size` |
+| 2 | `MouseActivitySource` 1000 start/stop cycles: same balance + RSS bound | same as cell 1 |
+| 3 | `ReactionBus` 10,000 publishes: `delivered <= published` (no fan-out amplification), RSS delta < 10 MB (busBufferDepth caps retention) | subscriber drain count, `task_info.resident_size` |
+| 4 | Per-source `_inject*` 5,000 calls (USB / Power / Bluetooth / SleepWake / AudioPeripheral), 10 chunks of 500: second-half median <= 3x first-half median (catches sustained per-iter cost drift). Identities cycle modulo 50 because production diff-state sets are bounded by physical hardware (~5-20), not by call count | per-chunk `ProcessInfo.systemUptime` deltas |
+| 5 | 20,000 `_injectClick` calls with debounce coalesce: RSS delta < 20 MB (catches orphan Task accumulation per call) | `task_info.resident_size` |
+| 6 | `ReactionBus` 500 open/subscribe/close cycles: max live `_testSubscriberCount() <= 1`, RSS delta < 10 MB | `ReactionBus._testSubscriberCount()`, `task_info.resident_size` |
+| 7 | `USBSource._injectAttach` x 1000 in tight loop: completes in < 5 s (10x of ~700 ms baseline catches gross regression without flaking on slower hosts) | `ProcessInfo.systemUptime` |
+
+These cells are NOT in `mutation-catalog.json`. A mutation that
+introduces a leak or a quadratic regression typically manifests as
+a subset of cells failing on different hosts (cell 5's RSS bound is
+sensitive to scheduler load; cell 4's median ratio is sensitive to
+a single GC pause), so anchor matching against
+`expectedFailureSubstring` would drift across CI hosts. The cells
+are a **regression net** — they catch catastrophic divergence from
+the documented baselines, not per-mutation single-gate failures.
+
+A NOTE on cell 4 calibration: an earlier draft used unique UIDs per
+inject and produced clean monotonic slowdown (`[0.09, 0.27, 0.52,
+0.46, 0.94, 0.92, 0.91, 1.55, 1.99, 2.43]` seconds) for
+`AudioPeripheralSource`. This was NOT a production bug — the test
+seam's `_injectAttach` does `var nextSet = knownDevices;
+nextSet.insert(uid); handleChange(newDevices: nextSet, ...)` which
+is O(n) per call where n = accumulated device count. In production
+n is bounded by physical hardware (~10); the test's 5000 unique
+UIDs created an artificial O(n^2) the test seam was not designed
+for. Cycling identity modulo 50 mirrors the real-world bound while
+still hammering the hot path 5000 times. The same pattern applies
+to USBSource's `lastEvent` debounce dictionary and BluetoothSource's
+`knownDevices` set.
+
+## Crash handling cells
+
+`Tests/CrashHandling_Tests.swift` is the arithmetic-trap /
+divide-by-zero / NaN-propagation / out-of-bounds-pointer audit
+suite. None of the example-based or matrix tests exercised the
+SIGSEGV / SIGTRAP / SIGABRT-adjacent paths before this file
+landed; every cell here pins a *guard* whose removal would surface
+as a process crash that takes the whole test runner down rather
+than a per-assertion failure.
+
+| Cell | Trap class | Boundary input | Pinned guard |
+|---|---|---|---|
+| 1 (cold-boot) | UInt64 underflow on `now &- lastTs` | `lastTsRaw=0, now=0` | `AccelHardware.evaluateActivity` `raw > 0` gate |
+| 1 (clock-equal) | UInt64 underflow → wrap interpreted as fresh | `lastTs=now=1000` | `now > lastTs` gate → `.clockNonMonotonic` |
+| 1 (clock-backwards) | UInt64 underflow on `now &- lastTs` | `lastTs=2e9, now=1e9` | `now > lastTs` gate → `.clockNonMonotonic` |
+| 2 (trackpad NaN) | NaN propagation from `atan2(0,0)` / `hypot(0,0)` into `circleAngleAccum` | `dx=0, dy=0` × 100 samples | `evaluateCircle` `mag > 2.0` gate |
+| 3 (mic zero-frame) | OOB pointer read on `channelData[i]` for empty buffer | `AVAudioPCMBuffer` with `frameLength == 0` | `installTap` closure `frameLength > 0` gate |
+| 4 (impact zero-mag) | Float divide-by-zero → Inf crest poisoning gate cascade | sustained `magnitude=0.0` × 100 samples | `ImpactDetector.process` `spikeThreshold` gate (short-circuits before crest) |
+| 4 (impact zero-bg) | Float divide-by-zero on first spike with empty EMA history | `intensityFloor=0`, single `magnitude=1.0` spike | `if backgroundRMS > 0` gate around `windowPeak / backgroundRMS` |
+| 5 (HID 1k matchers) | Int iteration overflow / CFArray bridge cost | 1000-element matcher list | per-matcher `for` loop bounds (Int domain) |
+| 6 (bus post-close) | Use-after-finish on `AsyncStream.Continuation` | `publish` after `close()` | `close()` clears subscriber dict; `publish` walks empty set |
+| 7 (UInt64 wrap) | Overflow on `(now &- lastTs) &* numer` at near-max boundary | `lastTs=Int.max, now=Int.max+1, stalenessNs=UInt64.max` | `&-` / `&*` wrap-arithmetic operators |
+| 8 (watchdog distant times) | TimeInterval → Int64 conversion overflow | `lastReportAt=Date.distantPast, now=Date.distantFuture` | `evaluateWatchdogTick` Double-domain math + `running` short-circuit |
+
+Degenerate cells (proposed in the original audit but not
+realisable in-process):
+
+- "Settings UInt64 overflow" — there are no UInt64-typed Settings
+  fields. All numeric Settings are `Double` (TimeInterval /
+  threshold) or `Int` (count). The wraparound arithmetic that
+  does exist lives in `AccelHardware.evaluateActivity` and is
+  covered by Cell 7.
+- "AccelerometerReader watchdog `mach_absolute_time` wraparound"
+  in-process — production watchdog uses `Date` (TimeInterval /
+  Double), not `mach_absolute_time`. `mach_absolute_time` rollover
+  is itself unreachable in-process (~584 years to wrap on
+  post-Big-Sur Apple silicon). Cell 8 pins the Date-domain
+  extreme reachable in this codebase.
+- Out-of-process SIGSEGV / SIGTRAP fault injection — XCTest cannot
+  trap SIGSEGV in-process; testing that a force-unwrap actually
+  traps requires `XCUIApplication` to spawn a child target, which
+  `swift test` does not configure here. Each cell pins the *guard*
+  that prevents the trap; the absence-of-trap assertion is the
+  test runner not crashing.
+
+These cells are NOT in `mutation-catalog.json` because the catalog
+matches single-gate mutations on `Sources/SensorKit/*` against
+`expectedFailureSubstring` — the crash-handling cells either span
+multiple files (Cell 7 hits both `&-` and `&*`) or pin idiomatic
+patterns (Cell 6's "no replay" is intrinsic to `AsyncStream`,
+not a single guard). Mutation pairs for the per-gate guards
+(`raw > 0`, `now > lastTs`, `frameLength > 0`, `backgroundRMS > 0`,
+`mag > 2.0`) are eligible for catalog entries when added; the
+crash-handling suite is the integrative regression net.
+
+## Driver parity cells
+
+`Tests/DriverParity_Tests.swift` complements the per-driver
+lifecycle / mock tests (e.g. `MicrophoneAdapterLifecycleTests`,
+`HeadphoneMotionAdapterLifecycleTests`,
+`NotificationResponderTests`, etc.) with eight cells that exercise
+each driver protocol's `Real*` and `Mock*` implementations through
+the SAME call sequence and assert the protocol's CONTRACT holds on
+both sides. Bug class addressed: every other test in the suite
+talks to ONE side of the protocol — Mocks for fast deterministic
+paths, Real impls only inside lifecycle tests gated on hardware /
+TCC. A divergence between the two (e.g. Real returns `nil` where
+Mock simulates a value, or Real adds a side effect Mock never
+records) would surface as a production-only bug the test suite
+cannot catch because no cell ever observes them under the same
+input.
+
+| Cell | Driver pair | Assertion shape |
+|------|-------------|-----------------|
+| `test_eventMonitor_parity_installAndRemove` | `RealEventMonitor` vs `MockEventMonitor` | install returns non-nil token (Mock unconditionally; Real iff Accessibility granted), remove cleans up; `XCTSkipUnless` on TCC for Real half |
+| `test_hidDeviceMonitor_parity_emptyMatcherAlwaysEmpty` | `RealHIDDeviceMonitor` vs `MockHIDDeviceMonitor` | empty matcher returns `[]` on both (CONTRACT); non-empty matcher: shape parity only (`[HIDDeviceInfo]` on both) — value diverges (Real reflects connected hw, Mock reflects test state) |
+| `test_microphoneEngineDriver_parity_installRemoveTapSymmetry` | `RealMicrophoneEngineDriver` vs `MockMicrophoneEngineDriver` | install/remove tap call sequence symmetric on both; `XCTSkipUnless` on Real input format validity |
+| `test_headphoneMotionDriver_parity_contractShape` | `RealHeadphoneMotionDriver` vs `MockHeadphoneMotionDriver` | `isDeviceMotionAvailable` and `isHeadphonesConnected` return Bool on both; `startUpdates` / `stopUpdates` call-counting symmetry on Mock; Real start/stop must not throw or crash |
+| `test_hapticEngineDriver_parity_startPlayStop` | `RealHapticEngineDriver` vs `MockHapticEngineDriver` | `start` → `playPattern` → `stop` succeeds on Mock unconditionally and on Real iff Force Touch hardware present (`XCTSkipUnless`) |
+| `test_hapticEngineDriver_parity_playWithoutStartThrows` | same | typed-throwing parity: Mock with `shouldFailPlay` throws; Real `playPattern` without prior `start` throws `HapticDriverError.engineNotStarted` |
+| `test_displayBrightnessDriver_parity_getSetShape` | `RealDisplayBrightnessDriver` vs `MockDisplayBrightnessDriver` | `get` returns `Float?` on both; Mock seeded set→get round-trips exactly; Real round-trip restores original (non-destructive) |
+| `test_systemVolumeDriver_parity_captureSetRestore` | `RealSystemVolumeDriver` vs `MockSystemVolumeDriver` | capture → set → restore round-trips on Mock; Real captures original and restores within tolerance (no-op for user); `XCTSkipUnless` when no default audio output |
+| `test_systemNotificationDriver_parity_authorizationShape` | `RealSystemNotificationDriver` vs `MockSystemNotificationDriver` | `currentAuthorization` returns `NotificationAuth` enum on both; `remove` does not throw on either; posting NOT asserted on Real (would surface a banner) |
+
+Skipped halves (Real-side only — Mock half always runs):
+- EventMonitor: skipped when Accessibility / TCC not granted to
+  the test runner (NSEvent's add returns nil in that case).
+- MicrophoneEngineDriver: skipped when no audio input device
+  (input format reports zero channels / sample rate).
+- HapticEngineDriver: skipped when host has no Force Touch trackpad
+  (Mac mini, headless CI).
+- DisplayBrightnessDriver: skipped when DisplayServices.framework
+  symbols cannot be resolved, or when the active display does not
+  report a brightness value (some external monitors).
+- SystemVolumeDriver: skipped when host has no default audio output
+  device (headless CI).
+
+These cells are NOT in `mutation-catalog.json` because parity is
+an INTEGRATIVE invariant across two implementations of the same
+protocol — a single-gate mutation in either Real or Mock would
+manifest as one half failing while the other passes, which is
+already caught by the per-side lifecycle / mock tests already in
+the catalog. The parity suite is a regression net for "the two
+implementations of this protocol have drifted apart", not a
+per-gate anchor.
+
+Divergences documented (not bugs — observed-and-captured contract
+differences):
+- `RealHIDDeviceMonitor.queryDevices` reflects connected hardware;
+  `MockHIDDeviceMonitor` reflects test-injected state. Equality of
+  return value is intentionally NOT asserted for non-empty
+  matcher lists.
+- `RealHeadphoneMotionDriver.isHeadphonesConnected` reflects
+  paired AirPods (delegate-driven); `MockHeadphoneMotionDriver` is
+  test-controlled. Real's `isDeviceMotionAvailable` returns true
+  on every Apple Silicon Mac independent of paired devices.
+- `RealSystemVolumeDriver.getVolume` reflects the host's audio
+  device state; `MockSystemVolumeDriver` reflects test seed. The
+  Real round-trip is restore-only (sets back the captured
+  original) so tests do not change the user's volume.
+- `RealSystemNotificationDriver.currentAuthorization` reflects the
+  test runner's notification grant state (any of the six
+  `NotificationAuth` cases is valid); `MockSystemNotificationDriver`
+  defaults to `.authorized`. Only enum-shape parity is asserted.
+
+## Snapshot UI cells
+
+Pixel-baseline snapshots in `Tests/SnapshotUI_Tests.swift` cover the
+menu UI's structural composition. These cells render real SwiftUI
+views into `NSHostingView`, capture the bitmap via the
+`pointfreeco/swift-snapshot-testing` `image` strategy, and compare
+against committed PNG baselines under
+`Tests/__Snapshots__/SnapshotUI_Tests/`.
+
+The bug class targeted: regressions in `AccordionCard` row-height
+geometry, `PillButton` framing, accordion expand/collapse layout,
+`Theme` color-token additions/removals/edits — all of which compile
+clean and pass `MatrixViewLabelCoverage_Tests` (string presence) and
+`MatrixAccordionExpansionSize_Tests` (numeric height deltas) but
+visually drift.
+
+Cells (14 baseline PNGs total):
+
+| Test | View rendered | Baselines |
+|------|---------------|-----------|
+| `test_cell_headerSection_lightScheme` | `HeaderSection` | 1 |
+| `test_cell_headerSection_darkScheme` | `HeaderSection` (.dark) | 1 |
+| `test_cell_deviceSection_collapsed` | `AccordionCard` wrapping `DeviceSection`, `isExpanded=false` | 1 |
+| `test_cell_deviceSection_expanded` | `AccordionCard` wrapping `DeviceSection`, `isExpanded=true` | 1 |
+| `test_cell_trackpadTuning_expanded_lightScheme` | `AccordionCard` wrapping `TrackpadTuningContent`, `isExpanded=true` | 1 |
+| `test_cell_trackpadTuning_expanded_darkScheme` | as above (.dark) | 1 |
+| `test_cell_responseSection_lightScheme` | `ResponseSection` (4-card variant, all-hardware-off) | 1 |
+| `test_cell_responseSection_darkScheme` | as above (.dark) | 1 |
+| `test_cell_footerSection` | `FooterSection` (App Store build only — DIRECT_BUILD skips) | 1 |
+| `test_cell_accordionCard_rowCounts` | `AccordionCard` with 1, 3, 5, 7 rows | 4 |
+| `test_cell_themeColorPaletteSwatches` | every `Theme.*` named color in declaration order | 1 |
+
+Determinism strategy:
+
+1. **Locale**: cells that render `NSLocalizedString`-backed Section
+   views skip via `XCTSkipUnless` when the host's preferred
+   localization is non-English. Synthetic-content cells inject
+   literal English strings.
+2. **Date / clock**: no view in scope formats a `Date()`. The
+   `MenuBarFace.impactCount` defaults to `0` and is never mutated by
+   the snapshot fixtures.
+3. **System fonts**: `precision: 0.99` and `perceptualPrecision:
+   0.98` tolerate sub-pixel hinting drift between minor macOS
+   versions. The bug classes targeted shift pixels by ≥ 4pt — well
+   outside the perceptual band.
+4. **Color schemes**: rendered explicitly via
+   `.preferredColorScheme(.light)` / `.dark` — never inherits the
+   host's appearance.
+5. **NSApplication / Bundle.main**: the FooterSection cell is
+   skipped under `#if DIRECT_BUILD` because `Updater.currentVersion`
+   reads `Bundle.main.infoDictionary`, which differs between
+   `swift test` (xctest bundle) and the shipped app.
+
+To regenerate baselines locally: flip `recordMode` in
+`SnapshotUI_Tests.swift` from `.missing` to `.all`, run
+`swift test --filter SnapshotUI_Tests`, commit the resulting
+`Tests/__Snapshots__/SnapshotUI_Tests/*.png`, then revert
+`recordMode` back to `.missing`.
+
+These cells are NOT in `mutation-catalog.json`. They are visual
+regression nets, not per-gate behaviour anchors — a single mutation
+typically perturbs more than one cell at once, which would create
+catalog-anchor drift under `make mutate`'s strict
+`expectedFailureSubstring` matching.
