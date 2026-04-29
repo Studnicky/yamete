@@ -1177,6 +1177,89 @@ typically perturbs more than one cell at once, which would create
 catalog-anchor drift under `make mutate`'s strict
 `expectedFailureSubstring` matching.
 
+## Direct-only snapshot cells (Phase 5)
+
+`SnapshotUI_Tests` covers the App Store build's UI; the Direct build
+adds surface that never ships on the Store and therefore never gets
+exercised by the App Store snapshot suite. Phase 5 adds a parallel,
+`#if DIRECT_BUILD`-gated suite at `Tests/SnapshotUI_Direct_Tests.swift`
+with baselines under `Tests/__Snapshots__/SnapshotUI_Direct_Tests/`.
+
+Direct-only surface covered:
+
+- `AccelTuningSection` / `MicTuningSection` / `HeadphoneTuningSection`
+  collapsible wrappers — production `Section` views that compose an
+  `AccordionCard` around their `*TuningContent` body. Direct builds
+  surface these as standalone collapsibles whose collapsed/expanded
+  geometry must stay stable across both color schemes.
+- `FooterSection` under `#if DIRECT_BUILD` — the right column renders
+  the `Updater.state` composition (info icon + version line + check
+  chevron). The App Store baseline only captures the version-only
+  variant of this row; the Direct variant has different leading icon,
+  trailing button, and pink-accent state branches that need their own
+  pixel anchor.
+- `ResponseSection` audio card with `volumeSpikeEnabled = true` — under
+  `#if DIRECT_BUILD`, the audio `SensorAccordionCard` adds an
+  `EnableToggleRow` for "Volume Override" below the volume range
+  slider. Captured as a full-`ResponseSection` snapshot with all
+  hardware-gated cards off so only the Direct-flavoured card stack
+  contributes pixels.
+- Composite — three tuning sections (all expanded) + the
+  Direct-flavoured `FooterSection` stacked vertically. Locks the
+  cumulative panel height a Direct user sees with every collapsible
+  open.
+
+Cells (14 baseline PNGs total):
+
+| Test | View rendered | Baselines |
+|------|---------------|-----------|
+| `test_cell_accelTuningSection_collapsed` | `AccordionCard` wrapping `AccelTuningContent`, `isExpanded=false` | 1 |
+| `test_cell_accelTuningSection_expanded_lightScheme` | as above, expanded, light | 1 |
+| `test_cell_accelTuningSection_expanded_darkScheme` | as above, expanded, dark | 1 |
+| `test_cell_micTuningSection_collapsed` | `AccordionCard` wrapping `MicTuningContent`, `isExpanded=false` | 1 |
+| `test_cell_micTuningSection_expanded_lightScheme` | as above, expanded, light | 1 |
+| `test_cell_micTuningSection_expanded_darkScheme` | as above, expanded, dark | 1 |
+| `test_cell_headphoneTuningSection_collapsed` | `AccordionCard` wrapping `HeadphoneTuningContent`, `isExpanded=false` | 1 |
+| `test_cell_headphoneTuningSection_expanded_lightScheme` | as above, expanded, light | 1 |
+| `test_cell_headphoneTuningSection_expanded_darkScheme` | as above, expanded, dark | 1 |
+| `test_cell_footerSection_directBuild_lightScheme` | `FooterSection` under `DIRECT_BUILD`, idle `Updater` | 1 |
+| `test_cell_footerSection_directBuild_darkScheme` | as above, dark | 1 |
+| `test_cell_responseSection_directBuild_audioVolumeSpikeOn_lightScheme` | `ResponseSection`, all-hardware-off, `volumeSpikeEnabled=true` | 1 |
+| `test_cell_responseSection_directBuild_audioVolumeSpikeOn_darkScheme` | as above, dark | 1 |
+| `test_cell_directOnlyComposite_allExpanded_lightScheme` | three tuning sections expanded + `FooterSection` stacked | 1 |
+
+Determinism strategy mirrors `SnapshotUI_Tests` (precision 0.99,
+perceptualPrecision 0.98, English-locale skip, `.preferredColorScheme`
+explicit). The new wrinkle:
+
+- `Updater()` initializes with `.idle` state; no cell calls
+  `checkForUpdates()`, so state stays `.idle` for the entire snapshot
+  capture. `Updater.currentVersion` resolves from `Bundle.main` at
+  init — stable across runs on the same host (either the bundle's
+  `CFBundleShortVersionString` or the `?? "1.0.0"` literal fallback
+  when the SPM `xctest` runner's bundle has nil `infoDictionary`).
+  No async update transition can race the snapshot capture.
+- The composite cell stacks production views directly via
+  `VStack(spacing: 0) { … Divider() … }` rather than rendering
+  `MenuBarView` to avoid the `NSScreen.screens`-driven
+  `maxScrollHeight` host dependency.
+
+To regenerate baselines locally: flip `recordMode` in
+`SnapshotUI_Direct_Tests.swift` from `.missing` to `.all`, run
+`swift test -Xswiftc -DDIRECT_BUILD --filter SnapshotUI_Direct_Tests`,
+commit the resulting
+`Tests/__Snapshots__/SnapshotUI_Direct_Tests/*.png`, then revert
+`recordMode` back to `.missing`.
+
+These cells are NOT in `mutation-catalog.json` for the same reason
+as the App Store snapshot cells — they're visual regression nets,
+not per-gate behaviour anchors.
+
+The default `swift test` (without `-Xswiftc -DDIRECT_BUILD`) skips
+this file entirely: every symbol it defines lives inside a single
+top-level `#if DIRECT_BUILD` block, so the file is invisible to the
+App Store-flavoured build.
+
 ## UI gate cells (Phase 7)
 
 Phase 7 extended the catalog from SensorKit + ResponseKit into
