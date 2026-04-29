@@ -390,6 +390,96 @@
       "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
     },
     {
+      "description": "AccelerometerReader.SensorActivation.activate \u2014 drop the IOServiceGetMatchingServices KERN_SUCCESS guard; a forced kernel failure must short-circuit before the iterator loop body runs (no registrySetCFProperty calls). Reachable via the AccelerometerKernelDriver injection seam.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testActivate_matchingFailure_shortCircuitsBeforeRegistryWrites",
+      "expectedFailureSubstring": "[accel-kernel-gate=activate-matching-fidelity]",
+      "id": "accel-kernel-activate-matching-gate",
+      "replace": "guard kr == kr else { return false }",
+      "search": "guard kr == KERN_SUCCESS else { return false }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.SensorActivation.activate \u2014 invert the iterator sentinel; mock yields one synthetic service then 0, so the gate must let the loop body run on the service before breaking on 0. Inverting the comparison breaks before the body and the registry-write counter stays at 0.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testActivate_iteratorYieldsOneService_loopBodyExecutesThreeWrites",
+      "expectedFailureSubstring": "[accel-kernel-gate=activate-iterator-sentinel]",
+      "id": "accel-kernel-activate-iterator-sentinel-gate",
+      "replace": "guard service == 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            let r1 = driver.registrySetCFProperty(service, key: \"ReportInterval\" as CFString, value: reportIntervalUS as CFNumber)",
+      "search": "guard service != 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            let r1 = driver.registrySetCFProperty(service, key: \"ReportInterval\" as CFString, value: reportIntervalUS as CFNumber)",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.SensorActivation.deactivate \u2014 drop the IOServiceGetMatchingServices KERN_SUCCESS guard; forced kernel failure must short-circuit before the iterator loop body runs (no registrySetCFProperty calls).",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testDeactivate_matchingFailure_shortCircuitsBeforeRegistryWrites",
+      "expectedFailureSubstring": "[accel-kernel-gate=deactivate-matching-fidelity]",
+      "id": "accel-kernel-deactivate-matching-gate",
+      "replace": "guard kr == kr else { return }",
+      "search": "guard kr == KERN_SUCCESS else { return }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.SensorActivation.deactivate \u2014 invert the iterator sentinel; mock yields one synthetic service then 0, so the gate must let the loop body run on the service before breaking on 0. Inverting the comparison breaks before the body and the registry-write counter stays at 0.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testDeactivate_iteratorYieldsOneService_loopBodyExecutesThreeWrites",
+      "expectedFailureSubstring": "[accel-kernel-gate=deactivate-iterator-sentinel]",
+      "id": "accel-kernel-deactivate-iterator-sentinel-gate",
+      "replace": "guard service == 0 else { break }\n            defer { driver.objectRelease(service) }\n            #if DIRECT_BUILD",
+      "search": "guard service != 0 else { break }\n            defer { driver.objectRelease(service) }\n            #if DIRECT_BUILD",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.isSPUDevicePresent \u2014 drop the IOHIDManagerOpen kIOReturnSuccess guard; forced manager-open failure must yield false and short-circuit before transport probing.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testIsSPUDevicePresent_managerOpenFailure_returnsFalseShortCircuit",
+      "expectedFailureSubstring": "[accel-kernel-gate=isSPUDevicePresent-managerOpen-fidelity]",
+      "id": "accel-kernel-isSPUDevicePresent-managerOpen-gate",
+      "replace": "guard driver.hidManagerOpen(manager) != driver.hidManagerOpen(manager) else { return false }",
+      "search": "guard driver.hidManagerOpen(manager) == kIOReturnSuccess else { return false }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.isSensorActivelyReporting \u2014 drop the IOServiceGetMatchingServices KERN_SUCCESS guard; forced kernel failure must yield false and short-circuit before iterator polling.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testIsSensorActivelyReporting_matchingFailure_returnsFalseShortCircuit",
+      "expectedFailureSubstring": "[accel-kernel-gate=isSensorActivelyReporting-matching-fidelity]",
+      "id": "accel-kernel-isSensorActivelyReporting-matching-gate",
+      "replace": "guard kr == kr else {\n            return false\n        }",
+      "search": "guard kr == KERN_SUCCESS else {\n            return false\n        }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.isSensorActivelyReporting \u2014 invert the iterator sentinel; mock yields one synthetic service then 0, so the gate must let the loop body probe dispatchAccel + DebugState before breaking on 0. Inverting the comparison breaks before the body and registryCreateCFProperty stays at 0.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testIsSensorActivelyReporting_iteratorYieldsOneService_loopBodyProbesTwoProperties",
+      "expectedFailureSubstring": "[accel-kernel-gate=isSensorActivelyReporting-iterator-sentinel]",
+      "id": "accel-kernel-isSensorActivelyReporting-iterator-sentinel-gate",
+      "replace": "guard service == 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            // The SPU bus also hosts gyro, temperature, and hinge-angle\n            // services. Only the one carrying `dispatchAccel = Yes` is\n            // ours.\n            let dispatchAccel = driver.registryCreateCFProperty(",
+      "search": "guard service != 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            // The SPU bus also hosts gyro, temperature, and hinge-angle\n            // services. Only the one carrying `dispatchAccel = Yes` is\n            // ours.\n            let dispatchAccel = driver.registryCreateCFProperty(",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.openStream \u2014 drop the IOHIDManagerOpen kIOReturnSuccess guard; forced manager-open failure must surface SensorError.ioKitError on the consumer stream and short-circuit before IOHIDDeviceOpen is reached.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testOpenStream_managerOpenFailure_surfacesIoKitErrorShortCircuit",
+      "expectedFailureSubstring": "[accel-kernel-gate=openStream-managerOpen-fidelity]",
+      "id": "accel-kernel-openStream-managerOpen-gate",
+      "replace": "guard openResult == openResult else {",
+      "search": "guard openResult == kIOReturnSuccess else {",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.openStream \u2014 drop the IOHIDDeviceOpen kIOReturnSuccess guard; forced device-open failure must surface SensorError.ioKitError and short-circuit before hidDeviceMaxReportSize is reached.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testOpenStream_deviceOpenFailure_surfacesIoKitErrorShortCircuit",
+      "expectedFailureSubstring": "[accel-kernel-gate=openStream-deviceOpen-fidelity]",
+      "id": "accel-kernel-openStream-deviceOpen-gate",
+      "replace": "guard devOpenResult == devOpenResult else {",
+      "search": "guard devOpenResult == kIOReturnSuccess else {",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.openStream \u2014 drop the maxSize > 0 guard; mock returns 0 and the production path must surface SensorError.ioKitError with kIOReturnInternalError rather than allocate a zero-length buffer.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testOpenStream_maxSizeZero_surfacesIoKitError",
+      "expectedFailureSubstring": "[accel-kernel-gate=openStream-maxSize-fidelity]",
+      "id": "accel-kernel-openStream-maxSize-gate",
+      "replace": "guard maxSize >= 0 else {",
+      "search": "guard maxSize > 0 else {",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
       "description": "USBSource.start \u2014 drop notifyPort==nil idempotency guard; second start must NOT re-register IOKit matching notifications. _testInstallationCount tracks each successful install path.",
       "expectedFailingTest": "MatrixUSBSourceTests/testDoubleStart_doesNotDoubleInstallNotifications",
       "expectedFailureSubstring": "[scenario=usb-double-start-idempotency]",

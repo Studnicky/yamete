@@ -264,10 +264,10 @@ own `IOHIDManager`, registers a C-level
 `IOHIDDeviceRegisterInputReportCallback`, and runs a `ReportContext`
 that consumes the callback.
 
-The 19 gates flagged by `--coverage` split as **8 catalogued / 11
-degenerate** after the minimum-cost test seam introduced by
-`Tests/MatrixAccelerometerReader_Tests.swift`. The seam comprises
-three production changes:
+The 19 gates flagged by `--coverage` now split as **18 catalogued / 1
+degenerate** after the Phase 4 kernel-driver seam was added on top of
+the original `Tests/MatrixAccelerometerReader_Tests.swift` seam. The
+seam comprises four production changes:
 
 - `ReportContext` (and its `init`, `handleReport`, `invalidate`,
   `surfaceStall`, `watchdogSnapshot`) was raised from `private` to
@@ -286,35 +286,42 @@ three production changes:
   decodes deterministically as `.stale` instead of trapping the
   process on `UInt64` underflow — this keeps the gate observable from
   a unit test without a SIGTRAP signal escaping the harness.
+- **Phase 4** added an `AccelerometerKernelDriver` protocol with a
+  default `RealAccelerometerKernelDriver` (forwards 1:1 to IOKit) and
+  a `MockAccelerometerKernelDriver` (`Tests/Mocks/`) that lets cells
+  force per-call failure codes (`forceMatchingFailureKr`,
+  `forceManagerOpenFailure`, `forceDeviceOpenFailure`,
+  `forceMaxReportSizeZero`, etc.). `AccelerometerSource` got a public
+  convenience init plus an internal designated init that accepts the
+  driver injection; `SensorActivation`, `AccelHardware.isSPUDevicePresent`,
+  `AccelHardware.isSensorActivelyReporting`, `AccelHardware.openStream`,
+  and `AccelHardware.findSPUDevice` all accept a `driver:` parameter
+  with a default `RealAccelerometerKernelDriver()`, so existing
+  default-arg callers (`AccelerometerSource()` in `YameteApp/Yamete.swift`
+  and the lifecycle stress tests) produce byte-identical kernel
+  traffic. Cells live in `Tests/MatrixAccelerometerKernelDriver_Tests.swift`.
 
-These changes are scoped to internal access — the public
-`AccelerometerSource` API and the file's IOKit lifecycle are
-unchanged. The `RealKernelDriver`-shaped seam mentioned in the agent
-brief was rejected as cost-disproportionate to the residual coverage
-gain: the eleven gates that remain Degenerate would require a
-parallel `RealAccelerometerKernelDriver` / `MockAccelerometerKernelDriver`
-hierarchy plus all-call-site rewiring for ~150 lines of new code, and
-all eleven are kernel-result fidelity guards that fire only when
-IOKit returns a non-success code — failures that real-hardware boots
-do not produce.
+These changes are scoped to internal access for the seam parameter
+threading; the public `AccelerometerSource` API and the file's IOKit
+lifecycle are unchanged for default-arg callers.
 
 Per-gate disposition:
 
 | Line | Gate | Disposition |
 |------|------|-------------|
 | 152  | `if !activated { log.info(...) }` | **Degenerate** — bare logging branch with no observable side effect. Not a behavioural gate — the body only writes a single info log. Mutating the predicate cannot be detected without parsing log files, and either branch produces a valid stream because `openStream` is invoked unconditionally on the next line. |
-| 174  | `guard IOServiceGetMatchingServices(...) == KERN_SUCCESS` (`SensorActivation.activate`) | **Degenerate** — wraps real `IOServiceGetMatchingServices` against `AppleSPUHIDDriver`. KERN_SUCCESS is the universal outcome on supported hardware; failure modes (kIOReturnNotReady, kIOReturnNoDevice) require a missing or torn-down kext that cannot be simulated. The strengthened justification: `IOServiceGetMatchingServices` is invoked with `kIOMainPortDefault` (the always-available default mach port) and a non-null `IOServiceMatching("AppleSPUHIDDriver")` dictionary, so the only failure modes the kernel can return are infrastructure-wide (kIOReturnError on out-of-resources, kIOReturnNoDevice on a torn-down `IOMainPort`) — both global host conditions that propagate as test-runner failures, not as gate-removable mutations. |
-| 180  | `guard service != 0 else { break }` (activate loop) | **Degenerate** — iterator sentinel terminating a `while true` over `IOIteratorNext`. On real hardware the iterator yields N services and then 0; mutating to `service != -1` would loop forever (stuck test, not failing assertion). The `make mutate` runner has no per-test timeout; a stuck test wedges the whole runner, which is INFRA failure, not CAUGHT. Cannot be exercised without a fake `io_iterator_t`. |
-| 203  | `guard IOServiceGetMatchingServices(...) == KERN_SUCCESS` (`SensorActivation.deactivate`) | **Degenerate** — symmetric to gate 174, in deactivate. Same kernel-call infrastructure argument applies. |
-| 208  | `guard service != 0 else { break }` (deactivate loop) | **Degenerate** — symmetric to gate 180. Iterator sentinel; mutation manifests as a stuck loop, not a failing assertion. |
-| 238  | `guard IOHIDManagerOpen(...) == kIOReturnSuccess` (`isSPUDevicePresent`) | **Degenerate** — wraps `IOHIDManagerOpen` on a freshly-created manager. Failure (kIOReturnNotPermitted, kIOReturnExclusiveAccess) requires an entitlement / sandbox failure that cannot be forced from a test. Mutating to always-fail makes `hardwarePresent` return false; the lifecycle stress tests then skip via `XCTSkipUnless`, which is XCTSkip not XCTFail — mutation escapes. The new `MatrixAccelerometerReader_Tests` cells do not call `isSPUDevicePresent` (they construct `ReportContext` directly), so this gate is structurally outside the catalogued behavioural scope. |
-| 270  | `guard IOServiceGetMatchingServices(...) == KERN_SUCCESS` (`isSensorActivelyReporting`) | **Degenerate** — symmetric to gate 174 in the read-only probe path. Probe is consumed only by `isAvailable` in the App Store build, and the test host runs the default (Direct) build path under `swift test`, so the probe is not on the executed code path during tests. |
-| 277  | `guard service != 0 else { break }` (probe loop) | **Degenerate** — symmetric to gates 180 / 208 inside the probe iterator. |
+| 174  | `guard ... == KERN_SUCCESS` (`SensorActivation.activate`) | **Catalogued (Phase 4)** as `accel-kernel-activate-matching-gate`. The cell `testActivate_matchingFailure_shortCircuitsBeforeRegistryWrites` injects `MockAccelerometerKernelDriver` with `forceMatchingFailureKr=KERN_FAILURE` and asserts both `activate=false` AND `registrySetCFProperty` was never called — removing the gate would let the loop body run on the mock's next-yielded synthetic service. |
+| 180  | `guard service != 0 else { break }` (activate loop) | **Catalogued (Phase 4)** as `accel-kernel-activate-iterator-sentinel-gate`. The cell `testActivate_iteratorYieldsOneService_loopBodyExecutesThreeWrites` runs the happy-path mock (one service yielded, then 0). With the gate intact the loop body executes its three `registrySetCFProperty` writes; the mutation flips `!= 0` to `== 0` so the loop breaks before the body and the counter stays at 0. |
+| 203  | `guard ... == KERN_SUCCESS` (`SensorActivation.deactivate`) | **Catalogued (Phase 4)** as `accel-kernel-deactivate-matching-gate`. Symmetric to gate 174 in the deactivate path. |
+| 208  | `guard service != 0 else { break }` (deactivate loop) | **Catalogued (Phase 4)** as `accel-kernel-deactivate-iterator-sentinel-gate`. Symmetric to gate 180 in the deactivate path. The mutation flips the sentinel to `== 0`, breaking before the registry-write body runs. |
+| 238  | `guard IOHIDManagerOpen(...) == kIOReturnSuccess` (`isSPUDevicePresent`) | **Catalogued (Phase 4)** as `accel-kernel-isSPUDevicePresent-managerOpen-gate`. The cell `testIsSPUDevicePresent_managerOpenFailure_returnsFalseShortCircuit` injects `forceManagerOpenFailure=kIOReturnNotPermitted`, asserts `isSPUDevicePresent=false`, and pins `hidDeviceTransportCalls=0` so a mutation that drops the gate (which would let the synthetic device pass through `findSPUDevice`) is observable. |
+| 270  | `guard ... == KERN_SUCCESS` (`isSensorActivelyReporting`) | **Catalogued (Phase 4)** as `accel-kernel-isSensorActivelyReporting-matching-gate`. Mock forces `KERN_FAILURE`; cell asserts both `reporting=false` and `iteratorNextCalls=0`. |
+| 277  | `guard service != 0 else { break }` (probe loop) | **Catalogued (Phase 4)** as `accel-kernel-isSensorActivelyReporting-iterator-sentinel-gate`. Mock yields one synthetic service then 0; with the gate intact the loop body's two `registryCreateCFProperty` calls (`dispatchAccel`, `DebugState`) execute. The mutation breaks early and the counter stays at 0. |
 | 286  | `guard dispatchAccel else { return .skip }` (now in `AccelHardware.evaluateActivity`) | **Catalogued** as `accel-activity-dispatchAccel-gate`. The gate moved from inline-iterator into the pure helper `evaluateActivity`; the cell `testEvaluateActivity_dispatchAccelFalse_returnsSkip` calls the helper directly and pins the `.skip` decode. |
 | 297  | `guard now > lastTs else { return .clockNonMonotonic }` (now in `AccelHardware.evaluateActivity`) | **Catalogued** as `accel-activity-clock-monotonicity-gate`. The cell `testEvaluateActivity_clockNotMonotonic_returnsClockNonMonotonic` synthesises a non-monotonic snapshot directly. The wrapping `&-` subtraction in the helper means a mutation that removes the gate decodes as `.stale` (huge wrapped delta past `stalenessNs`), avoiding a SIGTRAP that would mask the catch as INFRA. |
-| 319  | `guard openResult == kIOReturnSuccess` (`openStream` IOHIDManagerOpen) | **Degenerate** — same as gate 238: real `IOHIDManagerOpen` result. Mutating to always-fail surfaces a `SensorError.ioKitError` on the throwing stream, but the lifecycle stress test catches via `try?` and asserts only "did not crash", so the mutation escapes the existing assertion. The new `MatrixAccelerometerReader_Tests` does not call `openStream` (it builds `ReportContext` directly). |
-| 336  | `guard devOpenResult == kIOReturnSuccess` (`openStream` IOHIDDeviceOpen) | **Degenerate** — same as gate 319 for the per-device open call. Real IOKit return; no mock surface; existing tests do not pin the error path. |
-| 346  | `guard maxSize > 0` | **Degenerate** — reads `kIOHIDMaxInputReportSizeKey` from a real IOHIDDevice. Always positive on real hardware (BMI286 reports 24 bytes); mutation produces an unobservable identity branch. The strengthened justification: the only call site is inside `openStream`'s real-IOHIDDevice path, and `IOHIDDeviceGetProperty(_, kIOHIDMaxInputReportSizeKey, ...)` returns a UInt-shaped value the kernel reports from the device's HID descriptor — for the BMI286 this is 24, structurally non-zero. The `?? 64` fallback hides the gate from any test path that does NOT reach a real IOHIDDevice. |
+| 319  | `guard openResult == kIOReturnSuccess` (`openStream` IOHIDManagerOpen) | **Catalogued (Phase 4)** as `accel-kernel-openStream-managerOpen-gate`. The cell `testOpenStream_managerOpenFailure_surfacesIoKitErrorShortCircuit` injects `forceManagerOpenFailure=kIOReturnNotPermitted`, asserts the stream throws `SensorError.ioKitError`, and pins `hidDeviceOpenCalls=0` so a mutation that drops the gate (and lets execution continue past the failure) is observable. |
+| 336  | `guard devOpenResult == kIOReturnSuccess` (`openStream` IOHIDDeviceOpen) | **Catalogued (Phase 4)** as `accel-kernel-openStream-deviceOpen-gate`. The cell `testOpenStream_deviceOpenFailure_surfacesIoKitErrorShortCircuit` injects `forceDeviceOpenFailure=kIOReturnNotPermitted` and pins `hidDeviceMaxReportSizeCalls=0`. |
+| 346  | `guard maxSize > 0` | **Catalogued (Phase 4)** as `accel-kernel-openStream-maxSize-gate`. The cell `testOpenStream_maxSizeZero_surfacesIoKitError` injects `forceMaxReportSizeZero=true` and asserts the surfaced error message exactly equals `String(format: "0x%08x", kIOReturnInternalError)` — pinning the gate-thrown error rejects the watchdog-stall fall-through path that a mutation removing the gate would otherwise produce after the 5s watchdog threshold. |
 | 407  | `guard snapshot.running else { return .invalidated }` (now in `AccelHardware.evaluateWatchdogTick`) | **Catalogued** as `accel-watchdog-running-gate`. The watchdog poll body's running check moved from inline-Task into the pure helper `evaluateWatchdogTick`; the cell `testWatchdogTick_invalidatedSnapshot_returnsInvalidated` calls the helper directly and pins the `.invalidated` decode. |
 | 622  | `guard s.running else { return nil /* already-stalled */ }` (`surfaceStall`) | **Catalogued** as `accel-surfaceStall-running-gate`. The cell `testSurfaceStall_afterInvalidate_yieldsNothing` invalidates the context (running = false) and then calls `surfaceStall(error)`. With the gate, the consumer sees no error; without the gate, the spurious error reaches the consumer and the cell flags it. |
 | 630  | `guard length >= minReportLength else { return }` (`handleReport`) | **Catalogued** as `accel-handleReport-length-floor`. The cell `testHandleReport_shortPayloadBelowMin_yieldsNothing` constructs `ReportContext` directly and calls `handleReport(report:length:)` with a payload one byte below the floor. Buffer is over-allocated to 18 bytes so a mutation that removes the gate does not segfault — instead it falls through to decimation + magnitude and yields a sample, which the cell pins. |
@@ -322,8 +329,9 @@ Per-gate disposition:
 | 660  | `guard s.sampleCounter % decimationFactor == 0 else { return nil }` | **Catalogued** as `accel-handleReport-decimation-gate`. The cell `testHandleReport_decimation_yieldsEveryNthReport` drives 10 reports through a permissive detector and asserts exactly `10 / decimationFactor = 5` yields. Removing the gate yields on every report (10 yields), failing the equality assertion. |
 | 664  | `guard rawMag > magnitudeMin && rawMag < magnitudeMax else { return nil }` | **Catalogued** as `accel-handleReport-magnitude-bounds-gate`. The cells `testHandleReport_belowMagnitudeMin_yieldsNothing` and `testHandleReport_aboveMagnitudeMax_yieldsNothing` synthesise sub-floor (each axis = 0.01 g, vector ≈ 0.017 g) and super-ceiling (each axis = 10 g, vector ≈ 17 g) payloads and assert no impacts yield. Removing the gate lets the bounded payload reach the detector. |
 
-Summary: **8 catalogued / 11 degenerate / 19 total**. The 8 promoted
-entries are:
+Summary: **18 catalogued / 1 degenerate / 19 total** after Phase 4.
+The 8 originally-promoted entries (handleReport / watchdog / activity
+helpers) are:
 
 - `accel-handleReport-length-floor` (line 630)
 - `accel-handleReport-running-gate` (line 646)
@@ -334,21 +342,50 @@ entries are:
 - `accel-activity-dispatchAccel-gate` (line 286)
 - `accel-activity-clock-monotonicity-gate` (line 297)
 
-The 11 residual Degenerate gates are all kernel-result fidelity
-guards (KERN_SUCCESS / kIOReturnSuccess / iterator sentinels /
-`maxSize > 0`) and the bare logging branch at line 152. Closing them
-as CAUGHT would require a `RealAccelerometerKernelDriver` /
-`MockAccelerometerKernelDriver` protocol pair that wraps every
-`IOServiceMatching` / `IOIteratorNext` / `IOHIDManagerOpen` /
-`IOHIDDeviceOpen` / `IOHIDDeviceGetProperty` / `IORegistryEntry*`
-call site — roughly 150 lines of new types plus rewiring for two
-public entry points (`isSPUDevicePresent`, `isSensorActivelyReporting`)
-and one private entry point (`openStream`). The cost is
-disproportionate to the residual catch budget because every one of
-these guards fires only when IOKit returns a non-success code, which
-real-hardware boots do not produce — the gates exist to make
-sandbox-rejected paths safe, not to enforce behaviour the test
-harness can validate.
+#### Now CAUGHT (Phase 4 — kernel-driver seam)
+
+Phase 4 added the `AccelerometerKernelDriver` protocol (production
+default `RealAccelerometerKernelDriver`, test double
+`MockAccelerometerKernelDriver`) and threaded a `driver:` parameter
+through `SensorActivation.activate`, `SensorActivation.deactivate`,
+`AccelHardware.isSPUDevicePresent`, `AccelHardware.isSensorActivelyReporting`,
+`AccelHardware.openStream`, and `AccelHardware.findSPUDevice`. With
+the seam, the 10 kernel-result fidelity gates that were previously
+Degenerate are now CAUGHT. Cells live in
+`Tests/MatrixAccelerometerKernelDriver_Tests.swift`:
+
+- `accel-kernel-activate-matching-gate` (line 174)
+- `accel-kernel-activate-iterator-sentinel-gate` (line 180)
+- `accel-kernel-deactivate-matching-gate` (line 203)
+- `accel-kernel-deactivate-iterator-sentinel-gate` (line 208)
+- `accel-kernel-isSPUDevicePresent-managerOpen-gate` (line 238)
+- `accel-kernel-isSensorActivelyReporting-matching-gate` (line 270)
+- `accel-kernel-isSensorActivelyReporting-iterator-sentinel-gate` (line 277)
+- `accel-kernel-openStream-managerOpen-gate` (line 319)
+- `accel-kernel-openStream-deviceOpen-gate` (line 336)
+- `accel-kernel-openStream-maxSize-gate` (line 346)
+
+Mock failure knobs: `forceMatchingFailureKr`,
+`forceManagerOpenFailure`, `forceDeviceOpenFailure`,
+`forceMaxReportSizeZero`, `forceCopyDevicesNil`, `forceIteratorEmpty`,
+`forceTransportMismatch`, `forceRegistrySetFailureKr`. Each is a
+single-shot or sticky override depending on the call (matching /
+manager-open / device-open are single-shot so the mock can return to
+happy-path on subsequent invocations within the same cell).
+
+Production-behaviour guarantee: the public `AccelerometerSource()`
+init defaults `kernelDriver` to `RealAccelerometerKernelDriver()`,
+which forwards 1:1 to IOKit. Default-arg callers — including
+`Sources/YameteApp/Yamete.swift` and `Tests/AccelerometerLifecycleStressTests.swift` —
+produce byte-identical kernel traffic to the pre-seam build.
+
+#### Residual Degenerate (1)
+
+The bare logging branch at line 152 (`if !activated { log.info(...) }`)
+remains Degenerate. It is not a behavioural gate — the body only
+writes a single info log, and either branch produces a valid stream
+because `openStream` is invoked unconditionally on the next line.
+Mutating the predicate cannot be detected without parsing log files.
 
 ### `Sources/SensorKit/EventSources.swift`
 
