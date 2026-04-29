@@ -712,6 +712,132 @@
       "replace": "if false {",
       "search": "guard circlingEnabled, now >= circlingGate else {",
       "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "Theme.AccordionCard.animationDuration(forRows:) \u2014 drop the 0.30s upper cap. Large row counts now exceed the easeInOut perceptual budget.",
+      "expectedFailingTest": "PanelLayoutTests/testUIGate_accordionAnimationDuration_capsAt0_30",
+      "expectedFailureSubstring": "[ui-gate=accordion-anim-cap]",
+      "id": "ui-accordion-anim-cap",
+      "replace": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return raw\n    }",
+      "search": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return min(0.30, max(0.10, raw))\n    }",
+      "targetFile": "Sources/YameteApp/Views/Theme.swift"
+    },
+    {
+      "description": "Theme.AccordionCard.animationDuration(forRows:) \u2014 drop the per-row scale (multiply by 0). Duration collapses to the floor for every row count.",
+      "expectedFailingTest": "PanelLayoutTests/testUIGate_accordionAnimationDuration_scalesPerRow",
+      "expectedFailureSubstring": "[ui-gate=accordion-anim-scale]",
+      "id": "ui-accordion-anim-scale",
+      "replace": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * 0.0\n        return min(0.30, max(0.10, raw))\n    }",
+      "search": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return min(0.30, max(0.10, raw))\n    }",
+      "targetFile": "Sources/YameteApp/Views/Theme.swift"
+    },
+    {
+      "description": "Theme.AccordionCard.animationDuration(forRows:) \u2014 drop the rows>=1 floor. Negative row inputs produce sub-floor durations before the outer max(0.10) clamp.",
+      "expectedFailingTest": "PanelLayoutTests/testUIGate_accordionAnimationDuration_floorAtRow1",
+      "expectedFailureSubstring": "[ui-gate=accordion-anim-floor]",
+      "id": "ui-accordion-anim-floor",
+      "replace": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(rows) * perRow\n        return min(0.30, max(0.10, raw))\n    }",
+      "search": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return min(0.30, max(0.10, raw))\n    }",
+      "targetFile": "Sources/YameteApp/Views/Theme.swift"
+    },
+    {
+      "description": "Theme.SensorAccordionCard.animationDuration(forRows:) mirror \u2014 drop the 0.30s ceiling on the sensor card surface; mixed-card panels now animate at different speeds.",
+      "expectedFailingTest": "PanelLayoutTests/testUIGate_sensorAccordionAnimationDuration_mirrorsCap",
+      "expectedFailureSubstring": "[ui-gate=sensor-accordion-anim-cap]",
+      "id": "ui-sensor-accordion-anim-cap",
+      "replace": "/// instantiating a SwiftUI body.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return raw\n    }",
+      "search": "/// instantiating a SwiftUI body.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return min(0.30, max(0.10, raw))\n    }",
+      "targetFile": "Sources/YameteApp/Views/Theme.swift"
+    },
+    {
+      "description": "SettingsStore.sensitivityMin didSet \u2014 drop the recursive-clamp-and-return; out-of-range writes now persist instead of being snapped into [0,1].",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_sensitivityMinClamp_snapsAboveRangeToBound",
+      "expectedFailureSubstring": "[ui-gate=sensitivityMin-clamp]",
+      "id": "ui-sensitivityMin-clamp",
+      "replace": "if c != sensitivityMin { _ = c; return }",
+      "search": "if c != sensitivityMin { sensitivityMin = c; return }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.sensitivityMin didSet \u2014 drop the pair-fixup that drags max up when min exceeds it; the (min, max) ordering invariant breaks.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_sensitivityMinAboveMax_dragsMaxUp",
+      "expectedFailureSubstring": "[ui-gate=sensitivity-min-drags-max]",
+      "id": "ui-sensitivity-min-drags-max",
+      "replace": "if false { sensitivityMax = sensitivityMin }",
+      "search": "if sensitivityMin > sensitivityMax { sensitivityMax = sensitivityMin }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.sensitivityMax didSet \u2014 drop the pair-fixup that drags min down when max falls below it; (min, max) ordering invariant breaks.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_sensitivityMaxBelowMin_dragsMinDown",
+      "expectedFailureSubstring": "[ui-gate=sensitivity-max-drags-min]",
+      "id": "ui-sensitivity-max-drags-min",
+      "replace": "if false { sensitivityMin = sensitivityMax }",
+      "search": "if sensitivityMax < sensitivityMin { sensitivityMin = sensitivityMax }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.volumeMax didSet \u2014 drop the recursive-clamp-and-return; above-range writes now persist past the unit-range bound.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_volumeMaxClamp_snapsAboveRangeToBound",
+      "expectedFailureSubstring": "[ui-gate=volumeMax-clamp]",
+      "id": "ui-volumeMax-clamp",
+      "replace": "if c != volumeMax { _ = c; return }",
+      "search": "if c != volumeMax { volumeMax = c; return }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.flashOpacityMin didSet \u2014 drop the pair-fixup; min above max no longer drags max up, leaving an inverted opacity band.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_flashOpacityMinAboveMax_dragsMaxUp",
+      "expectedFailureSubstring": "[ui-gate=flashOpacity-min-drags-max]",
+      "id": "ui-flashOpacity-min-drags-max",
+      "replace": "if false { flashOpacityMax = flashOpacityMin }",
+      "search": "if flashOpacityMin > flashOpacityMax { flashOpacityMax = flashOpacityMin }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.accelBandpassLowHz didSet \u2014 drop the pair-fixup that drags high up when low exceeds it; the bandpass filter is mis-applied.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_bandpassLowAboveHigh_dragsHighUp",
+      "expectedFailureSubstring": "[ui-gate=bandpass-low-drags-high]",
+      "id": "ui-bandpass-low-drags-high",
+      "replace": "if false { accelBandpassHighHz = accelBandpassLowHz }",
+      "search": "if accelBandpassLowHz > accelBandpassHighHz { accelBandpassHighHz = accelBandpassLowHz }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.sanitizeNonFiniteAndPairings \u2014 drop the sensitivityMin isFinite check; a NaN persisted under the key now propagates into the live store.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_sanitizeNaN_sensitivityMin_restoredToDefault",
+      "expectedFailureSubstring": "[ui-gate=sanitize-nan-sensitivityMin]",
+      "id": "ui-sanitize-nan-sensitivityMin",
+      "replace": "if false                                { store.sensitivityMin       = Defaults.sensitivityMin }",
+      "search": "if !store.sensitivityMin.isFinite       { store.sensitivityMin       = Defaults.sensitivityMin }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.sanitizeNonFiniteAndPairings \u2014 drop the cold-load bandpass pair-fixup; a disk-corrupted (low > high) pair survives boot and the bandpass filter rejects every input.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_sanitizeBandpassInverted_pairFixedAtBoot",
+      "expectedFailureSubstring": "[ui-gate=sanitize-bandpass-pair]",
+      "id": "ui-sanitize-bandpass-pair",
+      "replace": "if false {",
+      "search": "if store.accelBandpassLowHz > store.accelBandpassHighHz {",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.flashEnabled didSet \u2014 drop the legacy-mode sync that resets visualResponseMode to .off when flash is turned off; legacy consumers see stale .overlay even though flash is off.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_flashEnabledOff_clearsVisualResponseModeOverlay",
+      "expectedFailureSubstring": "[ui-gate=flashEnabled-off-clears-mode]",
+      "id": "ui-flashEnabled-off-clears-mode",
+      "replace": "if false { visualResponseMode = .off }",
+      "search": "if !flashEnabled && visualResponseMode == .overlay { visualResponseMode = .off }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.flashEnabled didSet \u2014 drop the legacy-mode sync that promotes visualResponseMode to .overlay when flash is turned on; legacy consumers see stale .off even though flash is on.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_flashEnabledOn_promotesVisualResponseModeToOverlay",
+      "expectedFailureSubstring": "[ui-gate=flashEnabled-on-promotes-mode]",
+      "id": "ui-flashEnabled-on-promotes-mode",
+      "replace": "if false { visualResponseMode = .overlay }",
+      "search": "if flashEnabled && visualResponseMode == .off { visualResponseMode = .overlay }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
     }
   ]
 }

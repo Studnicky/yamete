@@ -1176,3 +1176,38 @@ regression nets, not per-gate behaviour anchors — a single mutation
 typically perturbs more than one cell at once, which would create
 catalog-anchor drift under `make mutate`'s strict
 `expectedFailureSubstring` matching.
+
+## UI gate cells (Phase 7)
+
+Phase 7 extended the catalog from SensorKit + ResponseKit into
+`Sources/YameteApp/`. The UI / settings / animation surfaces have
+behavioural gates that are NOT visual (snapshot tests cover those)
+but live in plain Swift control flow:
+
+- `Theme.AccordionCard.animationDuration(forRows:)` — three formula
+  clamps: 0.30s upper cap, 0.10s + (rows × 0.025) per-row scale, and
+  the `max(1, rows)` floor.
+- `Theme.SensorAccordionCard.animationDuration(forRows:)` — duplicate
+  formula on the sensor card surface; both must agree so mixed-card
+  panels animate consistently.
+- `SettingsStore.didSet` blocks across paired settings — the
+  recursive-clamp-and-return pattern for unit-range fields, plus the
+  pair-fixup gates that drag the partner up/down when the (min, max)
+  ordering invariant is violated. Cells anchor sensitivityMin clamp,
+  sensitivity / flashOpacity / volume pair invariants, the bandpass
+  pair-fixup, the `flashEnabled` ↔ `visualResponseMode` legacy sync,
+  plus the `sanitizeNonFiniteAndPairings` cold-load fixups (NaN
+  recovery + cold-load bandpass pair fixup).
+
+Anchors live in `Tests/SettingsStoreTests.swift` and
+`Tests/Integration/PanelLayoutTests.swift` under the `testUIGate_`
+prefix; each carries a stable `[ui-gate=<id>]` substring in its
+assertion message so the runner matches deterministically. The
+mutation catalog uses `id` prefix `ui-` for these entries.
+
+Coverage scan: `bash scripts/mutation-test.sh --coverage` walks both
+`Sources/SensorKit/` and `Sources/YameteApp/` (recursively, including
+`Views/`, `Views/MenuBar/`, `Views/Components/`) and emits the
+un-covered punch-list. Trace-log lines (`log.{debug,info,warning,
+error,trace,notice}`) are skipped — keywords like `threshold` /
+`debounce` appear in log format strings, not in control flow.

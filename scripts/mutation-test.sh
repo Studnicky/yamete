@@ -58,10 +58,11 @@ for arg in "$@"; do
             echo ""
             echo "  (default)    apply each catalog mutation, run its expected"
             echo "               failing test, assert CAUGHT, revert."
-            echo "  --coverage   list Sources/SensorKit/*.swift gate-shaped lines"
-            echo "               (guard|if|threshold|debounce|gate) that have NO"
-            echo "               catalog entry covering them. A punch-list of"
-            echo "               un-mutated production gates."
+            echo "  --coverage   list gate-shaped lines under Sources/SensorKit/"
+            echo "               and Sources/YameteApp/ (guard|if|threshold|"
+            echo "               debounce|gate) that have NO catalog entry"
+            echo "               covering them. A punch-list of un-mutated"
+            echo "               production gates."
             exit 0
             ;;
     esac
@@ -91,14 +92,15 @@ command -v python3 >/dev/null 2>&1 || {
 }
 
 # ── coverage mode ─────────────────────────────────────────────
-# Emits a punch-list of gate-shaped production lines in
-# Sources/SensorKit/*.swift that have NO catalog entry covering them.
-# A line is "covered" if the file appears as the targetFile of any
-# catalog entry AND any catalog `search` snippet is a substring of the
-# line's source text. Gate-shaped = matches the regex
-# `(guard|threshold|debounce)|^\s*if\s` (case-insensitive). We exclude
-# `guard let`, presence-check `if !monitor`, comments, and empty-line
-# noise to avoid drowning real gates in plumbing.
+# Emits a punch-list of gate-shaped production lines under
+# Sources/SensorKit/ AND Sources/YameteApp/ (recursively) that have NO
+# catalog entry covering them. A line is "covered" if the file appears
+# as the targetFile of any catalog entry AND any catalog `search`
+# snippet is a substring of the line's source text. Gate-shaped =
+# matches the regex `(guard|threshold|debounce)|^\s*if\s+!`
+# (case-insensitive). We exclude `guard let`, presence-check
+# `if !monitor`, comments, and empty-line noise to avoid drowning real
+# gates in plumbing.
 if [[ "$MODE" == "coverage" ]]; then
     printf "${C_BOLD}  coverage  un-mutated production gates${C_RESET}\n\n"
     python3 - "$CATALOG" <<'PY'
@@ -116,11 +118,22 @@ NOISE_RE = re.compile(r"guard\s+(let|var)\s|guard\s+self\b|guard\s+!\s*Task\.isC
 # appear inside log format strings, not in any control-flow check.
 LOG_RE = re.compile(r"^\s*log\.(debug|info|warning|error|trace|notice)\s*\(")
 
-src_dir = pathlib.Path("Sources/SensorKit")
+# Walk both SensorKit (kernel-side gates) and YameteApp (UI / settings /
+# layout / animation gates). YameteApp ships nested Views/ + MenuBar/ +
+# Components/ subdirectories, so use rglob to pick up every .swift.
+src_roots = [
+    pathlib.Path("Sources/SensorKit"),
+    pathlib.Path("Sources/YameteApp"),
+]
 total = 0
 uncovered = 0
 covered_count = 0
-for swift in sorted(src_dir.glob("*.swift")):
+files = []
+for root in src_roots:
+    if root.is_dir():
+        files.extend(sorted(root.rglob("*.swift")))
+
+for swift in files:
     rel = str(swift)
     file_searches = covered.get(rel, [])
     # Multi-line catalog searches can't be substring-matched against a

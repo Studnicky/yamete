@@ -141,6 +141,54 @@ final class PanelLayoutTests: IntegrationTestCase {
                        "0 rows clamps to row=1 → 0.125s floor")
     }
 
+    // MARK: - UI-gate mutation anchors (Phase 7)
+    //
+    // These cells exist to give the mutation catalog stable bracketed
+    // substrings for individual animation-duration formula gates. Each
+    // assertion message carries a `[ui-gate=...]` tag so the runner can
+    // match deterministically.
+
+    /// Upper-cap gate: `min(0.30, ...)` keeps the formula from running
+    /// away on huge row counts. Removing the cap means rows=20 yields
+    /// 0.10 + 20*0.025 = 0.60s instead of the 0.30s ceiling.
+    func testUIGate_accordionAnimationDuration_capsAt0_30() {
+        let d = AccordionCard<EmptyView>.animationDuration(forRows: 20)
+        XCTAssertEqual(d, 0.30, accuracy: 0.0001,
+            "[ui-gate=accordion-anim-cap] 20 rows must clamp to 0.30s ceiling; got \(d)")
+    }
+
+    /// Per-row scaling gate: `Double(max(1, rows)) * perRow`. Removing
+    /// the multiplication or the `max(1, rows)` floor changes the
+    /// returned value at small row counts. Pinning rows=4 → 0.20s
+    /// catches both removals.
+    func testUIGate_accordionAnimationDuration_scalesPerRow() {
+        let d = AccordionCard<EmptyView>.animationDuration(forRows: 4)
+        XCTAssertEqual(d, 0.20, accuracy: 0.0001,
+            "[ui-gate=accordion-anim-scale] 4 rows must yield base 0.10 + 4*0.025 = 0.20s; got \(d)")
+    }
+
+    /// Floor gate: `max(1, rows)` ensures rows ≤ 0 still produce a
+    /// non-trivial duration. Removing the floor would make rows=0 yield
+    /// 0.10s and rows=-3 yield a value below 0.10 (then clamped by the
+    /// outer `max(0.10, raw)`); pin rows=-3 → 0.125s to anchor both the
+    /// inner floor and the outer min(0.10) clamp.
+    func testUIGate_accordionAnimationDuration_floorAtRow1() {
+        let d = AccordionCard<EmptyView>.animationDuration(forRows: -3)
+        XCTAssertEqual(d, 0.125, accuracy: 0.0001,
+            "[ui-gate=accordion-anim-floor] negative rows must floor to row=1 yielding 0.125s; got \(d)")
+    }
+
+    /// SensorAccordionCard mirror gate: removing the formula on the
+    /// sensor card surface (or drifting it from the AccordionCard
+    /// formula) breaks panels mixing both card kinds. Pin rows=20 →
+    /// 0.30s (capped) on the sensor surface — well above the 8-row
+    /// natural cap so removing the cap pushes the result to 0.60s.
+    func testUIGate_sensorAccordionAnimationDuration_mirrorsCap() {
+        let d = SensorAccordionCard<EmptyView>.animationDuration(forRows: 20)
+        XCTAssertEqual(d, 0.30, accuracy: 0.0001,
+            "[ui-gate=sensor-accordion-anim-cap] 20 rows on SensorAccordionCard must yield 0.30s ceiling; got \(d)")
+    }
+
     /// `SensorAccordionCard.animationDuration(forRows:)` mirrors AccordionCard.
     /// Both surfaces must share the formula so panels with mixed accordion
     /// types animate consistently.
