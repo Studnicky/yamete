@@ -132,7 +132,19 @@ public final class ImpactFusion {
     }
 
     public func stop() {
-        guard isRunning else { return }
+        #if DEBUG
+        _testHooks.stopInvocationCount += 1
+        #endif
+        guard isRunning else {
+            #if DEBUG
+            _testHooks.lastStopWasNoOp = true
+            #endif
+            return
+        }
+        #if DEBUG
+        _testHooks.lastStopWasNoOp = false
+        _testHooks.stopTeardownCount += 1
+        #endif
         for task in sourceTasks { task.cancel() }
         sourceTasks.removeAll()
         fanInContinuation?.finish()
@@ -145,6 +157,21 @@ public final class ImpactFusion {
         onActiveSourcesChanged?([])
         log.info("activity:ImpactFusion wasEndedBy entity:ImpactFusion")
     }
+
+    #if DEBUG
+    /// Test-only observability for the `stop()` idempotency gate
+    /// (`guard isRunning else { return }`). Every `stop()` invocation
+    /// increments `stopInvocationCount`; `stopTeardownCount` increments
+    /// only when the gate allows teardown to proceed; `lastStopWasNoOp`
+    /// reflects the most recent invocation. Tests use these to observe
+    /// whether the idempotency guard is firing as designed.
+    public struct TestHooks {
+        public var stopInvocationCount: Int = 0
+        public var stopTeardownCount: Int = 0
+        public var lastStopWasNoOp: Bool = false
+    }
+    public var _testHooks = TestHooks()
+    #endif
 
     // MARK: - Fusion gating
 

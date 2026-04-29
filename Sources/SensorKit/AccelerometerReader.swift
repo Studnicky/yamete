@@ -231,7 +231,7 @@ private enum SensorActivation {
 
 // MARK: - Shared hardware access
 
-private enum AccelHardware {
+internal enum AccelHardware {
 
     static func isSPUDevicePresent() -> Bool {
         let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
@@ -272,6 +272,9 @@ private enum AccelHardware {
         }
         defer { IOObjectRelease(iterator) }
 
+        var timebase = mach_timebase_info_data_t()
+        mach_timebase_info(&timebase)
+
         while true {
             let service = IOIteratorNext(iterator)
             guard service != 0 else { break }
@@ -283,23 +286,24 @@ private enum AccelHardware {
             let dispatchAccel = IORegistryEntryCreateCFProperty(
                 service, "dispatchAccel" as CFString, kCFAllocatorDefault, 0
             )?.takeRetainedValue() as? Bool ?? false
-            guard dispatchAccel else { continue }
-
-            guard let debug = IORegistryEntryCreateCFProperty(
+            let debug = IORegistryEntryCreateCFProperty(
                 service, "DebugState" as CFString, kCFAllocatorDefault, 0
-            )?.takeRetainedValue() as? [String: Any],
-                  let lastTsRaw = debug["_last_event_timestamp"] as? Int,
-                  lastTsRaw > 0 else {
-                return false
-            }
-            let lastTs = UInt64(lastTsRaw)
+            )?.takeRetainedValue() as? [String: Any]
+            let lastTsRaw = debug?["_last_event_timestamp"] as? Int
             let now = mach_absolute_time()
-            guard now > lastTs else { return false }
 
-            var timebase = mach_timebase_info_data_t()
-            mach_timebase_info(&timebase)
-            let deltaNs = (now - lastTs) &* UInt64(timebase.numer) / UInt64(timebase.denom)
-            return deltaNs < AccelHardwareConstants.sensorActivityStalenessNs
+            switch evaluateActivity(
+                dispatchAccel: dispatchAccel,
+                lastTsRaw: lastTsRaw,
+                now: now,
+                timebaseNumer: timebase.numer,
+                timebaseDenom: timebase.denom,
+                stalenessNs: AccelHardwareConstants.sensorActivityStalenessNs
+            ) {
+            case .skip: continue
+            case .unreporting, .clockNonMonotonic, .stale: return false
+            case .reporting: return true
+            }
         }
         return false
     }
@@ -404,9 +408,13 @@ private enum AccelHardware {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(pollInterval))
                 let snapshot = ctx.watchdogSnapshot()
-                guard snapshot.running else { return }
-                let staleness = Date().timeIntervalSince(snapshot.lastReportAt)
-                if staleness > stallThreshold {
+                let now = Date()
+                switch AccelHardware.evaluateWatchdogTick(snapshot: snapshot, now: now, stallThreshold: stallThreshold) {
+                case .invalidated:
+                    return
+                case .alive:
+                    continue
+                case .stalled(let staleness):
                     log.warning("activity:SensorReading wasInvalidatedBy entity:Watchdog staleness=\(String(format: "%.1f", staleness))s sampleCount=\(snapshot.sampleCounter)")
                     ctx.surfaceStall(SensorError.ioKitError("accelerometer report stream stalled (\(Int(staleness))s without data)"))
                     return
@@ -486,6 +494,63 @@ private enum AccelHardware {
         }
 
         return stream
+    }
+
+    /// Watchdog poll-tick decision. Pure function so the gate at the
+    /// `running` check is unit-testable: removing it must produce a
+    /// `.stalled` outcome on an invalidated snapshot, which a behavioural
+    /// cell can pin without spinning a real HID stream.
+    enum WatchdogDecision: Equatable, Sendable {
+        case invalidated              // running == false → bail out of poll loop
+        case alive                    // staleness within budget → keep polling
+        case stalled(TimeInterval)    // exceeded stall threshold → surface error
+    }
+
+    static func evaluateWatchdogTick(
+        snapshot: (running: Bool, lastReportAt: Date, sampleCounter: Int),
+        now: Date,
+        stallThreshold: TimeInterval
+    ) -> WatchdogDecision {
+        guard snapshot.running else { return .invalidated }
+        let staleness = now.timeIntervalSince(snapshot.lastReportAt)
+        if staleness > stallThreshold { return .stalled(staleness) }
+        return .alive
+    }
+
+    /// Activity-probe decision derived from a single SPU service reading.
+    /// Pure helper extracted from `isSensorActivelyReporting()` so the
+    /// `dispatchAccel` filter and the monotonic-clock guard can be
+    /// exercised by direct unit calls — `IORegistryEntryCreateCFProperty`
+    /// itself remains untestable, but everything downstream of "we got
+    /// these properties back" is now mock-driven.
+    enum ActivityDecision: Equatable, Sendable {
+        case skip                     // service is gyro / temp / hinge — keep iterating
+        case unreporting              // dispatchAccel matched but no usable timestamp
+        case stale                    // timestamp older than freshness window
+        case clockNonMonotonic        // mach_absolute_time reading went backwards
+        case reporting                // sensor actively delivering reports
+    }
+
+    static func evaluateActivity(
+        dispatchAccel: Bool,
+        lastTsRaw: Int?,
+        now: UInt64,
+        timebaseNumer: UInt32,
+        timebaseDenom: UInt32,
+        stalenessNs: UInt64
+    ) -> ActivityDecision {
+        guard dispatchAccel else { return .skip }
+        guard let raw = lastTsRaw, raw > 0 else { return .unreporting }
+        let lastTs = UInt64(raw)
+        guard now > lastTs else { return .clockNonMonotonic }
+        // `&-` is wrap-on-underflow. The `now > lastTs` gate above is the
+        // primary defense; the wrapping subtraction means a mutation that
+        // removes the gate produces a `.stale` decode (the wrapped delta
+        // is enormous, far past `stalenessNs`) rather than trapping the
+        // process. That keeps the gate observable from a unit test
+        // without a process crash.
+        let deltaNs = (now &- lastTs) &* UInt64(timebaseNumer) / UInt64(timebaseDenom)
+        return deltaNs < stalenessNs ? .reporting : .stale
     }
 
     static var matchingDict: CFDictionary {
@@ -574,7 +639,14 @@ private struct WatchdogHandle: Sendable {
 
 /// Decodes HID reports, applies bandpass filtering, and runs ImpactDetector.
 /// All mutable and non-Sendable state is lock-protected.
-private final class ReportContext: Sendable {
+///
+/// Exposed as `internal` (rather than `private`) so mutation-coverage cells
+/// in `Tests/MatrixAccelerometerReader_Tests.swift` can drive
+/// `handleReport(report:length:)` with synthesised payloads. This is the
+/// minimum surface needed to make the four behavioural gates inside
+/// `handleReport` (length floor, running guard, decimation, magnitude
+/// bounds) directly catchable by `make mutate`.
+internal final class ReportContext: Sendable {
     let adapterID: SensorID
 
     /// Every field is now Sendable on its own: the continuation, filters,
@@ -596,10 +668,10 @@ private final class ReportContext: Sendable {
     }
     private let state: OSAllocatedUnfairLock<State>
 
-    init(adapterID: SensorID,
-         continuation: AsyncThrowingStream<SensorImpact, Error>.Continuation,
-         hpFilter: HighPassFilter, lpFilter: LowPassFilter,
-         detector: ImpactDetector) {
+    internal init(adapterID: SensorID,
+                  continuation: AsyncThrowingStream<SensorImpact, Error>.Continuation,
+                  hpFilter: HighPassFilter, lpFilter: LowPassFilter,
+                  detector: ImpactDetector) {
         self.adapterID = adapterID
         self.state = OSAllocatedUnfairLock(initialState: State(
             continuation: continuation, hpFilter: hpFilter,
@@ -610,23 +682,25 @@ private final class ReportContext: Sendable {
 
     /// Snapshot of (running, lastReportAt, sampleCounter) for the watchdog.
     /// Returns nil for lastReportAt if the stream has already been invalidated.
-    func watchdogSnapshot() -> (running: Bool, lastReportAt: Date, sampleCounter: Int) {
+    internal func watchdogSnapshot() -> (running: Bool, lastReportAt: Date, sampleCounter: Int) {
         state.withLock { ($0.running, $0.lastReportAt, $0.sampleCounter) }
     }
 
     /// Surfaces a recoverable error to the consuming AsyncThrowingStream.
     /// Used by the watchdog when no reports arrive for the stall threshold.
     /// Marks the context invalid first so any in-flight callback no-ops.
-    func surfaceStall(_ error: Error) {
+    internal func surfaceStall(_ error: Error) {
         let cont = state.withLock { s -> AsyncThrowingStream<SensorImpact, Error>.Continuation? in
-            guard s.running else { return nil }
+            // Double-stall guard: once we've finished the continuation no
+            // second error must reach the consumer.
+            guard s.running else { return nil /* already-stalled */ }
             s.running = false
             return s.continuation
         }
         cont?.finish(throwing: error)
     }
 
-    func handleReport(report: UnsafeMutablePointer<UInt8>, length: Int) {
+    internal func handleReport(report: UnsafeMutablePointer<UInt8>, length: Int) {
         guard length >= minReportLength else { return }
 
         // Int32 axes at byte offsets 6/10/14 are NOT 4-byte aligned. Using

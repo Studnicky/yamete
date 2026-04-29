@@ -41,7 +41,7 @@ public final class HeadphoneMotionSource: SensorSource, Sendable {
     /// device briefly to learn its current connection state, but we
     /// must not stomp on a real consumer that started impacts() during
     /// the probe window.
-    private enum ProbeStage: Sendable {
+    public enum ProbeStage: Sendable, Equatable {
         case pending     // init done, probe not started
         case running     // probe holds the manager
         case complete    // probe finished naturally and stopped the manager
@@ -99,18 +99,41 @@ public final class HeadphoneMotionSource: SensorSource, Sendable {
         // hardware (typically <100ms) without holding the device for too
         // long if nothing's there. 400ms is a comfortable margin.
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.4) { [weak self] in
-            guard let self else { return }
-            let shouldStop = probeStage.withLock { stage -> Bool in
-                guard stage == .running else { return false }
-                stage = .complete
-                return true
-            }
-            if shouldStop {
-                driver.stopUpdates()
-                log.info("activity:HeadphoneProbe wasEndedBy agent:HeadphoneMotionAdapter connected=\(driver.isHeadphonesConnected)")
-            }
+            self?.finishProbeIfRunning()
         }
     }
+
+    /// Body of the deferred probe-stop closure, extracted so tests can
+    /// drive it deterministically (no waiting on DispatchQueue.global()
+    /// 400ms timer). The `guard stage == .running` gate must let the
+    /// stop proceed only when the probe is still active; if `impacts()`
+    /// took over the manager (`.takenOver`), the deferred stop must
+    /// no-op so the in-flight consumer keeps the manager.
+    fileprivate func finishProbeIfRunning() {
+        let shouldStop = probeStage.withLock { stage -> Bool in
+            guard stage == .running else { return false }
+            stage = .complete
+            return true
+        }
+        if shouldStop {
+            driver.stopUpdates()
+            log.info("activity:HeadphoneProbe wasEndedBy agent:HeadphoneMotionAdapter connected=\(driver.isHeadphonesConnected)")
+        }
+    }
+
+    #if DEBUG
+    /// Test seam — current probe-stage observation.
+    public var _testCurrentProbeStage: ProbeStage {
+        probeStage.withLock { $0 }
+    }
+
+    /// Test seam — drives the deferred probe-stop closure body
+    /// synchronously so cells can assert the `stage == .running` gate
+    /// without waiting 400ms.
+    public func _testRunDeferredProbeStop() {
+        finishProbeIfRunning()
+    }
+    #endif
 
     public func impacts() -> AsyncThrowingStream<SensorImpact, Error> {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)

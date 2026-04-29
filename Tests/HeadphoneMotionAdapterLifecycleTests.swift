@@ -278,4 +278,54 @@ final class HeadphoneMotionSourceLifecycleTests: XCTestCase {
             "[hp-gate=disconnect-prune] post-disconnect high-magnitude samples must be pruned (got \(count))"
         )
     }
+
+    /// Pins `HeadphoneMotionAdapter.swift:89` `guard driver.isDeviceMotionAvailable
+    /// else { return }` in `startConnectionProbe()`. When the framework reports
+    /// motion-unavailable, the probe must NOT call `driver.startUpdates`. Mock
+    /// driver records `startUpdatesCalls`; production gate keeps it at 0.
+    func testProbeGate_frameworkUnavailable_doesNotStartUpdates() {
+        let mock = MockHeadphoneMotionDriver()
+        mock.setDeviceMotionAvailable(false)
+        _ = HeadphoneMotionSource(driver: mock)
+        XCTAssertEqual(
+            mock.startUpdatesCalls, 0,
+            "[hp-probe-gate=framework-available] framework-unavailable host must NOT trigger startUpdates; got \(mock.startUpdatesCalls)"
+        )
+    }
+
+    /// Pins `HeadphoneMotionAdapter.swift:104` `guard stage == .running` in the
+    /// deferred probe-stop body. After `impacts()` takes over the manager, the
+    /// stage flips to `.takenOver`; the deferred stop must no-op so the
+    /// in-flight consumer keeps the manager alive.
+    func testProbeStageGate_takenOver_deferredClosureIsNoOp() async {
+        let mock = MockHeadphoneMotionDriver()
+        mock.setDeviceMotionAvailable(true)
+        let adapter = HeadphoneMotionSource(driver: mock)
+        XCTAssertEqual(
+            adapter._testCurrentProbeStage, .running,
+            "precondition: probe must be in .running after init"
+        )
+
+        // Simulate impacts() taking over the manager.
+        let stream = adapter.impacts()
+        let consumer = Task<Void, Error> {
+            for try await _ in stream {}
+        }
+        try? await Task.sleep(for: .milliseconds(20))
+        XCTAssertEqual(
+            adapter._testCurrentProbeStage, .takenOver,
+            "precondition: impacts() must flip stage to .takenOver"
+        )
+
+        let stopsBefore = mock.stopUpdatesCalls
+        adapter._testRunDeferredProbeStop()
+        let stopsAfter = mock.stopUpdatesCalls
+        XCTAssertEqual(
+            stopsAfter, stopsBefore,
+            "[hp-probe-gate=takenOver] deferred probe-stop after impacts() takeover must no-op; got an unexpected stopUpdates"
+        )
+
+        consumer.cancel()
+        _ = try? await consumer.value
+    }
 }

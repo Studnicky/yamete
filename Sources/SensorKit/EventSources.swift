@@ -43,6 +43,10 @@ public final class USBSource: @unchecked Sendable {
     /// IOKit-callback test seams (`_injectAttach` / `_injectDetach`) to drive
     /// the same publish path the production stream drainer drives.
     private weak var _testBus: ReactionBus?
+    /// Test seam — forces both `IOServiceAddMatchingNotification` returns to the supplied non-success kernel result so the kernel-success guard fires. Production-default nil → real returns propagated.
+    internal var _forceKernelFailureKr: kern_return_t?
+    /// Test seam — increments after each successful registration of IOKit notifications. Idempotency cells call `start()` twice; expect 1.
+    internal var _testInstallationCount: Int = 0
     #endif
 
     public init() {}
@@ -72,7 +76,7 @@ public final class USBSource: @unchecked Sendable {
         let retainedDetachContext = Unmanaged.passRetained(detachContext)
 
         var rawAttachIter: io_iterator_t = 0
-        let attachKr = IOServiceAddMatchingNotification(
+        var attachKr = IOServiceAddMatchingNotification(
             port,
             kIOFirstMatchNotification,
             matching, // matching dict — IOServiceAddMatchingNotification consumes one ref
@@ -94,7 +98,7 @@ public final class USBSource: @unchecked Sendable {
         )
 
         var rawDetachIter: io_iterator_t = 0
-        let detachKr = IOServiceAddMatchingNotification(
+        var detachKr = IOServiceAddMatchingNotification(
             port,
             kIOTerminatedNotification,
             IOServiceMatching(kIOUSBDeviceClassName),
@@ -111,6 +115,9 @@ public final class USBSource: @unchecked Sendable {
             retainedDetachContext.toOpaque(),
             &rawDetachIter
         )
+        #if DEBUG
+        if let forced = _forceKernelFailureKr { attachKr = forced; detachKr = forced }
+        #endif
 
         guard attachKr == KERN_SUCCESS, detachKr == KERN_SUCCESS else {
             log.warning("activity:USBSource wasInvalidatedBy entity:IOService — attachKr=\(attachKr) detachKr=\(detachKr)")
@@ -124,6 +131,9 @@ public final class USBSource: @unchecked Sendable {
         }
         attachIterator = rawAttachIter
         detachIterator = rawDetachIter
+        #if DEBUG
+        _testInstallationCount += 1
+        #endif
 
         // Drain to flag end-of-replay.
         while case let dev = IOIteratorNext(attachIterator), dev != 0 { IOObjectRelease(dev) }
@@ -389,6 +399,10 @@ public final class AudioPeripheralSource: Sendable {
     private var knownDevices: Set<String> = []
     #if DEBUG
     private weak var _testBus: ReactionBus?
+    /// Test seam — forces `AudioObjectAddPropertyListenerBlock`'s `OSStatus` to non-noErr so the kernel-success guard fires. Production nil = real.
+    internal var _forceListenerStatus: OSStatus?
+    /// Test seam — increments after each successful listener install.
+    internal var _testInstallationCount: Int = 0
     #endif
 
     public init() {}
@@ -414,9 +428,20 @@ public final class AudioPeripheralSource: Sendable {
             guard let self else { return }
             MainActor.assumeIsolated { self.handleChange() }
         }
-        let status = AudioObjectAddPropertyListenerBlock(
+        var status = AudioObjectAddPropertyListenerBlock(
             AudioObjectID(kAudioObjectSystemObject), &address, queue, block
         )
+        #if DEBUG
+        if let forced = _forceListenerStatus {
+            // Tear down real listener so the override leaves no leak.
+            if status == noErr {
+                AudioObjectRemovePropertyListenerBlock(
+                    AudioObjectID(kAudioObjectSystemObject), &address, queue, block
+                )
+            }
+            status = forced
+        }
+        #endif
         guard status == noErr else {
             log.warning("activity:AudioPeripheralSource wasInvalidatedBy entity:CoreAudio status=\(status)")
             return
@@ -424,6 +449,9 @@ public final class AudioPeripheralSource: Sendable {
         listenerInstalled = true
         self.listenerBlock = block
         self.listenerAddress = address
+        #if DEBUG
+        _testInstallationCount += 1
+        #endif
 
         publishTask = Task {
             for await reaction in events {
@@ -598,6 +626,10 @@ public final class BluetoothSource: @unchecked Sendable {
     private var streamContinuation: AsyncStream<Reaction>.Continuation?
     #if DEBUG
     private weak var _testBus: ReactionBus?
+    /// Test seam — forces both `IOServiceAddMatchingNotification` kernel returns. Production-default nil = real returns propagated.
+    internal var _forceKernelFailureKr: kern_return_t?
+    /// Test seam — increments after each successful registration.
+    internal var _testInstallationCount: Int = 0
     #endif
 
     public init() {}
@@ -620,7 +652,7 @@ public final class BluetoothSource: @unchecked Sendable {
         let retainedAttachContext = Unmanaged.passRetained(attachContext)
         let retainedDetachContext = Unmanaged.passRetained(detachContext)
 
-        let attachKr = IOServiceAddMatchingNotification(
+        var attachKr = IOServiceAddMatchingNotification(
             port, kIOFirstMatchNotification,
             IOServiceMatching("IOBluetoothDevice"),
             { ctx, iter in
@@ -640,7 +672,7 @@ public final class BluetoothSource: @unchecked Sendable {
             &attachIterator
         )
 
-        let detachKr = IOServiceAddMatchingNotification(
+        var detachKr = IOServiceAddMatchingNotification(
             port, kIOTerminatedNotification,
             IOServiceMatching("IOBluetoothDevice"),
             { ctx, iter in
@@ -656,6 +688,9 @@ public final class BluetoothSource: @unchecked Sendable {
             retainedDetachContext.toOpaque(),
             &detachIterator
         )
+        #if DEBUG
+        if let forced = _forceKernelFailureKr { attachKr = forced; detachKr = forced }
+        #endif
         guard attachKr == KERN_SUCCESS, detachKr == KERN_SUCCESS else {
             log.warning("activity:BluetoothSource wasInvalidatedBy entity:IOService — attachKr=\(attachKr) detachKr=\(detachKr)")
             if attachIterator != 0 { IOObjectRelease(attachIterator); attachIterator = 0 }
@@ -672,6 +707,9 @@ public final class BluetoothSource: @unchecked Sendable {
 
         attachContextHandle = retainedAttachContext
         detachContextHandle = retainedDetachContext
+        #if DEBUG
+        _testInstallationCount += 1
+        #endif
 
         publishTask = Task { @MainActor in
             for await reaction in stream {
@@ -768,6 +806,10 @@ public final class ThunderboltSource: @unchecked Sendable {
     private var streamContinuation: AsyncStream<Reaction>.Continuation?
     #if DEBUG
     private weak var _testBus: ReactionBus?
+    /// Test seam — forces both `IOServiceAddMatchingNotification` kernel returns. Production-default nil = real returns propagated.
+    internal var _forceKernelFailureKr: kern_return_t?
+    /// Test seam — increments after each successful registration.
+    internal var _testInstallationCount: Int = 0
     #endif
 
     public init() {}
@@ -790,7 +832,7 @@ public final class ThunderboltSource: @unchecked Sendable {
         let retainedAttachContext = Unmanaged.passRetained(attachContext)
         let retainedDetachContext = Unmanaged.passRetained(detachContext)
 
-        let attachKr = IOServiceAddMatchingNotification(
+        var attachKr = IOServiceAddMatchingNotification(
             port, kIOFirstMatchNotification,
             IOServiceMatching("IOThunderboltPort"),
             { ctx, iter in
@@ -809,7 +851,7 @@ public final class ThunderboltSource: @unchecked Sendable {
             &attachIterator
         )
 
-        let detachKr = IOServiceAddMatchingNotification(
+        var detachKr = IOServiceAddMatchingNotification(
             port, kIOTerminatedNotification,
             IOServiceMatching("IOThunderboltPort"),
             { ctx, iter in
@@ -824,6 +866,9 @@ public final class ThunderboltSource: @unchecked Sendable {
             retainedDetachContext.toOpaque(),
             &detachIterator
         )
+        #if DEBUG
+        if let forced = _forceKernelFailureKr { attachKr = forced; detachKr = forced }
+        #endif
         guard attachKr == KERN_SUCCESS, detachKr == KERN_SUCCESS else {
             log.warning("activity:ThunderboltSource wasInvalidatedBy entity:IOService — attachKr=\(attachKr) detachKr=\(detachKr)")
             if attachIterator != 0 { IOObjectRelease(attachIterator); attachIterator = 0 }
@@ -840,6 +885,9 @@ public final class ThunderboltSource: @unchecked Sendable {
 
         attachContextHandle = retainedAttachContext
         detachContextHandle = retainedDetachContext
+        #if DEBUG
+        _testInstallationCount += 1
+        #endif
 
         publishTask = Task { @MainActor in
             for await reaction in stream {
@@ -921,6 +969,8 @@ public final class DisplayHotplugSource: @unchecked Sendable {
     private let lastFire = OSAllocatedUnfairLock<Date>(initialState: .distantPast)
     #if DEBUG
     private weak var _testBus: ReactionBus?
+    /// Test seam — increments after each successful registration.
+    internal var _testInstallationCount: Int = 0
     #endif
 
     public init() {}
@@ -944,6 +994,9 @@ public final class DisplayHotplugSource: @unchecked Sendable {
             me.dispatchDebounced()
         }, context)
         registered = true
+        #if DEBUG
+        _testInstallationCount += 1
+        #endif
 
         publishTask = Task { @MainActor in
             for await reaction in events {
@@ -1025,6 +1078,10 @@ public final class SleepWakeSource: @unchecked Sendable {
     private let stream = OSAllocatedUnfairLock<AsyncStream<Reaction>.Continuation?>(initialState: nil)
     #if DEBUG
     private weak var _testBus: ReactionBus?
+    /// Test seam — forces `IORegisterForSystemPower` to be treated as failed so the kernel-success guard fires. Real resources allocated by the call are torn down before the override applies.
+    internal var _forceRegistrationFailure: Bool = false
+    /// Test seam — increments after each successful registration.
+    internal var _testInstallationCount: Int = 0
     #endif
 
     public init() {}
@@ -1042,7 +1099,7 @@ public final class SleepWakeSource: @unchecked Sendable {
         let context = Unmanaged.passUnretained(self).toOpaque()
         var rawNotifier: io_object_t = 0
         var port: IONotificationPortRef?
-        let connect = IORegisterForSystemPower(context, &port, { ctx, _, messageType, messageArgument in
+        var connect = IORegisterForSystemPower(context, &port, { ctx, _, messageType, messageArgument in
             guard let ctx else { return }
             let me = Unmanaged<SleepWakeSource>.fromOpaque(ctx).takeUnretainedValue()
             switch messageType {
@@ -1058,6 +1115,22 @@ public final class SleepWakeSource: @unchecked Sendable {
                 break
             }
         }, &rawNotifier)
+        #if DEBUG
+        if _forceRegistrationFailure {
+            // Force a connect=0 outcome; keep port non-nil so the
+            // mutation-target sub-clause (`connect != 0`) is the SOLE
+            // decider of whether the cleanup branch runs. Real resources
+            // allocated by the call are torn down before the override
+            // applies.
+            if connect != 0 { IOServiceClose(connect); connect = 0 }
+            if rawNotifier != 0 { IODeregisterForSystemPower(&rawNotifier); rawNotifier = 0 }
+            if port == nil {
+                // The kernel call yielded port=nil (rare but allowed); fabricate a dummy
+                // so the let-port unwrap succeeds and only the connect != 0 sub-clause fails.
+                port = IONotificationPortCreate(kIOMainPortDefault)
+            }
+        }
+        #endif
         guard connect != 0, let port else {
             log.warning("activity:SleepWakeSource wasInvalidatedBy entity:IORegisterForSystemPower")
             return
@@ -1070,6 +1143,9 @@ public final class SleepWakeSource: @unchecked Sendable {
             IONotificationPortGetRunLoopSource(port).takeUnretainedValue(),
             .defaultMode
         )
+        #if DEBUG
+        _testInstallationCount += 1
+        #endif
 
         publishTask = Task { @MainActor in
             for await reaction in events {

@@ -261,115 +261,160 @@ know why these gate-shaped lines are not in the JSON catalog.
 `AccelerometerReader.swift` is a self-contained IOKit / IOHIDManager
 adapter for the BMI286 accelerometer on Apple Silicon. It builds its
 own `IOHIDManager`, registers a C-level
-`IOHIDDeviceRegisterInputReportCallback`, and runs a private
-`ReportContext` that consumes the callback. Every gate listed below
-sits inside one of:
+`IOHIDDeviceRegisterInputReportCallback`, and runs a `ReportContext`
+that consumes the callback.
 
-- a `private enum` (`SensorActivation`, `AccelHardware`),
-- a `private final class` (`ReportContext`), or
-- the IOHIDManager open / iterator path that is only reachable when a
-  real `AppleSPUHIDDriver` service exists in IORegistry.
+The 19 gates flagged by `--coverage` split as **8 catalogued / 11
+degenerate** after the minimum-cost test seam introduced by
+`Tests/MatrixAccelerometerReader_Tests.swift`. The seam comprises
+three production changes:
 
-There is no DI seam (the adapter takes no driver / monitor / clock
-parameter), no protocol abstraction over IOHIDManager, and no
-project-level mock for the IOKit surface. The closest sibling
-abstraction in the codebase, `HIDDeviceMonitor`, is used by other
-sources but is not threaded through `AccelerometerReader` — the file
-calls IOKit directly. This makes every gate listed below degenerate
-unless and until a future refactor introduces a mockable boundary.
+- `ReportContext` (and its `init`, `handleReport`, `invalidate`,
+  `surfaceStall`, `watchdogSnapshot`) was raised from `private` to
+  `internal`. Cells can now construct a context, build a synthetic HID
+  payload (24 bytes with `Int32` axes at offsets 6/10/14), and drive
+  `handleReport` directly, which makes every gate inside `handleReport`
+  observable from a unit test.
+- The watchdog's per-tick decision was extracted into the pure helper
+  `AccelHardware.evaluateWatchdogTick(snapshot:now:stallThreshold:)`,
+  isolating the `running` gate from the surrounding `Task.detached`.
+- The activity probe's per-service decision (the `dispatchAccel`
+  filter and the `now > lastTs` monotonicity check) was extracted into
+  `AccelHardware.evaluateActivity(...)`, replacing the inline
+  IORegistry-coupled iterator body. The wrapping subtraction in that
+  helper uses `&-` so a mutation that removes the monotonicity guard
+  decodes deterministically as `.stale` instead of trapping the
+  process on `UInt64` underflow — this keeps the gate observable from
+  a unit test without a SIGTRAP signal escaping the harness.
 
-The existing `Tests/AccelerometerLifecycleStressTests.swift` exercises
-the open / close lifecycle on real hardware via
-`AccelerometerSource.impacts()`, but it skips on hosts without a SPU
-device (`XCTSkipUnless(adapter.hardwarePresent)`) and asserts only
-that repeated open/close converges without crashing — it does not
-assert any specific gate's branch was taken, so it cannot serve as
-the `expectedFailingTest` for any catalog entry.
+These changes are scoped to internal access — the public
+`AccelerometerSource` API and the file's IOKit lifecycle are
+unchanged. The `RealKernelDriver`-shaped seam mentioned in the agent
+brief was rejected as cost-disproportionate to the residual coverage
+gain: the eleven gates that remain Degenerate would require a
+parallel `RealAccelerometerKernelDriver` / `MockAccelerometerKernelDriver`
+hierarchy plus all-call-site rewiring for ~150 lines of new code, and
+all eleven are kernel-result fidelity guards that fire only when
+IOKit returns a non-success code — failures that real-hardware boots
+do not produce.
 
-Per-gate justifications:
+Per-gate disposition:
 
-| Line | Gate | Degenerate because |
-|------|------|--------------------|
-| 152  | `if !activated { log.info(...) }` | Bare logging branch with no observable side effect. Not a behavioural gate — the body only writes a single info log. Mutating the predicate cannot be detected without parsing log files, and either branch produces a valid stream because `openStream` is invoked unconditionally on the next line. |
-| 174  | `guard IOServiceGetMatchingServices(...) == KERN_SUCCESS` (`SensorActivation.activate`) | Wraps real `IOServiceGetMatchingServices` against `AppleSPUHIDDriver`. KERN_SUCCESS is the universal outcome on supported hardware; failure modes (kIOReturnNotReady, kIOReturnNoDevice) require a missing or torn-down kext that cannot be simulated. No DI seam to inject a fake matching dictionary. |
-| 180  | `guard service != 0 else { break }` (activate loop) | Iterator sentinel terminating a `while true` over `IOIteratorNext`. On real hardware the iterator yields N services and then 0; mutating to `service != -1` would loop forever (stuck test, not failing assertion). Cannot be exercised without a fake `io_iterator_t`. |
-| 203  | `guard IOServiceGetMatchingServices(...) == KERN_SUCCESS` (`SensorActivation.deactivate`) | Symmetric to gate at 174, in deactivate. Same reasoning: real IOKit call with no inject point. |
-| 208  | `guard service != 0 else { break }` (deactivate loop) | Symmetric to gate at 180. Iterator sentinel; mutation manifests as a stuck loop, not a failing assertion. |
-| 238  | `guard IOHIDManagerOpen(...) == kIOReturnSuccess` (`isSPUDevicePresent`) | Wraps `IOHIDManagerOpen` on a freshly-created manager. Failure (kIOReturnNotPermitted, kIOReturnExclusiveAccess) requires an entitlement / sandbox failure that cannot be forced from a test. Mutating to always-fail makes `hardwarePresent` return false; the lifecycle stress tests then skip via `XCTSkipUnless`, which is XCTSkip not XCTFail — mutation escapes. |
-| 270  | `guard IOServiceGetMatchingServices(...) == KERN_SUCCESS` (`isSensorActivelyReporting`) | Symmetric to gate 174 in the read-only probe path. Probe is consumed only by `isAvailable` in the App Store build, and the test host runs the default (Direct) build path under `swift test`, so the probe is not on the executed code path during tests. |
-| 277  | `guard service != 0 else { break }` (probe loop) | Symmetric to gates 180 / 208 inside the probe iterator. |
-| 286  | `guard dispatchAccel else { continue }` | Filters SPU services to the one with `dispatchAccel = Yes` (vs. gyro / temp / hinge siblings). Property is read directly from IORegistry; cannot be injected. On real hardware the gate matters (multiple SPU services exist; only one has dispatchAccel), but it's only invoked from `isSensorActivelyReporting` which is unused in the Direct build that tests run against. |
-| 297  | `guard now > lastTs else { return false }` | `mach_absolute_time()` is documented monotonic, and `lastTs` is sampled from the same clock domain (`_last_event_timestamp`), so `now > lastTs` is structurally true for any in-bounds report. The `else` branch is unreachable on real hardware and mutation does not change observable output. |
-| 319  | `guard openResult == kIOReturnSuccess` (`openStream` IOHIDManagerOpen) | Same as gate 238: real `IOHIDManagerOpen` result. Mutating to always-fail surfaces a `SensorError.ioKitError` on the throwing stream, but the lifecycle stress test catches via `try?` and asserts only "did not crash", so the mutation escapes the existing assertion. |
-| 336  | `guard devOpenResult == kIOReturnSuccess` (`openStream` IOHIDDeviceOpen) | Same as gate 319 for the per-device open call. Real IOKit return; no mock surface; existing tests do not pin the error path. |
-| 346  | `guard maxSize > 0` | Reads `kIOHIDMaxInputReportSizeKey` from a real IOHIDDevice. Always positive on real hardware (BMI286 reports 24 bytes); mutation produces an unobservable identity branch. |
-| 407  | `guard snapshot.running else { return }` (watchdog) | Watchdog poll loop bail. The cleanup closure cancels the watchdog Task before invalidating the context, so by the time `running == false` could be observed, the Task is already cancelled and `Task.isCancelled` exits the outer `while`. Mutating the gate produces no observable divergence because the cancellation path wins the race. |
-| 622  | `guard s.running else { return nil }` (`surfaceStall`) | Double-stall guard. Only reachable if `surfaceStall` is called twice; the watchdog calls it at most once per stream (then returns) and cleanup never calls it. Mutating to always-pass would re-finish the continuation, but `AsyncThrowingStream.Continuation.finish` is documented idempotent — the second call is a no-op — so mutation produces no observable behavioural change. |
-| 630  | `guard length >= minReportLength else { return }` (`handleReport`) | Reachable only via the `IOHIDDeviceRegisterInputReportCallback` C-callback; the report buffer and length come from the kernel and cannot be synthesised from a Swift test without modifying production source to expose `handleReport` or the `ReportContext` constructor. Even on a real-hardware host with a warm sensor, the only externally-observable effect of dropping all reports is the watchdog firing after the 5 s stall threshold, which (a) is environment-dependent (cold sensors stall on un-mutated source too) and (b) requires a 7+ s wait per cell — not deterministic enough for `make mutate`. |
-| 646  | `guard s.running else { return nil }` (handleReport) | Same private-callback reachability as gate 630. The lifecycle stress tests rely on this gate's "false" branch (after `ctx.invalidate()`, late-arriving callbacks must no-op), but they assert "did not crash", not "no reports were yielded after invalidate". Without a synthetic-callback seam there is no way to anchor a behavioural cell. |
-| 660  | `guard s.sampleCounter % decimationFactor == 0 else { return nil }` | Same private-callback reachability as gate 630. Decimation is positionally AFTER the watchdog `lastReportAt` bump, so mutating it does not affect the watchdog at all — mutation is invisible to every external observer of `impacts()` because the only externally-visible outputs are (a) `SensorImpact` events (which require a real impact spike, untestable in a static lab) and (b) the watchdog stall (insensitive to decimation). |
-| 664  | `guard rawMag > magnitudeMin && rawMag < magnitudeMax else { return nil }` | Same reasoning as gate 660. Magnitude bounds run after the `lastReportAt` bump and produce no externally-observable signal under mutation. The accelerometer at rest reads ~1 g, which is inside `[0.3, 4.0]`, so the gate is silently true on every real-hardware report and the only observable downstream effect (`SensorImpact` emission) requires an actual impact spike that cannot be staged from a static unit test. |
+| Line | Gate | Disposition |
+|------|------|-------------|
+| 152  | `if !activated { log.info(...) }` | **Degenerate** — bare logging branch with no observable side effect. Not a behavioural gate — the body only writes a single info log. Mutating the predicate cannot be detected without parsing log files, and either branch produces a valid stream because `openStream` is invoked unconditionally on the next line. |
+| 174  | `guard IOServiceGetMatchingServices(...) == KERN_SUCCESS` (`SensorActivation.activate`) | **Degenerate** — wraps real `IOServiceGetMatchingServices` against `AppleSPUHIDDriver`. KERN_SUCCESS is the universal outcome on supported hardware; failure modes (kIOReturnNotReady, kIOReturnNoDevice) require a missing or torn-down kext that cannot be simulated. The strengthened justification: `IOServiceGetMatchingServices` is invoked with `kIOMainPortDefault` (the always-available default mach port) and a non-null `IOServiceMatching("AppleSPUHIDDriver")` dictionary, so the only failure modes the kernel can return are infrastructure-wide (kIOReturnError on out-of-resources, kIOReturnNoDevice on a torn-down `IOMainPort`) — both global host conditions that propagate as test-runner failures, not as gate-removable mutations. |
+| 180  | `guard service != 0 else { break }` (activate loop) | **Degenerate** — iterator sentinel terminating a `while true` over `IOIteratorNext`. On real hardware the iterator yields N services and then 0; mutating to `service != -1` would loop forever (stuck test, not failing assertion). The `make mutate` runner has no per-test timeout; a stuck test wedges the whole runner, which is INFRA failure, not CAUGHT. Cannot be exercised without a fake `io_iterator_t`. |
+| 203  | `guard IOServiceGetMatchingServices(...) == KERN_SUCCESS` (`SensorActivation.deactivate`) | **Degenerate** — symmetric to gate 174, in deactivate. Same kernel-call infrastructure argument applies. |
+| 208  | `guard service != 0 else { break }` (deactivate loop) | **Degenerate** — symmetric to gate 180. Iterator sentinel; mutation manifests as a stuck loop, not a failing assertion. |
+| 238  | `guard IOHIDManagerOpen(...) == kIOReturnSuccess` (`isSPUDevicePresent`) | **Degenerate** — wraps `IOHIDManagerOpen` on a freshly-created manager. Failure (kIOReturnNotPermitted, kIOReturnExclusiveAccess) requires an entitlement / sandbox failure that cannot be forced from a test. Mutating to always-fail makes `hardwarePresent` return false; the lifecycle stress tests then skip via `XCTSkipUnless`, which is XCTSkip not XCTFail — mutation escapes. The new `MatrixAccelerometerReader_Tests` cells do not call `isSPUDevicePresent` (they construct `ReportContext` directly), so this gate is structurally outside the catalogued behavioural scope. |
+| 270  | `guard IOServiceGetMatchingServices(...) == KERN_SUCCESS` (`isSensorActivelyReporting`) | **Degenerate** — symmetric to gate 174 in the read-only probe path. Probe is consumed only by `isAvailable` in the App Store build, and the test host runs the default (Direct) build path under `swift test`, so the probe is not on the executed code path during tests. |
+| 277  | `guard service != 0 else { break }` (probe loop) | **Degenerate** — symmetric to gates 180 / 208 inside the probe iterator. |
+| 286  | `guard dispatchAccel else { return .skip }` (now in `AccelHardware.evaluateActivity`) | **Catalogued** as `accel-activity-dispatchAccel-gate`. The gate moved from inline-iterator into the pure helper `evaluateActivity`; the cell `testEvaluateActivity_dispatchAccelFalse_returnsSkip` calls the helper directly and pins the `.skip` decode. |
+| 297  | `guard now > lastTs else { return .clockNonMonotonic }` (now in `AccelHardware.evaluateActivity`) | **Catalogued** as `accel-activity-clock-monotonicity-gate`. The cell `testEvaluateActivity_clockNotMonotonic_returnsClockNonMonotonic` synthesises a non-monotonic snapshot directly. The wrapping `&-` subtraction in the helper means a mutation that removes the gate decodes as `.stale` (huge wrapped delta past `stalenessNs`), avoiding a SIGTRAP that would mask the catch as INFRA. |
+| 319  | `guard openResult == kIOReturnSuccess` (`openStream` IOHIDManagerOpen) | **Degenerate** — same as gate 238: real `IOHIDManagerOpen` result. Mutating to always-fail surfaces a `SensorError.ioKitError` on the throwing stream, but the lifecycle stress test catches via `try?` and asserts only "did not crash", so the mutation escapes the existing assertion. The new `MatrixAccelerometerReader_Tests` does not call `openStream` (it builds `ReportContext` directly). |
+| 336  | `guard devOpenResult == kIOReturnSuccess` (`openStream` IOHIDDeviceOpen) | **Degenerate** — same as gate 319 for the per-device open call. Real IOKit return; no mock surface; existing tests do not pin the error path. |
+| 346  | `guard maxSize > 0` | **Degenerate** — reads `kIOHIDMaxInputReportSizeKey` from a real IOHIDDevice. Always positive on real hardware (BMI286 reports 24 bytes); mutation produces an unobservable identity branch. The strengthened justification: the only call site is inside `openStream`'s real-IOHIDDevice path, and `IOHIDDeviceGetProperty(_, kIOHIDMaxInputReportSizeKey, ...)` returns a UInt-shaped value the kernel reports from the device's HID descriptor — for the BMI286 this is 24, structurally non-zero. The `?? 64` fallback hides the gate from any test path that does NOT reach a real IOHIDDevice. |
+| 407  | `guard snapshot.running else { return .invalidated }` (now in `AccelHardware.evaluateWatchdogTick`) | **Catalogued** as `accel-watchdog-running-gate`. The watchdog poll body's running check moved from inline-Task into the pure helper `evaluateWatchdogTick`; the cell `testWatchdogTick_invalidatedSnapshot_returnsInvalidated` calls the helper directly and pins the `.invalidated` decode. |
+| 622  | `guard s.running else { return nil /* already-stalled */ }` (`surfaceStall`) | **Catalogued** as `accel-surfaceStall-running-gate`. The cell `testSurfaceStall_afterInvalidate_yieldsNothing` invalidates the context (running = false) and then calls `surfaceStall(error)`. With the gate, the consumer sees no error; without the gate, the spurious error reaches the consumer and the cell flags it. |
+| 630  | `guard length >= minReportLength else { return }` (`handleReport`) | **Catalogued** as `accel-handleReport-length-floor`. The cell `testHandleReport_shortPayloadBelowMin_yieldsNothing` constructs `ReportContext` directly and calls `handleReport(report:length:)` with a payload one byte below the floor. Buffer is over-allocated to 18 bytes so a mutation that removes the gate does not segfault — instead it falls through to decimation + magnitude and yields a sample, which the cell pins. |
+| 646  | `guard s.running else { return nil }` (handleReport) | **Catalogued** as `accel-handleReport-running-gate`. The cell `testHandleReport_afterInvalidate_yieldsNothing` invalidates the context and drives 4 reports. With the gate, no impacts yield; without it, decimation+magnitude let through 2 yields, which the cell pins. |
+| 660  | `guard s.sampleCounter % decimationFactor == 0 else { return nil }` | **Catalogued** as `accel-handleReport-decimation-gate`. The cell `testHandleReport_decimation_yieldsEveryNthReport` drives 10 reports through a permissive detector and asserts exactly `10 / decimationFactor = 5` yields. Removing the gate yields on every report (10 yields), failing the equality assertion. |
+| 664  | `guard rawMag > magnitudeMin && rawMag < magnitudeMax else { return nil }` | **Catalogued** as `accel-handleReport-magnitude-bounds-gate`. The cells `testHandleReport_belowMagnitudeMin_yieldsNothing` and `testHandleReport_aboveMagnitudeMax_yieldsNothing` synthesise sub-floor (each axis = 0.01 g, vector ≈ 0.017 g) and super-ceiling (each axis = 10 g, vector ≈ 17 g) payloads and assert no impacts yield. Removing the gate lets the bounded payload reach the detector. |
 
-Summary: 19 / 19 gates in `AccelerometerReader.swift` are degenerate.
-Closing them as CAUGHT requires either a refactor that exposes
-`ReportContext.handleReport` for direct-call testing (or routes
-through a mockable `HIDDeviceMonitor`-style seam) or an integration
-harness that injects synthetic IOHIDDeviceRegisterInputReportCallback
-events. Both are out of scope for the current pass — the constraint
-"May NOT touch any `Sources/` file" rules out option 1, and option 2
-is not feasible without first introducing a callback-injection point
-that is itself a `Sources/` change.
+Summary: **8 catalogued / 11 degenerate / 19 total**. The 8 promoted
+entries are:
+
+- `accel-handleReport-length-floor` (line 630)
+- `accel-handleReport-running-gate` (line 646)
+- `accel-handleReport-decimation-gate` (line 660)
+- `accel-handleReport-magnitude-bounds-gate` (line 664)
+- `accel-surfaceStall-running-gate` (line 622)
+- `accel-watchdog-running-gate` (line 407)
+- `accel-activity-dispatchAccel-gate` (line 286)
+- `accel-activity-clock-monotonicity-gate` (line 297)
+
+The 11 residual Degenerate gates are all kernel-result fidelity
+guards (KERN_SUCCESS / kIOReturnSuccess / iterator sentinels /
+`maxSize > 0`) and the bare logging branch at line 152. Closing them
+as CAUGHT would require a `RealAccelerometerKernelDriver` /
+`MockAccelerometerKernelDriver` protocol pair that wraps every
+`IOServiceMatching` / `IOIteratorNext` / `IOHIDManagerOpen` /
+`IOHIDDeviceOpen` / `IOHIDDeviceGetProperty` / `IORegistryEntry*`
+call site — roughly 150 lines of new types plus rewiring for two
+public entry points (`isSPUDevicePresent`, `isSensorActivelyReporting`)
+and one private entry point (`openStream`). The cost is
+disproportionate to the residual catch budget because every one of
+these guards fires only when IOKit returns a non-success code, which
+real-hardware boots do not produce — the gates exist to make
+sandbox-rejected paths safe, not to enforce behaviour the test
+harness can validate.
 
 ### `Sources/SensorKit/EventSources.swift`
 
 `EventSources.swift` hosts seven IOKit / CoreAudio / CoreGraphics
 sources (`USBSource`, `PowerSource`, `AudioPeripheralSource`,
 `BluetoothSource`, `ThunderboltSource`, `DisplayHotplugSource`,
-`SleepWakeSource`). The `_inject*` test seams added in commit
-`f21586a` give per-source debounce / dispatch coverage by yielding
-through the same `streamContinuation` the IOKit callbacks yield to.
-Three behavioural gates ARE catalogued (`power-edge-trigger-gate`,
-`power-start-idempotency-gate`, `display-hotplug-debounce-gate`).
-The remaining gate-shaped lines fall into three structurally
-non-coverable buckets.
+`SleepWakeSource`). The `_inject*` test seams give per-source debounce
+/ dispatch coverage by yielding through the same `streamContinuation`
+the IOKit callbacks yield to.
 
-Per-gate justifications:
+Each source's `start()` was extended with two `#if DEBUG`-only
+internal seams that close the previously-degenerate idempotency and
+kernel-success gates as CAUGHT mutations:
 
-| Line | Gate | Source | Degenerate because |
-|------|------|--------|--------------------|
-| 52   | `guard notifyPort == nil else { return }` | USBSource (idempotency) | The `_injectAttach` / `_injectDetach` seams write to the latest `streamContinuation`; a leaked first stream / drainer task is invisible to the inject path. Detecting double IOKit registration requires a real-hardware fixture or a new internal seam exposing `notifyPort`; per scope rules, no `Sources/` changes. |
-| 115  | `guard attachKr == KERN_SUCCESS, detachKr == KERN_SUCCESS else { ... }` | USBSource (kernel-success) | `IOServiceAddMatchingNotification` is called directly; no DI seam to make it return non-zero from a unit test. |
-| 145  | `log.debug("activity:USBGated kind=\(...) — debounce")` | USBSource (trace) | Observability line in `publishTask`'s drainer; no control-flow effect, mutating the literal cannot regress behaviour. |
-| 397  | `guard !listenerInstalled else { return }` | AudioPeripheralSource (idempotency) | A second start re-snapshots `knownDevices` from the host (clobbering `_testSeedKnownDevices`), making any follow-on inject diff host-dependent and non-deterministic. The seam yields to the latest `stream`, so single-publish counts match between guarded and unguarded cases. |
-| 420  | `guard status == noErr else { ... }` | AudioPeripheralSource (kernel-success) | `AudioObjectAddPropertyListenerBlock` non-mockable here. |
-| 537  | `guard AudioObjectGetPropertyDataSize(...) == noErr else { return [] }` | AudioPeripheralSource.snapshot | Private static helper; CoreAudio system call cannot fail without a real CoreAudio fault, which the test environment cannot inject. |
-| 540  | `guard AudioObjectGetPropertyData(...) == noErr else { return [] }` | AudioPeripheralSource.snapshot | Same as line 537. |
-| 552  | `guard AudioObjectGetPropertyData(...) == noErr, let value` | AudioPeripheralSource.uid | Same as line 537. |
-| 564  | `guard AudioObjectGetPropertyDataSize(...) == noErr else { return nil }` | AudioPeripheralSource.name | Same as line 537. |
-| 567  | `guard AudioObjectGetPropertyData(...) == noErr else { return nil }` | AudioPeripheralSource.name | Same as line 537. |
-| 607  | `guard notifyPort == nil else { return }` | BluetoothSource (idempotency) | Same shape as USB line 52. |
-| 659  | `guard attachKr == KERN_SUCCESS, detachKr == KERN_SUCCESS` | BluetoothSource (kernel-success) | Same shape as USB line 115. |
-| 777  | `guard notifyPort == nil else { return }` | ThunderboltSource (idempotency) | Same shape as USB line 52 / Bluetooth line 607. |
-| 827  | `guard attachKr == KERN_SUCCESS, detachKr == KERN_SUCCESS` | ThunderboltSource (kernel-success) | Same shape as USB line 115 / Bluetooth line 659. |
-| 930  | `guard !registered else { return }` | DisplayHotplugSource (idempotency) | Second start replaces the unfair-locked `stream` reference; `_testDispatchDebounced` / `_injectReconfigure` yield to the latest, so the leaked first drainer task is invisible. `lastFire` lives at instance scope (not start-scope), so debounce state is preserved either way. |
-| 1034 | `guard rootPort == 0 else { return }` | SleepWakeSource (idempotency) | Same shape; `_injectWillSleep` / `_injectDidWake` yield through `handleWillSleep` / `handleDidWake` to the latest `stream`. |
-| 1061 | `guard connect != 0, let port else { ... }` | SleepWakeSource (kernel-success) | `IORegisterForSystemPower` is called directly; failure path requires kernel registration to fail, not faultable in unit tests. |
+- `_testInstallationCount: Int` — bumped on every successful
+  registration. Idempotency cells call `start()` twice and assert the
+  counter stays at `1`. Mutation that drops `notifyPort==nil` (or
+  `!listenerInstalled` / `!registered` / `rootPort==0`) makes the
+  counter increment a second time.
+- `_forceKernelFailureKr: kern_return_t?` (USB / Bluetooth /
+  Thunderbolt) / `_forceListenerStatus: OSStatus?`
+  (AudioPeripheralSource) / `_forceRegistrationFailure: Bool`
+  (SleepWakeSource) — overrides the kernel-call return value AFTER
+  the real call has been issued (and any allocated resources cleaned
+  up under the override). Cells set the seam BEFORE `start()`,
+  drive the failure path, and assert `installCount == 0`. Mutation
+  that drops the kernel-success guard runs the post-cleanup body
+  with bad state, advancing the counter.
 
-`PowerSource`'s `runLoopSource == nil` guard at line 278 is the lone
-catalogued idempotency entry — PowerSource is the one source whose
-`start` re-seeds an edge-trigger baseline (`lastWasOnAC = currentlyOnAC()`),
-which IS observable through the inject path (see
-`testStartIsIdempotent_preservesEdgeBaseline`).
+Behavioural gates catalogued (14 total, all CAUGHT):
 
-These gates remain enforced in production and are exercised on real
-hardware every time the app launches; they are intentionally not
-included in `make mutate`'s caught-count budget.
+| Catalog id | Source line | Anchor cell |
+|------------|-------------|-------------|
+| `power-edge-trigger-gate` | `handlePowerChange(onAC:)` | `MatrixPowerSourceTests/testRepeatedSameState_publishesOnce` |
+| `power-start-idempotency-gate` | `start` (`runLoopSource==nil`) | `MatrixPowerSourceTests/testStartIsIdempotent_preservesEdgeBaseline` |
+| `display-hotplug-debounce-gate` | `dispatchDebounced` | `MatrixDisplayHotplugSourceTests/testRapidFourCallbacks_debouncedToOne` |
+| `usb-start-idempotency-gate` | `USBSource.start` (`notifyPort==nil`) | `MatrixUSBSourceTests/testDoubleStart_doesNotDoubleInstallNotifications` |
+| `usb-kernel-success-gate` | `USBSource.start` (`attachKr/detachKr==KERN_SUCCESS`) | `MatrixUSBSourceTests/testKernelFailure_doesNotInstall` |
+| `audio-peripheral-start-idempotency-gate` | `AudioPeripheralSource.start` (`!listenerInstalled`) | `MatrixAudioPeripheralSourceTests/testDoubleStart_doesNotDoubleInstallListener` |
+| `audio-peripheral-kernel-success-gate` | `AudioPeripheralSource.start` (`status==noErr`) | `MatrixAudioPeripheralSourceTests/testKernelFailure_doesNotInstall` |
+| `bluetooth-start-idempotency-gate` | `BluetoothSource.start` (`notifyPort==nil`) | `MatrixBluetoothSourceTests/testDoubleStart_doesNotDoubleInstallNotifications` |
+| `bluetooth-kernel-success-gate` | `BluetoothSource.start` (`attachKr/detachKr==KERN_SUCCESS`) | `MatrixBluetoothSourceTests/testKernelFailure_doesNotInstall` |
+| `thunderbolt-start-idempotency-gate` | `ThunderboltSource.start` (`notifyPort==nil`) | `MatrixThunderboltSourceTests/testDoubleStart_doesNotDoubleInstallNotifications` |
+| `thunderbolt-kernel-success-gate` | `ThunderboltSource.start` (`attachKr/detachKr==KERN_SUCCESS`) | `MatrixThunderboltSourceTests/testKernelFailure_doesNotInstall` |
+| `display-hotplug-start-idempotency-gate` | `DisplayHotplugSource.start` (`!registered`) | `MatrixDisplayHotplugSourceTests/testDoubleStart_doesNotDoubleRegister` |
+| `sleepwake-start-idempotency-gate` | `SleepWakeSource.start` (`rootPort==0`) | `MatrixSleepWakeSourceTests/testDoubleStart_doesNotDoubleRegister` |
+| `sleepwake-kernel-success-gate` | `SleepWakeSource.start` (`connect!=0, let port`) | `MatrixSleepWakeSourceTests/testKernelFailure_doesNotInstall` |
 
-Summary: 17 of 20 gate-shaped lines in `EventSources.swift` are
-degenerate per the table above; 3 are catalogued
-(`power-edge-trigger-gate`, `power-start-idempotency-gate`,
-`display-hotplug-debounce-gate`). 0 behavioural gates remain
-un-mutated.
+Truly unreachable (private static helpers — no DI seam, no public
+caller path that fires the cleanup branch):
+
+| Line | Gate | Reason |
+|------|------|--------|
+| `AudioPeripheralSource.snapshot:1` | `guard AudioObjectGetPropertyDataSize(...) == noErr else { return [] }` | `Self.snapshot()` is a private static helper called only from `start()`; the call hits the live system AudioObject and cannot be made to fail without a real CoreAudio fault. The empty-set fallback is structurally unreachable in the test environment. |
+| `AudioPeripheralSource.snapshot:2` | `guard AudioObjectGetPropertyData(...) == noErr else { return [] }` | Same private-helper / system-call argument as above. |
+| `AudioPeripheralSource.uid` | `guard AudioObjectGetPropertyData(...) == noErr, let value` | Private static helper invoked only from `snapshot()` / `name()`; no DI seam, no public caller. |
+| `AudioPeripheralSource.name:1` | `guard AudioObjectGetPropertyDataSize(...) == noErr else { return nil }` | Same as `snapshot:1`. |
+| `AudioPeripheralSource.name:2` | `guard AudioObjectGetPropertyData(...) == noErr else { return nil }` | Same as `snapshot:1`. |
+
+Trace-log lines in EventSources.swift (USBSource:145
+`log.debug("activity:USBGated kind=\(...) — debounce")`) are
+suppressed by the `--coverage` heuristic's `LOG_RE` filter so they
+no longer surface as gate candidates.
+
+Summary: **14 catalogued / 5 truly unreachable / 19 total**. 0
+Degenerate behavioural gates remain in EventSources.swift.
 
 ### `Sources/SensorKit/ImpactDetector.swift`
 
@@ -397,14 +442,18 @@ No degenerate gates. 5 / 5 gates catalogued.
 | `impact-fusion-empty-available-gate` | 85 | `ImpactFusionAvailabilityGateTests/testStartWithNoAvailableSources_invokesOnError_doesNotMarkRunning` |
 | `impact-fusion-rearm-gate` | 161 | `ImpactFusionTests/testFusionRearmGate_withinRearm_returnsNil` |
 | `impact-fusion-consensus-gate` | 168 | `ImpactFusionTests/testFusionConsensusGate_singleSource_belowRequired_returnsNil` |
+| `impact-fusion-stop-idempotency-gate` | 148 | `ImpactFusionStopIdempotencyGateTests/testStopWhenNotRunning_isNoOp` |
 
-Per-gate degenerate justifications:
+The `stop()` idempotency gate at line 148 was previously degenerate
+(no externally-observable signal). Resolved by exposing
+`ImpactFusion._testHooks` (`stopInvocationCount`,
+`stopTeardownCount`, `lastStopWasNoOp`) — production updates the
+counters on every invocation, the cell observes them. With the
+guard removed, calling `stop()` against a not-running engine flips
+`lastStopWasNoOp` from `true` to `false` and bumps
+`stopTeardownCount` from 0 to 1, both of which the cell pins.
 
-| Line | Gate | Degenerate because |
-|------|------|--------------------|
-| 135  | `guard isRunning else { return }` (`stop()`) | Idempotency gate. `stop()` is a void function with no return value; removing the guard re-runs `task.cancel()` / `continuation.finish()` on already-finished tasks, which Swift Concurrency documents as no-ops. There is no externally-observable signal — the test would have to assert "stop did not double-invalidate", which the harness cannot prove without exposing private state. |
-
-3 of 4 gates catalogued (3 behavioural + 1 degenerate idempotency).
+4 of 4 gates catalogued. 0 degenerate.
 
 ### `Sources/SensorKit/HeadphoneMotionAdapter.swift`
 
@@ -412,46 +461,157 @@ Per-gate degenerate justifications:
 |------------|-------------|-------------|
 | `headphone-motion-framework-available-gate` | 133 | `HeadphoneMotionSourceLifecycleTests/testFrameworkUnavailableThrowsDeviceNotFound` |
 | `headphone-motion-disconnect-prune-gate` | 150 | `HeadphoneMotionSourceLifecycleTests/testDisconnectMidStreamPrunes` |
+| `headphone-probe-framework-available-gate` | 89 | `HeadphoneMotionSourceLifecycleTests/testProbeGate_frameworkUnavailable_doesNotStartUpdates` |
+| `headphone-probe-stage-gate` | 73 | `HeadphoneMotionSourceLifecycleTests/testProbeStageGate_takenOver_deferredClosureIsNoOp` |
 
-Per-gate degenerate justifications:
+The probe-only gates at lines 89 / 73 (post-extract of the
+`finishProbeIfRunning` helper) were previously degenerate. Resolved
+by:
 
-| Line | Gate | Degenerate because |
-|------|------|--------------------|
-| 89   | `guard driver.isDeviceMotionAvailable else { return }` (`startConnectionProbe`) | Probe-only gate. The probe runs once at adapter construction and only logs / flips a private `probeStage`. With no real headphones the probe stops itself silently after 400 ms. Removing the gate calls `driver.startUpdates` on a framework that reports motion unavailable; the mock driver's `startUpdates` is unconditional, so observable state (`isAvailable`, `impacts()` outcome) is unchanged because the downstream gate at line 133 still throws on the actual stream open. |
-| 104  | `guard stage == .running else { return false }` (probe stop closure, inside `withLock`) | Internal state-machine guard inside the deferred probe-stop closure. Removing it lets the closure call `driver.stopUpdates()` even after `impacts()` took the manager over (`stage == .takenOver`), but `stopUpdates` on a mock that's already been re-driven by the impact handler installs a fresh handler-nil and the impact stream simply re-engages on the next sample. No externally-observable behaviour delta from a synthetic test — the timing window between probe-end and impacts() takeover is ~400 ms, and the mock driver does not model the race. |
+- Exposing `HeadphoneMotionSource._testCurrentProbeStage` for direct
+  observation of the state machine (`pending → running → complete`
+  or `running → takenOver`).
+- Extracting the deferred probe-stop body into a `fileprivate`
+  helper `finishProbeIfRunning()` so both the production
+  `DispatchQueue.global().asyncAfter` closure and the test seam
+  `_testRunDeferredProbeStop()` walk identical code. A mutation on
+  the helper's guard is therefore observable from a synchronous
+  test.
 
-2 of 4 gate-shaped lines catalogued; 2 are degenerate per the table.
+Cells:
+
+- `testProbeGate_frameworkUnavailable_doesNotStartUpdates` — adapter
+  init with a driver reporting `isDeviceMotionAvailable == false`
+  must NOT call `driver.startUpdates`; observable as `mock.startUpdatesCalls == 0`.
+- `testProbeStageGate_takenOver_deferredClosureIsNoOp` — drives
+  probe → takeOver → deferred stop, asserts the closure does NOT
+  re-`stopUpdates` and does NOT flip the stage to `.complete` when
+  it is already `.takenOver`.
+- `testProbeStageGate_running_deferredClosureStops` — companion cell
+  that pins the true branch (`.running` → `.complete` + one
+  stopUpdates).
+
+4 of 4 gates catalogued. 0 degenerate.
 
 ### `Sources/SensorKit/MicrophoneAdapter.swift`
 
 | Catalog id | Source line | Anchor cell |
 |------------|-------------|-------------|
 | `microphone-invalid-format-gate` | 91 | `MicrophoneSourceLifecycleTests/testInvalidInputFormat_throwsDeviceNotFound_doesNotInstallTap` |
+| `microphone-frame-length-gate` | 104 | `MicrophoneSourceLifecycleTests/testFrameLengthGate_validBuffers_yieldImpact` |
 
-Per-gate degenerate justifications:
+The `frameLength > 0` gate at line 104 was previously degenerate via
+"removing the guard with a zero-frame buffer is a no-op anyway".
+Resolved by reframing the mutation: instead of removing the guard,
+slam it shut (`frameLength <= 0` → "drop everything"). The cell
+drives a sequence of strong-transient buffers (256-frame buffer with
+amplitude-0.8 rising sine) through a permissive detector and
+asserts at least one impact is yielded; with the gate inverted the
+loop short-circuits before the peak / detector pipeline runs and
+zero impacts are emitted.
 
-| Line | Gate | Degenerate because |
-|------|------|--------------------|
-| 104  | `guard frameLength > 0 else { return }` (tap callback) | Defensive zero-frame guard inside the `installTap` callback. The mock microphone driver's `emit(buffer:)` is the only path that delivers buffers in tests; an `AVAudioPCMBuffer` with `frameLength == 0` has nothing to read, so removing the gate falls into the empty `for i in 0..<0` loop with `peak == 0`. The downstream HP filter on `peak == 0` still produces ~0, the detector rejects it (sub-threshold), and no impact is yielded — the gate's removal is observationally identical to the gate's presence. |
-
-1 of 2 gate-shaped lines catalogued; 1 is degenerate per the table.
+2 of 2 gates catalogued. 0 degenerate.
 
 ### `Sources/SensorKit/HIDDeviceMonitor.swift`
 
-No behavioural gates catalogued. Both gate-shaped lines in
-`RealHIDDeviceMonitor` are degenerate because the file's only consumers
-are static `isPresent(monitor:)` helpers on the activity sources, and
-those helpers always pass non-empty matcher lists and run on hosts
-where `CGGetOnlineDisplayList` returns ≥ 0.
+No catalog entries. Both gate-shaped lines are **truly unreachable**
+defensive guards on inputs that no caller can produce — see the
+"Truly unreachable gates" section below for citations.
 
-Per-gate degenerate justifications:
+## Truly unreachable gates
 
-| Line | Gate | Degenerate because |
-|------|------|--------------------|
-| 83   | `guard !matchers.isEmpty else { return [] }` (`queryDevices`) | Defensive empty-input gate. Every production caller (`TrackpadActivitySource.presenceMatchers`, etc.) is a non-empty static array — the empty-matchers branch is structurally unreachable from the production graph. Removing the guard with an empty matcher array would call `IOHIDManagerSetDeviceMatchingMultiple` with an empty CFArray, which IOKit treats as "match nothing" and returns an empty device set anyway. No externally-observable delta. |
-| 102  | `guard onlineCount > 0 else { return false }` (`hasBuiltInDisplay`) | Defensive zero-display fast-path. CoreGraphics's `CGGetOnlineDisplayList(0, nil, &onlineCount)` populates `onlineCount` with the number of online displays. On every test host (real Mac, headless CI runner with synthetic display, sandboxed virtualized macOS) this is ≥ 1, so the `else` branch is unreachable. Removing the gate still falls through to the `prefix(0).contains` check on an empty array, which returns false — same observable result. The gate exists for hosts that genuinely report zero displays (rare), which the harness cannot synthesize without modifying CoreGraphics. |
+A gate is **truly unreachable** when the input that would drive it to
+the false branch cannot be produced by any caller in the production
+graph. These are kept in production source as defense-in-depth, but
+no behavioural cell can pin them because their false branch is not
+reachable from the public API. They are explicitly NOT entered in
+`mutation-catalog.json` (the runner only verifies CAUGHT gates) and
+are listed here so reviewers can see the full population of gate
+shapes and the citations justifying each unreachability claim.
 
-0 of 2 gate-shaped lines catalogued; both are degenerate per the
-table. There are no behavioural gates in `HIDDeviceMonitor.swift` —
-the file is a thin IOKit shim with no thresholds, debounces, or
-attribution decisions.
+### `Sources/SensorKit/HIDDeviceMonitor.swift:83`
+
+```swift
+public func queryDevices(matchers: [HIDMatcher]) -> [HIDDeviceInfo] {
+    guard !matchers.isEmpty else { return [] }
+    ...
+}
+```
+
+**Citation — every caller passes a non-empty static matcher list:**
+
+- `Sources/SensorKit/TrackpadActivitySource.swift:127` — `presenceMatchers`
+  is a `nonisolated public static let` array literal with 2 entries
+  (digitizer-touchpad usage page + Magic Trackpad product). Construction
+  is at module-load time, immutable.
+- `Sources/SensorKit/TrackpadActivitySource.swift:139` — call site:
+  `monitor.queryDevices(matchers: presenceMatchers)`.
+- `Sources/SensorKit/MouseActivitySource.swift:59` — `presenceMatchers`
+  is a static let with 1 entry (GenericDesktop mouse, usage 0x02).
+  Call site at `:69`.
+- `Sources/SensorKit/KeyboardActivitySource.swift:55` — `presenceMatchers`
+  is a static let with 1 entry (GenericDesktop keyboard, usage 0x06).
+  Call site at `:62`.
+- `Tests/Integration/HIDPresenceRealDriverTests.swift` — every test
+  call passes one of the static matcher lists above.
+
+The gate's false branch (`matchers.isEmpty`) is therefore unreachable
+from any production or test caller. Removing the gate would call
+`IOHIDManagerSetDeviceMatchingMultiple` with an empty CFArray, which
+IOKit treats as "match nothing" and returns an empty device set —
+identical observable result to the gate being present. The gate
+exists as defense-in-depth against future callers but cannot be
+exercised today.
+
+### `Sources/SensorKit/HIDDeviceMonitor.swift:102`
+
+```swift
+public func hasBuiltInDisplay() -> Bool {
+    var onlineCount: UInt32 = 0
+    CGGetOnlineDisplayList(0, nil, &onlineCount)
+    guard onlineCount > 0 else { return false }
+    ...
+}
+```
+
+**Citation — `CGGetOnlineDisplayList` returns >= 1 on every supported host:**
+
+- macOS WindowServer-backed processes (every `swift test` host, including
+  GitHub Actions `macos-14` / `macos-15` runners and the project's
+  hosted self-runners) always have at least one online display. CoreGraphics
+  populates `onlineCount` with the number of currently-online displays;
+  zero implies WindowServer is not running, which a Swift unit test
+  process cannot reach.
+- Apple's `CGGetOnlineDisplayList` documentation: "An online display is
+  attached, awake, and available for drawing operations. ... There is
+  always at least one display online."
+  (https://developer.apple.com/documentation/coregraphics/1455522-cggetonlinedisplaylist)
+- Sandboxed virtualised macOS (the App Store build's runtime) and the
+  Direct build's runtime both run inside Aqua, which guarantees a
+  WindowServer connection. A test process running outside Aqua (e.g. via
+  `launchd` user-domain agent during boot) is the only known scenario
+  with `onlineCount == 0`, and that scenario cannot host an `XCTest`
+  invocation — `XCTest` requires `NSApplication` initialization which
+  itself bootstraps Aqua.
+- The `Tests/Integration/HIDPresenceRealDriverTests.swift` cells call
+  `monitor.hasBuiltInDisplay()` and gate the assertion via `guard ...`
+  / `XCTSkip`, which would correctly skip if `onlineCount == 0` ever
+  did occur — but it does not.
+
+The gate's false branch is therefore structurally unreachable from
+the test harness. Removing the gate still falls through to the
+`prefix(0).contains` check on an empty array (which returns false),
+so the observable result matches the gate's true branch. The gate
+exists as defense-in-depth for the rare boot-time scenario but
+cannot be exercised by `swift test`.
+
+### Tally
+
+- `Sources/SensorKit/ImpactDetection.swift` — 0 truly unreachable.
+- `Sources/SensorKit/HeadphoneMotionAdapter.swift` — 0 truly unreachable.
+- `Sources/SensorKit/MicrophoneAdapter.swift` — 0 truly unreachable.
+- `Sources/SensorKit/HIDDeviceMonitor.swift` — 2 truly unreachable
+  (lines 83, 102).
+
+Total: 2 truly unreachable gates across the four files in scope. 0
+degenerate gates remain.

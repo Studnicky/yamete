@@ -112,6 +112,9 @@ for m in catalog["mutations"]:
 
 GATE_RE = re.compile(r"\b(guard|threshold|debounce)\b|^\s*if\s+!", re.IGNORECASE)
 NOISE_RE = re.compile(r"guard\s+(let|var)\s|guard\s+self\b|guard\s+!\s*Task\.isCancelled")
+# Trace-log lines are not gates — keywords like "threshold" / "debounce"
+# appear inside log format strings, not in any control-flow check.
+LOG_RE = re.compile(r"^\s*log\.(debug|info|warning|error|trace|notice)\s*\(")
 
 src_dir = pathlib.Path("Sources/SensorKit")
 total = 0
@@ -120,6 +123,11 @@ covered_count = 0
 for swift in sorted(src_dir.glob("*.swift")):
     rel = str(swift)
     file_searches = covered.get(rel, [])
+    # Multi-line catalog searches can't be substring-matched against a
+    # single source line. Treat any source line that matches the FIRST
+    # line of a catalog `search` snippet as covered — that's the line the
+    # mutation runner anchors to.
+    first_lines = {s.splitlines()[0].rstrip() for s, _ in file_searches}
     for lineno, line in enumerate(swift.read_text().splitlines(), 1):
         stripped = line.strip()
         if not stripped or stripped.startswith("//") or stripped.startswith("///"):
@@ -128,8 +136,10 @@ for swift in sorted(src_dir.glob("*.swift")):
             continue
         if NOISE_RE.search(line):
             continue
+        if LOG_RE.match(line):
+            continue
         total += 1
-        is_covered = any(s in line for s, _ in file_searches)
+        is_covered = any(s in line for s, _ in file_searches) or line.rstrip() in first_lines
         if is_covered:
             covered_count += 1
             continue

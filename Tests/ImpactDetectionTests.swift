@@ -249,3 +249,29 @@ final class ImpactFusionAvailabilityGateTests: XCTestCase {
         )
     }
 }
+
+/// Pins `ImpactDetection.swift:135` `guard isRunning else { return }` in
+/// `stop()`. Removing the gate would let `stop()` proceed to invalidate
+/// already-invalid resources (cancel nil tasks, finish nil continuations),
+/// which CFRuntime tolerates silently — observable only via `_testHooks`.
+@MainActor
+final class ImpactFusionStopIdempotencyGateTests: XCTestCase {
+
+    func testStopWhenNotRunning_isNoOp() {
+        let engine = ImpactFusion()
+        XCTAssertFalse(engine.isRunning, "precondition: engine must start not-running")
+        engine.stop()
+        XCTAssertEqual(
+            engine._testHooks.stopInvocationCount, 1,
+            "[fusion-gate=stop-idempotency] stop() must always increment invocation counter"
+        )
+        XCTAssertEqual(
+            engine._testHooks.stopTeardownCount, 0,
+            "[fusion-gate=stop-idempotency] stop() on not-running engine must NOT take the teardown branch"
+        )
+        XCTAssertTrue(
+            engine._testHooks.lastStopWasNoOp,
+            "[fusion-gate=stop-idempotency] stop() on not-running engine must mark lastStopWasNoOp"
+        )
+    }
+}

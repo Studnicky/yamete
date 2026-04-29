@@ -122,4 +122,17 @@ final class MatrixDisplayHotplugSourceTests: XCTestCase {
         source.stop()
         await bus.close()
     }
+    // MARK: - Cell: idempotent start — second start() does not double-register
+    func testDoubleStart_doesNotDoubleRegister() async {
+        let bus = await makeBus()
+        let source = DisplayHotplugSource()
+        source.start(publishingTo: bus)
+        source.start(publishingTo: bus)
+        try? await Task.sleep(for: .milliseconds(20))
+        XCTAssertEqual(source._testInstallationCount, 1,
+            "[scenario=display-double-start-idempotency] second start must be a no-op; expected installCount=1, got \(source._testInstallationCount)")
+        source.stop()
+        await bus.close()
+    }
+
 }

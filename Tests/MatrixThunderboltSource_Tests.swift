@@ -136,4 +136,30 @@ final class MatrixThunderboltSourceTests: XCTestCase {
         source.stop()
         await bus.close()
     }
+    // MARK: - Cell: idempotent start — second start() does not double-install
+    func testDoubleStart_doesNotDoubleInstallNotifications() async {
+        let bus = await makeBus()
+        let source = ThunderboltSource()
+        source.start(publishingTo: bus)
+        source.start(publishingTo: bus)
+        try? await Task.sleep(for: .milliseconds(20))
+        XCTAssertEqual(source._testInstallationCount, 1,
+            "[scenario=tb-double-start-idempotency] second start must be a no-op; expected installCount=1, got \(source._testInstallationCount)")
+        source.stop()
+        await bus.close()
+    }
+
+    // MARK: - Cell: kernel-failure short-circuit — bad attachKr/detachKr ⇒ no install
+    func testKernelFailure_doesNotInstall() async {
+        let bus = await makeBus()
+        let source = ThunderboltSource()
+        source._forceKernelFailureKr = KERN_FAILURE
+        source.start(publishingTo: bus)
+        try? await Task.sleep(for: .milliseconds(20))
+        XCTAssertEqual(source._testInstallationCount, 0,
+            "[scenario=tb-kernel-failure] kernel-success guard must short-circuit; expected installCount=0, got \(source._testInstallationCount)")
+        source.stop()
+        await bus.close()
+    }
+
 }

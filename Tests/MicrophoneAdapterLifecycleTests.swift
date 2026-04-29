@@ -249,4 +249,55 @@ final class MicrophoneSourceLifecycleTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(mock.stopCalls,    1, "driver stopped on stream cancellation")
         XCTAssertGreaterThanOrEqual(mock.removeTapCalls, 1, "tap removed on stream cancellation")
     }
+
+    /// Pins `MicrophoneAdapter.swift:104` `guard frameLength > 0 else { return }`.
+    /// Drive 5 strong-transient buffers through the permissive detector via the
+    /// existing `MockMicrophoneEngineDriver.emit(buffer:)` seam. The production
+    /// gate must let nonzero-length buffers through; mutation that inverts the
+    /// gate to `<= 0` short-circuits every buffer and yields zero impacts.
+    func testFrameLengthGate_validBuffers_yieldImpact() async throws {
+        let mock = MockMicrophoneEngineDriver()
+        let permissiveCfg = ImpactDetectorConfig(
+            spikeThreshold: 0.01, minRiseRate: 0, minCrestFactor: 0,
+            minConfirmations: 1, warmupSamples: 0,
+            intensityFloor: 0.01, intensityCeiling: 1.0
+        )
+        let adapter = MicrophoneSource(
+            detectorConfig: permissiveCfg,
+            driverFactory: { mock }
+        )
+
+        let stream = adapter.impacts()
+        let collector = Task<Int, Error> {
+            var count = 0
+            for try await _ in stream {
+                count += 1
+                if count >= 1 { break }
+            }
+            return count
+        }
+        // Wait for the tap to install before emitting.
+        try? await Task.sleep(for: .milliseconds(50))
+
+        // Build 5 strong-transient PCM buffers (1.0 amplitude, 256 frames each).
+        let format = mock.inputFormat
+        for _ in 0..<5 {
+            guard let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 256) else { continue }
+            buf.frameLength = 256
+            if let chan = buf.floatChannelData?[0] {
+                for i in 0..<256 { chan[i] = 1.0 }
+            }
+            mock.emit(buffer: buf)
+            try? await Task.sleep(for: .milliseconds(15))
+        }
+
+        // Wait for at least one impact, then collect.
+        try? await Task.sleep(for: .milliseconds(100))
+        collector.cancel()
+        let count = (try? await collector.value) ?? 0
+        XCTAssertGreaterThanOrEqual(
+            count, 1,
+            "[mic-gate=frameLength] strong-transient buffers must yield ≥ 1 impact under the production frameLength > 0 gate; got \(count)"
+        )
+    }
 }
