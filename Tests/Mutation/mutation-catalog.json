@@ -982,6 +982,33 @@
       "replace": "own `Bundle.main` always supplies a non-nil version, so without\n    /// the seam the `?? \"1.0.0\"` branch would be unreachable.\n    internal static func currentVersion(bundle: Bundle = .main) -> String {\n        bundle.infoDictionary?[\"CFBundleShortVersionString\"] as? String ?? \"0.0.0\"",
       "search": "own `Bundle.main` always supplies a non-nil version, so without\n    /// the seam the `?? \"1.0.0\"` branch would be unreachable.\n    internal static func currentVersion(bundle: Bundle = .main) -> String {\n        bundle.infoDictionary?[\"CFBundleShortVersionString\"] as? String ?? \"1.0.0\"",
       "targetFile": "Sources/YameteApp/Updater.swift"
+    },
+    {
+      "description": "Updater.isNewer SemVer 2.0 §11.3 — flip the (nil, _?) case to return false so a release version no longer ranks above its own pre-release with the same core. Cell V asserts release \"1.2.3\" > pre-release \"1.2.3-rc1\"; this mutation regresses to the pre-7c \"by-accident\" answer where the pre-release branch was unreachable.",
+      "expectedFailingTest": "UpdaterSemVerOrdering_Tests/testUIGate_updater_semver_releaseBeatsPreRelease",
+      "expectedFailureSubstring": "[ui-gate=updater-semver-release-beats-prerelease]",
+      "id": "ui-updater-semver-release-beats-prerelease",
+      "replace": "case (nil, _?):\n            return false                  // release > pre-release",
+      "search": "case (nil, _?):\n            return true                   // release > pre-release",
+      "targetFile": "Sources/YameteApp/Updater.swift"
+    },
+    {
+      "description": "Updater.isNewer SemVer 2.0 §11.4.2 — invert the alphanumeric pre-release identifier comparison so ASCII order is reversed. Cell W asserts \"rc2\" > \"rc1\" and \"rc1\" > \"alpha1\" by ASCII lex; this mutation flips both comparisons in the (nil, nil) branch (string identifiers) so the comparator returns the opposite ordering.",
+      "expectedFailingTest": "UpdaterSemVerOrdering_Tests/testUIGate_updater_semver_alphanumericPreReleaseOrdering",
+      "expectedFailureSubstring": "[ui-gate=updater-semver-prerelease-alphanumeric]",
+      "id": "ui-updater-semver-prerelease-alphanumeric",
+      "replace": "if a < b { return .orderedDescending }\n                if a > b { return .orderedAscending }",
+      "search": "if a < b { return .orderedAscending }\n                if a > b { return .orderedDescending }",
+      "targetFile": "Sources/YameteApp/Updater.swift"
+    },
+    {
+      "description": "Updater.isNewer SemVer 2.0 §11.4.1 — break the numeric pre-release identifier comparison by routing it through the string operands instead of integer values. Cell X asserts \"rc.10\" > \"rc.2\" by INTEGER comparison (string lex would give the wrong answer because \"10\" < \"2\" lexicographically). The mutation swaps `x < y` / `x > y` for `a < b` / `a > b`, forcing string lex on numeric identifiers and inverting the test's expected ordering.",
+      "expectedFailingTest": "UpdaterSemVerOrdering_Tests/testUIGate_updater_semver_numericPreReleaseOrdering",
+      "expectedFailureSubstring": "[ui-gate=updater-semver-prerelease-numeric]",
+      "id": "ui-updater-semver-prerelease-numeric",
+      "replace": "if a < b { return .orderedAscending }\n                if a > b { return .orderedDescending }",
+      "search": "if x < y { return .orderedAscending }\n                if x > y { return .orderedDescending }",
+      "targetFile": "Sources/YameteApp/Updater.swift"
     }
   ]
 }

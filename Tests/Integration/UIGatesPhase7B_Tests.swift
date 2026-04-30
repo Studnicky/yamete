@@ -596,37 +596,79 @@ final class UIGatesPhase7C_DirectOnly_Tests: XCTestCase {
             "newer than \"1.2\" via zero-pad of local")
     }
 
-    /// Cell U — pre-release suffix handling (KNOWN LIMITATION, pinned).
-    /// `compactMap { Int($0) }` drops any segment that fails to parse
-    /// as Int, so `"1.2.3-rc1"` becomes [1, 2] and compares equal to
-    /// `"1.2"`. This is documented in production as a known limitation;
-    /// the cell pins the current behaviour so a future "fix" doesn't
-    /// silently regress without an accompanying catalog update.
-    func testUIGate_updater_isNewer_preReleaseSuffixDropped() {
-        // "1.2.3-rc1" parses as [1, 2] (the "3-rc1" segment is dropped
-        // because Int("3-rc1") is nil and compactMap discards it).
-        // Compared against "1.2" (which parses as [1, 2]), the result
-        // is "equal" → not newer.
-        XCTAssertFalse(Updater.isNewer(remote: "1.2.3-rc1", local: "1.2"),
-            "[ui-gate=updater-isNewer-prerelease-dropped] KNOWN " +
-            "LIMITATION: `1.2.3-rc1` drops the pre-release segment via " +
-            "compactMap and compares equal to `1.2`. If this assertion " +
-            "fires, the comparator semantics changed — update the " +
-            "catalog and the production limitation note in lock-step.")
-        // Local "1.2.3-rc1" drops to [1, 2]. Remote "1.2.3" parses as
-        // [1, 2, 3]. Padding makes the comparator see (3 vs 0) at i=2 →
-        // remote registers as newer. This is the visible artefact of
-        // the dropped-suffix bug: a release (`1.2.3`) appears strictly
-        // newer than its own rc (`1.2.3-rc1`), which happens to be the
-        // direction we want — but only by accident. Pinning here so
-        // any future fix that changes this answer is forced to update
-        // the catalog and the production limitation note.
+    /// Cell U — release > pre-release with same core (SemVer 2.0 §11.3).
+    /// A release version with no pre-release suffix is strictly NEWER
+    /// than any pre-release sharing the same `(major, minor, patch)`
+    /// core. Mutating the release-vs-pre-release branch (e.g. flipping
+    /// the `(nil, _?) → true` case) regresses to the old "by-accident"
+    /// answer and breaks SemVer ordering.
+    func testUIGate_updater_isNewer_releaseBeatsPreRelease() {
         XCTAssertTrue(Updater.isNewer(remote: "1.2.3", local: "1.2.3-rc1"),
-            "[ui-gate=updater-isNewer-prerelease-dropped] release " +
-            "\"1.2.3\" parses as [1,2,3]; rc \"1.2.3-rc1\" parses as " +
-            "[1,2] (suffix dropped). Padding compares (3 vs 0) at i=2 → " +
-            "release registers as newer — accidental but pinned.")
+            "[ui-gate=updater-isNewer-release-beats-prerelease] release " +
+            "\"1.2.3\" must register as newer than its own rc " +
+            "\"1.2.3-rc1\" per SemVer 2.0 §11.3 — a release with no " +
+            "pre-release suffix has higher precedence than any " +
+            "pre-release sharing the same core")
+        XCTAssertFalse(Updater.isNewer(remote: "1.2.3-rc1", local: "1.2.3"),
+            "[ui-gate=updater-isNewer-release-beats-prerelease] rc " +
+            "\"1.2.3-rc1\" must NOT register as newer than release " +
+            "\"1.2.3\" (the dual)")
     }
 }
 #endif
+
+/// Phase 7c — SemVer 2.0 ordering cells. Compiled under BOTH build
+/// variants (the `Updater.isNewer(...)` extension lives outside the
+/// `#if DIRECT_BUILD` block so the comparator is always available).
+/// These cells are catalog-able under bare `swift test` because they
+/// don't depend on the Direct-only `performCheck` plumbing.
+@MainActor
+final class UpdaterSemVerOrdering_Tests: XCTestCase {
+
+    /// Cell V — release version is strictly newer than its own
+    /// pre-release with the same core. Pins SemVer 2.0 §11.3.
+    func testUIGate_updater_semver_releaseBeatsPreRelease() {
+        XCTAssertTrue(Updater.isNewer(remote: "1.2.3", local: "1.2.3-rc1"),
+            "[ui-gate=updater-semver-release-beats-prerelease] " +
+            "release \"1.2.3\" must rank ABOVE pre-release \"1.2.3-rc1\" " +
+            "per SemVer 2.0 §11.3")
+        XCTAssertFalse(Updater.isNewer(remote: "1.2.3-rc1", local: "1.2.3"),
+            "[ui-gate=updater-semver-release-beats-prerelease] " +
+            "pre-release \"1.2.3-rc1\" must NOT rank above release " +
+            "\"1.2.3\"")
+    }
+
+    /// Cell W — alphanumeric pre-release identifiers compare by ASCII
+    /// lex order. `rc2` > `rc1` (final char '2' > '1'). Pins SemVer 2.0
+    /// §11.4.2 (alphanumeric vs alphanumeric).
+    func testUIGate_updater_semver_alphanumericPreReleaseOrdering() {
+        XCTAssertTrue(Updater.isNewer(remote: "1.2.3-rc2", local: "1.2.3-rc1"),
+            "[ui-gate=updater-semver-prerelease-alphanumeric] " +
+            "alphanumeric pre-release \"rc2\" must rank above \"rc1\" " +
+            "by ASCII lex per SemVer 2.0 §11.4.2")
+        XCTAssertFalse(Updater.isNewer(remote: "1.2.3-rc1", local: "1.2.3-rc2"),
+            "[ui-gate=updater-semver-prerelease-alphanumeric] dual: " +
+            "\"rc1\" must NOT rank above \"rc2\"")
+        // 'r' (0x72) > 'a' (0x61) ASCII, so "rc1" > "alpha1".
+        XCTAssertTrue(Updater.isNewer(remote: "1.2.3-rc1", local: "1.2.3-alpha1"),
+            "[ui-gate=updater-semver-prerelease-alphanumeric] " +
+            "\"rc1\" must rank above \"alpha1\" by ASCII lex " +
+            "('r' > 'a')")
+    }
+
+    /// Cell X — numeric pre-release identifiers compare by INTEGER
+    /// value, not lexicographically. `rc.10` > `rc.2` (10 > 2 as int,
+    /// even though "10" < "2" as string). Pins SemVer 2.0 §11.4.1
+    /// (numeric identifier comparison).
+    func testUIGate_updater_semver_numericPreReleaseOrdering() {
+        XCTAssertTrue(Updater.isNewer(remote: "1.2.3-rc.10", local: "1.2.3-rc.2"),
+            "[ui-gate=updater-semver-prerelease-numeric] numeric " +
+            "identifier \"10\" must rank above \"2\" as integer per " +
+            "SemVer 2.0 §11.4.1 — string lex would (incorrectly) give " +
+            "\"10\" < \"2\"")
+        XCTAssertFalse(Updater.isNewer(remote: "1.2.3-rc.2", local: "1.2.3-rc.10"),
+            "[ui-gate=updater-semver-prerelease-numeric] dual: " +
+            "\"rc.2\" must NOT rank above \"rc.10\"")
+    }
+}
 

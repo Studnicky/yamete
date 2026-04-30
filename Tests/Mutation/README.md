@@ -96,6 +96,43 @@ Outcomes:
 The runner refuses to start if any `targetFile` has uncommitted
 changes; the revert path would otherwise clobber unstaged work.
 
+### Runner reliability fix
+
+Earlier revisions of `scripts/mutation-test.sh` reverted each mutation
+with a single bare `git checkout -- <file>` call, with no verification
+that the revert actually took and no fallback if the runner exited
+between writing the mutation and reaching the explicit revert line.
+The Phase 2 run surfaced a residual mutation in
+`Sources/SensorKit/TrackpadActivitySource.swift` (and, on a separate
+occasion, `Sources/SensorKit/MouseActivitySource.swift`) — the runner
+had walked off via `set -e` (or a signal, or a script edit landing
+mid-execution) after `apply_mutation` wrote bytes but before
+`revert_file` ran, leaving the on-disk source mutated.
+
+The runner now hardens the revert path on three axes:
+
+1. **EXIT trap** — every mutation appends its `targetFile` to a
+   `MUTATED_FILES` array *before* `apply_mutation` runs. A
+   `trap cleanup_mutations EXIT INT TERM` walks that array on every
+   shell exit path (normal, `set -e` abort, signal) and force-reverts
+   every still-tracked file. The successful-revert site removes the
+   file from the array via `forget_mutation`, so the trap is a no-op
+   on the happy path.
+2. **Verified revert** — `revert_file` no longer trusts a clean
+   `git checkout` exit code. After checkout, it asserts
+   `git diff --quiet -- "$file"` and retries once on mismatch (covers
+   transient flakes where a still-flushing `swift test` child held
+   the file in cache). Persistent failure surfaces a `REVERT-FAIL`
+   line and a non-zero return.
+3. **Fail-fast on residual** — if the verified revert returns
+   non-zero, the runner aborts the whole catalog walk with a `FATAL`
+   line rather than soldiering on and compounding residuals across
+   subsequent mutations on the same file.
+
+Net effect: any path out of the runner — clean exit, `swift test`
+crash, `^C`, an editor saving over the script — produces a clean
+working tree, or a loud refusal to continue.
+
 ## Why JSON, not Swift
 
 Co-locating the catalog as `MutationCatalog.swift` would force the
@@ -1484,13 +1521,37 @@ Catalog entries:
   and every tick piles up at the origin; the cell asserts the middle
   tick at 100pt for a 200pt width.
 
-### `Sources/YameteApp/Updater.swift` — one caught gate (Phase 7c) + 5 DIRECT_BUILD cells (un-catalogued)
+### `Sources/YameteApp/Updater.swift` — four caught gates (Phase 7c) + 5 DIRECT_BUILD cells
 
-`Updater.currentVersion(bundle: Bundle = .main) -> String` is the new
-seam in BOTH `#if DIRECT_BUILD` branches; tests inject a `NilInfoBundle`
+`Updater.currentVersion(bundle: Bundle = .main) -> String` is the seam
+in BOTH `#if DIRECT_BUILD` branches; tests inject a `NilInfoBundle`
 (a `Bundle` subclass overriding `infoDictionary` to nil) to drive the
-fallback. `Updater.isNewer(remote:local:)` is promoted to
-`internal static` (still inside `#if DIRECT_BUILD`).
+fallback.
+
+#### SemVer 2.0 ordering — fully implemented
+
+`Updater.isNewer(remote:local:)` is now defined in an extension OUTSIDE
+the `#if DIRECT_BUILD` block so the comparator compiles (and is
+catalog-able) under both build variants. The implementation follows
+SemVer 2.0.0 §11 ordering rules end-to-end:
+
+1. Strip the first `-` (pre-release) or `+` (build metadata) to obtain
+   the version core.
+2. Parse the core as up to three dot-separated integers (major, minor,
+   patch); missing components default to 0.
+3. Compare cores in (major, minor, patch) order.
+4. If cores compare equal, a release version (no pre-release suffix)
+   is strictly NEWER than any pre-release with the same core (§11.3).
+5. If both have pre-release suffixes, compare per dot-separated
+   identifier: numeric vs numeric by integer value (§11.4.1); numeric
+   is LOWER than alphanumeric (§11.4.3); alphanumeric vs alphanumeric
+   by ASCII lex (§11.4.2). Longer suffix wins as tiebreaker (§11.4.4).
+6. Build metadata (`+...`) is ignored for ordering (§10).
+
+The previously-pinned KNOWN LIMITATION (`compactMap { Int($0) }` silently
+dropping pre-release suffixes so `"1.2.3-rc1"` collapsed to `[1, 2]`)
+is now removed; the production-code comment block has been replaced
+with a SemVer 2.0 reference.
 
 Catalog entries (running under bare `swift test`):
 
@@ -1499,6 +1560,25 @@ Catalog entries (running under bare `swift test`):
   to `"0.0.0"`. Multi-line search anchors on the App-Store-branch doc
   comment to disambiguate from the identical literal in the
   DIRECT_BUILD branch.
+- `ui-updater-semver-release-beats-prerelease` — release version
+  ranks above pre-release with the same core (§11.3). Mutation flips
+  the `(nil, _?)` branch in the pre-release switch from `return true`
+  to `return false`; Cell V (`testUIGate_updater_semver_releaseBeatsPreRelease`,
+  in the new `UpdaterSemVerOrdering_Tests` class) catches it via
+  `Updater.isNewer(remote: "1.2.3", local: "1.2.3-rc1")`.
+- `ui-updater-semver-prerelease-alphanumeric` — alphanumeric
+  pre-release identifiers compare by ASCII lex order (§11.4.2).
+  Mutation inverts the `if a < b` / `if a > b` pair inside the
+  `(nil, nil)` branch (string identifiers); Cell W
+  (`testUIGate_updater_semver_alphanumericPreReleaseOrdering`)
+  asserts `rc2 > rc1` and `rc1 > alpha1` ('r' > 'a' ASCII).
+- `ui-updater-semver-prerelease-numeric` — numeric pre-release
+  identifiers compare by INTEGER value (§11.4.1), not lexicographically.
+  Mutation routes the numeric branch through the string operands
+  (`a < b` instead of `x < y`); Cell X
+  (`testUIGate_updater_semver_numericPreReleaseOrdering`) asserts
+  `rc.10 > rc.2` (string lex would give the wrong answer because
+  `"10" < "2"` lexicographically).
 
 DIRECT_BUILD-only cells (driven by `swift test -Xswiftc -DDIRECT_BUILD`,
 NOT catalogued — the mutation runner does not pass `-DDIRECT_BUILD`,
@@ -1512,14 +1592,10 @@ so the named test wouldn't link at filter time):
   cases never register.
 - `testUIGate_updater_isNewer_segmentPadding` — short version
   `"1.2"` zero-pads to `[1, 2, 0]` for comparison.
-- `testUIGate_updater_isNewer_preReleaseSuffixDropped` — pins the
-  KNOWN LIMITATION that pre-release suffixes (`"1.2.3-rc1"`) are
-  silently dropped by `compactMap { Int($0) }`. Documented in
-  production as a known limitation. The cell pins the current
-  artefact (release `"1.2.3"` registers as newer than rc
-  `"1.2.3-rc1"`, accidentally in the right direction) so a future
-  fix that changes the answer must update the production note in
-  lock-step.
+- `testUIGate_updater_isNewer_releaseBeatsPreRelease` — release
+  version `"1.2.3"` is strictly newer than pre-release `"1.2.3-rc1"`
+  per SemVer 2.0 §11.3 (Cell U, originally pinned the by-accident
+  artefact; updated to assert proper SemVer ordering).
 
 ## Performance baseline (Phase 6)
 
@@ -1872,3 +1948,65 @@ recommended required-checks configuration on `master` and `develop`:
   drift detection is best run on a stable cadence on the same
   runner class, not per-PR (where runner heat / load variance
   swamps real perf signals).
+
+## Flake follow-ups
+
+### `SourceLifecycleTests/test_doubleStart_isIdempotent_Keyboard` — Phase 8 transient signal-11
+
+**Reported symptom (Phase 8):** the cell once exited with SIGSEGV
+during the back-half of the suite and cleared on re-run. The crash
+was not root-caused at the time and was filed as a transient flake
+that "may resurface under load."
+
+**Reproduction attempt (2026-04-28, follow-up triage):**
+
+- Isolation: `swift test --filter SourceLifecycleTests/test_doubleStart_isIdempotent_Keyboard`
+  ran 20 times consecutively on this host. Result: **20 / 20 PASS**,
+  no signal-11, no `Crashes/*.ips` written, no `EXC_BAD_ACCESS`.
+- Full suite: `swift test` ran 5 times. Result: the keyboard cell
+  itself reported **PASS in all 5 runs**. (Other unrelated cells in
+  concurrent-agent-edited Sources files did fail in some runs;
+  those are separate issues being handled by other workers and are
+  out of scope for this triage.)
+
+Conclusion: **not currently reproducible on this host.** The crash
+was likely a one-shot interaction with load on the original Phase 8
+runner — SwiftPM XCTest under heavy concurrent CI load occasionally
+manifests SIGSEGV in framework internals (XCTest discovery /
+test-bundle teardown) rather than user code, and that path cannot
+be falsified from outside the framework.
+
+**Hardening pass applied** (no source-code changes — production
+keyboard pipeline is well-tested and unchanged):
+
+1. `Tests/SourceLifecycleTests.swift`,
+   `test_doubleStart_isIdempotent_Keyboard`:
+   - `defer { source.stop() }` placed immediately after `source.configure`
+     so the source's bus reference and `keyWindow` are always cleared
+     on test exit, regardless of XCTest assertion outcome or thrown
+     errors. Prevents a detached `Task { await bus.publish(.keyboardTyped) }`
+     spawned by `_injectKeyPress` from outliving the test method and
+     racing the next `BusHarness().setUp()`.
+   - `await Task.yield()` between the two `source.start(publishingTo:)`
+     calls drains any concurrency work the first start might have
+     queued before the second start's idempotency guard is exercised,
+     removing a same-tick race where the second start could observe
+     partially-initialised state under load.
+   - `await harness.tearDown()` after the assertion explicitly
+     closes the bus and yields once so any queued detached publish
+     Task drains into the closed-bus no-op path before the test
+     method returns.
+2. `Tests/Helpers/BusHarness.swift`: added `tearDown()` async
+   helper symmetric with `setUp()`. `tearDown()` calls `bus.close()`
+   then `Task.yield()` once. Idempotent — safe to call twice (the
+   first close finishes all subscriber continuations and clears the
+   subscribers dictionary; subsequent calls are no-ops).
+
+The hardening reduces flake surface area without changing what the
+cell asserts. Verification: 30 / 30 PASS on isolation runs after
+the change. If the flake recurs in CI under load, the next triage
+should `sample` the test process or capture a `.ips` panic to
+isolate whether the SIGSEGV originates in XCTest framework
+internals (external to user code, requiring a runner-level fix
+such as parallel-job concurrency caps) or in the IOKit shim
+(would require Sources-level investigation).
