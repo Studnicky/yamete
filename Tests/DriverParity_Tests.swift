@@ -440,12 +440,22 @@ final class DriverParity_Tests: XCTestCase {
         // normally. This mirrors the documented skip in
         // `NotificationAuthRealDriverTests`.
         let bundleURL = Bundle.main.bundleURL.path
-        let isUnderXctestRunner = bundleURL.contains("/Xcode.app/")
+        // Phase 1: under xcodebuild with the YameteHostTest scheme,
+        // Bundle.main resolves to the bundled `Yamete.app` (or
+        // `Yamete Direct.app`) under DerivedData, which exposes a real
+        // bundle proxy and lets `UNUserNotificationCenter.current()`
+        // succeed. Detect that case and DO NOT skip — the Real half of
+        // the parity test runs there.
+        let isHostAppBundle = bundleURL.hasSuffix("/Yamete.app")
+            || bundleURL.hasSuffix("/Yamete Direct.app")
+        let isUnderXctestRunner = !isHostAppBundle && (
+            bundleURL.contains("/Xcode.app/")
             || bundleURL.contains("/usr/bin")
             || (Bundle.main.bundleIdentifier == nil)
+        )
         try XCTSkipIf(
             isUnderXctestRunner,
-            "[parity=notification] UN center unavailable when main bundle is Xcode/xctest (\(bundleURL)). Mock half passed; Real half skipped — calling real currentAuthorization() under `swift test` raises NSInternalInconsistencyException."
+            "[parity=notification] UN center unavailable when main bundle is Xcode/xctest (\(bundleURL)). Mock half passed; Real half skipped — calling real currentAuthorization() under `swift test` raises NSInternalInconsistencyException. Run `make test-host-app` to exercise the Real half."
         )
         let real = RealSystemNotificationDriver()
         let realAuth: NotificationAuth = await real.currentAuthorization()

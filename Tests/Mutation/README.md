@@ -1605,3 +1605,106 @@ The default `tolerance_factor` is 2.0× (a 2× drift fires). Cells that
 are inherently noisy (e.g. ones dominated by `Task.yield()` cost) can
 have their factor bumped per-entry in `baselines.json` — the recorder
 preserves any non-default value when re-writing.
+
+## Phase 1 — host-app xcodebuild
+
+`swift test` runs the test bundle inside the bare `xctest` runner, so
+`Bundle.main` resolves to `…/Xcode.app/Contents/Developer/usr/bin/`
+and `Bundle.main.bundleIdentifier` is nil. That makes a small set of
+real-driver cells unreachable under SPM: `UNUserNotificationCenter`
+raises an Objective-C `NSInternalInconsistencyException` (uncatchable
+from Swift) the moment `current()` is called against a non-`.app`
+host, the full `CHHapticEngine` cannot be constructed without a real
+bundle proxy, and `CGEvent.post` is rejected without an Accessibility-
+granted bundle. Those cells `XCTSkip` cleanly under `swift test` and
+their `[parity=…]` halves go uncovered.
+
+Phase 1 adds a host-app test path so those cells run.
+
+### Files
+
+- `project.yml` — second test target `YameteHostTest` (alongside
+  `YameteTests`). Same source root (`Tests/`); explicitly bundled
+  inside the `Yamete` host app via `TEST_HOST` /
+  `BUNDLE_LOADER` settings; excludes `Tests/__Snapshots__/**` and
+  `**/*.md` from the resource set so Xcode's flat `Resources/` copy
+  phase does not collide on duplicate filenames.
+- `project.yml` — companion scheme `YameteHostTest` whose `test`
+  action runs the new target's bundle inside `Yamete.app` under
+  Debug.
+- `Makefile` — `make test-host-app` target. Runs `xcodegen generate`
+  (project.yml is the source of truth; `Yamete.xcodeproj` is
+  gitignored) and then `xcodebuild test -project Yamete.xcodeproj
+  -scheme YameteHostTest -destination 'platform=macOS,arch=arm64'`.
+
+### Cells whose Real-driver halves stop XCTSkipping under host-app
+
+These cells gate their Real-driver assertions on a Bundle-URL check
+that detects whether the host process is `xctest` (skip) or
+`Yamete.app` / `Yamete Direct.app` (run). Under
+`make test-host-app` the suffix-match flips and the Real half runs:
+
+- `Tests/DriverParity_Tests.swift` —
+  `test_systemNotificationDriver_parity_authorizationShape`. Real
+  half calls `RealSystemNotificationDriver.currentAuthorization()`
+  and asserts the returned `NotificationAuth` is a member of the
+  exhaustive set; this exercises `UNUserNotificationCenter.current()
+  .getNotificationSettings(completionHandler:)` against a real
+  bundle proxy.
+- `Tests/Integration/NotificationAuthRealDriverTests.swift` —
+  `testNotificationAuthEnumCoversValidStatuses`. Now runs the
+  contract-shape assertion under host-app where it formerly skipped
+  via the `Bundle.main.bundleIdentifier == nil` SPM guard.
+
+The existing `XCTSkipUnless`-based skips elsewhere in
+`DriverParity_Tests.swift` (Haptic engine availability,
+`CGEvent.post`, AVAudioFormat shape, LED brightness, system volume)
+remain in place — they gate on hardware/availability, not on the
+process bundle, so they stay correct under both SPM and host-app.
+
+### Workflow
+
+1. Run gates locally: `swift test`, `swift test -Xswiftc
+   -DDIRECT_BUILD`, `make lint`, `make mutate`, `make test-host-app`.
+2. CI wires the host-app run alongside the SPM runs (Phase 2).
+3. When a cell's Real-driver path is the genuine integration surface,
+   prefer adding it as a host-app-aware Bundle-URL guard rather than
+   an unconditional `XCTSkip` — that keeps SPM `swift test` fast and
+   green while the host-app run gives the cell its full coverage.
+
+### Known production finding (deferred — Phase 1 surface)
+
+The new path tickled a pre-existing build issue: `xcodebuild` builds
+each SPM library product (`YameteCore`, `SensorKit`, `ResponseKit`,
+`YameteApp`) as a separate explicit module, while the existing
+`make build` / `make lint` raw-swiftc path lumps every source file
+into a single `-module-name YameteApp` compilation. Source files in
+`Sources/ResponseKit/` and `Sources/SensorKit/` and
+`Sources/YameteApp/` use `#if canImport(YameteCore) import YameteCore
+#endif` to bridge the difference, but under `xcodebuild` the
+package-graph dependency from `ResponseKit` / `SensorKit` /
+`YameteApp` to `YameteCore` is not propagated to the Xcode-side
+target deps, so `import YameteCore` cannot resolve and every type in
+the YameteCore module (`ReactionKind`, `Reaction`, `ReactionsConfig`,
+`FiredReaction`, `ReactionBus`, `SettingsStore`, `SensorSource`, …)
+fails to look up.
+
+Reproducer:
+
+```
+make test-host-app
+# → ResponseKit/OutputConfig.swift:14: cannot find type 'ReactionKind'
+# → SensorKit/EventSources.swift: cannot find type 'FiredReaction'
+# → YameteApp/YameteApp.swift:104: cannot find type 'SettingsStore'
+```
+
+This bug pre-dates Phase 1 — it surfaces against the existing
+`Yamete-AppStore` and `Yamete-Direct` schemes too — and is gated on
+remediation in `Sources/`, which Phase 1 cannot touch by HARD RULE.
+The Phase 1 infrastructure (target, scheme, Make target,
+Bundle-URL skip relaxations) is committed; the host-app run will go
+green once the build-graph mismatch is fixed under a follow-up that
+either drops the `#if canImport` guards (now that all build paths
+expose YameteCore as a real module) or wires the Xcode-side
+`package: Yamete, product: YameteCore` dependency onto every target
+that imports it.

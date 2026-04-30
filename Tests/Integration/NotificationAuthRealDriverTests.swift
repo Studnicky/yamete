@@ -19,8 +19,16 @@ final class NotificationAuthRealDriverTests: IntegrationTestCase {
         // Skip cleanly with the known SPM-bundle limitation documented
         // above. The contract assertion below is the best we can do
         // inside `swift test`; a real-bundle run is the genuine surface.
-        guard Bundle.main.bundleIdentifier != nil else {
-            throw XCTSkip("UN center unavailable in SPM test bundle")
+        // Phase 1: under `make test-host-app` (xcodebuild with the
+        // YameteHostTest scheme) Bundle.main resolves to a real
+        // `Yamete.app` / `Yamete Direct.app` and the assertion runs.
+        let bundleURL = Bundle.main.bundleURL.path
+        let isHostAppBundle = bundleURL.hasSuffix("/Yamete.app")
+            || bundleURL.hasSuffix("/Yamete Direct.app")
+        if !isHostAppBundle {
+            guard Bundle.main.bundleIdentifier != nil else {
+                throw XCTSkip("UN center unavailable in SPM test bundle")
+            }
         }
         // Exercise the full mapping surface so the enum stays in sync
         // with the production driver's `Self.map(_:)` switch statement.

@@ -91,7 +91,7 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 
 SIGNING_ID ?= -
 
-.PHONY: all build test install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
+.PHONY: all build test test-host-app install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
         appstore appstore-install appstore-lint mutate perf-baseline perf-baseline-record
 
 all: build
@@ -240,6 +240,26 @@ appstore-lint:
 # ── Test ──────────────────────────────────────────────────────
 test:
 	@swift test
+
+# ── Test (host-app, Phase 1) ─────────────────────────────────
+# Runs the YameteHostTest test bundle inside the bundled `Yamete.app`
+# host so `Bundle.main` resolves to a real `.app` at runtime. Cells
+# that XCTSkip under SPM (UN center, full Haptic engine, CGEvent.post
+# under Accessibility) execute their Real-driver halves here. See
+# Tests/Mutation/README.md → "Phase 1 — host-app xcodebuild".
+#
+# Regenerates Yamete.xcodeproj on the fly (project.yml is the source of
+# truth; .xcodeproj is gitignored) and then drives xcodebuild against
+# the YameteHostTest scheme on macOS arm64.
+test-host-app:
+	@printf "  xcodegen  Yamete.xcodeproj\n"
+	@xcodegen generate --quiet
+	@printf "  xcodebuild test  -scheme YameteHostTest\n"
+	@xcodebuild test \
+		-project Yamete.xcodeproj \
+		-scheme YameteHostTest \
+		-destination 'platform=macOS,arch=arm64' \
+		-quiet
 
 # ── Performance baseline regression detection ────────────────
 # `Tests/Performance_Tests.swift` cells assert RATIO bounds (second-half
