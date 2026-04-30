@@ -8,8 +8,8 @@ class IntegrationTestCase: XCTestCase {
     /// Subclasses can override to skip individual tests by environment flag.
     var requiresEnvironmentFlag: String? { nil }
 
-    override func setUp() async throws {
-        try await super.setUp()
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         if let flag = requiresEnvironmentFlag,
            ProcessInfo.processInfo.environment[flag] != "1" {
             throw XCTSkip("Set \(flag)=1 to run \(Self.self)")
