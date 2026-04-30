@@ -164,8 +164,11 @@ build: $(BUILD_BINARY) $(BUILD)/.minified
 
 # ── Lint ──────────────────────────────────────────────────────
 lint: lint-frameworks docs-check
-	@printf "  lint      strict concurrency\n"
+	@printf "  lint      strict concurrency (Sources/)\n"
 	@swiftc -typecheck $(SWIFTFLAGS) -strict-concurrency=complete -warnings-as-errors $(SOURCES)
+	@printf "  lint      strict concurrency (Tests/ via SPM)\n"
+	@swift build --build-tests -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors >/dev/null
+	@printf "  lint      Tests target compiled clean under strict concurrency\n"
 
 # ── Lint: framework-list drift guard ─────────────────────────
 # Fails if the framework list in the Makefile (FRAMEWORKS), Package.swift
