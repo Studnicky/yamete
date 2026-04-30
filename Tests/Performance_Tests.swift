@@ -349,7 +349,7 @@ final class Performance_Tests: XCTestCase {
         name: String,
         chunks: Int,
         perChunk: Int,
-        setup: () async -> (Int) async -> Void
+        setup: @MainActor () async -> @MainActor (Int) async -> Void
     ) async throws {
         let inject = await setup()
         var times: [TimeInterval] = []
