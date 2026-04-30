@@ -161,17 +161,32 @@ final class SnapshotUI_Tests: XCTestCase {
     ///   * `HostApp` — running inside `Yamete.app` or `Yamete Direct.app`
     ///     (host-app xcodebuild test). Detected by `bundleURL` containing
     ///     the host app bundle name.
+    ///   * `CI` — running on a GitHub Actions runner (detected via the
+    ///     `CI=true` env var GitHub Actions sets on every job). The
+    ///     macos-15 runner image renders AppKit views with subtly
+    ///     different antialiasing / font metrics than developer hosts,
+    ///     so a separate baseline directory is necessary or every CI
+    ///     run flags every snapshot. Seeded once via
+    ///     `.github/workflows/snapshot-baseline-seed.yml`.
     ///   * `Direct` — `DIRECT_BUILD` SPM build (Direct-only cells active).
     ///   * `AppStore` — default SPM `xctest` runner.
     /// The host-app branch wins over compile-time variants because the
     /// host-app target is built without `DIRECT_BUILD` (the YameteHostTest
     /// scheme links the App Store-flavoured `Yamete.app`); both lanes
     /// are nevertheless distinct from a plain SPM run because real
-    /// bundle assets render in.
+    /// bundle assets render in. The CI branch wins over the AppStore /
+    /// Direct split because runner-vs-developer-host pixel drift is the
+    /// dominant baseline failure mode on CI; the CI directory is itself
+    /// recorded under either AppStore or Direct semantics depending on
+    /// which job lane recorded it (the seed workflow runs both filters,
+    /// so both lanes' baselines land in the same `CI/` subtree).
     static func snapshotVariant() -> String {
         let bundlePath = Bundle.main.bundleURL.path
         if bundlePath.contains("Yamete.app") || bundlePath.contains("Yamete Direct.app") {
             return "HostApp"
+        }
+        if ProcessInfo.processInfo.environment["CI"] == "true" {
+            return "CI"
         }
         #if DIRECT_BUILD
         return "Direct"

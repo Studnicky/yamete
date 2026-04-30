@@ -112,11 +112,19 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
     /// App Store-flavoured `Yamete.app` (no `DIRECT_BUILD`), so this
     /// `#if DIRECT_BUILD`-gated file does not even compile in that
     /// configuration — meaning the host-app branch is unreachable here
-    /// in practice, but the symmetry keeps both helpers readable.
+    /// in practice, but the symmetry keeps both helpers readable. The
+    /// CI branch (env `CI=true`) wins over the compile-time
+    /// `Direct` / `AppStore` split because runner-vs-developer-host
+    /// pixel drift dominates over compile-flag-driven layout drift on
+    /// the runner; baselines are seeded once per lane via
+    /// `.github/workflows/snapshot-baseline-seed.yml`.
     private static func snapshotVariant() -> String {
         let bundlePath = Bundle.main.bundleURL.path
         if bundlePath.contains("Yamete.app") || bundlePath.contains("Yamete Direct.app") {
             return "HostApp"
+        }
+        if ProcessInfo.processInfo.environment["CI"] == "true" {
+            return "CI"
         }
         #if DIRECT_BUILD
         return "Direct"

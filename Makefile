@@ -101,7 +101,7 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 SIGNING_ID ?= -
 
 .PHONY: all build test test-host-app install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
-        appstore appstore-install appstore-lint mutate perf-baseline perf-baseline-record
+        appstore appstore-install appstore-lint mutate mutate-pr perf-baseline perf-baseline-record
 
 all: build
 
@@ -302,6 +302,19 @@ perf-baseline-record:
 # Sources/ permanently.
 mutate:
 	@scripts/mutation-test.sh
+
+# Phase 2.1 sustainability target. Sliced mutate: filters
+# Tests/Mutation/mutation-catalog.json down to entries whose targetFile
+# was touched on this branch vs. the PR base (BASE_REF env or
+# origin/develop fallback), then runs only those mutations through the
+# canonical runner. Typical PR touches 1–5 files (1–10 mutations) so a
+# slice run completes in ~1–2 minutes — fast enough to stay a required
+# PR gate without burning ~20 minutes of macOS-runner time. The full
+# `make mutate` still runs nightly + on push to master/develop to catch
+# drift the slice can miss (catalog edits on un-touched files, refactors
+# that move a search snippet without renaming targetFile, etc.).
+mutate-pr:
+	@scripts/mutation-test-slice.sh
 
 # ── Verify ────────────────────────────────────────────────────
 verify: build

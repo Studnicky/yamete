@@ -23,6 +23,84 @@ and confirm `total == caught`.
 The runner is `scripts/mutation-test.sh`; the Make target is
 `make mutate`.
 
+## CI architecture (Phase 2.1)
+
+Phase 2 wired `make mutate` as a required PR check. At 112 mutations ×
+~5–10 s/entry the full catalog cost ~20 minutes per PR push, which
+blocked iteration. Phase 2.1 splits the gate into a fast per-PR slice
+and a slow full nightly:
+
+| Lane | Trigger | Scope | Runtime | Required? |
+|------|---------|-------|---------|-----------|
+| `mutate-pr` | every PR + push to `master` / `develop` | only entries whose `targetFile` was touched on the branch | ~1–2 min | yes (PR gate) |
+| `mutate-nightly` | daily 08:00 UTC cron + push to `master` / `develop` | full 112-entry catalog | ~20 min | no (informational; opens an issue on regression) |
+
+### `mutate-pr` slice script
+
+`scripts/mutation-test-slice.sh` is the per-PR sustainability layer.
+It does NOT modify `scripts/mutation-test.sh` — the canonical runner
+remains the source of truth for per-mutation outcome semantics. The
+slice script:
+
+1. Resolves the PR base branch via `BASE_REF` env (or
+   `GITHUB_BASE_REF` set by Actions on `pull_request` events; falls
+   back to `develop` for direct push events).
+2. Reads `git diff --name-only <base>...HEAD` for files changed on
+   this branch since divergence.
+3. Filters `Tests/Mutation/mutation-catalog.json` via `jq` to entries
+   whose `targetFile` is in the changed-file set.
+4. If the filtered set is empty, exits 0 immediately — no production
+   gates touched means no mutation work to do. The nightly catches any
+   drift the slice missed.
+5. Otherwise atomically swaps the canonical catalog for the sliced
+   subset, invokes `scripts/mutation-test.sh`, and restores the
+   original catalog on EXIT (success or failure).
+
+The slicing is conservative: it only filters by `targetFile`, not by
+the line range of the diff. A test added on the branch that exercises
+an UN-touched mutation will not run on the slice — the nightly picks
+that up. The intent is "fast + cheap correctness signal on the
+mutations the diff could plausibly break", not "complete coverage on
+every push".
+
+### `mutate-nightly` failure handling
+
+The nightly workflow (`.github/workflows/mutate-nightly.yml`) opens a
+tracking issue tagged `mutation-catalog-regression` when the cron run
+fails. It deduplicates against existing open issues (comments on the
+existing issue rather than spamming new ones). Maintainers triage the
+attached `mutate-nightly-log` artifact, identify the ESCAPED entry, and
+either fix the test cell or remove the catalog entry if the production
+gate it covered was retired. The issue stays open until `make mutate`
+returns `total == caught` again.
+
+### Build cache
+
+Every Swift-touching CI job (including `mutate-pr` and
+`mutate-nightly`) restores `.build/` via `actions/cache@v4` keyed on
+`Package.resolved` + Xcode version + runner OS. Cache hits drop a
+fresh `swift test` from ~3 min to ~30 s, which compounds across the
+catalog walk on the nightly run.
+
+### Snapshot baseline strategy
+
+Pixel-baseline snapshot tests use a runtime variant resolver in
+`Tests/SnapshotUI_Tests.swift` and `Tests/SnapshotUI_Direct_Tests.swift`
+that selects the baseline directory based on environment:
+
+- `HostApp` — running inside `Yamete.app` / `Yamete Direct.app` (host-app xcodebuild lane).
+- `CI` — `ProcessInfo.processInfo.environment["CI"] == "true"` (GitHub Actions runner).
+- `Direct` — SPM build with `-DDIRECT_BUILD`.
+- `AppStore` — default SPM build.
+
+The CI branch wins over the compile-time AppStore / Direct split
+because runner-vs-developer-host pixel drift dominates over compile-flag
+layout drift. CI baselines are seeded once via the manual-trigger
+workflow `.github/workflows/snapshot-baseline-seed.yml`, which records
+a fresh baseline set under `Tests/__Snapshots__/CI/` and opens a PR
+adding them. Trigger that workflow after first deployment and again
+only when a deliberate visual change requires re-baselining.
+
 ## Catalog entry shape
 
 ```json
