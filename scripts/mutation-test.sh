@@ -193,9 +193,83 @@ fi
 
 # ── helpers ───────────────────────────────────────────────────
 
+# Tracks every file that currently has a mutation applied on disk. The
+# EXIT/INT/TERM trap walks this set and force-reverts each entry, so any
+# exit path — clean, `set -e` abort, signal — leaves the working tree as
+# clean as the pre-flight required it to be on entry.
+declare -a MUTATED_FILES=()
+
+# Add a file to the tracked-mutated set BEFORE writing the mutation.
+# Idempotent: a file already in the list is not re-added.
+remember_mutation() {
+    local file="$1"
+    local existing
+    for existing in "${MUTATED_FILES[@]:-}"; do
+        [[ "$existing" == "$file" ]] && return 0
+    done
+    MUTATED_FILES+=("$file")
+}
+
+# Drop a file from the tracked-mutated set after a successful, verified
+# revert. Rebuilds the array element-by-element to avoid the substring
+# replacement pitfalls of `${ARR[@]/pattern/}` (which performs a glob /
+# substring match and can silently drop unrelated entries that happen to
+# share a prefix or contain pattern metacharacters).
+forget_mutation() {
+    local file="$1"
+    local -a remaining=()
+    local existing
+    for existing in "${MUTATED_FILES[@]:-}"; do
+        [[ -z "$existing" ]] && continue
+        [[ "$existing" == "$file" ]] && continue
+        remaining+=("$existing")
+    done
+    # Reset cleanly. Avoid `("${remaining[@]:-}")` — when `remaining` is
+    # empty under `set -u`, that expansion injects a single empty-string
+    # element instead of producing a true zero-length array.
+    if [[ ${#remaining[@]} -eq 0 ]]; then
+        MUTATED_FILES=()
+    else
+        MUTATED_FILES=("${remaining[@]}")
+    fi
+}
+
+# EXIT/INT/TERM trap. Walks MUTATED_FILES and force-reverts each. Runs
+# under `set +e` so a failure on one entry does not stop us from trying
+# the rest. Belt-and-braces: also re-reverts the union of catalog target
+# files at the end, so even if MUTATED_FILES bookkeeping was somehow
+# bypassed (e.g., a SIGKILL between `remember_mutation` and the actual
+# write — impossible in this script's flow, but cheap to defend against)
+# the working tree still ends clean.
+cleanup_mutations() {
+    local rc=$?
+    set +e
+    local f
+    if [[ ${#MUTATED_FILES[@]} -gt 0 ]]; then
+        for f in "${MUTATED_FILES[@]:-}"; do
+            [[ -z "$f" ]] && continue
+            git checkout -- "$f" 2>/dev/null
+        done
+    fi
+    # Final sweep: revert any catalog target file that still shows as
+    # dirty. Cheap (one git invocation per dirty target) and only acts
+    # on files the runner is authorised to touch.
+    if [[ -n "${TARGET_FILES:-}" ]]; then
+        for f in $TARGET_FILES; do
+            if [[ -n "$(git status --porcelain -- "$f" 2>/dev/null)" ]]; then
+                git checkout -- "$f" 2>/dev/null
+            fi
+        done
+    fi
+    return $rc
+}
+trap cleanup_mutations EXIT INT TERM
+
 # Apply a literal search→replace mutation to a file. Refuses if the search
 # pattern is not present, or appears more than once. Uses Python for
-# byte-exact substitution (no regex).
+# byte-exact substitution (no regex). The caller MUST have already added
+# `file` to MUTATED_FILES via `remember_mutation` so the trap can recover
+# even if the python write fails partway.
 apply_mutation() {
     local file="$1" search="$2" replace="$3"
     python3 - "$file" "$search" "$replace" <<'PY'
@@ -215,11 +289,25 @@ path.write_text(text.replace(search, replace, 1))
 PY
 }
 
-# Revert a single file to the HEAD/staged state. Safe because pre-flight
-# refused to run on a dirty tree.
+# Revert a single file to the HEAD/staged state and verify the revert
+# actually took. Returns 0 on confirmed-clean, 1 on persistent residual.
+# Retries once on mismatch (defensive against transient filesystem
+# weirdness, e.g., a still-flushing `swift test` child holding the file
+# in cache).
 revert_file() {
     local file="$1"
-    git checkout -- "$file"
+    local attempt
+    for attempt in 1 2; do
+        git checkout -- "$file" 2>/dev/null || true
+        if git diff --quiet -- "$file"; then
+            forget_mutation "$file"
+            return 0
+        fi
+        # brief pause before retry
+        sleep 0.2
+    done
+    printf "  ${C_RED}REVERT-FAIL${C_RESET}  %s still dirty after 2 checkout attempts\n" "$file" >&2
+    return 1
 }
 
 # ── catalog walk ──────────────────────────────────────────────
@@ -255,12 +343,23 @@ for i in $(seq 0 $((mutation_count - 1))); do
         continue
     fi
 
+    # Track the file as (about to be) mutated BEFORE the write, so the
+    # EXIT trap can recover even if `apply_mutation` is interrupted
+    # mid-write or fails after a partial replace.
+    remember_mutation "$target_file"
+
     # Apply mutation
     if ! apply_mutation "$target_file" "$search" "$replace" 2>/tmp/mutate_apply.err; then
         printf "  ${C_RED}INFRA${C_RESET}     %s\n\n" "$(cat /tmp/mutate_apply.err)"
         infra=$((infra + 1))
         escape_details+=("[$id] INFRA: $(cat /tmp/mutate_apply.err)")
-        revert_file "$target_file" 2>/dev/null || true
+        # Even on apply-failure, the file may have been partially written
+        # (e.g., python crashed between read and write_text). Revert
+        # unconditionally and verify clean before continuing.
+        if ! revert_file "$target_file"; then
+            printf "  ${C_RED}FATAL${C_RESET}     %s could not be reverted; aborting catalog walk\n\n" "$target_file" >&2
+            exit 1
+        fi
         continue
     fi
 
@@ -273,8 +372,14 @@ for i in $(seq 0 $((mutation_count - 1))); do
     set -e
 
     # Always revert before evaluating, so a runner crash doesn't leave the
-    # tree mutated.
-    revert_file "$target_file"
+    # tree mutated. Verified revert: if the file is still dirty after two
+    # checkout attempts, abort the entire catalog walk rather than
+    # compound residuals across subsequent mutations.
+    if ! revert_file "$target_file"; then
+        rm -f "$test_log"
+        printf "  ${C_RED}FATAL${C_RESET}     %s could not be reverted; aborting catalog walk\n\n" "$target_file" >&2
+        exit 1
+    fi
 
     # Evaluate outcome
     output="$(cat "$test_log")"

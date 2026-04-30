@@ -207,6 +207,14 @@ The runner now hardens the revert path on three axes:
    line rather than soldiering on and compounding residuals across
    subsequent mutations on the same file.
 
+`forget_mutation` rebuilds `MUTATED_FILES` element-by-element through
+a temporary array rather than using `${ARR[@]/pattern/}` substring
+replacement. The substring form silently swallows unrelated entries
+that share a prefix with the file being forgotten, and produces an
+array containing a single empty-string element when the result would
+be empty (under `set -u`). Element-wise rebuild is unambiguous and
+plays correctly with the trap's empty-array guard.
+
 Net effect: any path out of the runner — clean exit, `swift test`
 crash, `^C`, an editor saving over the script — produces a clean
 working tree, or a loud refusal to continue.
