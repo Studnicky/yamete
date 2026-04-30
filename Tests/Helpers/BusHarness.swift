@@ -57,4 +57,15 @@ final class BusHarness: @unchecked Sendable {
     func close() async {
         await bus.close()
     }
+
+    /// Symmetric teardown for `setUp()`. Closes the bus and yields once so any
+    /// in-flight detached `Task { await bus.publish(...) }` spawned by a source
+    /// under test gets a chance to drain into the closed-bus no-op path before
+    /// the test method returns. Safe to call multiple times — `bus.close()` is
+    /// idempotent (finishing already-finished continuations is a no-op, the
+    /// subscribers dictionary is cleared on first call).
+    func tearDown() async {
+        await bus.close()
+        await Task.yield()
+    }
 }

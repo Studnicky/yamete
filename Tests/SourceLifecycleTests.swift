@@ -144,13 +144,36 @@ final class SourceLifecycleTests: XCTestCase {
     /// real IOKit input-value callback uses). Configure a low rate
     /// threshold so a single press is enough to clear the gate; a
     /// second `start()` must not produce a second publish.
+    ///
+    /// Hardening notes (Phase 8 transient signal-11 follow-up): the
+    /// flake did not reproduce on this host (30 / 30 isolated, 5 / 5
+    /// full-suite — see `Tests/Mutation/README.md`), so this cell adds
+    /// surface-area reductions rather than a targeted fix:
+    /// 1. `defer { source.stop() }` — runs even if `XCTAssertEqual`
+    ///    records a failure or any `try` throws, so the source's bus
+    ///    reference and `keyWindow` are always cleared on test exit
+    ///    and a detached `Task { await bus.publish(.keyboardTyped) }`
+    ///    spawned by `_injectKeyPress` cannot survive into a sibling
+    ///    test method's run.
+    /// 2. `Task.yield()` between the two `start()` calls — drains any
+    ///    Swift-concurrency work the first start might have queued
+    ///    before the second start exercises its idempotency guard,
+    ///    removing a same-tick race where the second start could
+    ///    observe partially-initialised state under load.
+    /// 3. `await harness.tearDown()` after the assertion — explicitly
+    ///    closes the bus and yields once so any queued detached
+    ///    publish Task drains into the closed-bus no-op path before
+    ///    the test method returns.
     func test_doubleStart_isIdempotent_Keyboard() async throws {
         let harness = BusHarness()
         await harness.setUp()
 
         let source = KeyboardActivitySource(enableHIDDetection: false)
         source.configure(tapRateThreshold: 0.1)  // any single press clears
+        defer { source.stop() }
+
         source.start(publishingTo: harness.bus)
+        await Task.yield()
         source.start(publishingTo: harness.bus)
 
         async let collected = harness.collectFor(seconds: 0.4)
@@ -163,7 +186,7 @@ final class SourceLifecycleTests: XCTestCase {
         XCTAssertEqual(matches.count, 1,
                        "[keyboard] double-start must not double-publish — got \(matches.count)")
 
-        source.stop()
+        await harness.tearDown()
     }
 
     // MARK: - Stop without start
