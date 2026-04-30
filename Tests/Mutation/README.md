@@ -1672,39 +1672,97 @@ process bundle, so they stay correct under both SPM and host-app.
    an unconditional `XCTSkip` — that keeps SPM `swift test` fast and
    green while the host-app run gives the cell its full coverage.
 
-### Known production finding (deferred — Phase 1 surface)
+### Build-graph reconciliation (resolved)
 
-The new path tickled a pre-existing build issue: `xcodebuild` builds
+Phase 1 originally tickled a build-graph mismatch: `xcodebuild` builds
 each SPM library product (`YameteCore`, `SensorKit`, `ResponseKit`,
 `YameteApp`) as a separate explicit module, while the existing
 `make build` / `make lint` raw-swiftc path lumps every source file
-into a single `-module-name YameteApp` compilation. Source files in
-`Sources/ResponseKit/` and `Sources/SensorKit/` and
-`Sources/YameteApp/` use `#if canImport(YameteCore) import YameteCore
-#endif` to bridge the difference, but under `xcodebuild` the
-package-graph dependency from `ResponseKit` / `SensorKit` /
-`YameteApp` to `YameteCore` is not propagated to the Xcode-side
-target deps, so `import YameteCore` cannot resolve and every type in
-the YameteCore module (`ReactionKind`, `Reaction`, `ReactionsConfig`,
-`FiredReaction`, `ReactionBus`, `SettingsStore`, `SensorSource`, …)
-fails to look up.
+into a single `-module-name YameteApp` compilation. Source files
+historically used `#if canImport(YameteCore) import YameteCore #endif`
+to bridge the two paths — `canImport` returned false under the lump
+(import skipped, types resolve intra-module) and true under SPM /
+xcodebuild (import included, types resolve cross-module). Under
+xcodebuild the package-graph edge from `ResponseKit` / `SensorKit` /
+`YameteApp` to `YameteCore` was not propagated to the Xcode-side
+target dependencies, so `import YameteCore` failed to resolve and
+every type in the YameteCore module (`ReactionKind`, `Reaction`,
+`ReactionsConfig`, `FiredReaction`, `ReactionBus`, `SettingsStore`,
+`SensorSource`, …) failed lookup.
 
-Reproducer:
+The reconciliation flips the polarity of those guards:
+
+- `#if canImport(<Module>)` → `#if !RAW_SWIFTC_LUMP`, with
+  `RAW_SWIFTC_LUMP` defined ONLY in the Makefile's raw-swiftc
+  invocation (via `-D RAW_SWIFTC_LUMP` in `SWIFTFLAGS`). SPM and
+  xcodebuild leave the flag undefined so the imports are taken and
+  modules resolve cleanly. The lump build keeps treating all sources
+  as a single `YameteApp` module and skips the would-be self-imports.
+- `Sources/YameteApp/YameteApp.swift` (the `@main` file, excluded
+  from the SPM `YameteApp` library so it can compile inside Xcode's
+  app target with `-module-name Yamete`) now also takes
+  `import YameteApp` under `#if !RAW_SWIFTC_LUMP`, since under
+  xcodebuild it lives in the `Yamete` module and reaches the rest of
+  the surface (SettingsStore, Yamete, Updater, StatusBarController)
+  through the YameteApp library.
+- `StatusBarController` (and `StatusBarController.init`,
+  `Updater.checkIfNeeded`) are now `public` so the `Yamete` module's
+  `YameteApp.swift` can reach them across the module boundary.
+- `project.yml` declares the `swift-snapshot-testing` package and
+  links `SnapshotTesting` into both `YameteTests` and
+  `YameteHostTest`, mirroring `Package.swift`.
+
+Reproducer (now passes the build):
 
 ```
 make test-host-app
-# → ResponseKit/OutputConfig.swift:14: cannot find type 'ReactionKind'
-# → SensorKit/EventSources.swift: cannot find type 'FiredReaction'
-# → YameteApp/YameteApp.swift:104: cannot find type 'SettingsStore'
+# → builds: YameteCore, IOHIDPublic, SensorKit, ResponseKit, YameteApp,
+#   Yamete (host app), YameteHostTest (test bundle hosted by Yamete.app)
+# → 725+ tests execute against a real .app Bundle.main
 ```
 
-This bug pre-dates Phase 1 — it surfaces against the existing
-`Yamete-AppStore` and `Yamete-Direct` schemes too — and is gated on
-remediation in `Sources/`, which Phase 1 cannot touch by HARD RULE.
-The Phase 1 infrastructure (target, scheme, Make target,
-Bundle-URL skip relaxations) is committed; the host-app run will go
-green once the build-graph mismatch is fixed under a follow-up that
-either drops the `#if canImport` guards (now that all build paths
-expose YameteCore as a real module) or wires the Xcode-side
-`package: Yamete, product: YameteCore` dependency onto every target
-that imports it.
+### Cross-bundle coverage gains and surfaced production findings
+
+With the build graph healed, the host-app run actually executes the
+test cells that previously failed to compile. Most pass; a handful
+surface real cross-bundle behavioural differences that did not show
+up under SPM. These are production findings, not new build issues:
+
+- `LEDBrightnessRealDriverTests.testCaptureSetRestoreCycle` —
+  `RealLEDBrightnessDriver.keyboardBacklightAvailable` returns true
+  even inside the App Store sandbox, where the underlying
+  `com.apple.backlightd` XPC connection is rejected
+  (`NSCocoaErrorDomain Code=4099 — Sandbox restriction`). The driver
+  then accepts `setLevel(0.42)` silently and `currentLevel()`
+  returns `nil`, so the test (which asserts `setLevel → currentLevel`
+  round-trips within tolerance) fails. The fix is in the driver:
+  `keyboardBacklightAvailable` should probe the XPC channel (or a
+  `currentLevel() != nil` smoke test) before returning true under
+  sandbox. Same backing finding applies to
+  `CombinatorialOutputBoundaryTests.testLEDFlashBoundaryCombinatorial`.
+- `NotificationPhraseTests.testEventFallbackUsesKindRawValueAsTitle`
+  — the test asserts the documented fallback (`title = kind.rawValue`,
+  `body = ""`) when no `Events.strings` resource is available. Under
+  SPM the bundle has no `.lproj` resources so the fallback fires
+  cleanly; under host-app the real `Yamete.app` ships
+  `Events.strings` and the bundle loader hands back authored
+  strings, so the fallback path never runs. The test contract was
+  written against the SPM environment only — it needs either a
+  `_testClearAndDisableLoad()` seam in `NotificationPhrase` or an
+  environment guard in the test itself, but is correctly observing
+  that the production bundle has resources.
+- `SnapshotUI_Tests.test_cell_*` (8 cells, both light/dark schemes
+  for `headerSection`, `responseSection`, `trackpadTuning_expanded`,
+  `deviceSection_expanded`, `footerSection`) — the
+  `Tests/__Snapshots__/AppStore/SnapshotUI_Tests/*.png` baselines
+  were recorded under SPM where `Bundle.main` resolves to the
+  `xctest` runner and SwiftUI's bundle-driven assets (icons, fonts,
+  string tables) fall back to defaults. Under host-app the real
+  app bundle's assets render in, so the per-pixel match drops
+  below the 0.99 / 0.98 thresholds. Re-recording the baselines
+  inside the host-app run regenerates the correct PNGs (no code
+  change required, only a one-time baseline refresh).
+
+These findings are scoped out of the build-graph fix (HARD RULE: no
+test-file edits) and tracked as follow-ups against the production
+drivers and snapshot baselines respectively.

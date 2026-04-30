@@ -1,4 +1,4 @@
-#if canImport(YameteCore)
+#if !RAW_SWIFTC_LUMP
 import YameteCore
 #endif
 import AppKit
@@ -62,7 +62,7 @@ public final class Updater {
     // MARK: - Public API
 
     /// Check for updates only if the throttle interval has elapsed.
-    func checkIfNeeded() {
+    public func checkIfNeeded() {
         if let last = lastCheckDate, Date().timeIntervalSince(last) < Self.checkInterval {
             Self.log.debug("Update check skipped — last check \(Int(Date().timeIntervalSince(last)))s ago")
             return
@@ -322,7 +322,7 @@ public final class Updater {
     }
 
     /// No-op for App Store builds (updates come through the Store).
-    func checkIfNeeded() {}
+    public func checkIfNeeded() {}
 }
 
 #endif

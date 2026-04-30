@@ -83,8 +83,17 @@ BUNDLE_RESOURCES := $(shell find $(RESOURCE_SRC) $(RESOURCE_DIRECT) -type f 2>/d
 # Keep the list sorted in normalized form (framework basename, no `.framework`
 # suffix, case-sensitive) to make diffs readable.
 FRAMEWORKS := AppKit AVFoundation CoreAudio CoreMotion IOKit ServiceManagement SwiftUI UserNotifications
+# RAW_SWIFTC_LUMP: Set during Makefile-driven raw-swiftc compilation, where
+# every Sources/**/*.swift file is fed to a single `-module-name YameteApp`
+# invocation. Under SPM (`swift test`) and xcodebuild (`make test-host-app`)
+# each module compiles to its own .swiftmodule and the symbol resolves via
+# `import YameteCore` / `import SensorKit` / `import ResponseKit` /
+# `import YameteApp`. Source files use `#if !RAW_SWIFTC_LUMP` to skip those
+# imports under the lump (where the symbols are intra-module and a self-import
+# is a no-op warning that becomes an error under -warnings-as-errors).
 SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as-library \
               -swift-version 6 \
+              -D RAW_SWIFTC_LUMP \
               $(VARIANT_FLAGS) \
               $(addprefix -framework ,$(FRAMEWORKS)) \
               -I Sources/IOHIDPublic/include

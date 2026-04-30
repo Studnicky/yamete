@@ -30,6 +30,12 @@ settings:
 packages:
   Yamete:
     path: .
+  # Test-only package for SwiftUI/NSView snapshot baselines. Also declared
+  # in Package.swift dependencies for SPM `swift test`. Linked into test
+  # targets only — main app target has no dependency.
+  swift-snapshot-testing:
+    url: https://github.com/pointfreeco/swift-snapshot-testing
+    from: 1.19.0
 
 targets:
   Yamete:
@@ -116,6 +122,8 @@ targets:
         product: ResponseKit
       - package: Yamete
         product: YameteApp
+      - package: swift-snapshot-testing
+        product: SnapshotTesting
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete.tests
@@ -155,6 +163,8 @@ targets:
         product: ResponseKit
       - package: Yamete
         product: YameteApp
+      - package: swift-snapshot-testing
+        product: SnapshotTesting
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete.hosttest

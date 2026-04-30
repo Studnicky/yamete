@@ -1,5 +1,5 @@
 #if DIRECT_BUILD
-#if canImport(YameteCore)
+#if !RAW_SWIFTC_LUMP
 import YameteCore
 #endif
 import AppKit

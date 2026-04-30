@@ -23,7 +23,7 @@ extension Notification.Name {
 /// _before_ it becomes visible, eliminating the blank-gap / resize-flash
 /// that `MenuBarExtra` produces when conditional sections change height.
 @MainActor
-final class StatusBarController {
+public final class StatusBarController {
     private let statusItem: NSStatusItem
     private let panel: MenuBarPanel
     private var monitor: Any?
@@ -37,7 +37,7 @@ final class StatusBarController {
     nonisolated(unsafe) private var contentSizeObserver: (any NSObjectProtocol)?
     nonisolated(unsafe) private var animationDurationObserver: (any NSObjectProtocol)?
 
-    init(settings: SettingsStore, yamete: Yamete, updater: Updater) {
+    public init(settings: SettingsStore, yamete: Yamete, updater: Updater) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         self.yamete = yamete
 

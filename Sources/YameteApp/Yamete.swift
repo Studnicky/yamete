@@ -1,10 +1,10 @@
-#if canImport(YameteCore)
+#if !RAW_SWIFTC_LUMP
 import YameteCore
 #endif
-#if canImport(SensorKit)
+#if !RAW_SWIFTC_LUMP
 import SensorKit
 #endif
-#if canImport(ResponseKit)
+#if !RAW_SWIFTC_LUMP
 import ResponseKit
 #endif
 import AppKit

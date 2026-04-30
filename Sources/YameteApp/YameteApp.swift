@@ -1,17 +1,26 @@
 import SwiftUI
 import AppKit
-#if canImport(YameteCore)
+#if !RAW_SWIFTC_LUMP
 import YameteCore
 #endif
-#if canImport(SensorKit)
+#if !RAW_SWIFTC_LUMP
 import SensorKit
 #endif
-#if canImport(ResponseKit)
+#if !RAW_SWIFTC_LUMP
 import ResponseKit
 #endif
-// Note: no `import YameteApp` — in the Makefile build, all YameteApp/*.swift
-// files (plus this one) compile into a single module named YameteApp, so a
-// self-import is a no-op warning that becomes an error under -warnings-as-errors.
+#if !RAW_SWIFTC_LUMP
+// Under xcodebuild, this file compiles as part of the `Yamete` target
+// (module name: Yamete), and pulls in the rest of the YameteApp surface
+// (SettingsStore, Yamete, Updater, StatusBarController) via the YameteApp
+// SPM library. Package.swift excludes this file from the YameteApp library
+// itself, so an import here is NOT a self-import. Under the Makefile's
+// raw-swiftc lump (RAW_SWIFTC_LUMP), every YameteApp/*.swift file (plus
+// this one) compiles into a single module named YameteApp, so importing
+// YameteApp from inside that module would be a self-import (warning →
+// error under -warnings-as-errors), hence the guard.
+import YameteApp
+#endif
 
 @main
 struct YameteApp: App {

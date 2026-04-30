@@ -1,4 +1,4 @@
-#if canImport(YameteCore)
+#if !RAW_SWIFTC_LUMP
 import YameteCore
 #endif
 @preconcurrency import CoreMotion
