@@ -11,6 +11,9 @@
 <p align="center">
 
 [![CI](https://github.com/Studnicky/yamete/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/Studnicky/yamete/actions/workflows/ci.yml)
+[![Test](https://github.com/Studnicky/yamete/actions/workflows/test.yml/badge.svg?branch=develop)](https://github.com/Studnicky/yamete/actions/workflows/test.yml)
+[![Host-app test](https://github.com/Studnicky/yamete/actions/workflows/host-app-test.yml/badge.svg?branch=develop)](https://github.com/Studnicky/yamete/actions/workflows/host-app-test.yml)
+[![Perf baseline](https://github.com/Studnicky/yamete/actions/workflows/perf-baseline.yml/badge.svg)](https://github.com/Studnicky/yamete/actions/workflows/perf-baseline.yml)
 [![itai](https://img.shields.io/badge/%E3%81%84%E3%81%9F%E3%81%84-ouch-red)](https://knowyourmeme.com/memes/pain)
 [![USB detected](https://img.shields.io/badge/USB%20cable-detected-mediumpurple)](https://knowyourmeme.com/memes/surprised-pikachu)
 [![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](https://swift.org)
@@ -150,6 +153,10 @@ This project stands on the work of researchers and builders who've reverse-engin
 - **[macbook-lighter](https://github.com/harttle/macbook-lighter)** — Brightness daemon design and light-sensing approaches.
 
 Thank you to everyone shipping open tools for Apple Silicon. This app only exists because others reverse-engineered what Apple won't expose.
+
+## Continuous integration
+
+Every PR and every push to `master` / `develop` runs four required correctness gates via GitHub Actions: `swift test` (default), `swift test -Xswiftc -DDIRECT_BUILD`, `make lint` (strict-concurrency type-check), and `make mutate` (109/109 mutation-catalog gates caught). The host-app xcodebuild scheme runs alongside as a recommended-but-not-yet-required check, and `make perf-baseline` runs weekly on cron for absolute-baseline drift detection. See [.github/RULESET.md](.github/RULESET.md) for the branch-protection ruleset.
 
 ## Contributing
 

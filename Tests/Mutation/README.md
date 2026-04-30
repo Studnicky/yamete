@@ -1829,3 +1829,46 @@ make lint                               OK
 make mutate                             109 / 109 caught
 make test-host-app                      726 tests, 40 skipped, 0 failures
 ```
+
+## Phase 2 — CI wiring
+
+Local-only gates are necessary but insufficient: a regression slips in
+the moment a contributor pushes a branch without re-running them. Phase
+2 wires every locally-enforced gate into GitHub Actions so the same
+five commands run on every PR + push to `master`/`develop`.
+
+**New workflow files** (alongside the pre-existing `ci.yml` /
+`release.yml`):
+
+| File | Trigger | Jobs |
+|------|---------|------|
+| `.github/workflows/test.yml` | push (`master`/`develop`) + PR | `swift-test`, `swift-test-direct-build`, `lint`, `mutate` |
+| `.github/workflows/host-app-test.yml` | push (`master`/`develop`) + PR | `host-app-test` (xcodegen + xcodebuild + `make test-host-app`) |
+| `.github/workflows/perf-baseline.yml` | weekly cron (Mon 09:00 UTC) + `workflow_dispatch` | `perf-baseline` (drift detection vs. committed `Tests/Performance/baselines.json`) |
+
+All jobs run on `macos-15` to match the Xcode toolchain pinned in
+the existing `ci.yml`/`release.yml` workflows. `concurrency` keys
+cancel superseded runs on feature branches and protect master runs
+from cancellation.
+
+**Branch-protection ruleset.** See `.github/RULESET.md` for the
+recommended required-checks configuration on `master` and `develop`:
+
+- **Required:** `lint`, `swift-test`, `swift-test-direct-build`,
+  `mutate` (all from the `Test` workflow).
+- **Recommended (promote to required once stable):** `host-app-test`.
+- **Informational only (never blocking):** `perf-baseline` —
+  cron-driven drift detection that runs out-of-band of PRs.
+
+**Why three workflows, not one.**
+
+- `test.yml` is the per-PR correctness gate aggregate. Cheap,
+  parallel, blocks merge.
+- `host-app-test.yml` is split out so its xcodebuild + xcodegen
+  setup overhead doesn't slow down the parallel jobs in `test.yml`,
+  and so it can be marked recommended-not-required while the
+  Force-Touch-availability story stabilises on the runner.
+- `perf-baseline.yml` is split out because absolute-baseline
+  drift detection is best run on a stable cadence on the same
+  runner class, not per-PR (where runner heat / load variance
+  swamps real perf signals).

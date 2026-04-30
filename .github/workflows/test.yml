@@ -1,0 +1,74 @@
+name: Test
+
+# Phase 2 CI wiring: every PR + push to master/develop runs the full
+# correctness gate suite — default-config swift test, DIRECT_BUILD-flag
+# swift test, strict-concurrency lint, and the mutation-catalog runner.
+# Each job pins macOS-15 (matches existing ci.yml/release.yml) so the
+# Xcode toolchain version is consistent across workflows.
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+
+# Least-privilege default. None of these jobs need write access.
+permissions:
+  contents: read
+
+# Cancel superseded runs for the same ref. Keeps master runs visible.
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  swift-test:
+    name: swift test (default)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run swift test (default config)
+        run: swift test
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-test-default-results
+          path: |
+            .build/**/*.xcresult
+          retention-days: 7
+
+  swift-test-direct-build:
+    name: swift test (DIRECT_BUILD)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run swift test with -DDIRECT_BUILD
+        run: swift test -Xswiftc -DDIRECT_BUILD
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-test-direct-build-results
+          path: |
+            .build/**/*.xcresult
+          retention-days: 7
+
+  lint:
+    name: Lint (strict concurrency)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify framework lists
+        run: make lint-frameworks
+      - name: Type-check with strict concurrency
+        run: make lint
+
+  mutate:
+    name: Mutation catalog
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run mutation-catalog runner
+        # Asserts every catalogued production gate has a behavioural test
+        # cell that catches its removal. Exit 0 only when caught == total.
+        run: make mutate
