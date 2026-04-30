@@ -54,7 +54,17 @@ final class NotificationPhraseTests: XCTestCase {
     /// in the banner. The body is empty under the fallback. This locks the
     /// kind→key mapping so a missing dispatch case can't silently produce a
     /// blank banner.
+    ///
+    /// The fallback path only runs when both `eventPools(for:preferred)`
+    /// and `eventPools(for:fallback)` come back empty. Under SPM the test
+    /// bundle has no `.lproj` resources so this is automatic; under
+    /// host-app `Bundle.main` is the real `Yamete.app` which ships
+    /// `Events.strings`, and without intervention the loader hands back
+    /// authored strings instead. `_testClearAndDisableLoad` short-circuits
+    /// the bundle-driven loader so the fallback is exercised under both
+    /// build environments.
     func testEventFallbackUsesKindRawValueAsTitle() {
+        NotificationPhrase._testClearAndDisableLoad()
         for kind in ReactionKind.allCases where kind != .impact {
             let reaction = ReactionForKind.make(kind: kind)
             let phrase = NotificationPhrase.phrasing(for: reaction, preferredLocale: "en")

@@ -148,6 +148,24 @@ enum NotificationPhrase {
     /// Separate cache for `Events.strings` so impact-pool clears don't blow
     /// it away (and vice-versa).
     private static let eventCache = OSAllocatedUnfairLock<[String: [String: [String]]]>(initialState: [:])
+    /// When true, `loadPools` and `loadEventPools` short-circuit to empty
+    /// regardless of bundle content. Set via the `_testClearAndDisableLoad`
+    /// seam so tests pinning the documented fallback shape (title=key,
+    /// body="") run identically under SPM (no resources) and host-app (real
+    /// `Events.strings` shipped). Without this seam, the host-app test
+    /// bundle inherits `Yamete.app`'s `Events.strings` and the loader
+    /// returns authored strings, so the fallback path never runs and any
+    /// test asserting fallback output fails.
+    ///
+    /// The flag is unguarded by `#if DEBUG` for the same reason the
+    /// existing `_testInject` / `_testClear` seams are: ResponseKit
+    /// compiles under both SPM (which auto-defines `DEBUG`) and the
+    /// xcodebuild package-product path used by `make test-host-app`
+    /// (which does NOT define `DEBUG` at the package layer). Gating on
+    /// `DEBUG` would orphan the seam under host-app and reintroduce the
+    /// exact failure this seam exists to fix. The flag has no effect in
+    /// release builds because no production code path flips it.
+    private static let loadDisabled = OSAllocatedUnfairLock<Bool>(initialState: false)
     private static let fallbackLocaleID = "en"
 
     /// Returns the (title, body) pair for any reaction. Impacts route through
@@ -190,6 +208,7 @@ enum NotificationPhrase {
     /// Parses `Events.strings` for a locale into `title_<kind>` /
     /// `body_<kind>` arrays. Same numbered-suffix convention as `Moans.strings`.
     private static func loadEventPools(localeID: String) -> [String: [String]] {
+        if loadDisabled.withLock({ $0 }) { return [:] }
         guard let lprojPath = Bundle.main.path(forResource: localeID, ofType: "lproj"),
               let stringsPath = Bundle(path: lprojPath)?.path(forResource: "Events", ofType: "strings"),
               let dict = NSDictionary(contentsOfFile: stringsPath) as? [String: String]
@@ -251,6 +270,7 @@ enum NotificationPhrase {
     /// `NSDictionary(contentsOfFile:)` auto-handles both text and binary plist
     /// formats — the same loader Foundation uses internally for `.strings`.
     private static func loadPools(localeID: String) -> [String: [String]] {
+        if loadDisabled.withLock({ $0 }) { return [:] }
         guard let lprojPath = Bundle.main.path(forResource: localeID, ofType: "lproj"),
               let stringsPath = Bundle(path: lprojPath)?.path(forResource: "Moans", ofType: "strings"),
               let dict = NSDictionary(contentsOfFile: stringsPath) as? [String: String]
@@ -299,9 +319,28 @@ enum NotificationPhrase {
         eventCache.withLock { cache in cache[localeID] = pools }
     }
 
-    /// Clears the pool cache so tests don't leak state across runs.
+    /// Clears the pool cache so tests don't leak state across runs. Also
+    /// re-enables the bundle-driven loader in case a prior cell flipped
+    /// `loadDisabled` via `_testClearAndDisableLoad`.
     static func _testClear() {
         cache.withLock { cache in cache.removeAll() }
         eventCache.withLock { cache in cache.removeAll() }
+        loadDisabled.withLock { $0 = false }
+    }
+
+    /// Clears every cached pool AND disables the bundle-driven loader for
+    /// the remainder of the test process or until `_testClear` is called.
+    /// With load disabled, `eventPhrasing` and `phrasing` always traverse
+    /// the documented fallback path (title=key, body=""). Required under
+    /// host-app where `Bundle.main` is a real `Yamete.app` and ships
+    /// `Events.strings`/`Moans.strings`; without the seam, the loader
+    /// hands back authored strings and the fallback contract can never be
+    /// observed. Mirrors the always-available shape of `_testInject` /
+    /// `_testClear` (no `#if DEBUG`) because the host-app package-product
+    /// build of ResponseKit does not inherit the test target's DEBUG flag.
+    static func _testClearAndDisableLoad() {
+        cache.withLock { cache in cache.removeAll() }
+        eventCache.withLock { cache in cache.removeAll() }
+        loadDisabled.withLock { $0 = true }
     }
 }

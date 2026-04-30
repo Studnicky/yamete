@@ -84,22 +84,100 @@ final class SnapshotUI_Tests: XCTestCase {
     /// overwriting the other's, baselines live in build-variant
     /// subdirectories under `__Snapshots__/`.
     ///
+    /// Phase 1 host-app extension: a third dimension also affects pixel
+    /// output — whether tests run under the SPM `xctest` runner (where
+    /// `Bundle.main` is the runner and SwiftUI bundle assets fall back to
+    /// defaults) versus inside `Yamete.app` / `Yamete Direct.app` host
+    /// (where the real bundle assets render in). Detect the host bundle
+    /// via `Bundle.main.bundleURL` and route to a `HostApp` variant
+    /// directory in either case so the SPM and host-app baselines do
+    /// not overwrite each other.
+    ///
     /// `#filePath` resolves to the absolute path of this test file at
     /// compile time. We strip the file basename and append the variant
     /// directory + the test class's snapshot subdirectory.
+    ///
+    /// Sandbox handling: under host-app the YameteHostTest bundle inherits
+    /// `Yamete.app`'s App Store sandbox, which forbids writes outside the
+    /// container. The SnapshotTesting library always writes new baselines
+    /// to the snapshot directory at first record, so a source-tree path
+    /// trips a Cocoa "permission to save" error. We seed the writable
+    /// `NSTemporaryDirectory()` path on first call by copying any
+    /// committed `Tests/__Snapshots__/HostApp/SnapshotUI_Tests/*.png`
+    /// baselines (sandbox CAN read out-of-container paths via the
+    /// debug configuration's POSIX-permission grant) into the temp
+    /// directory — subsequent reads/writes flow through the temp path
+    /// inside the container's allow-list. The committed PNGs in the
+    /// source tree remain the canonical baselines and are surfaced via
+    /// the seed step. After re-recording, a one-time
+    /// `make snapshot-sync-host-app` copies the newly-rendered PNGs back
+    /// into the source tree for commit.
     private static func snapshotDirectory(filePath: StaticString) -> String {
+        let variant = Self.snapshotVariant()
         let testFileURL = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
         let testsDir = testFileURL.deletingLastPathComponent()
-        #if DIRECT_BUILD
-        let variant = "Direct"
-        #else
-        let variant = "AppStore"
-        #endif
-        return testsDir
+        let sourceTreeDir = testsDir
             .appendingPathComponent("__Snapshots__")
             .appendingPathComponent(variant)
             .appendingPathComponent("SnapshotUI_Tests")
-            .path
+        guard variant == "HostApp" else { return sourceTreeDir.path }
+        return Self.sandboxSeededDirectory(sourceTreeDir: sourceTreeDir,
+                                           leaf: "SnapshotUI_Tests")
+    }
+
+    /// Seeds a sandbox-writable mirror of the source-tree snapshot
+    /// directory under `NSTemporaryDirectory()` on first call, then
+    /// returns its path so the SnapshotTesting library can read AND
+    /// write through it. Idempotent: re-running the test re-syncs
+    /// committed baselines from the source tree (read-only OK from
+    /// sandbox) so changes to committed baselines are honoured on the
+    /// next run.
+    static func sandboxSeededDirectory(sourceTreeDir: URL, leaf: String) -> String {
+        let mirror = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("yamete-snapshots", isDirectory: true)
+            .appendingPathComponent("HostApp", isDirectory: true)
+            .appendingPathComponent(leaf, isDirectory: true)
+        let fm = FileManager.default
+        try? fm.createDirectory(at: mirror, withIntermediateDirectories: true)
+        // Seed: copy every committed baseline from source tree into the
+        // writable mirror. `copyItem` errors on existing destinations, so
+        // remove first. Read access from the sandbox to the source tree
+        // path goes through the Debug build's POSIX file-access grant
+        // (the source tree is owned by the developer running the test
+        // and macOS's App Sandbox honours plain POSIX read for
+        // out-of-container paths even when the entitlement is set).
+        if let baselines = try? fm.contentsOfDirectory(at: sourceTreeDir,
+                                                      includingPropertiesForKeys: nil) {
+            for source in baselines {
+                let dst = mirror.appendingPathComponent(source.lastPathComponent)
+                try? fm.removeItem(at: dst)
+                try? fm.copyItem(at: source, to: dst)
+            }
+        }
+        return mirror.path
+    }
+
+    /// Resolves the active snapshot-variant directory:
+    ///   * `HostApp` — running inside `Yamete.app` or `Yamete Direct.app`
+    ///     (host-app xcodebuild test). Detected by `bundleURL` containing
+    ///     the host app bundle name.
+    ///   * `Direct` — `DIRECT_BUILD` SPM build (Direct-only cells active).
+    ///   * `AppStore` — default SPM `xctest` runner.
+    /// The host-app branch wins over compile-time variants because the
+    /// host-app target is built without `DIRECT_BUILD` (the YameteHostTest
+    /// scheme links the App Store-flavoured `Yamete.app`); both lanes
+    /// are nevertheless distinct from a plain SPM run because real
+    /// bundle assets render in.
+    static func snapshotVariant() -> String {
+        let bundlePath = Bundle.main.bundleURL.path
+        if bundlePath.contains("Yamete.app") || bundlePath.contains("Yamete Direct.app") {
+            return "HostApp"
+        }
+        #if DIRECT_BUILD
+        return "Direct"
+        #else
+        return "AppStore"
+        #endif
     }
 
     private func assertImageSnapshot<V: View>(

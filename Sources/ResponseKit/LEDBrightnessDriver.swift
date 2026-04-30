@@ -87,6 +87,15 @@ public final class RealLEDBrightnessDriver: LEDBrightnessDriver, @unchecked Send
     private let manager: IOHIDManager
     private let kbClient: AnyObject?
     private let accessState = OSAllocatedUnfairLock<Bool>(initialState: false)
+    /// Cached XPC-channel probe result. Computed lazily on first access to
+    /// `keyboardBacklightAvailable` and reused for the rest of the process
+    /// lifetime. `nil` means "not probed yet"; `true`/`false` is the cached
+    /// outcome of a single round-trip through `brightnessForKeyboard:`. The
+    /// probe never re-runs because the App Store sandbox decision is a
+    /// per-process attribute — once `com.apple.backlightd` rejects the
+    /// connection, it will reject every subsequent request from the same
+    /// process for the same reason, so caching is safe.
+    private let backlightProbeState = OSAllocatedUnfairLock<Bool?>(initialState: nil)
 
     public init() {
         manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
@@ -122,7 +131,51 @@ public final class RealLEDBrightnessDriver: LEDBrightnessDriver, @unchecked Send
         IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
     }
 
-    public var keyboardBacklightAvailable: Bool { kbClient != nil }
+    /// True only when CoreBrightness loaded, the `KeyboardBrightnessClient`
+    /// instance constructed, AND a one-shot `brightnessForKeyboard:` round-trip
+    /// returned a finite, in-range value. Under the App Store sandbox the
+    /// `com.apple.backlightd` XPC channel is rejected with
+    /// `NSCocoaErrorDomain Code=4099 — Sandbox restriction`; the client object
+    /// still constructs, but every method call silently no-ops and reads
+    /// return `0.0`/`NaN`. Probing the channel up-front lets callers honestly
+    /// distinguish "no backlight hardware" / "sandboxed away" from a
+    /// genuinely-working surface — `setLevel` and `currentLevel` consumers
+    /// can then take their fallback path instead of writing into a black
+    /// hole. The probe runs at most once per process; the result is cached.
+    public var keyboardBacklightAvailable: Bool {
+        guard kbClient != nil else { return false }
+        return backlightProbeState.withLock { state in
+            if let cached = state { return cached }
+            let probed = Self.probeBacklightChannel(client: kbClient)
+            state = probed
+            return probed
+        }
+    }
+
+    /// One-shot probe of the keyboard backlight XPC channel. Calls
+    /// `brightnessForKeyboard:` (the cheapest read-only selector available)
+    /// and returns true only if the result is finite and within `[0, 1]`.
+    /// Under sandbox rejection the IMP returns `0.0` *and* the system log
+    /// emits the 4099 NSXPCConnection error, but the Swift caller sees only
+    /// `0.0`. We therefore treat `0.0` as "ambiguous — probably broken" and
+    /// require a non-zero finite read to declare the channel healthy. A real
+    /// backlight at level zero is reachable but rare (the user has dimmed
+    /// the keyboard all the way down); the cost of a false-negative there
+    /// is "feature not advertised this session," which is a much smaller
+    /// failure mode than silently no-op'ing every flash. NaN/Infinity from a
+    /// borked unsafeBitCast / wrong selector arity also fall through to
+    /// false here.
+    private static func probeBacklightChannel(client: AnyObject?) -> Bool {
+        guard let client else { return false }
+        let sel = NSSelectorFromString("brightnessForKeyboard:")
+        guard let m = class_getInstanceMethod(object_getClass(client), sel) else { return false }
+        guard method_getNumberOfArguments(m) == 1 + 2 else { return false }
+        let f = unsafeBitCast(method_getImplementation(m),
+                              to: (@convention(c) (AnyObject, Selector, UInt64) -> Float).self)
+        let value = f(client, sel, 1)
+        guard value.isFinite, value > 0, value <= 1 else { return false }
+        return true
+    }
 
     public var capsLockAccessGranted: Bool { accessState.withLock { $0 } }
 

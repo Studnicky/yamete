@@ -1766,3 +1766,66 @@ up under SPM. These are production findings, not new build issues:
 These findings are scoped out of the build-graph fix (HARD RULE: no
 test-file edits) and tracked as follow-ups against the production
 drivers and snapshot baselines respectively.
+
+### Phase 1 follow-up — host-app finding remediation
+
+The three findings above were remediated in a follow-up pass. Net
+effect:
+
+- **LED XPC probe.** `RealLEDBrightnessDriver.keyboardBacklightAvailable`
+  now runs a one-shot read-back probe through `brightnessForKeyboard:`
+  and caches the result. Under sandbox-rejected `com.apple.backlightd`
+  the probe sees a non-finite / out-of-range value and the property
+  reports `false`, so `LEDBrightnessRealDriverTests.testCaptureSetRestoreCycle`
+  and `CombinatorialOutputBoundaryTests.testLEDFlashBoundaryCombinatorial`
+  XCTSkip cleanly via the existing "no keyboard backlight" branch
+  instead of asserting against a silently no-op'd channel.
+  `LEDBrightnessRealDriverTests.testKeyboardBacklightAvailableHonoursXPCProbe`
+  pins the contract on both SPM and host-app: when the property
+  returns `true`, `currentLevel()` MUST return a finite, in-range
+  value; otherwise the probe missed a sandbox case.
+
+- **NotificationPhrase fallback seam.** Added a
+  `_testClearAndDisableLoad()` test seam (mirroring the existing
+  `_testClear` / `_testInject` shape) that flips an internal
+  `loadDisabled` flag. With load disabled, `loadPools` and
+  `loadEventPools` short-circuit to empty regardless of bundle
+  content, so `NotificationPhraseTests.testEventFallbackUsesKindRawValueAsTitle`
+  exercises the documented fallback (`title = kind.rawValue`,
+  `body = ""`) under both SPM (bundle has no resources anyway) and
+  host-app (bundle ships `Events.strings`, but the loader is
+  bypassed). Seam intentionally left UNguarded by `#if DEBUG` because
+  the xcodebuild package-product build of `ResponseKit` does not
+  inherit `DEBUG` from the test target — gating it would orphan the
+  seam under host-app and reintroduce the failure.
+
+- **Snapshot variant directory.** Added a `HostApp` variant alongside
+  `AppStore` and `Direct`. `SnapshotUI_Tests.snapshotVariant()`
+  detects host-app via `Bundle.main.bundleURL.path.contains(...)` and
+  routes baselines through `Tests/__Snapshots__/HostApp/...`. Sandbox
+  caveat: the host-app test bundle inherits `Yamete.app`'s App Store
+  sandbox and cannot write to the source tree. The helper seeds a
+  sandbox-writable mirror under `NSTemporaryDirectory()/yamete-snapshots/HostApp/`
+  on first call (copying any committed PNGs from the source tree
+  into the mirror), then routes both reads and writes through the
+  mirror. After re-recording, the developer manually copies the
+  rendered PNGs from
+  `~/Library/Containers/com.studnicky.yamete/Data/tmp/yamete-snapshots/HostApp/`
+  back into `Tests/__Snapshots__/HostApp/` and commits. 14 host-app
+  baselines (every cell in `SnapshotUI_Tests`) are now committed.
+  `SnapshotUI_Direct_Tests` does not contribute baselines under
+  host-app: that file is `#if DIRECT_BUILD`-gated and the
+  YameteHostTest target builds against the App Store-flavoured
+  `Yamete.app` (no `DIRECT_BUILD`), so the cells do not even compile
+  in the host-app configuration — the variant routing is in place
+  for symmetry only.
+
+All gates remain green after remediation:
+
+```
+swift test                              726 tests, 37 skipped, 0 failures
+swift test -Xswiftc -DDIRECT_BUILD      751 tests, 37 skipped, 0 failures
+make lint                               OK
+make mutate                             109 / 109 caught
+make test-host-app                      726 tests, 40 skipped, 0 failures
+```

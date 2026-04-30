@@ -84,25 +84,45 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     /// Per-build-variant snapshot directory.
     ///
-    /// This whole file is `#if DIRECT_BUILD`-gated, so the variant
-    /// branch always resolves to `Direct`. The selection still flows
-    /// through `#if DIRECT_BUILD` for symmetry with `SnapshotUI_Tests`'s
-    /// helper — keeping both files structurally identical means a
-    /// future contributor can copy-paste the helper to a third
-    /// snapshot suite without rethinking path layout.
+    /// This whole file is `#if DIRECT_BUILD`-gated, so the compile-time
+    /// branch always resolves to `Direct`. The host-app runtime check
+    /// (`Bundle.main.bundleURL` containing `Yamete Direct.app` or
+    /// `Yamete.app`) overrides to `HostApp` so SPM-recorded `Direct`
+    /// baselines and host-app baselines stay separate. Symmetry with
+    /// `SnapshotUI_Tests.snapshotDirectory(...)` keeps both helpers
+    /// structurally identical, including the sandbox-seeded redirect
+    /// for the `HostApp` branch (see the SnapshotUI_Tests doc comment
+    /// for the rationale on why writes have to flow through
+    /// `NSTemporaryDirectory()`).
     private static func snapshotDirectory(filePath: StaticString) -> String {
+        let variant = Self.snapshotVariant()
         let testFileURL = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
         let testsDir = testFileURL.deletingLastPathComponent()
-        #if DIRECT_BUILD
-        let variant = "Direct"
-        #else
-        let variant = "AppStore"
-        #endif
-        return testsDir
+        let sourceTreeDir = testsDir
             .appendingPathComponent("__Snapshots__")
             .appendingPathComponent(variant)
             .appendingPathComponent("SnapshotUI_Direct_Tests")
-            .path
+        guard variant == "HostApp" else { return sourceTreeDir.path }
+        return SnapshotUI_Tests.sandboxSeededDirectory(sourceTreeDir: sourceTreeDir,
+                                                      leaf: "SnapshotUI_Direct_Tests")
+    }
+
+    /// See `SnapshotUI_Tests.snapshotVariant()` for the layered variant
+    /// resolution. Under host-app the YameteHostTest target links the
+    /// App Store-flavoured `Yamete.app` (no `DIRECT_BUILD`), so this
+    /// `#if DIRECT_BUILD`-gated file does not even compile in that
+    /// configuration — meaning the host-app branch is unreachable here
+    /// in practice, but the symmetry keeps both helpers readable.
+    private static func snapshotVariant() -> String {
+        let bundlePath = Bundle.main.bundleURL.path
+        if bundlePath.contains("Yamete.app") || bundlePath.contains("Yamete Direct.app") {
+            return "HostApp"
+        }
+        #if DIRECT_BUILD
+        return "Direct"
+        #else
+        return "AppStore"
+        #endif
     }
 
     private func assertImageSnapshot<V: View>(
