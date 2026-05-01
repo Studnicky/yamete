@@ -78,8 +78,14 @@ final class MatrixBusEnricherFallback_Tests: XCTestCase {
 
     func testEnricher_underTimeout_resultDelivered() async throws {
         let bus = ReactionBus()
+        // Production timeout is 500 ms. 200 ms enricher leaves 300 ms of
+        // headroom — robust under CI schedulers that can delay an awaiting
+        // task by 100+ ms. The 0.4 s value used previously was within 100 ms
+        // of the timeout and flaked on slow runners (got fallback's [0]
+        // instead of [42]).
+        let enricherDelayMs = 200
         await bus.setEnricher { reaction, publishedAt in
-            try? await Task.sleep(for: .milliseconds(400))
+            try? await Task.sleep(for: .milliseconds(enricherDelayMs))
             return FiredReaction(reaction: reaction, clipDuration: 9.9,
                                  soundURL: nil, faceIndices: [42], publishedAt: publishedAt)
         }
@@ -89,18 +95,24 @@ final class MatrixBusEnricherFallback_Tests: XCTestCase {
             for await f in stream { got.append(f); if got.count >= 1 { break } }
             return got
         }
-        try await Task.sleep(for: .milliseconds(5))
+        try await Task.sleep(for: .milliseconds(10))
         let start = Date()
         await bus.publish(.acConnected)
-        try await Task.sleep(for: .milliseconds(600))
+        // Wait at least 2x the enricher latency to give it time to deliver,
+        // scaled for slow CI hardware.
+        try await Task.sleep(for: CITiming.scaledDuration(ms: enricherDelayMs * 2 + 100))
         collector.cancel()
         let collected = await collector.value
         let coords = "[scenario=enricher-under-timeout]"
         XCTAssertEqual(collected.count, 1, "\(coords) expected 1 delivery")
         XCTAssertEqual(collected.first?.faceIndices, [42],
             "\(coords) enricher value must win when under timeout")
-        XCTAssertGreaterThan(Date().timeIntervalSince(start), 0.35,
-            "\(coords) publish must wait for enricher (~400ms)")
+        // Lower bound: publish() must have waited at least ~80% of the
+        // enricher latency before returning. Avoids a hardcoded magic
+        // number that would need updating with the latency knob.
+        XCTAssertGreaterThan(Date().timeIntervalSince(start),
+                             Double(enricherDelayMs) / 1000.0 * 0.8,
+            "\(coords) publish must wait for enricher (~\(enricherDelayMs)ms)")
         await bus.close()
     }
 

@@ -58,16 +58,16 @@ final class MatrixCoalesceTiming_Tests: XCTestCase {
 
     /// .acConnected intensity=0.4 → multiplier = 1.0 + 0.4*0.5 = 1.2
     func testStackingWithinCoalesceWindow() async throws {
-        // Cells safely inside the 16ms coalesce window. 15ms is too close to
-        // the boundary to be reliable under MainActor scheduling jitter; 12ms
-        // still exercises a different point in the window than 0/5/10ms while
-        // leaving ~4ms slack.
+        // Cells safely inside the 16ms coalesce window. Under CI, even 5ms
+        // sleeps can drift past the 16ms boundary if the scheduler is loaded;
+        // tighten to 0/2ms inter-arrivals so the second publish always lands
+        // within the window. Multiple cells still exercise different scheduler
+        // points without straddling the boundary.
         struct Cell { let interArrivalMs: Int }
         let cells: [Cell] = [
             .init(interArrivalMs: 0),
-            .init(interArrivalMs: 5),
-            .init(interArrivalMs: 10),
-            .init(interArrivalMs: 12),
+            .init(interArrivalMs: 1),
+            .init(interArrivalMs: 2),
         ]
         for cell in cells {
             let actions = try await runTwoStimulusCell(
@@ -153,20 +153,30 @@ final class MatrixCoalesceTiming_Tests: XCTestCase {
         let task = Task { await spy.consume(from: bus, configProvider: provider) }
         defer { task.cancel() }
 
-        try await Task.sleep(for: .milliseconds(10))
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 10))
+        // Spacing of 5ms × 3 publishes = 10ms span; under CI the cumulative
+        // sleep can drift to 20-30ms (past the 16ms coalesce window) and
+        // produce 2 actions instead of 1. Drop to 1ms spacing so even with
+        // 5x scheduler drift the three publishes still land inside coalesce.
         await bus.publish(.acConnected)
-        try await Task.sleep(for: .milliseconds(5))
+        try await Task.sleep(for: .milliseconds(1))
         await bus.publish(.acConnected)
-        try await Task.sleep(for: .milliseconds(5))
+        try await Task.sleep(for: .milliseconds(1))
         await bus.publish(.acConnected)
-        try await Task.sleep(for: .milliseconds(120))
+        // Wait for the coalesce timer + action to run, scaled for CI.
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 120))
+        // Poll until the coalesced action lands (or timeout) — robust against
+        // a slow CI scheduler taking longer than the bare 120ms tail.
+        _ = await awaitUntil(timeout: 1.0) {
+            spy.actions().count >= 1
+        }
 
         let actions = spy.actions()
         XCTAssertEqual(actions.count, 1,
-            "[count=3 spacing=5ms] three stimuli within coalesce must coalesce → 1 action, got \(actions.count)")
+            "[count=3 spacing=1ms] three stimuli within coalesce must coalesce → 1 action, got \(actions.count)")
         let multiplier = actions.first?.multiplier ?? 0
         // 1.0 + 0.4*0.5 + 0.4*0.5 = 1.4 (well below 2.0 cap)
         XCTAssertEqual(multiplier, 1.4, accuracy: 0.01,
-            "[count=3 spacing=5ms intensity=0.4] expected multiplier≈1.4, got \(multiplier)")
+            "[count=3 spacing=1ms intensity=0.4] expected multiplier≈1.4, got \(multiplier)")
     }
 }

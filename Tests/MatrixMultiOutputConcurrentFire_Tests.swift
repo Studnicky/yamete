@@ -147,14 +147,24 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
             for slot in inactiveSlots { spies[slot]?.allow = false }
             defer { tasks.forEach { $0.cancel() } }
 
-            // Allow consume tasks to subscribe.
-            try await Task.sleep(for: .milliseconds(10))
+            // Allow all consume tasks to subscribe before we publish — on
+            // slow CI the 7-task subscribe storm can take >10ms.
+            try await Task.sleep(for: CITiming.scaledDuration(ms: 20))
 
             // Publish one reaction of the chosen kind.
             await bus.publish(reaction(for: kind))
 
-            // Wait for coalesce (16ms) + action (2ms) + slack.
-            try await Task.sleep(for: .milliseconds(70))
+            // Poll until every active spy has a complete pre/action/post
+            // record. Replaces a brittle 70ms tail-sleep that was below the
+            // CI scheduler's worst-case lifecycle latency.
+            _ = await awaitUntil(timeout: 1.5) {
+                activeSlots.allSatisfy { slot in
+                    let s = spies[slot]!
+                    return s.preCalls.count == 1
+                        && s.actCalls.count == 1
+                        && s.postCalls.count == 1
+                }
+            }
 
             // Active outputs: pre, action, post each fired once for this kind.
             for slot in activeSlots {

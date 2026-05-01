@@ -215,18 +215,33 @@ final class MatrixCancelAndResetPhases_Tests: XCTestCase {
         let task = Task { @MainActor in await out.consume(from: bus, configProvider: provider) }
         defer { task.cancel() }
 
-        try await Task.sleep(for: .milliseconds(10))
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 10))
         await bus.publish(.impact(FusedImpact(timestamp: Date(), intensity: 0.7, confidence: 1, sources: [])))
 
-        // Wait just past coalesce + a couple of action ticks.
-        try await Task.sleep(for: .milliseconds(25))
+        // Wait just past coalesce (16 ms) + a couple of action ticks before
+        // we cancel. On CI, the coalesce timer + first action tick can take
+        // 40-60 ms instead of 25 — poll for evidence the action loop entered
+        // (at least one setIdleSuspended(true) call from preAction).
+        _ = await awaitUntil(timeout: 1.0) {
+            drv.setIdleSuspendedHistory.contains(true)
+        }
+        // Yield once more so the action loop has a tick or two of runtime.
+        await Task.yield()
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 10))
+
         out.cancelAndReset()
-        try await Task.sleep(for: .milliseconds(200))
+        // Poll until reset has run and recorded the resume-idle write. The
+        // 200 ms tail-sleep was insufficient on CI — reset's async machinery
+        // can take longer to land on slower hardware.
+        _ = await awaitUntil(timeout: 1.5) {
+            drv.setIdleSuspendedHistory.last == false
+                && drv.setLevelHistory.last == 0.55
+        }
 
         // reset() should have run, resuming idle dimming.
         XCTAssertEqual(drv.setIdleSuspendedHistory.last, false,
             "[output=led phase=B] reset must resume idle dimming")
-        // The action loop did not run to full sweep — we cancelled at ~25ms
+        // The action loop did not run to full sweep — we cancelled early
         // into a 300ms clip. It may have written a few setLevel values; the
         // important assertion is that we ended in a restored state.
         let lastLevel = drv.setLevelHistory.last

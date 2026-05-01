@@ -101,20 +101,30 @@ final class CombinatorialRoutingTests: IntegrationTestCase {
             await harness.setUp()
             let spy = AudioGatedSpyOutput()
             let consumeTask = Task { await spy.consume(from: harness.bus, configProvider: cfg) }
-            // Let the consume loop subscribe before we publish.
-            try? await Task.sleep(for: .milliseconds(20))
+            // Let the consume loop subscribe before we publish. Scaled for
+            // slower CI runners where the consume loop's first await may not
+            // land in 20 ms.
+            try? await Task.sleep(for: CITiming.scaledDuration(ms: 20))
 
             let reaction = ReactionForKind.make(kind: kind)
             await harness.bus.publish(reaction)
-            // Coalesce window 16 ms + action 2 ms + buffer
-            try? await Task.sleep(for: .milliseconds(80))
 
             let coords = "[kind=\(kind.rawValue) audioMaster=\(audioMaster) perKind=\(perKindAllowed) flash=\(flashMaster) notif=\(notifMaster) led=\(ledMaster) haptic=\(hapticMaster) bright=\(brightMaster) tint=\(tintMaster)]"
             let expected = audioMaster && perKindAllowed
             if expected {
+                // Poll until the gate has delivered, up to 1 s (3 s on CI).
+                // Wall-clock budget bounded by the timeout; on local Apple
+                // Silicon the predicate flips in <50 ms.
+                _ = await awaitUntil(timeout: 1.0) {
+                    spy.actionKinds().contains(kind)
+                }
                 XCTAssertTrue(spy.actionKinds().contains(kind),
                               "\(coords) expected action for \(kind), got \(spy.actionKinds())")
             } else {
+                // Negative case: there is no positive event to poll for.
+                // Wait long enough for any action to land if the gate is broken,
+                // then assert the action did NOT fire.
+                try? await Task.sleep(for: CITiming.scaledDuration(ms: 80))
                 XCTAssertFalse(spy.actionKinds().contains(kind),
                                "\(coords) expected NO action for \(kind), got \(spy.actionKinds())")
             }

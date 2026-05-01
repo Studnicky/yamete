@@ -98,13 +98,24 @@ final class MatrixBusStressRapidFire_Tests: XCTestCase {
         let task = Task { await spy.consume(from: bus, configProvider: provider) }
         defer { task.cancel() }
 
-        try await Task.sleep(for: .milliseconds(10))
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 10))
         let count = 8
+        // Inter-arrival was 80 ms (16 coalesce + 10 action + ~54 ms slack).
+        // On a slow CI runner the action+post can stretch to 60+ ms, leaving
+        // <20 ms slack; if A's lifecycle is still wrapping when B publishes,
+        // B coalesces into A's still-pending slot and we lose a delivery.
+        // Scale the inter-arrival on CI so each lifecycle has plenty of room
+        // to wind down before the next publish.
+        let interArrivalMs = CITiming.scaledMs(80)
         for _ in 0..<count {
             await bus.publish(.acConnected)
-            try await Task.sleep(for: .milliseconds(80))
+            try await Task.sleep(for: .milliseconds(interArrivalMs))
         }
-        try await Task.sleep(for: .milliseconds(120))
+        // Poll until all `count` actions have landed; fall back to a tail
+        // sleep if the last lifecycle is still draining.
+        _ = await awaitUntil(timeout: 2.0) {
+            spy.actions().count >= count
+        }
 
         let actions = spy.actions()
         XCTAssertEqual(actions.count, count,

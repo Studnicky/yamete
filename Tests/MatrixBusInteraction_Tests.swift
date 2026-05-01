@@ -143,13 +143,25 @@ final class MatrixBusInteractionTests: IntegrationTestCase {
         spy.actionDuration = .milliseconds(20)
 
         let consumeTask = Task { await spy.consume(from: harness.bus, configProvider: provider) }
-        try? await Task.sleep(for: .milliseconds(20))
+        try? await Task.sleep(for: CITiming.scaledDuration(ms: 20))
 
         await harness.bus.publish(reactionFor(kind: kindA))
-        // 16 coalesce + 20 action + post + slack — A fully done.
-        try? await Task.sleep(for: .milliseconds(150))
+        // Poll until A's full lifecycle completes (preAction, action, post all
+        // recorded). On a fast box this lands in ~40 ms; on slow CI it can
+        // take 200+ ms. Poll-until-condition replaces the brittle 150 ms sleep.
+        _ = await awaitUntil(timeout: 1.0) {
+            spy.actionKinds().contains(kindA)
+                && spy.calls.contains { $0.phase == .post && $0.kind == kindA }
+        }
+        // Tiny yield so any tail of A's lifecycle (lifecycleTask = nil) lands
+        // before we publish B.
+        await Task.yield()
+
         await harness.bus.publish(reactionFor(kind: kindB))
-        try? await Task.sleep(for: .milliseconds(150))
+        // Poll for B's action delivery.
+        _ = await awaitUntil(timeout: 1.0) {
+            spy.actionKinds().contains(kindB)
+        }
 
         let coords = "[A=\(kindA.rawValue) B=\(kindB.rawValue) sc=3]"
         let actionKinds = spy.actionKinds()
