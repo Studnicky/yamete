@@ -95,21 +95,52 @@ final class MatrixBusInteractionTests: IntegrationTestCase {
         let provider = MockConfigProvider()
         let spy = MatrixSpyOutput()
         spy.allow = true
-        // Long enough that B publish happens during action sleep, short enough
-        // that the test finishes inside a reasonable budget.
-        spy.actionDuration = .milliseconds(200)
+        // Pin A's action `in flight` deterministically — instead of racing
+        // a wall-clock `actionDuration` against slow CI hardware (which
+        // could let A finish before B publishes and falsify drop-not-cancel),
+        // gate A's action on an explicit token. Test releases the token
+        // only AFTER B has been published and the in-flight drop has had
+        // a chance to register.
+        let token = PauseToken()
+        spy.pauseUntil = token
 
         let consumeTask = Task { await spy.consume(from: harness.bus, configProvider: provider) }
-        try? await Task.sleep(for: .milliseconds(20))   // subscriber registered
+        // Wait until the subscriber is actually registered on the bus —
+        // polling beats a fixed lead because GitHub's macos runner can
+        // delay Task scheduling beyond the old 20 ms allowance.
+        _ = await awaitUntil(timeout: 1.0) {
+            await harness.bus._testSubscriberCount() > 0
+        }
 
         await harness.bus.publish(reactionFor(kind: kindA))
-        // 16ms coalesce + a few ms slack before A's action begins sleeping.
-        try? await Task.sleep(for: .milliseconds(80))
-        await harness.bus.publish(reactionFor(kind: kindB))
-        // Wait for A's full lifecycle to wind down (action 200ms + post + slack).
-        try? await Task.sleep(for: .milliseconds(350))
-
+        // Poll until A's action() has actually begun — i.e. the .action
+        // phase is recorded. At that point A is unambiguously in flight
+        // (blocked on the token) and the next publish targets the
+        // drop-not-cancel guard, not a finished lifecycle.
+        let aInFlight = await awaitUntil(timeout: 2.0) {
+            spy.actionKinds().contains(kindA)
+        }
         let coords = "[A=\(kindA.rawValue) B=\(kindB.rawValue) sc=2]"
+        XCTAssertTrue(aInFlight,
+                      "\(coords) A's action must begin within timeout — gate setup is broken")
+
+        await harness.bus.publish(reactionFor(kind: kindB))
+        // Give the bus + output enough time to evaluate B against the
+        // in-flight guard. Poll-with-timeout: if B is going to surface
+        // (bug), it will land within this window; if B is dropped (correct),
+        // the predicate stays false and we fall through to the assertion.
+        _ = await awaitUntil(timeout: 0.3) {
+            kindA != kindB && spy.actionKinds().contains(kindB)
+        }
+
+        // Release A so the lifecycle drains, then wait for postAction
+        // before tearing down — keeps the spy state consistent for callers
+        // that read `calls` afterwards.
+        token.release()
+        _ = await awaitUntil(timeout: 1.0) {
+            spy.calls.contains { $0.phase == .post && $0.kind == kindA }
+        }
+
         let actionKinds = spy.actionKinds()
         XCTAssertTrue(actionKinds.contains(kindA),
                       "\(coords) A must still deliver during in-flight drop: got \(actionKinds)")

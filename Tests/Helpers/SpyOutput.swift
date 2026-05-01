@@ -10,6 +10,19 @@ enum SpyPhase: String, Sendable {
     case reset
 }
 
+/// Deterministic gate used by `MatrixSpyOutput.pauseUntil`. The spy's
+/// `action()` loops on `released` and only returns once the test calls
+/// `release()`. Replaces wall-clock `actionDuration` races for cells that
+/// need A's lifecycle pinned in flight while B publishes.
+///
+/// MainActor-isolated so the bool is read/written on the same actor as
+/// the spy that polls it — no cross-actor send, no atomics needed.
+@MainActor
+final class PauseToken {
+    private(set) var released: Bool = false
+    func release() { released = true }
+}
+
 /// One recorded lifecycle call.
 struct SpyCall: Sendable {
     let phase: SpyPhase
@@ -31,6 +44,26 @@ final class MatrixSpyOutput: ReactiveOutput {
     var allow: Bool = true
     var actionDuration: Duration = .milliseconds(2)
 
+    /// Optional gate that, when non-nil, causes `action()` to poll until
+    /// the gate flips to `true` BEFORE returning — independent of
+    /// `actionDuration`. Lets tests pin A's lifecycle "in flight" for as
+    /// long as they need to publish B and assert drop-not-cancel
+    /// semantics deterministically, instead of racing wall-clock sleeps
+    /// against slow CI hardware.
+    ///
+    /// Usage:
+    ///   let token = PauseToken()
+    ///   spy.pauseUntil = token
+    ///   // publish A → action() begins, records the .action phase, then blocks
+    ///   // poll spy until .action observed for A
+    ///   // publish B → guaranteed in-flight, must be dropped
+    ///   token.release()              // releases A
+    ///
+    /// When `pauseUntil` is `nil` (the default), `action()` falls back to
+    /// the legacy `actionDuration` sleep — no behaviour change for cells
+    /// that don't opt in.
+    var pauseUntil: PauseToken?
+
     override func shouldFire(_ fired: FiredReaction, provider: OutputConfigProvider) -> Bool {
         allow
     }
@@ -41,7 +74,16 @@ final class MatrixSpyOutput: ReactiveOutput {
 
     override func action(_ fired: FiredReaction, multiplier: Float, provider: OutputConfigProvider) async {
         calls.append(.init(phase: .action, kind: fired.kind, multiplier: multiplier, timestamp: Date()))
-        try? await Task.sleep(for: actionDuration)
+        if let token = pauseUntil {
+            // Poll until released. 5 ms poll matches awaitUntil cadence and
+            // keeps idle wakeups cheap; the loop yields cooperatively so
+            // cancellation still propagates.
+            while !token.released {
+                try? await Task.sleep(for: .milliseconds(5))
+            }
+        } else {
+            try? await Task.sleep(for: actionDuration)
+        }
     }
 
     override func postAction(_ fired: FiredReaction, multiplier: Float, provider: OutputConfigProvider) async {

@@ -98,7 +98,14 @@ final class StimulusToOutputScenariosTests: XCTestCase {
         let consumeTask = Task { @MainActor [bus = harness.bus] in
             await spy.consume(from: bus, configProvider: provider)
         }
-        try await Task.sleep(for: .milliseconds(30))
+        // Wait for subscriber registration before driving events. Polling
+        // is robust against scheduling delays on the GitHub macos runner —
+        // a fixed 30 ms lead can land before the consume task has actually
+        // registered, which means the gesture flows into a bus with no
+        // subscribers and the test fails for an unrelated reason.
+        _ = await awaitUntil(timeout: 1.0) {
+            await harness.bus._testSubscriberCount() > 0
+        }
 
         guard let cg = CGEvent(scrollWheelEvent2Source: nil,
                                units: .pixel, wheelCount: 2,
@@ -110,7 +117,12 @@ final class StimulusToOutputScenariosTests: XCTestCase {
             throw XCTSkip("NSEvent bridge unavailable")
         }
         monitor.emit(scroll, ofType: .scrollWheel)
-        try await Task.sleep(for: .milliseconds(50))
+        // CI-scaled gap between gesture and click. The attribution window
+        // in TrackpadActivitySource closes after a few hundred ms, but the
+        // click must land AFTER the scroll has been ingested by the source.
+        // 50 ms is comfortable locally; on slow CI the scroll ingest may
+        // not have completed — scaling gives the source room to settle.
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 50))
 
         let click = NSEvent.mouseEvent(
             with: .leftMouseDown,
@@ -124,7 +136,14 @@ final class StimulusToOutputScenariosTests: XCTestCase {
             pressure: 1.0
         )!
         monitor.emit(click, ofType: .leftMouseDown)
-        try await Task.sleep(for: .milliseconds(180))
+        // Replace the brittle 180 ms fixed sleep with a poll on the spy's
+        // recorded actions. The trackpad source's attribution + the bus
+        // fanout + the output's lifecycle take wildly variable wall time
+        // under CI load; awaitUntil scales the timeout via CITiming and
+        // returns the moment the assertion would pass.
+        _ = await awaitUntil(timeout: 2.0) {
+            spy.actionKinds().contains(.trackpadTapping)
+        }
 
         XCTAssertTrue(spy.actionKinds().contains(.trackpadTapping),
                       "[trackpadActivity/OSSurface tapping] gesture+click must produce trackpadTapping — got \(spy.actionKinds().map(\.rawValue))")
