@@ -36,6 +36,12 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
     /// Per-slot spy: records full lifecycle (pre/action/post) and the kind
     /// observed on each call. Each spy carries its own slot identity so
     /// failure messages can name the offender directly.
+    ///
+    /// `pauseUntil` mirrors `MatrixSpyOutput.pauseUntil`: when set, `action()`
+    /// blocks on the token instead of sleeping `actionDuration`. Round 5
+    /// added this so `testTwoBackToBack_dropDuringInflight_perOutput` could
+    /// pin A in flight deterministically while B publishes, instead of
+    /// racing wall-clock sleeps that the slow CI runner could re-order.
     private final class TaggedSpy: ReactiveOutput {
         let slot: OutputSlot
         var preCalls: [(kind: ReactionKind, ts: Date)] = []
@@ -43,6 +49,7 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
         var postCalls: [(kind: ReactionKind, ts: Date)] = []
         var allow: Bool = true
         var actionDuration: Duration = .milliseconds(2)
+        var pauseUntil: PauseToken?
 
         init(slot: OutputSlot) {
             self.slot = slot
@@ -57,7 +64,13 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
         }
         override func action(_ fired: FiredReaction, multiplier: Float, provider: OutputConfigProvider) async {
             actCalls.append((fired.kind, Date()))
-            try? await Task.sleep(for: actionDuration)
+            if let token = pauseUntil {
+                while !token.released {
+                    try? await Task.sleep(for: .milliseconds(5))
+                }
+            } else {
+                try? await Task.sleep(for: actionDuration)
+            }
         }
         override func postAction(_ fired: FiredReaction, multiplier: Float, provider: OutputConfigProvider) async {
             postCalls.append((fired.kind, Date()))
@@ -195,20 +208,60 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
     /// Two reactions arriving in close succession with all outputs enabled.
     /// The drop-not-cancel rule: if the second reaction arrives during the
     /// first's lifecycle (post-coalesce, mid-action), it is dropped.
-    /// Our action duration here is 50ms — the second publish at +30ms lands
-    /// inside the first's lifecycle, so each output should see kind A only.
+    ///
+    /// Round 5 hardening: instead of racing a wall-clock 50 ms `actionDuration`
+    /// against the slow CI runner (the previous approach occasionally let
+    /// A's lifecycle finish before B even published, falsifying the
+    /// drop-not-cancel coordinates), pin every spy's action on a shared
+    /// `PauseToken`. Sequence:
+    ///   1. publish A → poll until each spy records `preCalls.count >= 1`
+    ///      (action() has begun for every output and is blocked on the gate)
+    ///   2. publish B → must be dropped because every spy's lifecycleTask is
+    ///      still alive
+    ///   3. release the token → poll for postAction to land
+    ///   4. assert each output saw exactly A and finished its lifecycle
     func testTwoBackToBack_dropDuringInflight_perOutput() async throws {
         let bus = await makeBus()
         let provider = MockConfigProvider()
         let (spies, tasks) = startRoster(slots: OutputSlot.allCases, bus: bus, provider: provider)
-        for spy in spies.values { spy.actionDuration = .milliseconds(50) }
+        let token = PauseToken()
+        for spy in spies.values { spy.pauseUntil = token }
         defer { tasks.forEach { $0.cancel() } }
 
-        try await Task.sleep(for: .milliseconds(10))
+        // Wait for every consume task to subscribe before publishing — under
+        // CI a 7-task subscribe storm can take >10ms, and an early publish
+        // would land before some outputs registered.
+        _ = await awaitUntil(timeout: 1.5) {
+            await bus._testSubscriberCount() >= OutputSlot.allCases.count
+        }
+
         await bus.publish(.acConnected)            // A
-        try await Task.sleep(for: .milliseconds(30))   // past coalesce, mid-action
-        await bus.publish(.acDisconnected)         // B — should be dropped
-        try await Task.sleep(for: .milliseconds(120)) // wait for A to finish
+        // Poll until every spy's action() has begun. At that point each
+        // output's lifecycleTask is alive and blocked on the token, so the
+        // next publish targets the in-flight drop guard, not a finished
+        // lifecycle.
+        let aInFlight = await awaitUntil(timeout: 2.0) {
+            OutputSlot.allCases.allSatisfy { (spies[$0]?.actCalls.count ?? 0) >= 1 }
+        }
+        XCTAssertTrue(aInFlight,
+            "[scenario=back-to-back-drop] every output's action() must begin before B publishes — gate setup is broken")
+
+        await bus.publish(.acDisconnected)         // B — must be dropped
+        // Give the bus + outputs a chance to evaluate B against the
+        // in-flight guard. If B is going to surface (bug), it will land
+        // within this window; if dropped (correct), the predicate stays
+        // false and we fall through.
+        _ = await awaitUntil(timeout: 0.3) {
+            OutputSlot.allCases.contains { slot in
+                (spies[slot]?.actCalls.contains { $0.kind == .acDisconnected }) ?? false
+            }
+        }
+
+        // Release the gate so A's lifecycle can drain, then poll for post.
+        token.release()
+        _ = await awaitUntil(timeout: 2.0) {
+            OutputSlot.allCases.allSatisfy { (spies[$0]?.postCalls.count ?? 0) >= 1 }
+        }
 
         for slot in OutputSlot.allCases {
             let spy = spies[slot]!
