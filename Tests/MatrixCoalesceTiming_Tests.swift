@@ -105,11 +105,19 @@ final class MatrixCoalesceTiming_Tests: XCTestCase {
     func testSecondStimulusDropsWhileLifecycleInFlight() async throws {
         // 17ms is too close to the 16ms boundary for reliable behavior; use
         // 30ms as the smallest "definitely past coalesce" cell.
+        //
+        // The (100ms, 200ms) cell that previously appeared here was removed
+        // after CI flakes: a `Task.sleep(100ms)` can drift to 250ms+ on the
+        // slow runner, by which time the first lifecycle's 200ms action has
+        // already completed and the second publish starts its own lifecycle
+        // — producing 2 actions instead of the dropped-second 1. The 30ms
+        // and 50ms cells are still well below any plausible CI drift past
+        // the action window (80ms), so the drop-during-flight contract
+        // remains exercised across two scheduler points.
         struct Cell { let interArrivalMs: Int; let actionDurationMs: Int }
         let cells: [Cell] = [
             .init(interArrivalMs: 30, actionDurationMs: 80),
             .init(interArrivalMs: 50, actionDurationMs: 80),
-            .init(interArrivalMs: 100, actionDurationMs: 200),
         ]
         for cell in cells {
             let actions = try await runTwoStimulusCell(

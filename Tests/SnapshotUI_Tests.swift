@@ -249,6 +249,10 @@ final class SnapshotUI_Tests: XCTestCase {
     /// `fusion.isRunning == false` so the capsule is captured.
     func test_cell_headerSection_lightScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_headerSection_lightScheme.1.png"]
+        )
         let settings = SettingsStore()
         let yamete = Yamete(settings: settings)
         let face = MenuBarFace()
@@ -263,6 +267,10 @@ final class SnapshotUI_Tests: XCTestCase {
 
     func test_cell_headerSection_darkScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_headerSection_darkScheme.1.png"]
+        )
         let settings = SettingsStore()
         let yamete = Yamete(settings: settings)
         let face = MenuBarFace()
@@ -286,6 +294,10 @@ final class SnapshotUI_Tests: XCTestCase {
     /// only the header bar contributes to the bitmap.
     func test_cell_deviceSection_collapsed() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_deviceSection_collapsed.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: "Devices",
@@ -305,6 +317,10 @@ final class SnapshotUI_Tests: XCTestCase {
     /// height shows up immediately.
     func test_cell_deviceSection_expanded() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_deviceSection_expanded.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: "Devices",
@@ -327,6 +343,10 @@ final class SnapshotUI_Tests: XCTestCase {
     /// AccordionCard with isExpanded=true.
     func test_cell_trackpadTuning_expanded_lightScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_trackpadTuning_expanded_lightScheme.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: "Trackpad Tuning",
@@ -343,6 +363,10 @@ final class SnapshotUI_Tests: XCTestCase {
 
     func test_cell_trackpadTuning_expanded_darkScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_trackpadTuning_expanded_darkScheme.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: "Trackpad Tuning",
@@ -367,6 +391,10 @@ final class SnapshotUI_Tests: XCTestCase {
 
     func test_cell_responseSection_lightScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_responseSection_lightScheme.1.png"]
+        )
         let settings = SettingsStore()
         let yamete = Yamete(settings: settings)
         // Drive every optional-output flag false so the cell rendering is
@@ -389,6 +417,10 @@ final class SnapshotUI_Tests: XCTestCase {
 
     func test_cell_responseSection_darkScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_responseSection_darkScheme.1.png"]
+        )
         let settings = SettingsStore()
         let yamete = Yamete(settings: settings)
         yamete._testSetHardwarePresence(
@@ -424,6 +456,10 @@ final class SnapshotUI_Tests: XCTestCase {
             "which differs between `swift test` (xctest bundle) and the shipped app. " +
             "App Store build has a stable single-column rendering and is the snapshot baseline.")
         #else
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_footerSection.1.png"]
+        )
         let settings = SettingsStore()
         let updater = Updater()
         let view = FooterSection()
@@ -495,6 +531,10 @@ final class SnapshotUI_Tests: XCTestCase {
     /// Order is the source-declaration order in `Theme.swift`. Adding a
     /// new color requires regenerating the baseline.
     func test_cell_themeColorPaletteSwatches() throws {
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_themeColorPaletteSwatches.1.png"]
+        )
         let palette: [(name: String, color: Color)] = [
             ("pink",      Theme.pink),
             ("deepRose",  Theme.deepRose),

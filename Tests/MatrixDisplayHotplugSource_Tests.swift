@@ -114,15 +114,23 @@ final class MatrixDisplayHotplugSourceTests: XCTestCase {
         let source = DisplayHotplugSource()
         source.start(publishingTo: bus)
 
-        let collectTask = Task { await self.collect(from: bus, seconds: 0.7) }
+        // CI-scale the collect window so the post-third-inject 200ms tail
+        // (also CI-scaled to up to 600ms) lands inside the collect period.
+        let collectSeconds: TimeInterval = CITiming.isCI ? 2.5 : 0.9
+        let collectTask = Task { await self.collect(from: bus, seconds: collectSeconds) }
         try? await Task.sleep(for: .milliseconds(20))
 
         await source._injectReconfigure()      // fires
         try? await Task.sleep(for: .milliseconds(50))
         await source._injectReconfigure()      // gated (within 200ms)
-        try? await Task.sleep(for: .milliseconds(250)) // window expires
+        // The 200ms sliding debounce closes 200ms after the *first* fire.
+        // Sleep 300ms (CI-scaled) so the window has definitively closed
+        // before the third inject — under CI a 250ms `Task.sleep` can
+        // drift to ~280ms which lands inside the still-open window and
+        // gates the third inject, producing only 1 publish.
+        try? await Task.sleep(for: CITiming.scaledDuration(ms: 300))
         await source._injectReconfigure()      // fires
-        try? await Task.sleep(for: .milliseconds(150))
+        try? await Task.sleep(for: CITiming.scaledDuration(ms: 200))
 
         let collected = await collectTask.value
         let configs = collected.filter { $0.kind == .displayConfigured }

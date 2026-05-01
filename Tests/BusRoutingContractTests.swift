@@ -74,14 +74,16 @@ final class BusRoutingContractTests: XCTestCase {
         await source.start(publishingTo: harness.bus)
 
         // Spawn the collector before any emit so the subscription is in place.
-        async let collected = harness.collectFor(seconds: 0.5)
+        // CI-scale the collect window so the emit + subscribe latencies fit.
+        let collectSeconds: TimeInterval = CITiming.isCI ? 1.5 : 0.5
+        async let collected = harness.collectFor(seconds: collectSeconds)
 
-        // Allow the subscription to register.
-        try await Task.sleep(for: .milliseconds(40))
+        // Allow the subscription to register. CI-scaled.
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 60))
 
         for kind in contract.emittedKinds {
             await emitter._testEmit(kind)
-            try await Task.sleep(for: .milliseconds(20))
+            try await Task.sleep(for: CITiming.scaledDuration(ms: 20))
         }
 
         let fired = await collected
@@ -113,13 +115,20 @@ final class BusRoutingContractTests: XCTestCase {
         let consumeTask = Task { @MainActor [bus = harness.bus] in
             await spy.consume(from: bus, configProvider: provider)
         }
-        // Allow consume() to subscribe before emitting.
-        try await Task.sleep(for: .milliseconds(30))
+        // Allow consume() to subscribe before emitting. CI-scaled — under
+        // CI load a 30 ms `Task.sleep` can drift past 100 ms and the emit
+        // can land before the consume task has registered its subscription.
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 50))
 
         await emitter._testEmit(kind)
 
-        // Give coalesce (16 ms) + action (~2 ms) + slack to land.
-        try await Task.sleep(for: .milliseconds(150))
+        // Poll until the action lands rather than waiting a fixed 150 ms.
+        // Some sources (Bluetooth, keyboard activity) take longer to flow
+        // through their detection pipeline on CI; the bare 150 ms tail
+        // expired before the action wrote and the assertion below tripped.
+        _ = await awaitUntil(timeout: 2.0) {
+            spy.actionKinds().contains(kind)
+        }
 
         XCTAssertTrue(spy.actionKinds().contains(kind),
                       "[\(contract.id.rawValue)/\(kind.rawValue)] action did not fire — got \(spy.actionKinds().map(\.rawValue))")
@@ -155,10 +164,14 @@ final class BusRoutingContractTests: XCTestCase {
         let consumeTask = Task { @MainActor [bus = harness.bus] in
             await gated.consume(from: bus, configProvider: provider)
         }
-        try await Task.sleep(for: .milliseconds(30))
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 50))
 
         await emitter._testEmit(kind)
-        try await Task.sleep(for: .milliseconds(150))
+        // The blocked case asserts the kind never fires. We still need a
+        // bounded settle window to give the bus time to deliver and the
+        // gate time to reject. Use the CI-scaled tail so we don't trip
+        // an early "no action yet" false negative on slow runners.
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 200))
 
         XCTAssertFalse(gated.actionKinds().contains(kind),
                        "[\(contract.id.rawValue)/\(kind.rawValue)] action fired despite block — got \(gated.actionKinds().map(\.rawValue))")

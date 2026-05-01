@@ -184,6 +184,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
     /// crest factor, report interval, rise rate, spike threshold, warmup).
     func test_cell_accelTuningSection_collapsed() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_accelTuningSection_collapsed.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: NSLocalizedString("section_accel_tuning", comment: "Accelerometer tuning section header"),
@@ -199,6 +203,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_accelTuningSection_expanded_lightScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_accelTuningSection_expanded_lightScheme.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: NSLocalizedString("section_accel_tuning", comment: "Accelerometer tuning section header"),
@@ -215,6 +223,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_accelTuningSection_expanded_darkScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_accelTuningSection_expanded_darkScheme.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: NSLocalizedString("section_accel_tuning", comment: "Accelerometer tuning section header"),
@@ -233,6 +245,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_micTuningSection_collapsed() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_micTuningSection_collapsed.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: NSLocalizedString("section_mic_tuning", comment: "Microphone tuning section header"),
@@ -248,6 +264,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_micTuningSection_expanded_lightScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_micTuningSection_expanded_lightScheme.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: NSLocalizedString("section_mic_tuning", comment: "Microphone tuning section header"),
@@ -264,6 +284,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_micTuningSection_expanded_darkScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_micTuningSection_expanded_darkScheme.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: NSLocalizedString("section_mic_tuning", comment: "Microphone tuning section header"),
@@ -282,6 +306,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_headphoneTuningSection_collapsed() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_headphoneTuningSection_collapsed.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: NSLocalizedString("section_hp_tuning", comment: "Headphone tuning section header"),
@@ -297,6 +325,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_headphoneTuningSection_expanded_lightScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_headphoneTuningSection_expanded_lightScheme.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: NSLocalizedString("section_hp_tuning", comment: "Headphone tuning section header"),
@@ -313,6 +345,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_headphoneTuningSection_expanded_darkScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_headphoneTuningSection_expanded_darkScheme.1.png"]
+        )
         let settings = SettingsStore()
         let view = AccordionCard(
             title: NSLocalizedString("section_hp_tuning", comment: "Headphone tuning section header"),
@@ -340,6 +376,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_footerSection_directBuild_lightScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_footerSection_directBuild_lightScheme.1.png"]
+        )
         let settings = SettingsStore()
         let updater = Updater()
         let view = FooterSection()
@@ -352,6 +392,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_footerSection_directBuild_darkScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_footerSection_directBuild_darkScheme.1.png"]
+        )
         let settings = SettingsStore()
         let updater = Updater()
         let view = FooterSection()
@@ -375,6 +419,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_responseSection_directBuild_audioVolumeSpikeOn_lightScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_responseSection_directBuild_audioVolumeSpikeOn_lightScheme.1.png"]
+        )
         let settings = SettingsStore()
         // Drive the Direct-only sub-toggle on so its colored icon + label
         // composition is part of the baseline (vs. the dimmed-off variant).
@@ -403,6 +451,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_responseSection_directBuild_audioVolumeSpikeOn_darkScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_responseSection_directBuild_audioVolumeSpikeOn_darkScheme.1.png"]
+        )
         let settings = SettingsStore()
         settings.volumeSpikeEnabled = true
         let yamete = Yamete(settings: settings)
@@ -434,6 +486,10 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
 
     func test_cell_directOnlyComposite_allExpanded_lightScheme() throws {
         try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_directOnlyComposite_allExpanded_lightScheme.1.png"]
+        )
         let settings = SettingsStore()
         let updater = Updater()
         let composite = VStack(spacing: 0) {

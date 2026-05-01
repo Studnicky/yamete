@@ -170,20 +170,33 @@ final class MatrixCancelAndResetPhases_Tests: XCTestCase {
         let task = Task { @MainActor in await out.consume(from: bus, configProvider: provider) }
         defer { task.cancel() }
 
-        try await Task.sleep(for: .milliseconds(10))
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 10))
         await bus.publish(.impact(FusedImpact(timestamp: Date(), intensity: 0.9, confidence: 1, sources: [])))
 
-        // Wait past coalesce + into action loop.
-        try await Task.sleep(for: .milliseconds(60))
-
-        let writesBeforeCancel = drv.setHistory.count
-        XCTAssertGreaterThan(writesBeforeCancel, 0,
+        // Poll for the first action write to land — the bare 60ms wait was
+        // not enough on slow CI runners (coalesce + first tick can take
+        // 80-120ms there) AND the previous variant let the action loop run
+        // long enough that a post-cancel tick could leak through. Cancel
+        // immediately after we observe evidence the action loop has begun
+        // writing, so the loop has the smallest possible window to ship
+        // another tick after we issue cancelAndReset.
+        let writesStarted = await awaitUntil(timeout: 1.5) {
+            drv.setHistory.count >= 1
+        }
+        XCTAssertTrue(writesStarted,
             "[output=brightness phase=C] action loop should have written before cancel")
 
         out.cancelAndReset()
 
-        // Sleep enough for any orphaned post to leak through (it must not).
-        try await Task.sleep(for: .milliseconds(150))
+        // Poll until the last write equals the canned restore level (0.40).
+        // If the action loop manages to land another tick after cancel, the
+        // last write will be a non-0.40 animation level and the predicate
+        // never goes true — the timeout is the failure path. CI-scaled.
+        _ = await awaitUntil(timeout: 1.5) {
+            guard let last = drv.setHistory.last else { return false }
+            return abs(Double(last.level) - 0.40) < 0.001
+        }
+
         // The very last write must be the reset's restore, not a stale animation tick.
         let last = drv.setHistory.last
         XCTAssertNotNil(last)

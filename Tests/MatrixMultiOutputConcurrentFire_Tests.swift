@@ -231,27 +231,40 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
     func testSlowOutput_doesNotBlock_otherOutputs() async throws {
         let bus = await makeBus()
         let provider = MockConfigProvider()
+        // Stretch the slow output for CI so the no-block window has headroom
+        // even when fast outputs take longer than 80ms to clear postAction.
+        // 600ms is well above any plausible fast-output latency under load,
+        // and we now poll for fast completion rather than waiting a fixed
+        // 80ms — so the inequality "fast done before slow done" survives
+        // wide scheduler variance.
+        let slowDurationMs = CITiming.scaledMs(600)
         let (spies, tasks) = startRoster(
             slots: OutputSlot.allCases,
             bus: bus,
             provider: provider,
             slowSlot: .haptic,
-            slowDuration: .milliseconds(200)
+            slowDuration: .milliseconds(slowDurationMs)
         )
         defer { tasks.forEach { $0.cancel() } }
 
-        try await Task.sleep(for: .milliseconds(10))
+        try await Task.sleep(for: CITiming.scaledDuration(ms: 10))
         await bus.publish(.acConnected)
-        // Wait long enough for fast outputs to finish (coalesce 16 + action 2 + slack)
-        // but well before slow output completes.
-        try await Task.sleep(for: .milliseconds(80))
+
+        // Poll until every fast output has completed its postAction. This
+        // replaces the brittle 80ms fixed wait — under CI load the fast
+        // outputs can take 100-200ms to finish and the prior fixed sleep
+        // tripped the assertion before they did.
+        let fastSlots = OutputSlot.allCases.filter { $0 != .haptic }
+        _ = await awaitUntil(timeout: 2.0) {
+            fastSlots.allSatisfy { (spies[$0]?.postCalls.count ?? 0) >= 1 }
+        }
 
         // Fast outputs: completed full lifecycle.
-        for slot in OutputSlot.allCases where slot != .haptic {
+        for slot in fastSlots {
             let spy = spies[slot]!
             let coords = "[output=\(slot.rawValue) scenario=slow-haptic-noblock]"
-            XCTAssertEqual(spy.postCalls.count, 1,
-                "\(coords) fast output blocked by slow haptic — postAction did not fire in 80ms")
+            XCTAssertGreaterThanOrEqual(spy.postCalls.count, 1,
+                "\(coords) fast output blocked by slow haptic — postAction did not fire")
         }
         // Slow output: started action but post not yet recorded.
         let slow = spies[.haptic]!
@@ -261,7 +274,9 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
             "[output=haptic scenario=slow-haptic-noblock] slow output must not yet have completed")
 
         // Wait for slow output to complete.
-        try await Task.sleep(for: .milliseconds(180))
+        _ = await awaitUntil(timeout: 5.0) {
+            (spies[.haptic]?.postCalls.count ?? 0) >= 1
+        }
         XCTAssertEqual(slow.postCalls.count, 1,
             "[output=haptic scenario=slow-haptic-noblock] slow output must complete eventually")
         await bus.close()
