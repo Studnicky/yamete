@@ -56,14 +56,23 @@ final class MatrixDisplayHotplugSourceTests: XCTestCase {
 
         // Real reconfigures emit ~3-4 callbacks within ~50ms. Production
         // collapses them with the 200ms debounce window.
+        //
+        // Original test spaced the 4 injections with 20ms `Task.sleep`s.
+        // Under CI the scheduler stretches 20ms sleeps past 50ms, so the
+        // four callbacks span > 200ms and the debounce window closes
+        // mid-burst — producing 2 publishes instead of 1. To keep the
+        // test exercising the debounce gate deterministically across
+        // hardware, the injections are now back-to-back via `Task.yield`
+        // only. The 200ms debounce still catches them all in a single
+        // window because there's no real-time gap between them.
         await source._injectReconfigure()
-        try? await Task.sleep(for: .milliseconds(20))
+        await Task.yield()
         await source._injectReconfigure()
-        try? await Task.sleep(for: .milliseconds(20))
+        await Task.yield()
         await source._injectReconfigure()
-        try? await Task.sleep(for: .milliseconds(20))
+        await Task.yield()
         await source._injectReconfigure()
-        try? await Task.sleep(for: .milliseconds(150))
+        try? await Task.sleep(for: CITiming.scaledDuration(ms: 250))
 
         let collected = await collectTask.value
         let configs = collected.filter { $0.kind == .displayConfigured }

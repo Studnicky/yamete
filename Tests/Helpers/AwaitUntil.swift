@@ -1,4 +1,5 @@
 import Foundation
+import XCTest
 
 /// Test-only timing helpers that harden async assertions against slow CI
 /// hardware. Two complementary patterns:
@@ -31,6 +32,48 @@ enum CITiming {
     /// for the current environment.
     static func scaledDuration(ms: Int) -> Duration {
         .milliseconds(scaledMs(ms))
+    }
+
+    /// True when running under GitHub Actions (or any environment that sets
+    /// `CI=true`). Used by snapshot suites to opt into a CI-bootstrap
+    /// fallback when the CI baseline directory has not yet been seeded.
+    static var isCI: Bool {
+        ProcessInfo.processInfo.environment["CI"] == "true"
+    }
+}
+
+/// Throws `XCTSkip` when running on CI and the CI snapshot baseline file
+/// for `name` does not exist on disk yet. The CI variant lives in a
+/// separate `__Snapshots__/CI/` subtree (the macos-15 runner renders
+/// AppKit views with subtly different antialiasing than developer hosts);
+/// when a UI change adds new cells, the CI subtree won't have a baseline
+/// until the `snapshot-baseline-seed` workflow_dispatch run produces one.
+/// During that bootstrap window the cell skips on CI rather than failing.
+/// On developer hosts (and on CI once the baseline exists), the test runs
+/// normally and the existing baseline is authoritative.
+///
+/// Uses `directory` (the resolved snapshot directory for the variant) and
+/// the `expectedFiles` list (full filenames the cell would write) to
+/// detect the missing-baseline condition.
+@MainActor
+func skipIfCIBaselineMissing(
+    directory: String,
+    expectedFiles: [String],
+    file: StaticString = #filePath,
+    line: UInt = #line
+) throws {
+    guard CITiming.isCI else { return }
+    let fm = FileManager.default
+    let allPresent = expectedFiles.allSatisfy { name in
+        fm.fileExists(atPath: (directory as NSString).appendingPathComponent(name))
+    }
+    if !allPresent {
+        throw XCTSkip(
+            "CI snapshot baseline missing under \(directory). " +
+            "Run the `snapshot-baseline-seed` workflow_dispatch to seed " +
+            "the CI/ subtree before this cell can assert.",
+            file: file, line: line
+        )
     }
 }
 

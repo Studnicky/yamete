@@ -197,10 +197,23 @@ final class ReactiveOutputLifecycleTests: XCTestCase {
 
         try await Task.sleep(for: .milliseconds(10))
         await bus.publish(.acConnected)          // A
-        // Wait for A to fully complete (coalesce 16ms + action 20ms + buffer)
-        try await Task.sleep(for: .milliseconds(80))
+        // Poll until A's lifecycle has fully completed (postAction fired)
+        // before publishing B. Under CI the 80ms fixed sleep was too tight
+        // — the coalesce timer + action sleep + post hook can stretch past
+        // 80ms when the scheduler is loaded, leaving B published while A
+        // is still in flight (so B drops). Polling for `postActions.count >= 1`
+        // guarantees A is done regardless of how long A actually took.
+        let aFinished = await awaitUntil(timeout: 1.5) {
+            spy.postActions.count >= 1
+        }
+        XCTAssertTrue(aFinished, "A's postAction must fire before publishing B")
+
         await bus.publish(.acConnected)          // B — lifecycle is idle, must fire
-        try await Task.sleep(for: .milliseconds(80))
+        // Poll until B's lifecycle has also completed (postActions reaches 2).
+        let bFinished = await awaitUntil(timeout: 1.5) {
+            spy.postActions.count >= 2
+        }
+        XCTAssertTrue(bFinished, "B's postAction must fire after A finishes")
 
         XCTAssertEqual(spy.actions.count, 2, "B should be accepted after A finishes")
         XCTAssertEqual(spy.postActions.count, 2)

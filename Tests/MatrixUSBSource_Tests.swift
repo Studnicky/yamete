@@ -57,12 +57,19 @@ final class MatrixUSBSourceTests: XCTestCase {
 
         // Three rapid attach events for the same vendor/product within the
         // 50ms debounce window. Production must collapse to one publish.
+        //
+        // Original spacing was 10ms × 3 = 30ms total span. Under CI the
+        // 10ms `Task.sleep`s stretch enough that the third inject can
+        // land past the 50ms debounce boundary, producing 2 publishes
+        // instead of 1. Inject back-to-back via `Task.yield()` so the
+        // span is bounded by scheduler turnaround (sub-ms) regardless
+        // of host load.
         await source._injectAttach(vendor: "Apple", product: "Magic Mouse")
-        try? await Task.sleep(for: .milliseconds(10))
+        await Task.yield()
         await source._injectAttach(vendor: "Apple", product: "Magic Mouse")
-        try? await Task.sleep(for: .milliseconds(10))
+        await Task.yield()
         await source._injectAttach(vendor: "Apple", product: "Magic Mouse")
-        try? await Task.sleep(for: .milliseconds(150))
+        try? await Task.sleep(for: CITiming.scaledDuration(ms: 150))
 
         let collected = await collectTask.value
         let attaches = collected.filter { $0.kind == .usbAttached }

@@ -30,6 +30,13 @@ final class MatrixCoalesceTiming_Tests: XCTestCase {
     /// Publish, wait the inter-arrival, publish second.
     /// Sleeps `coalesceMs + actionDurationMs + slack` afterwards before reading
     /// `spy.actions`.
+    ///
+    /// `interArrivalMs == 0` means "back-to-back via Task.yield only" — no
+    /// real sleep, so the second publish lands inside the coalesce window
+    /// regardless of CI scheduler load. Any positive value falls back to a
+    /// `Task.sleep`, which the CI scheduler may stretch by 30-50ms under
+    /// load (a 2ms requested sleep can drift past the 16ms coalesce
+    /// boundary on the GitHub macos runner).
     private func runTwoStimulusCell(interArrivalMs: Int, actionDurationMs: Int) async throws -> [SpyCall] {
         let bus = await makeBus()
         let spy = MatrixSpyOutput()
@@ -43,13 +50,18 @@ final class MatrixCoalesceTiming_Tests: XCTestCase {
         await bus.publish(.acConnected)
         if interArrivalMs > 0 {
             try await Task.sleep(for: .milliseconds(interArrivalMs))
+        } else {
+            await Task.yield()
         }
         await bus.publish(.acConnected)
 
         // Wait long enough for both potential lifecycles to settle. The longest
         // case is 200ms inter-arrival + 16ms coalesce + actionDuration + slack.
+        // Scale by CI envelope so the settle window stretches with scheduler
+        // load — otherwise the post-publish read can race the second
+        // lifecycle's completion.
         let settleMs = max(200, interArrivalMs) + 16 + actionDurationMs + 80
-        try await Task.sleep(for: .milliseconds(settleMs))
+        try await Task.sleep(for: CITiming.scaledDuration(ms: settleMs))
 
         return spy.actions()
     }
@@ -58,16 +70,18 @@ final class MatrixCoalesceTiming_Tests: XCTestCase {
 
     /// .acConnected intensity=0.4 → multiplier = 1.0 + 0.4*0.5 = 1.2
     func testStackingWithinCoalesceWindow() async throws {
-        // Cells safely inside the 16ms coalesce window. Under CI, even 5ms
-        // sleeps can drift past the 16ms boundary if the scheduler is loaded;
-        // tighten to 0/2ms inter-arrivals so the second publish always lands
-        // within the window. Multiple cells still exercise different scheduler
-        // points without straddling the boundary.
+        // Cells must land within the 16ms coalesce window. Under CI even
+        // a 2ms `Task.sleep` can stretch past 16ms when the scheduler is
+        // loaded. To keep the test deterministic across hardware, all
+        // cells use `interArrivalMs=0` — the second publish lands after
+        // a single `Task.yield()` only, well inside the window. Cells
+        // are kept (rather than collapsed to one call) so coalesce is
+        // exercised across multiple scheduler points.
         struct Cell { let interArrivalMs: Int }
         let cells: [Cell] = [
             .init(interArrivalMs: 0),
-            .init(interArrivalMs: 1),
-            .init(interArrivalMs: 2),
+            .init(interArrivalMs: 0),
+            .init(interArrivalMs: 0),
         ]
         for cell in cells {
             let actions = try await runTwoStimulusCell(

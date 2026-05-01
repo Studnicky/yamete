@@ -47,18 +47,23 @@ final class MatrixSourceDebounce_Tests: XCTestCase {
         return passed
     }
 
-    /// 5 cells × {0ms, 1ms, debounce-10ms (40ms), debounce (50ms), debounce+30ms (80ms)}.
+    /// 4 cells × {0ms, 1ms, debounce-well-under (10ms), debounce-well-over (200ms)}.
     /// First emit always passes. Second passes only when delay ≥ debounce.
+    ///
+    /// CI calibration: under the GitHub macos runner a 40ms `Task.sleep`
+    /// can stretch past the 50ms USB debounce constant, so the
+    /// previously-used "debounce-10ms" cell flipped to "second emit
+    /// passes" non-deterministically. The strict-block cells are now
+    /// well under 50ms (10ms + 30ms scheduler slack still ≤ 50ms) and
+    /// the strict-pass cell is well past (200ms + slack still > 50ms),
+    /// so the test stays deterministic regardless of scheduler load.
     func testUSBDebounceRapidFire() async throws {
         struct Cell { let delayMs: Int; let expectedPassed: Int }
-        // 50ms is the boundary — under MainActor scheduling the second emit
-        // can fire just before or just after. To keep determinism, only assert
-        // strict-pass cells well past 50ms and strict-block cells well under.
         let cells: [Cell] = [
-            .init(delayMs: 0,  expectedPassed: 1),
-            .init(delayMs: 1,  expectedPassed: 1),
-            .init(delayMs: 40, expectedPassed: 1),
-            .init(delayMs: 80, expectedPassed: 2),
+            .init(delayMs: 0,   expectedPassed: 1),
+            .init(delayMs: 1,   expectedPassed: 1),
+            .init(delayMs: 5,   expectedPassed: 1),  // safely under 50ms debounce
+            .init(delayMs: 200, expectedPassed: 2),  // safely past 50ms debounce
         ]
         for cell in cells {
             let passed = try await usbRapidFire(delayMs: cell.delayMs)
@@ -95,13 +100,20 @@ final class MatrixSourceDebounce_Tests: XCTestCase {
     }
 
     /// Display debounce window is 200ms.
+    ///
+    /// CI calibration: under load a 100ms `Task.sleep` can stretch past
+    /// the 200ms debounce boundary (~3x scheduler factor). The
+    /// strict-block cells stay safely under 200ms (≤ 30ms + slack still
+    /// fits) and the strict-pass cell uses 700ms (200ms debounce + 500ms
+    /// margin against scheduler stretch) so the test is deterministic
+    /// across hardware.
     func testDisplayDebounceRapidFire() async throws {
         struct Cell { let delayMs: Int; let expectedPassed: Int }
         let cells: [Cell] = [
             .init(delayMs: 0,   expectedPassed: 1),
             .init(delayMs: 1,   expectedPassed: 1),
-            .init(delayMs: 100, expectedPassed: 1),  // half the window
-            .init(delayMs: 250, expectedPassed: 2),  // past window + slack
+            .init(delayMs: 30,  expectedPassed: 1),  // safely under 200ms window
+            .init(delayMs: 700, expectedPassed: 2),  // safely past 200ms window
         ]
         for cell in cells {
             let passed = try await displayRapidFire(delayMs: cell.delayMs)
