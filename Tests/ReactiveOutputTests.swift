@@ -136,6 +136,13 @@ final class ReactiveOutputLifecycleTests: XCTestCase {
     // MARK: - Normal completion sequence
 
     /// A single stimulus produces pre → action → post in order, multiplier = 1.0.
+    ///
+    /// Round 6 hardening: the fixed `Task.sleep(100ms)` tail wait was too
+    /// tight under CI — coalesce (16ms) + action (10ms) + post hook can
+    /// stretch past 100ms when the scheduler is loaded, leaving postAction
+    /// not yet fired when the assertion runs. Replace with `awaitUntil` on
+    /// `postActions.count >= 1` so the test waits until the lifecycle
+    /// actually completes regardless of scheduler load.
     func testNormalSequenceFiresAllHooksInOrder() async throws {
         let bus = await makeBus()
         let spy = SpyOutput()
@@ -147,8 +154,12 @@ final class ReactiveOutputLifecycleTests: XCTestCase {
 
         try await Task.sleep(for: .milliseconds(10))
         await bus.publish(.acConnected)
-        // Wait for coalesce (16ms) + action (10ms) + buffer
-        try await Task.sleep(for: .milliseconds(100))
+        // Poll until postAction has fired — replaces the brittle fixed
+        // 100ms tail sleep that flaked on the slow CI runner.
+        let finished = await awaitUntil(timeout: 1.0) {
+            spy.postActions.count >= 1
+        }
+        XCTAssertTrue(finished, "postAction must fire within timeout")
 
         XCTAssertEqual(spy.preActions.count, 1, "preAction must fire once")
         XCTAssertEqual(spy.actions.count,    1, "action must fire once")

@@ -102,35 +102,76 @@ final class MatrixCoalesceTiming_Tests: XCTestCase {
     /// Inter-arrival exceeds coalesce window AND second stimulus arrives while
     /// the first lifecycle is still running. Second is dropped (no coalesce
     /// window restart, lifecycle in flight).
+    ///
+    /// Round 6 hardening: the wall-clock `actionDur=80ms` knob raced the
+    /// slow CI scheduler — a 30/50ms inter-arrival sleep could drift past
+    /// the 80ms action window, letting A's lifecycle finish before B
+    /// published and producing 2 actions instead of the dropped-second 1.
+    /// Switch to the round-4 PauseToken pattern: A's spy blocks
+    /// deterministically until the test releases it. Publish A, poll for
+    /// `actionKinds().contains(...)` (action() has begun), publish B,
+    /// settle, assert exactly 1 action, then release.
     func testSecondStimulusDropsWhileLifecycleInFlight() async throws {
-        // 17ms is too close to the 16ms boundary for reliable behavior; use
-        // 30ms as the smallest "definitely past coalesce" cell.
-        //
-        // The (100ms, 200ms) cell that previously appeared here was removed
-        // after CI flakes: a `Task.sleep(100ms)` can drift to 250ms+ on the
-        // slow runner, by which time the first lifecycle's 200ms action has
-        // already completed and the second publish starts its own lifecycle
-        // — producing 2 actions instead of the dropped-second 1. The 30ms
-        // and 50ms cells are still well below any plausible CI drift past
-        // the action window (80ms), so the drop-during-flight contract
-        // remains exercised across two scheduler points.
-        struct Cell { let interArrivalMs: Int; let actionDurationMs: Int }
+        // Two cells exercise different scheduler points between A and B.
+        // The actionDur knob is gone — A is pinned in flight by the token,
+        // not by a sleep.
+        struct Cell { let interArrivalMs: Int }
         let cells: [Cell] = [
-            .init(interArrivalMs: 30, actionDurationMs: 80),
-            .init(interArrivalMs: 50, actionDurationMs: 80),
+            .init(interArrivalMs: 30),
+            .init(interArrivalMs: 50),
         ]
         for cell in cells {
-            let actions = try await runTwoStimulusCell(
-                interArrivalMs: cell.interArrivalMs,
-                actionDurationMs: cell.actionDurationMs
-            )
+            let bus = await makeBus()
+            let spy = MatrixSpyOutput()
+            let token = PauseToken()
+            spy.pauseUntil = token
+            let provider = MockConfigProvider()
+
+            let task = Task { await spy.consume(from: bus, configProvider: provider) }
+            // Wait until the subscriber is registered before publishing —
+            // an early publish would land before consume() subscribes and
+            // be lost.
+            _ = await awaitUntil(timeout: 1.0) {
+                await bus._testSubscriberCount() > 0
+            }
+
+            await bus.publish(.acConnected)            // A
+            // Poll until A's action() has actually begun — at that point A
+            // is unambiguously in flight (blocked on the token) and the
+            // next publish targets the drop-not-cancel guard.
+            let aInFlight = await awaitUntil(timeout: 2.0) {
+                spy.actionKinds().contains(.acConnected)
+            }
+            let coords = "[interArrival=\(cell.interArrivalMs)ms]"
+            XCTAssertTrue(aInFlight,
+                "\(coords) A's action must begin within timeout — gate setup is broken")
+
+            // Wait the inter-arrival sleep so the second publish lands
+            // outside the coalesce window (the contract under test).
+            try await Task.sleep(for: .milliseconds(cell.interArrivalMs))
+            await bus.publish(.acConnected)            // B — must be dropped
+            // Give the output a chance to evaluate B against the in-flight
+            // guard. If B were going to surface (bug), it would land here;
+            // if dropped (correct), the predicate stays false.
+            _ = await awaitUntil(timeout: 0.3) {
+                spy.actions().count >= 2
+            }
+
+            // Release A so the lifecycle drains; wait for postAction
+            // before tearing down so we read a stable spy state.
+            token.release()
+            _ = await awaitUntil(timeout: 1.0) {
+                spy.calls.contains { $0.phase == .post }
+            }
+
+            let actions = spy.actions()
             XCTAssertEqual(actions.count, 1,
-                "[interArrival=\(cell.interArrivalMs)ms actionDur=\(cell.actionDurationMs)ms] " +
-                "second stimulus must drop while first lifecycle in flight, got actions=\(actions.count)")
+                "\(coords) second stimulus must drop while first lifecycle in flight, got actions=\(actions.count)")
             let multiplier = actions.first?.multiplier ?? 0
             XCTAssertEqual(multiplier, 1.0, accuracy: 0.01,
-                "[interArrival=\(cell.interArrivalMs)ms] " +
-                "expected baseline multiplier=1.0 (no stack), got \(multiplier)")
+                "\(coords) expected baseline multiplier=1.0 (no stack), got \(multiplier)")
+
+            task.cancel()
         }
     }
 

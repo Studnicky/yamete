@@ -30,6 +30,13 @@ final class MatrixBusStressRapidFire_Tests: XCTestCase {
     /// 100 publishes of `.acConnected` arriving inside the 16ms coalesce
     /// window must produce exactly one action whose multiplier is capped at
     /// 2.0 by `min(2.0, pendingMultiplier + intensity * 0.5)`.
+    ///
+    /// Round 6 hardening: the fixed `Task.sleep(10ms)` lead before the
+    /// burst raced subscriber registration on the slow CI runner — when
+    /// `consume()` had not yet subscribed, the entire 100-publish burst
+    /// was dropped (0 actions instead of 1). Replace with a poll on
+    /// `_testSubscriberCount() > 0` and replace the tail wait with
+    /// `awaitUntil` on `spy.actions().count >= 1`.
     func testHundredSameKindCoalescesToOneActionMultiplierCapped() async throws {
         let bus = await makeBus()
         let spy = MatrixSpyOutput()
@@ -39,11 +46,20 @@ final class MatrixBusStressRapidFire_Tests: XCTestCase {
         let task = Task { await spy.consume(from: bus, configProvider: provider) }
         defer { task.cancel() }
 
-        try await Task.sleep(for: .milliseconds(10))
+        // Wait until the subscriber is registered before bursting — under
+        // CI the consume() subscribe can take >10ms and the old fixed lead
+        // let the burst race subscription, dropping all 100 events.
+        _ = await awaitUntil(timeout: 1.0) {
+            await bus._testSubscriberCount() > 0
+        }
         for _ in 0..<100 {
             await bus.publish(.acConnected)
         }
-        try await Task.sleep(for: .milliseconds(120))
+        // Poll until the coalesced action lands (or timeout) — replaces
+        // the brittle fixed 120ms tail sleep.
+        _ = await awaitUntil(timeout: 2.0) {
+            spy.actions().count >= 1
+        }
 
         let actions = spy.actions()
         XCTAssertEqual(actions.count, 1,
