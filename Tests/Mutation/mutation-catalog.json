@@ -840,52 +840,7 @@
       "targetFile": "Sources/YameteApp/SettingsStore.swift"
     },
     {
-      "description": "FlowLayout.makeRows — flatten the wrap predicate so every item joins row 0; multi-row layouts must NOT collapse to a single row when ideal width exceeds the proposal.",
-      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_wrapsWhenRowFull",
-      "expectedFailureSubstring": "[ui-gate=flowLayout-wrap-row-full]",
-      "id": "ui-flowLayout-wrap-row-full",
-      "replace": "if true || lastRow.indices.isEmpty {",
-      "search": "if proposed <= maxWidth || lastRow.indices.isEmpty {",
-      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
-    },
-    {
-      "description": "FlowLayout.makeRows — drop the empty-row fallback so an oversized first item lands in a fresh row, leaving the initial Row() orphaned and inflating total height by one inter-row spacing.",
-      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_emptyRowFallback",
-      "expectedFailureSubstring": "[ui-gate=flowLayout-empty-row-fallback]",
-      "id": "ui-flowLayout-empty-row-fallback",
-      "replace": "if proposed <= maxWidth || false {",
-      "search": "if proposed <= maxWidth || lastRow.indices.isEmpty {",
-      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
-    },
-    {
-      "description": "FlowLayout.sizeThatFits — drop the inter-row spacing accumulator; multi-row totalHeight must include spacing * (rows - 1).",
-      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_interRowSpacingAccumulator",
-      "expectedFailureSubstring": "[ui-gate=flowLayout-inter-row-spacing]",
-      "id": "ui-flowLayout-inter-row-spacing",
-      "replace": "+ 0.0",
-      "search": "+ spacing * CGFloat(max(0, rows.count - 1))",
-      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
-    },
-    {
-      "description": "FlowLayout.sizeThatFits — flip the nil-proposal-width fallback from .infinity to 0; rendering with no parent width constraint must NOT force every item onto its own row.",
-      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_nilProposalFallsBackToInfinity",
-      "expectedFailureSubstring": "[ui-gate=flowLayout-nil-proposal-infinity]",
-      "id": "ui-flowLayout-nil-proposal-infinity",
-      "replace": "let maxWidth = proposal.width ?? 0",
-      "search": "let maxWidth = proposal.width ?? .infinity",
-      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
-    },
-    {
-      "description": "FlowLayout.makeRows — stop tracking the running max child height per row; rows containing a tall child after a short child must report the tall height, not the short one.",
-      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_rowHeightTakesMaxOfChildren",
-      "expectedFailureSubstring": "[ui-gate=flowLayout-row-height-max]",
-      "id": "ui-flowLayout-row-height-max",
-      "replace": "rows[lastIdx].height = rows[lastIdx].height",
-      "search": "rows[lastIdx].height = max(rows[lastIdx].height, h)",
-      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
-    },
-    {
-      "description": "RangeSlider — collapse the default labelWidth from 40 to 0; default-call sites lose all label real estate and the slider's intrinsic width drops by 80pt.",
+      "description": "RangeSlider \u2014 collapse the default labelWidth from 40 to 0; default-call sites lose all label real estate and the slider's intrinsic width drops by 80pt.",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_defaultLabelWidth",
       "expectedFailureSubstring": "[ui-gate=rangeSlider-default-labelWidth]",
       "id": "ui-rangeSlider-default-labelWidth",
@@ -894,7 +849,7 @@
       "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
     },
     {
-      "description": "SensitivityRuler — zero out the GeometryReader's vertical frame; the ruler must retain its 16pt vertical footprint so the menu-bar layout stays stable.",
+      "description": "SensitivityRuler \u2014 zero out the GeometryReader's vertical frame; the ruler must retain its 16pt vertical footprint so the menu-bar layout stays stable.",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_intrinsicHeight",
       "expectedFailureSubstring": "[ui-gate=sensitivityRuler-intrinsic-height]",
       "id": "ui-sensitivityRuler-intrinsic-height",
@@ -903,7 +858,7 @@
       "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
     },
     {
-      "description": "SensitivityRuler — collapse the LEFT-gutter Spacer width from 50 to 0; the menu-bar tick region must keep its left padding so labels never crowd the panel edge. Multi-line search disambiguates the left gutter (followed by the GeometryReader) from the right gutter (followed by the HStack close).",
+      "description": "SensitivityRuler \u2014 collapse the LEFT-gutter Spacer width from 50 to 0; the menu-bar tick region must keep its left padding so labels never crowd the panel edge. Multi-line search disambiguates the left gutter (followed by the GeometryReader) from the right gutter (followed by the HStack close).",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_leftGutterWidth",
       "expectedFailureSubstring": "[ui-gate=sensitivityRuler-left-gutter-width]",
       "id": "ui-sensitivityRuler-left-gutter-width",
@@ -912,7 +867,7 @@
       "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
     },
     {
-      "description": "RangeSlider.clamp(position:half:usable:) — drop the lower-bound max() so an overshoot-left x-coordinate runs negative; clamp must hold the position at `half` regardless of how far left the user drags.",
+      "description": "RangeSlider.clamp(position:half:usable:) \u2014 drop the lower-bound max() so an overshoot-left x-coordinate runs negative; clamp must hold the position at `half` regardless of how far left the user drags.",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_clampLowerBound",
       "expectedFailureSubstring": "[ui-gate=rangeSlider-clamp-lower-bound]",
       "id": "ui-rangeSlider-clamp-lower-bound",
@@ -921,7 +876,7 @@
       "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
     },
     {
-      "description": "RangeSlider.clamp(position:half:usable:) — drop the upper-bound min() so an overshoot-right x-coordinate runs past the track; clamp must hold the position at `half + usable` regardless of how far right the user drags.",
+      "description": "RangeSlider.clamp(position:half:usable:) \u2014 drop the upper-bound min() so an overshoot-right x-coordinate runs past the track; clamp must hold the position at `half + usable` regardless of how far right the user drags.",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_clampUpperBound",
       "expectedFailureSubstring": "[ui-gate=rangeSlider-clamp-upper-bound]",
       "id": "ui-rangeSlider-clamp-upper-bound",
@@ -930,7 +885,7 @@
       "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
     },
     {
-      "description": "RangeSlider.applyDrag — disable the low-overshoots-high pair-swap branch so a drag of the low thumb past the high thumb leaves the (low, high) pair in an invalid low > high state.",
+      "description": "RangeSlider.applyDrag \u2014 disable the low-overshoots-high pair-swap branch so a drag of the low thumb past the high thumb leaves the (low, high) pair in an invalid low > high state.",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_applyDrag_lowOvershootSwapsToHigh",
       "expectedFailureSubstring": "[ui-gate=rangeSlider-applyDrag-low-overshoot-swap]",
       "id": "ui-rangeSlider-applyDrag-low-overshoot-swap",
@@ -939,7 +894,7 @@
       "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
     },
     {
-      "description": "RangeSlider.applyDrag — disable the high-overshoots-low pair-swap branch so a drag of the high thumb past the low thumb leaves the (low, high) pair in an invalid high < low state.",
+      "description": "RangeSlider.applyDrag \u2014 disable the high-overshoots-low pair-swap branch so a drag of the high thumb past the low thumb leaves the (low, high) pair in an invalid high < low state.",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_applyDrag_highOvershootSwapsToLow",
       "expectedFailureSubstring": "[ui-gate=rangeSlider-applyDrag-high-overshoot-swap]",
       "id": "ui-rangeSlider-applyDrag-high-overshoot-swap",
@@ -948,7 +903,7 @@
       "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
     },
     {
-      "description": "RangeSlider.applyDrag — flip the overlap-disambiguation translation-sign comparator so a positive-direction drag on overlapped thumbs grabs the LOW thumb instead of HIGH (and vice versa); the wrong thumb leads under thumb overlap.",
+      "description": "RangeSlider.applyDrag \u2014 flip the overlap-disambiguation translation-sign comparator so a positive-direction drag on overlapped thumbs grabs the LOW thumb instead of HIGH (and vice versa); the wrong thumb leads under thumb overlap.",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_applyDrag_overlapPicksByTranslation",
       "expectedFailureSubstring": "[ui-gate=rangeSlider-applyDrag-overlap-translation]",
       "id": "ui-rangeSlider-applyDrag-overlap-translation",
@@ -957,7 +912,7 @@
       "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
     },
     {
-      "description": "SensitivityRuler.ticks — mutate the medium-tier position from 0.50 to 0.40; the five tier marks must lie at the canonical [0.0, 0.25, 0.5, 0.75, 1.0] unit-interval positions so the ruler aligns with the slider track endpoints and SettingsStore tier thresholds.",
+      "description": "SensitivityRuler.ticks \u2014 mutate the medium-tier position from 0.50 to 0.40; the five tier marks must lie at the canonical [0.0, 0.25, 0.5, 0.75, 1.0] unit-interval positions so the ruler aligns with the slider track endpoints and SettingsStore tier thresholds.",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_ticksArrayShape",
       "expectedFailureSubstring": "[ui-gate=sensitivityRuler-ticks-positions]",
       "id": "ui-sensitivityRuler-ticks-positions",
@@ -966,7 +921,7 @@
       "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
     },
     {
-      "description": "SensitivityRuler.position(for:in:) — collapse the per-tick placement formula to 0; every tick must sit at `tick.position * width` so the five tier marks spread across the available width instead of piling up at the origin.",
+      "description": "SensitivityRuler.position(for:in:) \u2014 collapse the per-tick placement formula to 0; every tick must sit at `tick.position * width` so the five tier marks spread across the available width instead of piling up at the origin.",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_positionFormula",
       "expectedFailureSubstring": "[ui-gate=sensitivityRuler-position-formula]",
       "id": "ui-sensitivityRuler-position-formula",
@@ -975,7 +930,7 @@
       "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
     },
     {
-      "description": "Updater.currentVersion(bundle:) — mutate the App-Store-stub fallback literal from \"1.0.0\" to \"0.0.0\"; when Bundle.infoDictionary is nil the helper must return the canonical \"1.0.0\" so the menu-bar footer never displays a degraded version. Multi-line search anchors on the App-Store-branch doc comment to disambiguate from the identical literal in the DIRECT_BUILD branch.",
+      "description": "Updater.currentVersion(bundle:) \u2014 mutate the App-Store-stub fallback literal from \"1.0.0\" to \"0.0.0\"; when Bundle.infoDictionary is nil the helper must return the canonical \"1.0.0\" so the menu-bar footer never displays a degraded version. Multi-line search anchors on the App-Store-branch doc comment to disambiguate from the identical literal in the DIRECT_BUILD branch.",
       "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_updater_currentVersion_fallbackWhenInfoDictionaryNil",
       "expectedFailureSubstring": "[ui-gate=updater-currentVersion-fallback]",
       "id": "ui-updater-currentVersion-fallback",
@@ -984,7 +939,7 @@
       "targetFile": "Sources/YameteApp/Updater.swift"
     },
     {
-      "description": "Updater.isNewer SemVer 2.0 §11.3 — flip the (nil, _?) case to return false so a release version no longer ranks above its own pre-release with the same core. Cell V asserts release \"1.2.3\" > pre-release \"1.2.3-rc1\"; this mutation regresses to the pre-7c \"by-accident\" answer where the pre-release branch was unreachable.",
+      "description": "Updater.isNewer SemVer 2.0 \u00a711.3 \u2014 flip the (nil, _?) case to return false so a release version no longer ranks above its own pre-release with the same core. Cell V asserts release \"1.2.3\" > pre-release \"1.2.3-rc1\"; this mutation regresses to the pre-7c \"by-accident\" answer where the pre-release branch was unreachable.",
       "expectedFailingTest": "UpdaterSemVerOrdering_Tests/testUIGate_updater_semver_releaseBeatsPreRelease",
       "expectedFailureSubstring": "[ui-gate=updater-semver-release-beats-prerelease]",
       "id": "ui-updater-semver-release-beats-prerelease",
@@ -993,7 +948,7 @@
       "targetFile": "Sources/YameteApp/Updater.swift"
     },
     {
-      "description": "Updater.isNewer SemVer 2.0 §11.4.2 — invert the alphanumeric pre-release identifier comparison so ASCII order is reversed. Cell W asserts \"rc2\" > \"rc1\" and \"rc1\" > \"alpha1\" by ASCII lex; this mutation flips both comparisons in the (nil, nil) branch (string identifiers) so the comparator returns the opposite ordering.",
+      "description": "Updater.isNewer SemVer 2.0 \u00a711.4.2 \u2014 invert the alphanumeric pre-release identifier comparison so ASCII order is reversed. Cell W asserts \"rc2\" > \"rc1\" and \"rc1\" > \"alpha1\" by ASCII lex; this mutation flips both comparisons in the (nil, nil) branch (string identifiers) so the comparator returns the opposite ordering.",
       "expectedFailingTest": "UpdaterSemVerOrdering_Tests/testUIGate_updater_semver_alphanumericPreReleaseOrdering",
       "expectedFailureSubstring": "[ui-gate=updater-semver-prerelease-alphanumeric]",
       "id": "ui-updater-semver-prerelease-alphanumeric",
@@ -1002,13 +957,58 @@
       "targetFile": "Sources/YameteApp/Updater.swift"
     },
     {
-      "description": "Updater.isNewer SemVer 2.0 §11.4.1 — break the numeric pre-release identifier comparison by routing it through the string operands instead of integer values. Cell X asserts \"rc.10\" > \"rc.2\" by INTEGER comparison (string lex would give the wrong answer because \"10\" < \"2\" lexicographically). The mutation swaps `x < y` / `x > y` for `a < b` / `a > b`, forcing string lex on numeric identifiers and inverting the test's expected ordering.",
+      "description": "Updater.isNewer SemVer 2.0 \u00a711.4.1 \u2014 break the numeric pre-release identifier comparison by routing it through the string operands instead of integer values. Cell X asserts \"rc.10\" > \"rc.2\" by INTEGER comparison (string lex would give the wrong answer because \"10\" < \"2\" lexicographically). The mutation swaps `x < y` / `x > y` for `a < b` / `a > b`, forcing string lex on numeric identifiers and inverting the test's expected ordering.",
       "expectedFailingTest": "UpdaterSemVerOrdering_Tests/testUIGate_updater_semver_numericPreReleaseOrdering",
       "expectedFailureSubstring": "[ui-gate=updater-semver-prerelease-numeric]",
       "id": "ui-updater-semver-prerelease-numeric",
       "replace": "if a < b { return .orderedAscending }\n                if a > b { return .orderedDescending }",
       "search": "if x < y { return .orderedAscending }\n                if x > y { return .orderedDescending }",
       "targetFile": "Sources/YameteApp/Updater.swift"
+    },
+    {
+      "description": "FlowLayout.balancedRowCounts \u2014 flip the smaller-row-on-top ordering so 5 \u2192 [3, 2] instead of [2, 3].",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_balancedRowCounts",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-balanced-rowcounts]",
+      "id": "ui-flowLayout-balanced-rowcounts",
+      "replace": "out.append(r < (rowCount - extras) ? base + 1 : base)",
+      "search": "out.append(r < (rowCount - extras) ? base : base + 1)",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.balancedRowCounts \u2014 replace ceiling with floor division; 5/4 collapses to 1 row, 13/4 to 3.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_rowCountCeiling",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-row-count-ceiling]",
+      "id": "ui-flowLayout-row-count-ceiling",
+      "replace": "let rowCount = max(1, total / cap)",
+      "search": "let rowCount = max(1, (total + cap - 1) / cap)",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.sizeThatFits \u2014 drop the inter-row spacing accumulator; multi-row reports collapse by (rows-1)*spacing.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_totalHeightAccumulator",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-total-height-accumulator]",
+      "id": "ui-flowLayout-total-height-accumulator",
+      "replace": "let totalH = rowH * CGFloat(counts.count)",
+      "search": "let totalH = rowH * CGFloat(counts.count) + spacing * CGFloat(max(0, counts.count - 1))",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.uniformRowHeight \u2014 flip max to min so the global row height shrinks to the smallest child rather than the largest.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_uniformRowHeightAcrossRows",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-uniform-row-height]",
+      "id": "ui-flowLayout-uniform-row-height",
+      "replace": "for s in subviews { h = min(h == 0 ? .infinity : h, s.sizeThatFits(.unspecified).height) }",
+      "search": "for s in subviews { h = max(h, s.sizeThatFits(.unspecified).height) }",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.placeSubviews \u2014 divide by (n+1) instead of n; per-button width shrinks and the row leaves trailing slack.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_perRowEvenSubdivision",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-per-row-subdivision]",
+      "id": "ui-flowLayout-per-row-subdivision",
+      "replace": "let perItem = availableWidth / max(1, nF + 1)",
+      "search": "let perItem = availableWidth / max(1, nF)",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
     }
   ]
 }

@@ -92,105 +92,75 @@ final class UIGatesPhase7B_Tests: XCTestCase {
         )
     }
 
-    /// Cell A — wrap-when-row-full gate. Three 60pt-wide children proposed
-    /// into a 100pt row must wrap (1 + 1 wraps to 2 rows or similar). With
-    /// the wrap gate removed (`proposed <= maxWidth` → always-true), all
-    /// three squeeze onto a single row and the rendered height collapses
-    /// to one child's height.
-    func testUIGate_flowLayout_wrapsWhenRowFull() {
-        let s = flowSize(width: 100, childSize: CGSize(width: 60, height: 30),
-                         count: 3, spacing: 4)
-        // 60 + 4 + 60 = 124 > 100 → second item wraps. 60 alone in row 3
-        // (third item also can't fit two-on-a-row in 100pt). Rows = 3,
-        // height = 30*3 + 2*4 = 98. Lower bound 60 catches "all squeezed
-        // into one row" (height=30) and "two-rows-only" mistake (height=64).
-        XCTAssertGreaterThanOrEqual(s.height, 60,
-            "[ui-gate=flowLayout-wrap-row-full] expected ≥60pt height " +
-            "(multi-row wrap) for 3×60pt children in 100pt row; got \(s.height) " +
-            "— production gate `proposed <= maxWidth` likely removed")
+    /// Cell A — balanced row count formula. 5 buttons must split 2+3 with
+    /// the smaller row on top so column rails stay aligned. Mutating the
+    /// distribution flips the order or collapses the rows.
+    func testUIGate_flowLayout_balancedRowCounts() {
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 0, cap: 4), [],
+            "[ui-gate=flowLayout-balanced-rowcounts] empty input → empty output")
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 1, cap: 4), [1])
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 4, cap: 4), [4],
+            "[ui-gate=flowLayout-balanced-rowcounts] 4 → [4] (single row)")
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 5, cap: 4), [2, 3],
+            "[ui-gate=flowLayout-balanced-rowcounts] 5 → [2, 3] (smaller on top)")
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 6, cap: 4), [3, 3])
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 7, cap: 4), [3, 4])
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 8, cap: 4), [4, 4])
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 9, cap: 4), [3, 3, 3])
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 10, cap: 4), [3, 3, 4])
     }
 
-    /// Cell B — empty-row fallback gate. The wrap predicate keeps an
-    /// `|| lastRow.indices.isEmpty` clause so the very first child never
-    /// gets bounced into a fresh row even when oversized. Removing that
-    /// clause leaves the initial empty `Row()` orphaned, padding the total
-    /// height by one extra inter-row spacing.
-    ///
-    /// Configuration: 3 oversized children (100×30) into a 20pt row with
-    /// 20pt inter-row spacing. Original layout: rows = [[0]], [[1]], [[2]],
-    /// height = 90 + 40 = 130. Mutated layout: rows = [[], [0], [1], [2]],
-    /// height = 0 + 90 + 60 = 150.
-    func testUIGate_flowLayout_emptyRowFallback() {
-        let s = flowSize(width: 20, childSize: CGSize(width: 100, height: 30),
-                         count: 3, spacing: 20)
-        XCTAssertLessThanOrEqual(s.height, 140,
-            "[ui-gate=flowLayout-empty-row-fallback] expected ≤140pt height " +
-            "(three rows, two spacings) for oversized first item; got \(s.height) " +
-            "— production gate `|| lastRow.indices.isEmpty` likely removed, " +
-            "leaving an orphan empty row")
+    /// Cell B — row count is ceil(total / cap). Floor-division would
+    /// orphan an item (5 buttons → 1 row) or with cap=3 produce 4 buttons
+    /// in a single row when 2 rows are required.
+    func testUIGate_flowLayout_rowCountCeiling() {
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 5, cap: 4).count, 2,
+            "[ui-gate=flowLayout-row-count-ceiling] 5 / 4 = 2 rows")
+        XCTAssertEqual(FlowLayout.balancedRowCounts(total: 13, cap: 4).count, 4,
+            "[ui-gate=flowLayout-row-count-ceiling] 13 / 4 = 4 rows")
     }
 
-    /// Cell C — inter-row spacing accumulator. `sizeThatFits` adds
-    /// `spacing * (rows.count - 1)` to the rendered height. Removing the
-    /// accumulator collapses inter-row gaps and the rendered height drops
-    /// by `spacing * (rows - 1)`.
-    ///
-    /// Three children of 60×30 in a 100pt row with spacing=20: original
-    /// rows=3, height = 90 + 40 = 130. Mutated (no spacing accumulation):
-    /// height = 90.
-    func testUIGate_flowLayout_interRowSpacingAccumulator() {
-        let s = flowSize(width: 100, childSize: CGSize(width: 60, height: 30),
-                         count: 3, spacing: 20)
-        XCTAssertGreaterThanOrEqual(s.height, 110,
-            "[ui-gate=flowLayout-inter-row-spacing] expected ≥110pt height " +
-            "(3 rows × 30pt + 2 × 20pt spacing) but got \(s.height) " +
-            "— production gate `+ spacing * (rows.count - 1)` likely removed")
+    /// Cell C — total height accumulator includes inter-row spacing.
+    /// 5 children of 30pt each in 2 rows with 20pt spacing should report
+    /// 30 + 20 + 30 = 80pt of height; dropping the spacing term collapses
+    /// to 60pt.
+    func testUIGate_flowLayout_totalHeightAccumulator() {
+        let s = flowSize(width: 200, childSize: CGSize(width: 30, height: 30),
+                         count: 5, spacing: 20)
+        XCTAssertGreaterThanOrEqual(s.height, 70,
+            "[ui-gate=flowLayout-total-height-accumulator] 2-row layout " +
+            "must include inter-row spacing; got \(s.height)")
     }
 
-    /// Cell D — `proposal.width ?? .infinity` fallback. When the parent
-    /// proposes no width (`.unspecified`), FlowLayout treats `maxWidth` as
-    /// `.infinity` so all items fit on one row. Mutating the fallback to
-    /// `?? 0` flips the maxWidth to zero, forcing every item onto its own
-    /// row (the empty-row fallback still accepts each first item, then
-    /// every subsequent proposed width exceeds 0).
-    ///
-    /// Five 40×30 children with no parent width frame: original height = 30.
-    /// Mutated height = 5 × 30 + 4 × 4 = 166.
-    func testUIGate_flowLayout_nilProposalFallsBackToInfinity() {
+    /// Cell D — uniform row height. Both rows render at the GLOBAL max
+    /// intrinsic height of any subview, not the per-row max. Mixed 30pt
+    /// and 60pt children → both rows at 60pt.
+    func testUIGate_flowLayout_uniformRowHeightAcrossRows() {
         let s = intrinsicSize(
             FlowLayout(spacing: 4) {
-                ForEach(0..<5, id: \.self) { _ in
-                    Color.red.frame(width: 40, height: 30)
+                ForEach(0..<4, id: \.self) { _ in
+                    Color.red.frame(width: 30, height: 30)
                 }
-            }
-            .fixedSize(horizontal: true, vertical: true)
-        )
-        XCTAssertLessThanOrEqual(s.height, 60,
-            "[ui-gate=flowLayout-nil-proposal-infinity] expected ≤60pt height " +
-            "(single row, no width constraint) for 5 children with " +
-            ".fixedSize(horizontal: true) outer; got \(s.height) " +
-            "— production gate `?? .infinity` likely flipped to `?? 0`")
-    }
-
-    /// Cell E — row height = max of children. Each row's height is the
-    /// max of its children's heights. With 30pt and 60pt children both in
-    /// row 0, original row height = 60 → total height = 60. Mutating
-    /// `max(rows[lastIdx].height, h)` to drop the running max would leave
-    /// row height stuck at the FIRST child's 30pt, hiding the taller child.
-    func testUIGate_flowLayout_rowHeightTakesMaxOfChildren() {
-        let s = intrinsicSize(
-            FlowLayout(spacing: 4) {
-                Color.red.frame(width: 30, height: 30)
                 Color.blue.frame(width: 30, height: 60)
             }
-            .frame(width: 200)
+            .frame(width: 400)
             .fixedSize(horizontal: false, vertical: true)
         )
-        XCTAssertGreaterThanOrEqual(s.height, 50,
-            "[ui-gate=flowLayout-row-height-max] expected ≥50pt row height " +
-            "(max of 30pt and 60pt children); got \(s.height) " +
-            "— production gate `max(rows[lastIdx].height, h)` likely " +
-            "drifted to the first child's height")
+        XCTAssertGreaterThanOrEqual(s.height, 100,
+            "[ui-gate=flowLayout-uniform-row-height] both rows render at " +
+            "60pt (global max); expected ≥100pt got \(s.height)")
+    }
+
+    /// Cell E — per-row even subdivision respects the proposal width
+    /// exactly (the container fills bounds.width). 5 children in a 200pt
+    /// frame split 2+3 with uniform 30pt row height → 64pt total.
+    func testUIGate_flowLayout_perRowEvenSubdivision() {
+        let s = flowSize(width: 200, childSize: CGSize(width: 100, height: 30),
+                         count: 5, spacing: 4)
+        XCTAssertEqual(s.width, 200, accuracy: 1.0,
+            "[ui-gate=flowLayout-per-row-subdivision] width matches proposal")
+        XCTAssertEqual(s.height, 64, accuracy: 2.0,
+            "[ui-gate=flowLayout-per-row-subdivision] 5 items in 200pt → 64pt total; got \(s.height)")
     }
 
     // MARK: - RangeSlider cell
