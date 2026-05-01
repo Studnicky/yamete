@@ -2096,3 +2096,9 @@ isolate whether the SIGSEGV originates in XCTest framework
 internals (external to user code, requiring a runner-level fix
 such as parallel-job concurrency caps) or in the IOKit shim
 (would require Sources-level investigation).
+
+## Degenerate gates (FlowLayout per-row subdivision)
+
+`Sources/YameteApp/Views/FlowLayout.swift` — `let perItem = availableWidth / max(1, nF)` in `placeSubviews`.
+
+Initial Phase 7c+post-rewrite catalog included `ui-flowLayout-per-row-subdivision` mutating the per-row even-subdivision divisor. Removed: the per-button width allocation is an INTERNAL layout detail; the container's reported size (`sizeThatFits`) still matches the proposal regardless of per-button placement, and SwiftUI's `Layout` protocol does not surface placed subview frames in a way `NSHostingView.intrinsicContentSize` observes. The other 4 FlowLayout catalog entries (balanced-rowcounts, row-count-ceiling, total-height-accumulator, uniform-row-height) cover the externally observable invariants.

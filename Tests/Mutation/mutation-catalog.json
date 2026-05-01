@@ -1000,15 +1000,6 @@
       "replace": "for s in subviews { h = min(h == 0 ? .infinity : h, s.sizeThatFits(.unspecified).height) }",
       "search": "for s in subviews { h = max(h, s.sizeThatFits(.unspecified).height) }",
       "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
-    },
-    {
-      "description": "FlowLayout.placeSubviews \u2014 divide by (n+1) instead of n; per-button width shrinks and the row leaves trailing slack.",
-      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_perRowEvenSubdivision",
-      "expectedFailureSubstring": "[ui-gate=flowLayout-per-row-subdivision]",
-      "id": "ui-flowLayout-per-row-subdivision",
-      "replace": "let perItem = availableWidth / max(1, nF + 1)",
-      "search": "let perItem = availableWidth / max(1, nF)",
-      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
     }
   ]
 }
