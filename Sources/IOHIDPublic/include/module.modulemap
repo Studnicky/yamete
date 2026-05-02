@@ -1,4 +1,4 @@
 module IOHIDPublic {
-    header "IOHIDPublic.h"
+    umbrella header "IOHIDPublic.h"
     export *
 }

@@ -23,7 +23,7 @@ jobs:
     name: Lint workflow YAML
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Run actionlint
         uses: raven-actions/actionlint@v2
 
@@ -31,7 +31,9 @@ jobs:
     name: Lint (strict concurrency)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
+      - name: Verify framework lists
+        run: make lint-frameworks
       - name: Type-check with strict concurrency
         run: make lint
 
@@ -39,7 +41,7 @@ jobs:
     name: Build
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Build Direct bundle
         run: make build
       - name: Build App Store bundle
@@ -62,7 +64,18 @@ jobs:
     name: Test
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       # Route through Makefile so local `make test` and CI stay in sync.
+      # Hardware-dependent integration tests self-skip via XCTSkip when the
+      # specific hardware (keyboard backlight, built-in trackpad, accessible
+      # audio device, bundle resources) isn't present on the runner.
       - name: Run tests
         run: make test
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            .build/**/*.xcresult
+          retention-days: 7

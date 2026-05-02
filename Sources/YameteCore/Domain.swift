@@ -51,29 +51,6 @@ public enum ImpactTier: Int, CaseIterable, Sendable, CustomStringConvertible {
     }
 }
 
-// MARK: - Response protocols
-
-/// Plays audio scaled by impact intensity. Returns clip duration.
-@MainActor
-public protocol AudioResponder {
-    @discardableResult
-    func play(intensity: Float, volumeMin: Float, volumeMax: Float, deviceUIDs: [String]) -> Double
-    func playOnAllDevices(url: URL, volume: Float)
-    var longestSoundURL: URL? { get }
-}
-
-/// Visual reaction to an impact. Implementations include the full-screen
-/// overlay (`ScreenFlash`) and the system notification responder
-/// (`NotificationResponder`); both fire from the same dispatch path.
-///
-/// `flash` is the historical method name kept for source compatibility.
-/// Parameter shape is preserved as a flat list rather than a typed request
-/// object — the typed-request refactor is tracked separately.
-@MainActor
-public protocol VisualResponder {
-    func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, dismissAfter: Double, enabledDisplayIDs: [Int])
-}
-
 // MARK: - Type-safe identifiers
 
 /// Uniquely identifies a sensor adapter. Prevents accidental use of display names as dictionary keys.
@@ -86,6 +63,19 @@ public struct SensorID: Hashable, Sendable, RawRepresentable, CustomStringConver
     public static let accelerometer = SensorID("accelerometer")
     public static let microphone = SensorID("microphone")
     public static let headphoneMotion = SensorID("headphone-motion")
+
+    /// Event sources — same identifier surface as sensor sources so the
+    /// settings store can persist a single `enabledSensorIDs`-shaped list.
+    public static let usb = SensorID("usb")
+    public static let power = SensorID("power")
+    public static let audioPeripheral = SensorID("audio-peripheral")
+    public static let bluetooth = SensorID("bluetooth")
+    public static let thunderbolt = SensorID("thunderbolt")
+    public static let displayHotplug = SensorID("display-hotplug")
+    public static let sleepWake = SensorID("sleep-wake")
+    public static let trackpadActivity = SensorID("trackpad_activity")
+    public static let mouseActivity    = SensorID("mouse_activity")
+    public static let keyboardActivity = SensorID("keyboard_activity")
 }
 
 // MARK: - Display helpers

@@ -1,5 +1,13 @@
 /* Yamete — English (Base) Localizable Strings */
 
+/* App identity */
+"app_title"   = "Yamete";
+"app_tagline" = "An app that reacts when you smack your MacBook.";
+
+/* Footer labels */
+"label_reset_settings" = "Reset Settings";
+"label_quit"           = "Quit";
+
 /* Header Section */
 
 /* Daily impact counter */
@@ -20,7 +28,7 @@
 "help_reactivity" = "Impact force response window. Low thumb = weakest force that triggers. High thumb = force for maximum response. Higher values respond to lighter impacts.";
 
 /* Volume setting title */
-"setting_volume" = "Volume";
+"setting_volume" = "Playback Volume";
 
 /* Volume setting help text */
 "help_volume" = "Audio playback level window. Intensity maps linearly between low and high. Clip selection also follows intensity — lighter impacts play shorter clips.";
@@ -35,16 +43,12 @@
 "setting_notification_locale" = "Notification Language";
 
 /* Notification language picker help */
-"help_notification_locale" = "Language used for notification body text. Defaults to your system language. Each language carries the same playful arc — only the words change.";
 
 /* Visual response setting title */
-"setting_visual_response" = "Flash Mode";
 
 /* Visual response setting help text */
-"help_visual_response" = "How the flash response fires. Overlay flashes the selected displays; Notification posts a banner; Off disables both. The menu bar icon always reacts when an impact fires, regardless of this setting.";
 
 /* Notification response mode help text */
-"notification_mode_hint" = "Notification mode posts an impact banner to Notification Center. The entry is removed from Notification Center after the cooldown; how long the on-screen banner stays visible is controlled by macOS.";
 
 /* Sensitivity Ruler Labels */
 
@@ -66,7 +70,6 @@
 /* Sensitivity & Sensors Section */
 
 /* Sensitivity & Sensors accordion title */
-"section_sensitivity_sensors" = "Sensitivity & Sensors";
 
 /* Sensor consensus setting title */
 "setting_consensus" = "Sensor Consensus";
@@ -154,10 +157,8 @@
 /* Devices Section */
 
 /* Devices accordion title */
-"section_devices" = "Devices";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%1$lld displays, %2$lld audio";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Flash Displays";
@@ -165,23 +166,20 @@
 /* Flash displays setting help text */
 "help_flash_displays" = "Select which monitors show the flash overlay on impact.";
 
+/* Flash active display only toggle label */
+"setting_flash_active_display" = "Active display only";
+
 /* Visual response mode setting title */
-"setting_visual_mode" = "Visual Mode";
 
 /* Visual response mode help text */
-"help_visual_mode" = "Choose between the full-screen overlay and a temporary notification response.";
 
 /* Visual response off label */
-"response_mode_off" = "Off";
 
 /* Overlay response mode label */
-"response_mode_overlay" = "Overlay";
 
 /* Notification response mode label */
-"response_mode_notification" = "Notify";
 
 /* Notification mode display hint */
-"notification_display_hint" = "Notification mode ignores display selection. The notification is removed from Notification Center after the cooldown; banner visibility duration is controlled by macOS.";
 
 /* Audio output setting title */
 "setting_audio_output" = "Audio Output";
@@ -238,13 +236,10 @@
 "button_support" = "Support";
 
 /* Privacy policy accessibility label */
-"action_open_privacy_policy" = "Open Privacy Policy";
 
 /* Support accessibility label */
-"action_open_support" = "Open Support";
 
 /* Impact notification title */
-"notification_title" = "Yamete";
 
 /* Impact notification title and body pools live in Moans.strings.
    See App/Resources/en.lproj/Moans.strings for the App-Store-safe defaults
@@ -324,3 +319,134 @@
 
 /* Microphone onboarding skip button */
 "mic_onboarding_skip" = "Skip";
+
+/* LED / Keyboard section */
+"setting_led_enabled" = "Caps Lock LED";
+"setting_keyboard_leds" = "Keyboard";
+"help_keyboard_leds" = "Flashes the Caps Lock LED and oscillates the keyboard backlight on each reaction. Both restore to their original state after the animation.";
+"setting_led_brightness" = "LED Brightness";
+"help_led_brightness" = "Range of pulse brightness scaled by impact intensity. Min for the lightest reactions, Max for the strongest.";
+
+/* Events section */
+"event_usb"               = "USB";
+"event_power"             = "Power";
+"event_audio_peripheral"  = "Audio Devices";
+"event_bluetooth"         = "Bluetooth";
+"event_thunderbolt"       = "Thunderbolt";
+"event_display"           = "Display Hot-plug";
+"event_sleep_wake"        = "Sleep / Wake";
+
+/* Per-reaction matrix labels */
+"kind_usb_attached"       = "Plugged in";
+"kind_usb_detached"       = "Unplugged";
+"kind_ac_connected"       = "AC connected";
+"kind_ac_disconnected"    = "AC disconnected";
+"kind_audio_attached"     = "Device added";
+"kind_audio_detached"     = "Device removed";
+"kind_bt_connected"       = "Connected";
+"kind_bt_disconnected"    = "Disconnected";
+"kind_tb_attached"        = "Attached";
+"kind_tb_detached"        = "Detached";
+"kind_display_configured" = "Reconfigured";
+"kind_will_sleep"         = "Going to sleep";
+"kind_did_wake"           = "Waking up";
+
+/* Output toggles (independent) */
+"setting_visual_response_flash" = "Screen Flash";
+"help_visual_response_flash"    = "Flashes an overlay on selected displays when an impact or event is detected. Opacity scales with intensity.";
+"setting_notifications"         = "Notifications";
+"help_notifications"            = "Posts a system notification for each reaction. Draws from the moan/event phrase pools.";
+
+/* Haptic output */
+"setting_haptic"            = "Haptic Feedback";
+"help_haptic"               = "Fires rapid Force Touch haptic pulses on impact. Pulse density scales with reaction intensity. Requires a Mac with a Force Touch trackpad.";
+"setting_haptic_intensity"  = "Pulse Density";
+"help_haptic_intensity"     = "Multiplier for the number of haptic pulses per reaction. Higher values produce denser bursts.";
+
+/* Display brightness output */
+"setting_display_brightness"    = "Display Brightness";
+"help_display_brightness"       = "Briefly spikes display brightness above your current level on impact, then fades back. Uses DisplayServices (private framework, loaded at runtime).";
+"setting_brightness_boost"      = "Boost";
+"help_brightness_boost"         = "How much above your current brightness level to spike. 50% adds 0.5 to a max of 1.0.";
+"setting_brightness_threshold"  = "Minimum Intensity";
+"help_brightness_threshold"     = "Impact intensity required to trigger the brightness spike. Lighter impacts below this level are ignored.";
+
+/* Display tint output */
+"setting_display_tint"      = "Screen Tint";
+"help_display_tint"         = "Briefly tints the display pink by adjusting the gamma table. Skipped on macOS 26+. Uses public CoreGraphics APIs.";
+"setting_tint_intensity"    = "Tint Depth";
+"help_tint_intensity"       = "How strongly to crush the green and blue gamma channels. Higher values produce a more vivid pink flash.";
+
+/* Volume spike output (Direct only) */
+"setting_volume_spike"          = "Volume Override";
+
+/* Trackpad tuning section */
+"section_trackpad_tuning"       = "Trackpad Tuning";
+"setting_trackpad_window"       = "Activity Window";
+"help_trackpad_window"          = "Duration of the sliding window used to accumulate trackpad activity. Longer windows are more forgiving but slower to react.";
+
+/* Trackpad reaction kind labels */
+"kind_trackpad_touching"    = "Excessive touching";
+"kind_trackpad_sliding"     = "Sliding";
+
+/* Trackpad event source */
+"event_trackpad"            = "Trackpad Activity";
+
+/* Trackpad tuning — scroll sensitivity */
+"setting_trackpad_scroll"   = "Scroll & Swipe";
+"help_trackpad_scroll"      = "Activity range for scroll and swipe detection. Left edge = starts firing, right edge = full intensity. Lower values react to lighter touches.";
+
+/* Trackpad tuning — finger contact */
+"setting_trackpad_contact"  = "Finger Contact";
+"help_trackpad_contact"     = "Duration range for resting-finger detection. Fires after the left-edge duration; reaches full intensity at the right-edge duration. Requires at least a brief scroll gesture to detect contact.";
+
+/* Trackpad tuning — tap rate */
+"setting_trackpad_tap"      = "Tap Rate";
+"help_trackpad_tap"         = "Taps-per-second range for rapid tap detection. Left edge = minimum rate to fire, right edge = full intensity rate. Counts any quick click (< 300 ms hold) from any input device.";
+
+/* Unit format — taps per second */
+"unit_taps_per_sec"         = "%.1f/s";
+
+/* Trackpad reaction kind labels */
+"kind_trackpad_contact"     = "Resting";
+"kind_trackpad_tapping"     = "Tapping";
+"kind_trackpad_circling"    = "Circling";
+
+/* Trackpad tuning — circling */
+"setting_trackpad_circle"   = "Circling detection";
+"help_trackpad_circle"      = "Detects rapid finger circles on trackpad — fires the long moan at max volume.";
+
+/* Output matrix legend labels (very short) */
+"legend_sound"  = "Sound";
+"legend_flash"  = "Flash";
+"legend_notif"  = "Notif";
+"legend_led"    = "LED";
+"legend_haptic" = "Haptic";
+"legend_bright" = "Bright";
+"legend_tint"   = "Tint";
+
+/* Sensor names */
+"sensor_accelerometer"    = "Accelerometer";
+"sensor_microphone"       = "Microphone";
+"sensor_headphone_motion" = "Headphone Motion";
+
+/* Stimulus source tooltips */
+"help_source_usb"              = "Fires a reaction when a USB device is plugged in or unplugged.";
+"help_source_power"            = "Fires a reaction when the power adapter is connected or disconnected.";
+"help_source_audio_peripheral" = "Fires a reaction when audio devices (headphones, speakers) are added or removed.";
+"help_source_bluetooth"        = "Fires a reaction when Bluetooth devices connect or disconnect.";
+"help_source_thunderbolt"      = "Fires a reaction when Thunderbolt devices attach or detach.";
+"help_source_display"          = "Fires a reaction when a display is connected, disconnected, or reconfigured.";
+"help_source_sleep_wake"       = "Fires a reaction when the Mac goes to sleep or wakes up.";
+"help_source_trackpad"         = "Fires reactions on trackpad activity — scrolling, swiping, finger contact, and tapping. Includes per-detection-mode sensitivity tuning.";
+
+/* Mouse / keyboard event sources */
+"event_mouse"                = "Mouse";
+"event_keyboard"             = "Keyboard";
+"help_source_mouse"          = "Fires reactions on mouse button clicks and sustained scroll-wheel activity. Only appears when an external mouse is connected.";
+"help_source_keyboard"       = "Fires a reaction when keyboard typing rate crosses the configured threshold. Requires Input Monitoring permission.";
+
+/* Mouse / keyboard reaction kind labels */
+"kind_mouse_clicked"         = "Clicked";
+"kind_mouse_scrolled"        = "Scrolling";
+"kind_keyboard_typed"        = "Typing";

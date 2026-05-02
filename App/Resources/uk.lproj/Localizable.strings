@@ -51,7 +51,6 @@
 /* Sensitivity & Sensors Section */
 
 /* Sensitivity & Sensors accordion title */
-"section_sensitivity_sensors" = "Чутливість і датчики";
 
 /* Sensor consensus setting title */
 "setting_consensus" = "Консенсус датчиків";
@@ -139,10 +138,8 @@
 /* Devices Section */
 
 /* Devices accordion title */
-"section_devices" = "Пристрої";
 
 /* Devices section subtitle: display and audio count */
-"devices_subtitle" = "%1$lld дисплеїв, %2$lld аудіо";
 
 /* Flash displays setting title */
 "setting_flash_displays" = "Дисплеї для спалаху";
@@ -204,3 +201,126 @@
 /* No adapters error */
 "No compatible motion sensor found on this Mac." = "На цьому Mac не знайдено сумісного датчика руху.";
 
+
+/* English fallback (translation pending) */
+"app_tagline" = "An app that reacts when you smack your MacBook.";
+"app_title" = "Yamete";
+"button_privacy" = "Privacy";
+"button_reset" = "Reset";
+"button_support" = "Support";
+"button_update" = "Update";
+"event_audio_peripheral" = "Audio Devices";
+"event_bluetooth" = "Bluetooth";
+"event_display" = "Display Hot-plug";
+"event_keyboard" = "Keyboard";
+"event_mouse" = "Mouse";
+"event_power" = "Power";
+"event_sleep_wake" = "Sleep / Wake";
+"event_thunderbolt" = "Thunderbolt";
+"event_trackpad" = "Trackpad Activity";
+"event_usb" = "USB";
+"help_brightness_boost" = "How much above your current brightness level to spike. 50% adds 0.5 to a max of 1.0.";
+"help_brightness_threshold" = "Impact intensity required to trigger the brightness spike. Lighter impacts below this level are ignored.";
+"help_display_brightness" = "Briefly spikes display brightness above your current level on impact, then fades back. Uses DisplayServices (private framework, loaded at runtime).";
+"help_display_tint" = "Briefly tints the display pink by adjusting the gamma table. Skipped on macOS 26+. Uses public CoreGraphics APIs.";
+"help_haptic" = "Fires rapid Force Touch haptic pulses on impact. Pulse density scales with reaction intensity. Requires a Mac with a Force Touch trackpad.";
+"help_haptic_intensity" = "Multiplier for the number of haptic pulses per reaction. Higher values produce denser bursts.";
+"help_hp_rise_rate" = "Minimum magnitude increase between motion samples. Sharp head jolts rise fast. Gradual movement rises slowly.";
+"help_hp_spike_threshold" = "Minimum userAcceleration magnitude (g-force) to consider as impact. Normal head movement is below 0.05g.";
+"help_keyboard_leds" = "Flashes the Caps Lock LED and oscillates the keyboard backlight on each reaction. Both restore to their original state after the animation.";
+"help_led_brightness" = "Range of pulse brightness scaled by impact intensity. Min for the lightest reactions, Max for the strongest.";
+"help_mic_rise_rate" = "Minimum amplitude increase between audio buffers. Sharp transients rise fast. Gradual ambient changes rise slowly.";
+"help_mic_spike_threshold" = "Minimum HP-filtered audio amplitude to consider as impact. Higher values require louder desk sounds.";
+"help_notifications" = "Posts a system notification for each reaction. Draws from the moan/event phrase pools.";
+"help_source_audio_peripheral" = "Fires a reaction when audio devices (headphones, speakers) are added or removed.";
+"help_source_bluetooth" = "Fires a reaction when Bluetooth devices connect or disconnect.";
+"help_source_display" = "Fires a reaction when a display is connected, disconnected, or reconfigured.";
+"help_source_keyboard" = "Fires a reaction when keyboard typing rate crosses the configured threshold. Requires Input Monitoring permission.";
+"help_source_mouse" = "Fires reactions on mouse button clicks and sustained scroll-wheel activity. Only appears when an external mouse is connected.";
+"help_source_power" = "Fires a reaction when the power adapter is connected or disconnected.";
+"help_source_sleep_wake" = "Fires a reaction when the Mac goes to sleep or wakes up.";
+"help_source_thunderbolt" = "Fires a reaction when Thunderbolt devices attach or detach.";
+"help_source_trackpad" = "Fires reactions on trackpad activity — scrolling, swiping, finger contact, and tapping. Includes per-detection-mode sensitivity tuning.";
+"help_source_usb" = "Fires a reaction when a USB device is plugged in or unplugged.";
+"help_tint_intensity" = "How strongly to crush the green and blue gamma channels. Higher values produce a more vivid pink flash.";
+"help_trackpad_circle" = "Detects rapid finger circles on trackpad — fires the long moan at max volume.";
+"help_trackpad_contact" = "Duration range for resting-finger detection. Fires after the left-edge duration; reaches full intensity at the right-edge duration. Requires at least a brief scroll gesture to detect contact.";
+"help_trackpad_scroll" = "Activity range for scroll and swipe detection. Left edge = starts firing, right edge = full intensity. Lower values react to lighter touches.";
+"help_trackpad_tap" = "Taps-per-second range for rapid tap detection. Left edge = minimum rate to fire, right edge = full intensity rate. Counts any quick click (< 300 ms hold) from any input device.";
+"help_trackpad_window" = "Duration of the sliding window used to accumulate trackpad activity. Longer windows are more forgiving but slower to react.";
+"help_visual_response_flash" = "Flashes an overlay on selected displays when an impact or event is detected. Opacity scales with intensity.";
+"kind_ac_connected" = "AC connected";
+"kind_ac_disconnected" = "AC disconnected";
+"kind_audio_attached" = "Device added";
+"kind_audio_detached" = "Device removed";
+"kind_bt_connected" = "Connected";
+"kind_bt_disconnected" = "Disconnected";
+"kind_did_wake" = "Waking up";
+"kind_display_configured" = "Reconfigured";
+"kind_keyboard_typed" = "Typing";
+"kind_mouse_clicked" = "Clicked";
+"kind_mouse_scrolled" = "Scrolling";
+"kind_tb_attached" = "Attached";
+"kind_tb_detached" = "Detached";
+"kind_trackpad_circling" = "Circling";
+"kind_trackpad_contact" = "Resting";
+"kind_trackpad_sliding" = "Sliding";
+"kind_trackpad_tapping" = "Tapping";
+"kind_trackpad_touching" = "Excessive touching";
+"kind_usb_attached" = "Plugged in";
+"kind_usb_detached" = "Unplugged";
+"kind_will_sleep" = "Going to sleep";
+"label_links" = "Links";
+"label_quit" = "Quit";
+"label_reset_settings" = "Reset Settings";
+"legend_bright" = "Bright";
+"legend_flash" = "Flash";
+"legend_haptic" = "Haptic";
+"legend_led" = "LED";
+"legend_notif" = "Notif";
+"legend_sound" = "Sound";
+"legend_tint" = "Tint";
+"mic_onboarding_allow" = "Allow";
+"mic_onboarding_body" = "Yamete can use your microphone to detect desk impacts. Audio is processed in real-time and never recorded or transmitted.";
+"mic_onboarding_skip" = "Skip";
+"mic_onboarding_title" = "Microphone Access";
+"no_audio_selected" = "No audio devices selected — sound is muted";
+"no_displays_selected" = "No displays selected — flash is disabled";
+"reset_confirm_cancel" = "Cancel";
+"reset_confirm_message" = "Reset all settings to their default values? This cannot be undone.";
+"reset_confirm_reset" = "Reset";
+"reset_confirm_title" = "Reset Settings";
+"section_hp_tuning" = "Headphone Tuning";
+"section_mic_tuning" = "Microphone Tuning";
+"section_trackpad_tuning" = "Trackpad Tuning";
+"sensor_accelerometer" = "Accelerometer";
+"sensor_headphone_motion" = "Headphone Motion";
+"sensor_microphone" = "Microphone";
+"setting_brightness_boost" = "Boost";
+"setting_brightness_threshold" = "Minimum Intensity";
+"setting_display_brightness" = "Display Brightness";
+"setting_display_tint" = "Screen Tint";
+"setting_haptic" = "Haptic Feedback";
+"setting_haptic_intensity" = "Pulse Density";
+"setting_keyboard_leds" = "Keyboard";
+"setting_led_brightness" = "LED Brightness";
+"setting_led_enabled" = "Caps Lock LED";
+"setting_notification_locale" = "Notification Language";
+"setting_notifications" = "Notifications";
+"setting_tint_intensity" = "Tint Depth";
+"setting_trackpad_circle" = "Circling detection";
+"setting_trackpad_contact" = "Finger Contact";
+"setting_trackpad_scroll" = "Scroll & Swipe";
+"setting_trackpad_tap" = "Tap Rate";
+"setting_trackpad_window" = "Activity Window";
+"setting_visual_response_flash" = "Screen Flash";
+"setting_volume_spike" = "Volume Override";
+"unit_taps_per_sec" = "%.1f/s";
+"update_available_format" = "v%@ available";
+"update_check_tooltip" = "Check for updates";
+"update_checking" = "Checking for updates…";
+"update_downloading" = "Downloading update…";
+"update_installing" = "Installing update…";
+
+/* English fallback (translation pending) */
+"setting_flash_active_display" = "Active display only";

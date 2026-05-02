@@ -1,0 +1,2104 @@
+# Mutation Test Catalog
+
+This directory holds the declarative catalog used by `make mutate`
+(`scripts/mutation-test.sh`) to mechanically re-verify that every
+production gate in `Sources/SensorKit/` has a behavioural test cell that
+catches its removal.
+
+## Why this exists
+
+Mutation pairs ("remove guard X → assert cell Y fails") were previously
+embedded only in agent narration / PR descriptions and forgotten the
+moment the agent ended. This catalog makes them executable, repeatable,
+and CI-targetable. Every release should be able to run `make mutate`
+and confirm `total == caught`.
+
+## Files
+
+- `mutation-catalog.json` — single source of truth. Each entry pairs a
+  production gate (encoded as a literal `search` / `replace` snippet)
+  with the XCTest method that must fail when the gate is removed.
+- `README.md` — this file.
+
+The runner is `scripts/mutation-test.sh`; the Make target is
+`make mutate`.
+
+## CI architecture (Phase 2.1)
+
+Phase 2 wired `make mutate` as a required PR check. At 112 mutations ×
+~5–10 s/entry the full catalog cost ~20 minutes per PR push, which
+blocked iteration. Phase 2.1 splits the gate into a fast per-PR slice
+and a slow full nightly:
+
+| Lane | Trigger | Scope | Runtime | Required? |
+|------|---------|-------|---------|-----------|
+| `mutate-pr` | every PR + push to `master` / `develop` | only entries whose `targetFile` was touched on the branch | ~1–2 min | yes (PR gate) |
+| `mutate-nightly` | daily 08:00 UTC cron + push to `master` / `develop` | full 112-entry catalog | ~20 min | no (informational; opens an issue on regression) |
+
+### `mutate-pr` slice script
+
+`scripts/mutation-test-slice.sh` is the per-PR sustainability layer.
+It does NOT modify `scripts/mutation-test.sh` — the canonical runner
+remains the source of truth for per-mutation outcome semantics. The
+slice script:
+
+1. Resolves the PR base branch via `BASE_REF` env (or
+   `GITHUB_BASE_REF` set by Actions on `pull_request` events; falls
+   back to `develop` for direct push events).
+2. Reads `git diff --name-only <base>...HEAD` for files changed on
+   this branch since divergence.
+3. Filters `Tests/Mutation/mutation-catalog.json` via `jq` to entries
+   whose `targetFile` is in the changed-file set.
+4. If the filtered set is empty, exits 0 immediately — no production
+   gates touched means no mutation work to do. The nightly catches any
+   drift the slice missed.
+5. Otherwise atomically swaps the canonical catalog for the sliced
+   subset, invokes `scripts/mutation-test.sh`, and restores the
+   original catalog on EXIT (success or failure).
+
+The slicing is conservative: it only filters by `targetFile`, not by
+the line range of the diff. A test added on the branch that exercises
+an UN-touched mutation will not run on the slice — the nightly picks
+that up. The intent is "fast + cheap correctness signal on the
+mutations the diff could plausibly break", not "complete coverage on
+every push".
+
+### `mutate-nightly` failure handling
+
+The nightly workflow (`.github/workflows/mutate-nightly.yml`) opens a
+tracking issue tagged `mutation-catalog-regression` when the cron run
+fails. It deduplicates against existing open issues (comments on the
+existing issue rather than spamming new ones). Maintainers triage the
+attached `mutate-nightly-log` artifact, identify the ESCAPED entry, and
+either fix the test cell or remove the catalog entry if the production
+gate it covered was retired. The issue stays open until `make mutate`
+returns `total == caught` again.
+
+### Build cache
+
+Every Swift-touching CI job (including `mutate-pr` and
+`mutate-nightly`) restores `.build/` via `actions/cache@v4` keyed on
+`Package.resolved` + Xcode version + runner OS. Cache hits drop a
+fresh `swift test` from ~3 min to ~30 s, which compounds across the
+catalog walk on the nightly run.
+
+### Snapshot baseline strategy
+
+Pixel-baseline snapshot tests use a runtime variant resolver in
+`Tests/SnapshotUI_Tests.swift` and `Tests/SnapshotUI_Direct_Tests.swift`
+that selects the baseline directory based on environment:
+
+- `HostApp` — running inside `Yamete.app` / `Yamete Direct.app` (host-app xcodebuild lane).
+- `CI` — `ProcessInfo.processInfo.environment["CI"] == "true"` (GitHub Actions runner).
+- `Direct` — SPM build with `-DDIRECT_BUILD`.
+- `AppStore` — default SPM build.
+
+The CI branch wins over the compile-time AppStore / Direct split
+because runner-vs-developer-host pixel drift dominates over compile-flag
+layout drift. CI baselines are seeded once via the manual-trigger
+workflow `.github/workflows/snapshot-baseline-seed.yml`, which records
+a fresh baseline set under `Tests/__Snapshots__/CI/` and opens a PR
+adding them. Trigger that workflow after first deployment and again
+only when a deliberate visual change requires re-baselining.
+
+## Catalog entry shape
+
+```json
+{
+  "id": "trackpad-gesture-recency-gate",
+  "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift",
+  "search":  "guard sinceGesture <= tapAttributionWindow else {",
+  "replace": "guard sinceGesture >= -1 else {",
+  "expectedFailingTest": "MatrixDeviceAttributionTests/testExternalMouseClick_doesNotFireTrackpadTap",
+  "expectedFailureSubstring": "[scenario=external-mouse-click]",
+  "description": "..."
+}
+```
+
+Field rules:
+
+- `id` — unique slug, kebab-case, used as a stable handle in reports.
+- `targetFile` — repo-relative path under `Sources/`.
+- `search` — literal byte-exact string that MUST appear exactly once in
+  the target file. The runner validates uniqueness before applying the
+  mutation. Line numbers are intentionally NOT used — they drift the
+  moment formatting changes; a search/replace pair stays valid as long
+  as the gate's surface text is preserved.
+- `replace` — literal replacement string. Must keep the file
+  syntactically valid Swift (the runner reports a build failure as an
+  infrastructure failure, not as a caught mutation).
+- `expectedFailingTest` — `XCTestClass/testMethod` form, exactly as
+  passed to `swift test --filter YameteTests.<expectedFailingTest>`.
+- `expectedFailureSubstring` — literal substring that MUST appear in
+  the captured XCTest output for the runner to count the mutation as
+  CAUGHT. Anchors the runner to the specific assertion, not just any
+  failure (a build error, an unrelated XCTSkip, etc., would otherwise
+  masquerade as a catch).
+- `description` — one-line rationale. Shown in reports.
+
+## Adding a new mutation
+
+1. Pick a production guard / threshold / debounce / phase gate in
+   `Sources/SensorKit/*.swift` that has no catalog entry yet. The
+   stretch coverage helper (`scripts/mutation-test.sh` → see runner
+   header) can identify candidates that match `guard|if|threshold|
+   debounce|gate` keywords without coverage.
+2. Find (or write) a matrix test cell that asserts the behaviour the
+   gate enforces. The assertion message MUST contain a stable
+   substring you can pin in `expectedFailureSubstring`.
+3. Append an entry to `mutation-catalog.json`. Run `make mutate` and
+   confirm the new entry reports CAUGHT.
+4. Commit catalog and (if you wrote one) test changes. Never commit a
+   mutation applied to `Sources/`.
+
+## What the runner does
+
+For each entry, on a clean working tree:
+
+1. Validates that `search` is present exactly once in `targetFile`.
+2. Applies the mutation via Python literal `str.replace(..., 1)`.
+3. Runs `swift test --filter YameteTests.<expectedFailingTest>`.
+4. Reverts via `git checkout -- <targetFile>`.
+5. Asserts the test exited non-zero AND the captured output contains
+   `expectedFailureSubstring`.
+
+Outcomes:
+
+- **CAUGHT** — exit non-zero AND substring matched. Good.
+- **ESCAPED** — test passed despite mutation, or failed without the
+  expected substring (catalog drift), or test wasn't found. Bad — the
+  gate is unverified.
+- **INFRA** — search pattern missing/non-unique, or mutated code did
+  not compile. Bad — catalog must be updated.
+
+The runner refuses to start if any `targetFile` has uncommitted
+changes; the revert path would otherwise clobber unstaged work.
+
+### Runner reliability fix
+
+Earlier revisions of `scripts/mutation-test.sh` reverted each mutation
+with a single bare `git checkout -- <file>` call, with no verification
+that the revert actually took and no fallback if the runner exited
+between writing the mutation and reaching the explicit revert line.
+The Phase 2 run surfaced a residual mutation in
+`Sources/SensorKit/TrackpadActivitySource.swift` (and, on a separate
+occasion, `Sources/SensorKit/MouseActivitySource.swift`) — the runner
+had walked off via `set -e` (or a signal, or a script edit landing
+mid-execution) after `apply_mutation` wrote bytes but before
+`revert_file` ran, leaving the on-disk source mutated.
+
+The runner now hardens the revert path on three axes:
+
+1. **EXIT trap** — every mutation appends its `targetFile` to a
+   `MUTATED_FILES` array *before* `apply_mutation` runs. A
+   `trap cleanup_mutations EXIT INT TERM` walks that array on every
+   shell exit path (normal, `set -e` abort, signal) and force-reverts
+   every still-tracked file. The successful-revert site removes the
+   file from the array via `forget_mutation`, so the trap is a no-op
+   on the happy path.
+2. **Verified revert** — `revert_file` no longer trusts a clean
+   `git checkout` exit code. After checkout, it asserts
+   `git diff --quiet -- "$file"` and retries once on mismatch (covers
+   transient flakes where a still-flushing `swift test` child held
+   the file in cache). Persistent failure surfaces a `REVERT-FAIL`
+   line and a non-zero return.
+3. **Fail-fast on residual** — if the verified revert returns
+   non-zero, the runner aborts the whole catalog walk with a `FATAL`
+   line rather than soldiering on and compounding residuals across
+   subsequent mutations on the same file.
+
+`forget_mutation` rebuilds `MUTATED_FILES` element-by-element through
+a temporary array rather than using `${ARR[@]/pattern/}` substring
+replacement. The substring form silently swallows unrelated entries
+that share a prefix with the file being forgotten, and produces an
+array containing a single empty-string element when the result would
+be empty (under `set -u`). Element-wise rebuild is unambiguous and
+plays correctly with the trap's empty-array guard.
+
+Net effect: any path out of the runner — clean exit, `swift test`
+crash, `^C`, an editor saving over the script — produces a clean
+working tree, or a loud refusal to continue.
+
+## Why JSON, not Swift
+
+Co-locating the catalog as `MutationCatalog.swift` would force the
+runner to spawn `swift run` (slow + circular: the runner mutates the
+same package) or to parse Swift literals via fragile regex. JSON is
+shell-friendly via `jq`, language-agnostic, and trivially extensible.
+
+## Degenerate gates (intentionally un-mutated)
+
+The `--coverage` heuristic flags every line whose surface text matches
+`(guard|threshold|debounce)|^\s*if\s+!`. Some flagged lines do not
+admit a meaningful mutation in the test environment — removing them
+either crashes immediately, runs into a downstream gate that shadows
+the deletion, or fires only on a code path the harness cannot drive
+deterministically. They are listed here so reviewers can confirm none
+of them is a missed coverage opportunity.
+
+Each entry uses the form `<file>:<line>  reason`.
+
+### `Sources/SensorKit/KeyboardActivitySource.swift`
+
+- **`:78  guard hidManager == nil else { return }`** — Idempotency
+  gate against double-init. In every test-reachable configuration,
+  callers construct the source with `enableHIDDetection: false` (the
+  test seam at `:91` short-circuits before HID open). Removing the
+  `:78` guard therefore has no observable side effect in the harness:
+  the second `start()` call falls into the next gate and returns. In
+  production (`enableHIDDetection: true`) a double-init would attempt
+  to re-open the IOHIDManager, but `swift test` cannot exercise that
+  path without TCC Input Monitoring grant.
+- **`:91  guard enableHIDDetection else { ... return }`** — Test-seam
+  kill switch. The whole reason this gate exists is to let tests skip
+  the IOKit hop deterministically; removing it makes the test seam
+  ineffective but produces no behaviour delta unless TCC Input
+  Monitoring is also granted to the swift-test runner. On unattended
+  CI the next gate (`:96 IOHIDCheckAccess`) catches the same case
+  silently. No clean cell can pin this gate without TCC.
+- **`:96  guard IOHIDCheckAccess(...) == kIOHIDAccessTypeGranted`** —
+  Kernel-permission fidelity. With TCC denied (the standard CI
+  configuration), removing the gate causes `IOHIDManagerOpen` to
+  fail with a non-success result and the `startHID` tail bails out
+  cleanly. No behaviour delta visible to tests. With TCC granted,
+  removing the gate would let the source consume ambient typing —
+  but ambient input is exactly what cells take pains to keep out
+  via the `enableHIDDetection: false` seam, so any cell that
+  required granted TCC to drive a delta would fail closed in CI.
+- **`:142  log.debug("activity:KeyPress ...")`** — Trace log line
+  flagged by the coverage heuristic because it contains
+  "threshold". Not a gate.
+- **`:194  guard result == kIOReturnSuccess, let context else { ... }`** —
+  Inside the C-shaped `keyboardHIDCallback`. Reachable only from a
+  real `IOHIDManager` input-value callback, which the test harness
+  cannot synthesize without the same TCC grant noted above. Removing
+  the guard with a non-success result or nil context would either
+  return early via the `let context` binding failing, or trap on the
+  unsafe pointer access — i.e. crashes immediately rather than
+  producing a behaviour delta.
+- **`:197  guard IOHIDElementGetUsagePage(element) == 0x07, ...`** —
+  Type/payload predicate inside the same C callback. Same access-path
+  argument as `:194`: cannot be driven from a test without a real
+  IOHIDManager event, and the matcher set installed at `:161`
+  guarantees only keyboard usage-page elements arrive at the
+  callback in production, so a wrong-page event is unreachable in
+  the test environment.
+
+### `Sources/SensorKit/MouseActivitySource.swift`
+
+- **`:84  guard scrollMonitor == nil else { return }`** — Idempotency
+  gate. Removing it lets a second `start()` install a duplicate
+  scroll-monitor closure in `MockEventMonitor.installed`. Both copies
+  receive every emit and append to the source's `scrollWindow`, but
+  the production RMS computation `sqrt(sum(v²)/n)` is invariant under
+  sample duplication (the same value appearing twice yields the same
+  RMS as appearing once). The click-detection path is independent of
+  `scrollMonitor` and unaffected by the duplicate. Result: no
+  behaviour delta is reachable for this gate via the harness.
+- **`:229  guard result == kIOReturnSuccess, let context else { ... }`** —
+  Inside the C-shaped `mouseClickHIDCallback`. Same access-path
+  argument as the keyboard callback at `:194`: not driveable from
+  tests without TCC and a real HID event source. Removing the guard
+  would crash on the `let context` unwrap or the pointer
+  dereference, not produce a clean behaviour delta.
+- **`:232  guard IOHIDElementGetUsagePage(element) == 0x09, ...`** —
+  Same C callback. Wrong-usage-page events cannot arrive in
+  production because the matcher list at `:197` restricts the
+  IOHIDManager to GenericDesktop-mouse pages (0x01) plus button-1
+  filtering. The harness cannot drive a wrong-page event without the
+  TCC grant the rest of the click pipeline needs.
+
+### `Sources/SensorKit/TrackpadActivitySource.swift`
+
+- **`:139  if !monitor.queryDevices(matchers: presenceMatchers).isEmpty {`** —
+  Inside the static `isPresent(monitor:)` availability check, not a
+  runtime gate. Removing it lets the function fall through to the
+  built-in display fallback. The full presence matrix lives in
+  `Tests/MatrixHardwarePresence_Tests.swift` (out of scope for this
+  agent's edits) and uses `XCTAssertTrue/False` without anchor
+  substrings, so no cell here can pin the gate via a catalog
+  substring without modifying that file.
+- **`:331  guard dur <= maxDur else { return }`** — Inside the
+  contact-detection timer closure. The behaviour delta only manifests
+  when `dur > contactMax`, which requires holding `phase=.mayBegin`
+  past `contactMin` and reading the elapsed time. The `.mayBegin`
+  phase bit does not survive the CGEvent → NSEvent bridge reliably
+  on all hosts (see `testContact_mayBeginThenHeldFires`'s soft
+  fallback), so any cell that depended on the timer firing would
+  flake on the same hosts.
+- **`:370  log.debug("activity:TrackpadScrollRMS ...")`** — Trace log
+  line flagged because it contains "threshold". Not a gate.
+- **`:390  guard mag > 2.0 else { return }`** — Inside
+  `evaluateCircle`, gating tiny movements out of the angle-integration
+  path. Catchable only via a circle-detection cell that reliably
+  drives ≥15 events at smoothly varying angles through the
+  CGEvent → NSEvent bridge — exactly the scenario the existing
+  `testCircling_fullRevolutionFires` documents as host-fragile.
+- **`:404  guard abs(circleAngleAccum) > 2 * .pi, circleEventCount >= 15 else { return }`** —
+  Same circle-detection path. Removing the gate fires
+  `.trackpadCircling` on partial sweeps, but the harness cannot drive
+  a clean partial sweep deterministically (CGEvent quantization
+  makes the integrated angle path-dependent on the host).
+- **`:405  guard circlingEnabled, now >= circlingGate else { ... }`** —
+  Per-mode enable + debounce gate, gated by the same circle-detection
+  delivery problem as `:390` and `:404`.
+- **`:425  guard !values.isEmpty else { return 0 }`** — Empty-array
+  safety in `rms(_:)`. Removing it produces a divide-by-zero
+  (`sqrt(0 / 0) = NaN`) which the production code then compares
+  against thresholds (NaN comparisons are false), so the failure
+  mode is "no reactions ever fire" — undistinguishable from
+  legitimate below-threshold input. In hostile mutation conditions
+  the NaN may also taint downstream RMS computations, but a clean
+  cell cannot pin the gate without contriving an empty `scrollWindow`
+  call site, which the public API does not admit.
+
+## Degenerate gates
+
+A gate is **degenerate** for mutation testing when no behavioural cell
+can deterministically observe its removal from outside the production
+module. Common reasons:
+
+- The gate wraps a kernel / IOKit / CoreFoundation call whose result
+  cannot be forced from a unit test (no DI seam, no protocol surface,
+  no mock).
+- The gate is reached only via a private C-callback (e.g. an
+  IOHIDDeviceRegisterInputReportCallback handler) that cannot be
+  invoked synthetically without modifying production source.
+- The gate's "false" branch is structurally unreachable on real
+  hardware (e.g. `mach_absolute_time` monotonicity) and the "true"
+  branch is the always-taken path, so mutation produces no observable
+  divergence.
+- The gate is a per-iteration sentinel inside a loop over a real OS
+  iterator (`IOIteratorNext` returning 0); mutating it would break
+  loop termination but cannot be observed without running against the
+  real driver, which the test cannot drive.
+
+Document each degenerate gate inline below with the exact source
+location and the reason no catalog entry exists. The `make mutate`
+runner does not consult this section — it is a rationale anchor for
+auditors and future contributors who run `--coverage` and want to
+know why these gate-shaped lines are not in the JSON catalog.
+
+### `Sources/SensorKit/AccelerometerReader.swift` — entire module
+
+`AccelerometerReader.swift` is a self-contained IOKit / IOHIDManager
+adapter for the BMI286 accelerometer on Apple Silicon. It builds its
+own `IOHIDManager`, registers a C-level
+`IOHIDDeviceRegisterInputReportCallback`, and runs a `ReportContext`
+that consumes the callback.
+
+The 19 gates flagged by `--coverage` now split as **18 catalogued / 1
+degenerate** after the Phase 4 kernel-driver seam was added on top of
+the original `Tests/MatrixAccelerometerReader_Tests.swift` seam. The
+seam comprises four production changes:
+
+- `ReportContext` (and its `init`, `handleReport`, `invalidate`,
+  `surfaceStall`, `watchdogSnapshot`) was raised from `private` to
+  `internal`. Cells can now construct a context, build a synthetic HID
+  payload (24 bytes with `Int32` axes at offsets 6/10/14), and drive
+  `handleReport` directly, which makes every gate inside `handleReport`
+  observable from a unit test.
+- The watchdog's per-tick decision was extracted into the pure helper
+  `AccelHardware.evaluateWatchdogTick(snapshot:now:stallThreshold:)`,
+  isolating the `running` gate from the surrounding `Task.detached`.
+- The activity probe's per-service decision (the `dispatchAccel`
+  filter and the `now > lastTs` monotonicity check) was extracted into
+  `AccelHardware.evaluateActivity(...)`, replacing the inline
+  IORegistry-coupled iterator body. The wrapping subtraction in that
+  helper uses `&-` so a mutation that removes the monotonicity guard
+  decodes deterministically as `.stale` instead of trapping the
+  process on `UInt64` underflow — this keeps the gate observable from
+  a unit test without a SIGTRAP signal escaping the harness.
+- **Phase 4** added an `AccelerometerKernelDriver` protocol with a
+  default `RealAccelerometerKernelDriver` (forwards 1:1 to IOKit) and
+  a `MockAccelerometerKernelDriver` (`Tests/Mocks/`) that lets cells
+  force per-call failure codes (`forceMatchingFailureKr`,
+  `forceManagerOpenFailure`, `forceDeviceOpenFailure`,
+  `forceMaxReportSizeZero`, etc.). `AccelerometerSource` got a public
+  convenience init plus an internal designated init that accepts the
+  driver injection; `SensorActivation`, `AccelHardware.isSPUDevicePresent`,
+  `AccelHardware.isSensorActivelyReporting`, `AccelHardware.openStream`,
+  and `AccelHardware.findSPUDevice` all accept a `driver:` parameter
+  with a default `RealAccelerometerKernelDriver()`, so existing
+  default-arg callers (`AccelerometerSource()` in `YameteApp/Yamete.swift`
+  and the lifecycle stress tests) produce byte-identical kernel
+  traffic. Cells live in `Tests/MatrixAccelerometerKernelDriver_Tests.swift`.
+
+These changes are scoped to internal access for the seam parameter
+threading; the public `AccelerometerSource` API and the file's IOKit
+lifecycle are unchanged for default-arg callers.
+
+Per-gate disposition:
+
+| Line | Gate | Disposition |
+|------|------|-------------|
+| 152  | `if !activated { log.info(...) }` | **Degenerate** — bare logging branch with no observable side effect. Not a behavioural gate — the body only writes a single info log. Mutating the predicate cannot be detected without parsing log files, and either branch produces a valid stream because `openStream` is invoked unconditionally on the next line. |
+| 174  | `guard ... == KERN_SUCCESS` (`SensorActivation.activate`) | **Catalogued (Phase 4)** as `accel-kernel-activate-matching-gate`. The cell `testActivate_matchingFailure_shortCircuitsBeforeRegistryWrites` injects `MockAccelerometerKernelDriver` with `forceMatchingFailureKr=KERN_FAILURE` and asserts both `activate=false` AND `registrySetCFProperty` was never called — removing the gate would let the loop body run on the mock's next-yielded synthetic service. |
+| 180  | `guard service != 0 else { break }` (activate loop) | **Catalogued (Phase 4)** as `accel-kernel-activate-iterator-sentinel-gate`. The cell `testActivate_iteratorYieldsOneService_loopBodyExecutesThreeWrites` runs the happy-path mock (one service yielded, then 0). With the gate intact the loop body executes its three `registrySetCFProperty` writes; the mutation flips `!= 0` to `== 0` so the loop breaks before the body and the counter stays at 0. |
+| 203  | `guard ... == KERN_SUCCESS` (`SensorActivation.deactivate`) | **Catalogued (Phase 4)** as `accel-kernel-deactivate-matching-gate`. Symmetric to gate 174 in the deactivate path. |
+| 208  | `guard service != 0 else { break }` (deactivate loop) | **Catalogued (Phase 4)** as `accel-kernel-deactivate-iterator-sentinel-gate`. Symmetric to gate 180 in the deactivate path. The mutation flips the sentinel to `== 0`, breaking before the registry-write body runs. |
+| 238  | `guard IOHIDManagerOpen(...) == kIOReturnSuccess` (`isSPUDevicePresent`) | **Catalogued (Phase 4)** as `accel-kernel-isSPUDevicePresent-managerOpen-gate`. The cell `testIsSPUDevicePresent_managerOpenFailure_returnsFalseShortCircuit` injects `forceManagerOpenFailure=kIOReturnNotPermitted`, asserts `isSPUDevicePresent=false`, and pins `hidDeviceTransportCalls=0` so a mutation that drops the gate (which would let the synthetic device pass through `findSPUDevice`) is observable. |
+| 270  | `guard ... == KERN_SUCCESS` (`isSensorActivelyReporting`) | **Catalogued (Phase 4)** as `accel-kernel-isSensorActivelyReporting-matching-gate`. Mock forces `KERN_FAILURE`; cell asserts both `reporting=false` and `iteratorNextCalls=0`. |
+| 277  | `guard service != 0 else { break }` (probe loop) | **Catalogued (Phase 4)** as `accel-kernel-isSensorActivelyReporting-iterator-sentinel-gate`. Mock yields one synthetic service then 0; with the gate intact the loop body's two `registryCreateCFProperty` calls (`dispatchAccel`, `DebugState`) execute. The mutation breaks early and the counter stays at 0. |
+| 286  | `guard dispatchAccel else { return .skip }` (now in `AccelHardware.evaluateActivity`) | **Catalogued** as `accel-activity-dispatchAccel-gate`. The gate moved from inline-iterator into the pure helper `evaluateActivity`; the cell `testEvaluateActivity_dispatchAccelFalse_returnsSkip` calls the helper directly and pins the `.skip` decode. |
+| 297  | `guard now > lastTs else { return .clockNonMonotonic }` (now in `AccelHardware.evaluateActivity`) | **Catalogued** as `accel-activity-clock-monotonicity-gate`. The cell `testEvaluateActivity_clockNotMonotonic_returnsClockNonMonotonic` synthesises a non-monotonic snapshot directly. The wrapping `&-` subtraction in the helper means a mutation that removes the gate decodes as `.stale` (huge wrapped delta past `stalenessNs`), avoiding a SIGTRAP that would mask the catch as INFRA. |
+| 319  | `guard openResult == kIOReturnSuccess` (`openStream` IOHIDManagerOpen) | **Catalogued (Phase 4)** as `accel-kernel-openStream-managerOpen-gate`. The cell `testOpenStream_managerOpenFailure_surfacesIoKitErrorShortCircuit` injects `forceManagerOpenFailure=kIOReturnNotPermitted`, asserts the stream throws `SensorError.ioKitError`, and pins `hidDeviceOpenCalls=0` so a mutation that drops the gate (and lets execution continue past the failure) is observable. |
+| 336  | `guard devOpenResult == kIOReturnSuccess` (`openStream` IOHIDDeviceOpen) | **Catalogued (Phase 4)** as `accel-kernel-openStream-deviceOpen-gate`. The cell `testOpenStream_deviceOpenFailure_surfacesIoKitErrorShortCircuit` injects `forceDeviceOpenFailure=kIOReturnNotPermitted` and pins `hidDeviceMaxReportSizeCalls=0`. |
+| 346  | `guard maxSize > 0` | **Catalogued (Phase 4)** as `accel-kernel-openStream-maxSize-gate`. The cell `testOpenStream_maxSizeZero_surfacesIoKitError` injects `forceMaxReportSizeZero=true` and asserts the surfaced error message exactly equals `String(format: "0x%08x", kIOReturnInternalError)` — pinning the gate-thrown error rejects the watchdog-stall fall-through path that a mutation removing the gate would otherwise produce after the 5s watchdog threshold. |
+| 407  | `guard snapshot.running else { return .invalidated }` (now in `AccelHardware.evaluateWatchdogTick`) | **Catalogued** as `accel-watchdog-running-gate`. The watchdog poll body's running check moved from inline-Task into the pure helper `evaluateWatchdogTick`; the cell `testWatchdogTick_invalidatedSnapshot_returnsInvalidated` calls the helper directly and pins the `.invalidated` decode. |
+| 622  | `guard s.running else { return nil /* already-stalled */ }` (`surfaceStall`) | **Catalogued** as `accel-surfaceStall-running-gate`. The cell `testSurfaceStall_afterInvalidate_yieldsNothing` invalidates the context (running = false) and then calls `surfaceStall(error)`. With the gate, the consumer sees no error; without the gate, the spurious error reaches the consumer and the cell flags it. |
+| 630  | `guard length >= minReportLength else { return }` (`handleReport`) | **Catalogued** as `accel-handleReport-length-floor`. The cell `testHandleReport_shortPayloadBelowMin_yieldsNothing` constructs `ReportContext` directly and calls `handleReport(report:length:)` with a payload one byte below the floor. Buffer is over-allocated to 18 bytes so a mutation that removes the gate does not segfault — instead it falls through to decimation + magnitude and yields a sample, which the cell pins. |
+| 646  | `guard s.running else { return nil }` (handleReport) | **Catalogued** as `accel-handleReport-running-gate`. The cell `testHandleReport_afterInvalidate_yieldsNothing` invalidates the context and drives 4 reports. With the gate, no impacts yield; without it, decimation+magnitude let through 2 yields, which the cell pins. |
+| 660  | `guard s.sampleCounter % decimationFactor == 0 else { return nil }` | **Catalogued** as `accel-handleReport-decimation-gate`. The cell `testHandleReport_decimation_yieldsEveryNthReport` drives 10 reports through a permissive detector and asserts exactly `10 / decimationFactor = 5` yields. Removing the gate yields on every report (10 yields), failing the equality assertion. |
+| 664  | `guard rawMag > magnitudeMin && rawMag < magnitudeMax else { return nil }` | **Catalogued** as `accel-handleReport-magnitude-bounds-gate`. The cells `testHandleReport_belowMagnitudeMin_yieldsNothing` and `testHandleReport_aboveMagnitudeMax_yieldsNothing` synthesise sub-floor (each axis = 0.01 g, vector ≈ 0.017 g) and super-ceiling (each axis = 10 g, vector ≈ 17 g) payloads and assert no impacts yield. Removing the gate lets the bounded payload reach the detector. |
+
+Summary: **18 catalogued / 1 degenerate / 19 total** after Phase 4.
+The 8 originally-promoted entries (handleReport / watchdog / activity
+helpers) are:
+
+- `accel-handleReport-length-floor` (line 630)
+- `accel-handleReport-running-gate` (line 646)
+- `accel-handleReport-decimation-gate` (line 660)
+- `accel-handleReport-magnitude-bounds-gate` (line 664)
+- `accel-surfaceStall-running-gate` (line 622)
+- `accel-watchdog-running-gate` (line 407)
+- `accel-activity-dispatchAccel-gate` (line 286)
+- `accel-activity-clock-monotonicity-gate` (line 297)
+
+#### Now CAUGHT (Phase 4 — kernel-driver seam)
+
+Phase 4 added the `AccelerometerKernelDriver` protocol (production
+default `RealAccelerometerKernelDriver`, test double
+`MockAccelerometerKernelDriver`) and threaded a `driver:` parameter
+through `SensorActivation.activate`, `SensorActivation.deactivate`,
+`AccelHardware.isSPUDevicePresent`, `AccelHardware.isSensorActivelyReporting`,
+`AccelHardware.openStream`, and `AccelHardware.findSPUDevice`. With
+the seam, the 10 kernel-result fidelity gates that were previously
+Degenerate are now CAUGHT. Cells live in
+`Tests/MatrixAccelerometerKernelDriver_Tests.swift`:
+
+- `accel-kernel-activate-matching-gate` (line 174)
+- `accel-kernel-activate-iterator-sentinel-gate` (line 180)
+- `accel-kernel-deactivate-matching-gate` (line 203)
+- `accel-kernel-deactivate-iterator-sentinel-gate` (line 208)
+- `accel-kernel-isSPUDevicePresent-managerOpen-gate` (line 238)
+- `accel-kernel-isSensorActivelyReporting-matching-gate` (line 270)
+- `accel-kernel-isSensorActivelyReporting-iterator-sentinel-gate` (line 277)
+- `accel-kernel-openStream-managerOpen-gate` (line 319)
+- `accel-kernel-openStream-deviceOpen-gate` (line 336)
+- `accel-kernel-openStream-maxSize-gate` (line 346)
+
+Mock failure knobs: `forceMatchingFailureKr`,
+`forceManagerOpenFailure`, `forceDeviceOpenFailure`,
+`forceMaxReportSizeZero`, `forceCopyDevicesNil`, `forceIteratorEmpty`,
+`forceTransportMismatch`, `forceRegistrySetFailureKr`. Each is a
+single-shot or sticky override depending on the call (matching /
+manager-open / device-open are single-shot so the mock can return to
+happy-path on subsequent invocations within the same cell).
+
+Production-behaviour guarantee: the public `AccelerometerSource()`
+init defaults `kernelDriver` to `RealAccelerometerKernelDriver()`,
+which forwards 1:1 to IOKit. Default-arg callers — including
+`Sources/YameteApp/Yamete.swift` and `Tests/AccelerometerLifecycleStressTests.swift` —
+produce byte-identical kernel traffic to the pre-seam build.
+
+#### Residual Degenerate (1)
+
+The bare logging branch at line 152 (`if !activated { log.info(...) }`)
+remains Degenerate. It is not a behavioural gate — the body only
+writes a single info log, and either branch produces a valid stream
+because `openStream` is invoked unconditionally on the next line.
+Mutating the predicate cannot be detected without parsing log files.
+
+### `Sources/SensorKit/EventSources.swift`
+
+`EventSources.swift` hosts seven IOKit / CoreAudio / CoreGraphics
+sources (`USBSource`, `PowerSource`, `AudioPeripheralSource`,
+`BluetoothSource`, `ThunderboltSource`, `DisplayHotplugSource`,
+`SleepWakeSource`). The `_inject*` test seams give per-source debounce
+/ dispatch coverage by yielding through the same `streamContinuation`
+the IOKit callbacks yield to.
+
+Each source's `start()` was extended with two `#if DEBUG`-only
+internal seams that close the previously-degenerate idempotency and
+kernel-success gates as CAUGHT mutations:
+
+- `_testInstallationCount: Int` — bumped on every successful
+  registration. Idempotency cells call `start()` twice and assert the
+  counter stays at `1`. Mutation that drops `notifyPort==nil` (or
+  `!listenerInstalled` / `!registered` / `rootPort==0`) makes the
+  counter increment a second time.
+- `_forceKernelFailureKr: kern_return_t?` (USB / Bluetooth /
+  Thunderbolt) / `_forceListenerStatus: OSStatus?`
+  (AudioPeripheralSource) / `_forceRegistrationFailure: Bool`
+  (SleepWakeSource) — overrides the kernel-call return value AFTER
+  the real call has been issued (and any allocated resources cleaned
+  up under the override). Cells set the seam BEFORE `start()`,
+  drive the failure path, and assert `installCount == 0`. Mutation
+  that drops the kernel-success guard runs the post-cleanup body
+  with bad state, advancing the counter.
+
+Behavioural gates catalogued (14 total, all CAUGHT):
+
+| Catalog id | Source line | Anchor cell |
+|------------|-------------|-------------|
+| `power-edge-trigger-gate` | `handlePowerChange(onAC:)` | `MatrixPowerSourceTests/testRepeatedSameState_publishesOnce` |
+| `power-start-idempotency-gate` | `start` (`runLoopSource==nil`) | `MatrixPowerSourceTests/testStartIsIdempotent_preservesEdgeBaseline` |
+| `display-hotplug-debounce-gate` | `dispatchDebounced` | `MatrixDisplayHotplugSourceTests/testRapidFourCallbacks_debouncedToOne` |
+| `usb-start-idempotency-gate` | `USBSource.start` (`notifyPort==nil`) | `MatrixUSBSourceTests/testDoubleStart_doesNotDoubleInstallNotifications` |
+| `usb-kernel-success-gate` | `USBSource.start` (`attachKr/detachKr==KERN_SUCCESS`) | `MatrixUSBSourceTests/testKernelFailure_doesNotInstall` |
+| `audio-peripheral-start-idempotency-gate` | `AudioPeripheralSource.start` (`!listenerInstalled`) | `MatrixAudioPeripheralSourceTests/testDoubleStart_doesNotDoubleInstallListener` |
+| `audio-peripheral-kernel-success-gate` | `AudioPeripheralSource.start` (`status==noErr`) | `MatrixAudioPeripheralSourceTests/testKernelFailure_doesNotInstall` |
+| `bluetooth-start-idempotency-gate` | `BluetoothSource.start` (`notifyPort==nil`) | `MatrixBluetoothSourceTests/testDoubleStart_doesNotDoubleInstallNotifications` |
+| `bluetooth-kernel-success-gate` | `BluetoothSource.start` (`attachKr/detachKr==KERN_SUCCESS`) | `MatrixBluetoothSourceTests/testKernelFailure_doesNotInstall` |
+| `thunderbolt-start-idempotency-gate` | `ThunderboltSource.start` (`notifyPort==nil`) | `MatrixThunderboltSourceTests/testDoubleStart_doesNotDoubleInstallNotifications` |
+| `thunderbolt-kernel-success-gate` | `ThunderboltSource.start` (`attachKr/detachKr==KERN_SUCCESS`) | `MatrixThunderboltSourceTests/testKernelFailure_doesNotInstall` |
+| `display-hotplug-start-idempotency-gate` | `DisplayHotplugSource.start` (`!registered`) | `MatrixDisplayHotplugSourceTests/testDoubleStart_doesNotDoubleRegister` |
+| `sleepwake-start-idempotency-gate` | `SleepWakeSource.start` (`rootPort==0`) | `MatrixSleepWakeSourceTests/testDoubleStart_doesNotDoubleRegister` |
+| `sleepwake-kernel-success-gate` | `SleepWakeSource.start` (`connect!=0, let port`) | `MatrixSleepWakeSourceTests/testKernelFailure_doesNotInstall` |
+
+Truly unreachable (private static helpers — no DI seam, no public
+caller path that fires the cleanup branch):
+
+| Line | Gate | Reason |
+|------|------|--------|
+| `AudioPeripheralSource.snapshot:1` | `guard AudioObjectGetPropertyDataSize(...) == noErr else { return [] }` | `Self.snapshot()` is a private static helper called only from `start()`; the call hits the live system AudioObject and cannot be made to fail without a real CoreAudio fault. The empty-set fallback is structurally unreachable in the test environment. |
+| `AudioPeripheralSource.snapshot:2` | `guard AudioObjectGetPropertyData(...) == noErr else { return [] }` | Same private-helper / system-call argument as above. |
+| `AudioPeripheralSource.uid` | `guard AudioObjectGetPropertyData(...) == noErr, let value` | Private static helper invoked only from `snapshot()` / `name()`; no DI seam, no public caller. |
+| `AudioPeripheralSource.name:1` | `guard AudioObjectGetPropertyDataSize(...) == noErr else { return nil }` | Same as `snapshot:1`. |
+| `AudioPeripheralSource.name:2` | `guard AudioObjectGetPropertyData(...) == noErr else { return nil }` | Same as `snapshot:1`. |
+
+Trace-log lines in EventSources.swift (USBSource:145
+`log.debug("activity:USBGated kind=\(...) — debounce")`) are
+suppressed by the `--coverage` heuristic's `LOG_RE` filter so they
+no longer surface as gate candidates.
+
+Summary: **14 catalogued / 5 truly unreachable / 19 total**. 0
+Degenerate behavioural gates remain in EventSources.swift.
+
+### `Sources/SensorKit/ImpactDetector.swift`
+
+The five threshold gates in `ImpactDetector.process` (warmup, spike,
+rise rate, crest factor, confirmations) are ALL behavioural and ALL
+catalogued. Each has a dedicated cell in
+`Tests/MatrixImpactDetector_Tests.swift` that calibrates every other
+gate permissively so the gate under test is the sole decider of the
+outcome:
+
+| Catalog id | Source line | Anchor cell |
+|------------|-------------|-------------|
+| `impact-detector-warmup-gate` | 129 | `testWarmupGate_belowSampleCount_returnsNil` |
+| `impact-detector-spike-threshold-gate` | 132 | `testSpikeGate_belowThreshold_returnsNil` |
+| `impact-detector-rise-rate-gate` | 141 | `testRiseRateGate_gradualRamp_returnsNil` |
+| `impact-detector-crest-factor-gate` | 150 | `testCrestFactorGate_elevatedBackground_returnsNil` |
+| `impact-detector-confirmations-gate` | 158 | `testConfirmationsGate_singleSample_returnsNil` |
+
+No degenerate gates. 5 / 5 gates catalogued.
+
+### `Sources/SensorKit/ImpactDetection.swift`
+
+| Catalog id | Source line | Anchor cell |
+|------------|-------------|-------------|
+| `impact-fusion-empty-available-gate` | 85 | `ImpactFusionAvailabilityGateTests/testStartWithNoAvailableSources_invokesOnError_doesNotMarkRunning` |
+| `impact-fusion-rearm-gate` | 161 | `ImpactFusionTests/testFusionRearmGate_withinRearm_returnsNil` |
+| `impact-fusion-consensus-gate` | 168 | `ImpactFusionTests/testFusionConsensusGate_singleSource_belowRequired_returnsNil` |
+| `impact-fusion-stop-idempotency-gate` | 148 | `ImpactFusionStopIdempotencyGateTests/testStopWhenNotRunning_isNoOp` |
+
+The `stop()` idempotency gate at line 148 was previously degenerate
+(no externally-observable signal). Resolved by exposing
+`ImpactFusion._testHooks` (`stopInvocationCount`,
+`stopTeardownCount`, `lastStopWasNoOp`) — production updates the
+counters on every invocation, the cell observes them. With the
+guard removed, calling `stop()` against a not-running engine flips
+`lastStopWasNoOp` from `true` to `false` and bumps
+`stopTeardownCount` from 0 to 1, both of which the cell pins.
+
+4 of 4 gates catalogued. 0 degenerate.
+
+### `Sources/SensorKit/HeadphoneMotionAdapter.swift`
+
+| Catalog id | Source line | Anchor cell |
+|------------|-------------|-------------|
+| `headphone-motion-framework-available-gate` | 133 | `HeadphoneMotionSourceLifecycleTests/testFrameworkUnavailableThrowsDeviceNotFound` |
+| `headphone-motion-disconnect-prune-gate` | 150 | `HeadphoneMotionSourceLifecycleTests/testDisconnectMidStreamPrunes` |
+| `headphone-probe-framework-available-gate` | 89 | `HeadphoneMotionSourceLifecycleTests/testProbeGate_frameworkUnavailable_doesNotStartUpdates` |
+| `headphone-probe-stage-gate` | 73 | `HeadphoneMotionSourceLifecycleTests/testProbeStageGate_takenOver_deferredClosureIsNoOp` |
+
+The probe-only gates at lines 89 / 73 (post-extract of the
+`finishProbeIfRunning` helper) were previously degenerate. Resolved
+by:
+
+- Exposing `HeadphoneMotionSource._testCurrentProbeStage` for direct
+  observation of the state machine (`pending → running → complete`
+  or `running → takenOver`).
+- Extracting the deferred probe-stop body into a `fileprivate`
+  helper `finishProbeIfRunning()` so both the production
+  `DispatchQueue.global().asyncAfter` closure and the test seam
+  `_testRunDeferredProbeStop()` walk identical code. A mutation on
+  the helper's guard is therefore observable from a synchronous
+  test.
+
+Cells:
+
+- `testProbeGate_frameworkUnavailable_doesNotStartUpdates` — adapter
+  init with a driver reporting `isDeviceMotionAvailable == false`
+  must NOT call `driver.startUpdates`; observable as `mock.startUpdatesCalls == 0`.
+- `testProbeStageGate_takenOver_deferredClosureIsNoOp` — drives
+  probe → takeOver → deferred stop, asserts the closure does NOT
+  re-`stopUpdates` and does NOT flip the stage to `.complete` when
+  it is already `.takenOver`.
+- `testProbeStageGate_running_deferredClosureStops` — companion cell
+  that pins the true branch (`.running` → `.complete` + one
+  stopUpdates).
+
+4 of 4 gates catalogued. 0 degenerate.
+
+### `Sources/SensorKit/MicrophoneAdapter.swift`
+
+| Catalog id | Source line | Anchor cell |
+|------------|-------------|-------------|
+| `microphone-invalid-format-gate` | 91 | `MicrophoneSourceLifecycleTests/testInvalidInputFormat_throwsDeviceNotFound_doesNotInstallTap` |
+| `microphone-frame-length-gate` | 104 | `MicrophoneSourceLifecycleTests/testFrameLengthGate_validBuffers_yieldImpact` |
+
+The `frameLength > 0` gate at line 104 was previously degenerate via
+"removing the guard with a zero-frame buffer is a no-op anyway".
+Resolved by reframing the mutation: instead of removing the guard,
+slam it shut (`frameLength <= 0` → "drop everything"). The cell
+drives a sequence of strong-transient buffers (256-frame buffer with
+amplitude-0.8 rising sine) through a permissive detector and
+asserts at least one impact is yielded; with the gate inverted the
+loop short-circuits before the peak / detector pipeline runs and
+zero impacts are emitted.
+
+2 of 2 gates catalogued. 0 degenerate.
+
+### `Sources/SensorKit/HIDDeviceMonitor.swift`
+
+No catalog entries. Both gate-shaped lines are **truly unreachable**
+defensive guards on inputs that no caller can produce — see the
+"Truly unreachable gates" section below for citations.
+
+## Truly unreachable gates
+
+A gate is **truly unreachable** when the input that would drive it to
+the false branch cannot be produced by any caller in the production
+graph. These are kept in production source as defense-in-depth, but
+no behavioural cell can pin them because their false branch is not
+reachable from the public API. They are explicitly NOT entered in
+`mutation-catalog.json` (the runner only verifies CAUGHT gates) and
+are listed here so reviewers can see the full population of gate
+shapes and the citations justifying each unreachability claim.
+
+### `Sources/SensorKit/HIDDeviceMonitor.swift:83`
+
+```swift
+public func queryDevices(matchers: [HIDMatcher]) -> [HIDDeviceInfo] {
+    guard !matchers.isEmpty else { return [] }
+    ...
+}
+```
+
+**Citation — every caller passes a non-empty static matcher list:**
+
+- `Sources/SensorKit/TrackpadActivitySource.swift:127` — `presenceMatchers`
+  is a `nonisolated public static let` array literal with 2 entries
+  (digitizer-touchpad usage page + Magic Trackpad product). Construction
+  is at module-load time, immutable.
+- `Sources/SensorKit/TrackpadActivitySource.swift:139` — call site:
+  `monitor.queryDevices(matchers: presenceMatchers)`.
+- `Sources/SensorKit/MouseActivitySource.swift:59` — `presenceMatchers`
+  is a static let with 1 entry (GenericDesktop mouse, usage 0x02).
+  Call site at `:69`.
+- `Sources/SensorKit/KeyboardActivitySource.swift:55` — `presenceMatchers`
+  is a static let with 1 entry (GenericDesktop keyboard, usage 0x06).
+  Call site at `:62`.
+- `Tests/Integration/HIDPresenceRealDriverTests.swift` — every test
+  call passes one of the static matcher lists above.
+
+The gate's false branch (`matchers.isEmpty`) is therefore unreachable
+from any production or test caller. Removing the gate would call
+`IOHIDManagerSetDeviceMatchingMultiple` with an empty CFArray, which
+IOKit treats as "match nothing" and returns an empty device set —
+identical observable result to the gate being present. The gate
+exists as defense-in-depth against future callers but cannot be
+exercised today.
+
+### `Sources/SensorKit/HIDDeviceMonitor.swift:102`
+
+```swift
+public func hasBuiltInDisplay() -> Bool {
+    var onlineCount: UInt32 = 0
+    CGGetOnlineDisplayList(0, nil, &onlineCount)
+    guard onlineCount > 0 else { return false }
+    ...
+}
+```
+
+**Citation — `CGGetOnlineDisplayList` returns >= 1 on every supported host:**
+
+- macOS WindowServer-backed processes (every `swift test` host, including
+  GitHub Actions `macos-14` / `macos-15` runners and the project's
+  hosted self-runners) always have at least one online display. CoreGraphics
+  populates `onlineCount` with the number of currently-online displays;
+  zero implies WindowServer is not running, which a Swift unit test
+  process cannot reach.
+- Apple's `CGGetOnlineDisplayList` documentation: "An online display is
+  attached, awake, and available for drawing operations. ... There is
+  always at least one display online."
+  (https://developer.apple.com/documentation/coregraphics/1455522-cggetonlinedisplaylist)
+- Sandboxed virtualised macOS (the App Store build's runtime) and the
+  Direct build's runtime both run inside Aqua, which guarantees a
+  WindowServer connection. A test process running outside Aqua (e.g. via
+  `launchd` user-domain agent during boot) is the only known scenario
+  with `onlineCount == 0`, and that scenario cannot host an `XCTest`
+  invocation — `XCTest` requires `NSApplication` initialization which
+  itself bootstraps Aqua.
+- The `Tests/Integration/HIDPresenceRealDriverTests.swift` cells call
+  `monitor.hasBuiltInDisplay()` and gate the assertion via `guard ...`
+  / `XCTSkip`, which would correctly skip if `onlineCount == 0` ever
+  did occur — but it does not.
+
+The gate's false branch is therefore structurally unreachable from
+the test harness. Removing the gate still falls through to the
+`prefix(0).contains` check on an empty array (which returns false),
+so the observable result matches the gate's true branch. The gate
+exists as defense-in-depth for the rare boot-time scenario but
+cannot be exercised by `swift test`.
+
+### Tally
+
+- `Sources/SensorKit/ImpactDetection.swift` — 0 truly unreachable.
+- `Sources/SensorKit/HeadphoneMotionAdapter.swift` — 0 truly unreachable.
+- `Sources/SensorKit/MicrophoneAdapter.swift` — 0 truly unreachable.
+- `Sources/SensorKit/HIDDeviceMonitor.swift` — 2 truly unreachable
+  (lines 83, 102).
+
+Total: 2 truly unreachable gates across the four files in scope. 0
+degenerate gates remain.
+
+## Property-based cells
+
+`Tests/PropertyBased_Tests.swift` complements the example-based matrix
+cells with eight invariant cells driven by a hand-rolled deterministic
+xorshift64 generator (`SeededGenerator`). Every cell loops over a fixed
+seed range, constructs a random input within the property's domain
+from the seed, and asserts the post-condition. Failure messages cite
+the seed + observed values so any regression is locally reproducible:
+`swift test --filter PropertyBased_Tests/test_property_<name>` plus the
+emitted `seed=N` reproduces the exact failure.
+
+| Cell | Invariant | Trials |
+|------|-----------|--------|
+| `test_property_keyboard_rate_debounce_invariant` | rate < 3.0/s → 0 fires; rate ≥ 3.0/s → ≤ ⌈duration / debounce⌉ + 1 fires | 200 |
+| `test_property_mouse_scroll_rms_invariant` | RMS far below threshold → 0 fires; RMS far above → ≥ 1 fire (CGEvent quantization tolerated as a documented synthetic-event limitation) | 50 below × 50 above |
+| `test_property_trackpad_attribution_invariant` | clicks WITHOUT a recent trackpad gesture (lastTrackpadGestureAt = .distantPast) → never fire `.trackpadTapping` regardless of click count / spacing | 200 |
+| `test_property_usb_debounce_per_key_invariant` | for distinct (vendor, product) pairs interleaved with repeats: distinctCount ≤ fires ≤ totalCalls (every distinct key fires at least once; debounce never synthesizes fires beyond injections) | 200 |
+| `test_property_bus_delivery_order_invariant` | for a single producer's `_injectAttach` / `_injectDetach` sequence with distinct keys: bus delivery order matches publish order | 200 |
+| `test_property_bus_delivery_completeness_invariant` | for accept-by-gate sequences with distinct keys: bus emissions == issued publishes | 200 |
+| `test_property_coalesce_window_monotonicity_invariant` | for same-key bursts within debounce: emissions ≤ injections AND ≥ 1 | 200 |
+| `test_property_per_mode_disabled_invariant` | for each disabled trackpad mode (touching/sliding/contact/tapping/circling): no fires of that kind under any random input shape | 40 outer × 5 modes |
+
+Determinism: the generator is hand-rolled xorshift64 with seed-as-state
+(no `SystemRandomNumberGenerator`, no `arc4random`, no `Foundation`
+random APIs). Same seed N produces the same sequence on every host,
+every run, every CI shard.
+
+The existing 69 catalog entries already pin the gates these properties
+exercise (see e.g. `keyboard-rate-threshold-default`,
+`trackpad-gesture-recency-gate`, `usb-debounce` family). Property
+cells are kept out of the catalog because each one runs 50–200 trials
+per invocation; co-opting them as mutation anchors would inflate
+`make mutate` runtime without adding catch-coverage beyond the
+example-based cells already linked from the catalog.
+
+## Concurrent / interleaved cells
+
+`Tests/MatrixConcurrentInterleaved_Tests.swift` complements the
+serial example-based matrix and the loop-based property suite with
+eight cells that drive ≥ 2 production paths CONCURRENTLY via plain
+`Task` spawning, then assert cross-source invariants on the resulting
+bus traffic. The bug class addressed: existing matrix cells exercise
+ONE source at a time. Real users drive many at once — typing while
+plugging USB while the system goes to sleep. Concurrency-related
+races (cross-source state corruption, debounce gate bleed-through,
+bus-publish ordering under contention, close-during-publish crashes,
+fan-out skew across subscribers) cannot be exercised by serial cells.
+
+Each cell asserts a SPECIFIC invariant tagged with a
+`[concurrent-cell=<name>]` substring anchor for grep-friendly
+failure triage. Each cell is budgeted at ≤ 200 ms wallclock.
+
+| Cell | Invariant |
+|------|-----------|
+| `test_concurrent_cell_cross_source_debounce_sanity` | concurrent USB attach + BT connect → both fire exactly once on the bus, total = 2 deliveries |
+| `test_concurrent_cell_trackpad_gesture_during_external_click_burst` | 5 USB-mouse clicks debounce to 1 `.mouseClicked`; interleaved phased trackpad scrolls fire `.trackpadTouching` ≥ 1; no cross-source pollination |
+| `test_concurrent_cell_usb_attach_mid_keyboard_burst` | 10 above-threshold key injects fire ≥ 1 `.keyboardTyped`; mid-burst USB attach fires exactly 1 `.usbAttached`; no cross-source pollination |
+| `test_concurrent_cell_sleep_mid_trackpad_tap` | sleep injection mid-trackpad-gesture emits exactly 1 `.willSleep` and does not crash the trackpad pipeline |
+| `test_concurrent_cell_bus_close_mid_publish_race` | 100 mixed injects raced against `bus.close()` produce no crash, exactly one stream terminator per subscriber, and bounded delivery (≤ 100, never duplicated) |
+| `test_concurrent_cell_coalesce_window_stress` | 50 same-key `_injectClick` calls back-to-back collapse to exactly 1 `.mouseClicked` (within debounce window) |
+| `test_concurrent_cell_multi_output_fanout_under_producer_race` | 5 independent subscribers attached to the SAME bus see identical per-kind multisets when concurrent producers (USB / BT / keyboard) drive injects in parallel — no fan-out skew across subscribers |
+| `test_concurrent_cell_stable_interleaving_fuzz` | for seeds 42 / 7 / 31 (200 random injects each across 5 sources): no crash, no kind cross-pollination, deliveries upper-bounded by injections (no amplification), and every producer that fired ≥ 1 inject delivers ≥ 1 event (no total starvation) |
+
+Determinism: the fuzz cell uses the same hand-rolled xorshift64
+generator pattern as the property suite. Same seed N produces the
+same inject plan on every host, every run, every CI shard. The
+inject plan is pre-rolled BEFORE the concurrent task spawn so the
+expected counts are derived from the plan, not from the race.
+
+Concurrency strategy: plain `Task { @MainActor in ... }` spawning
+plus `await task.value` per child. `withTaskGroup` was tried first
+but the strict-concurrency region-based isolation checker rejects
+the pattern when `addTask` closures re-enter `@MainActor` and
+capture source variables — see the matching pattern in
+`Tests/MatrixMultiOutputConcurrentFire_Tests.swift`. The plain-Task
+pattern compiles clean against `-strict-concurrency=complete`
+`-warnings-as-errors`.
+
+Why `≤ injections` (not strict equality) on the fuzz cell: under
+200-burst pressure, the `ReactionBus` subscriber buffer
+(`bufferingNewest(8)`) and the upstream source streams
+(`bufferingNewest(32)` for USB / BT / SleepWake) legitimately drop
+oldest entries — this is the documented backpressure policy, not a
+bug. The cell asserts `delivered ≤ injected` (no amplification) and
+liveness (every producer that fired delivers ≥ 1) without committing
+to strict equality the buffer policy explicitly does not promise.
+
+These cells are NOT in `mutation-catalog.json` for the same reason
+property cells aren't: they are integrative invariants that span
+multiple gates simultaneously, so a single mutation typically
+manifests as a SUBSET of cells failing — which would produce
+catalog-anchor drift under `make mutate`'s strict
+`expectedFailureSubstring` matching. The existing 69 catalog
+entries already pin the per-gate behaviour; the concurrent suite is
+a regression net for cross-gate races, not a per-gate anchor.
+
+## Cross-boundary fault cells
+
+`Tests/CrossBoundaryFaultInjection_Tests.swift` complements the
+per-source `_force*` mutation cells with eight cells that drive ≥ 2
+production fault paths SIMULTANEOUSLY. Bug class addressed: existing
+seams (USB / Bluetooth / Thunderbolt `_forceKernelFailureKr`,
+AudioPeripheral `_forceListenerStatus`, SleepWake
+`_forceRegistrationFailure`, AccelerometerKernelDriver
+`setForceManagerOpenFailure`, etc.) drive ONE source's failure path
+in isolation. Real systems fail across boundaries simultaneously
+(USB hot-unplug while microphone is starting; sleep
+mid-`IORegisterForSystemPower`; AudioPeripheral listener install
+rejected during a USB attach storm). A regression where one source's
+failure path corrupts a sibling's state would slip through the
+per-source cells.
+
+Each cell asserts a SPECIFIC invariant tagged with a
+`[crossfault-cell=<name>]` substring anchor. Each cell is budgeted
+at ≤ 500ms wallclock.
+
+| Cell | Invariant |
+|------|-----------|
+| `test_crossfault_cell_usb_fail_during_bt_fail_simultaneous` | concurrent USB + BT kernel-failure injection → both `_testInstallationCount` stay 0; bus has no emissions; neither source crashes |
+| `test_crossfault_cell_accel_open_fail_during_mic_start` | `MockAccelerometerKernelDriver.setForceManagerOpenFailure` while `MicrophoneSource` starts → 0 accelerometer impacts, microphone tap installed exactly once independent of accelerometer fault |
+| `test_crossfault_cell_sleepwake_fail_during_iohid_flood` | 100 USB attaches concurrent with `SleepWakeSource._forceRegistrationFailure` → SleepWake installCount=0, no `.willSleep` / `.didWake`, USB attaches still publish |
+| `test_crossfault_cell_audio_listener_fail_during_usb_flood` | AudioPeripheral `_forceListenerStatus` non-noErr during 30-attach USB burst → AudioPeripheral installCount=0, no audio emissions, USB attaches still publish |
+| `test_crossfault_cell_all_iokit_sources_fail` | every IOKit source (USB / BT / TB / Audio / SleepWake) faulted simultaneously → all installCount=0, bus total=0, no crash |
+| `test_crossfault_cell_recovery_after_fault` | source faulted then knob cleared then restarted → installCount=1 after recovery, follow-up `_injectAttach` lands at the bus |
+| `test_crossfault_cell_concurrent_fault_during_in_flight_subscription` | 3 subscribers attached, healthy injects flow, faults flipped during in-flight subscription → all subscribers see identical per-kind multisets (no fan-out skew under fault) |
+| `test_crossfault_cell_stable_interleaved_fault_fuzz` | for seeds 42 / 7 / 31: 2-5 random IOKit faults from the 5-source pool with 30 random injects → no crash, no kind cross-pollination, delivered ≤ injected (no amplification) |
+
+These cells are NOT in `mutation-catalog.json` for the same reason
+the concurrent / property cells aren't: they are integrative
+invariants that span multiple gates simultaneously, so a single
+mutation typically manifests as a SUBSET of cells failing — which
+produces catalog-anchor drift under strict
+`expectedFailureSubstring` matching. The existing per-source
+`_force*` catalog entries already pin per-gate behaviour; the
+cross-boundary suite is a regression net for cross-source state
+corruption under simultaneous fault, not a per-gate anchor.
+
+## Settings fuzz cells
+
+`Tests/SettingsFuzz_Tests.swift` complements the example-based
+`Tests/MatrixSettingsMigration_Tests.swift` matrix with eight cells
+that generate arbitrary plist shapes and corrupted settings inputs,
+asserting `SettingsStore.init()` survives them without throwing,
+crashing, or handing back NaN. Bug class addressed: the migration
+matrix only covers the *known* type-mismatch paths the example
+author thought of; a fuzzer that generates random key shapes
+catches the boot-time crash classes that random user upgrades —
+including version skew across multiple major releases — can
+produce.
+
+| Cell | Inputs | Trials |
+|------|--------|--------|
+| `test_fuzz_cell1_emptyDictPlist_usesDefaults` | empty `[String: Any]()` plist (every key missing) | 1 |
+| `test_fuzz_cell2_typeMismatchAllKeys_usesDefaults` | every `Key.allCases` entry written with the wrong type (Bool→String, Double→String, Int→String, Array→Int, Data→String, String→Int) | 1 |
+| `test_fuzz_cell3_truncatedPlist_partialKeys_useDefaultsForMissing` | first half of `Key.allCases` written with type-correct sentinels, second half absent | 1 |
+| `test_fuzz_cell4_randomBlobPlist_200trials_noCrash` | per-trial random `[String: Any]` of 0..N real keys + 0..10 garbage keys with type-roulette values (String, Int, Double incl. NaN/±∞, Bool, Array, Data) | 200 |
+| `test_fuzz_cell5_migrationFromFutureVersion_doesNotCrash` | `version: 99` + `settingsSchemaVersion: 99` + `schemaVersion: "99.0.0-future"` markers under the current schema (no version field) | 1 |
+| `test_fuzz_cell6_migrationFromCorruptVersion_doesNotCrash` | corrupt version markers: `-1`, `"broken"`, `""`, `Double.nan`, `[1,2,3]` | 5 |
+| `test_fuzz_cell7_serializationRoundTrip_100trials` | per-trial coherent in-band settings configuration; assert write→fresh-store→read round-trip is bijective for the in-clamp domain | 100 |
+| `test_fuzz_cell8_maliciousMatrixData_doesNotCrash` | 6 garbage `Data` blobs (empty, 1-byte, 4 KiB zeros, broken JSON, fake bplist magic, pseudo-random) driven through every `*ReactionMatrix` key plus the throwing `NSKeyedUnarchiver.unarchivedObject(ofClasses:from:)` API | 6 |
+
+Determinism: the random-blob and round-trip cells use the same
+hand-rolled xorshift64 `SeededGenerator` pattern as the property
+suite, inlined locally to keep the file self-contained. Same seed
+N produces the same plist shape on every host, every run, every CI
+shard. Failure messages cite `seed=N` so any regression is locally
+reproducible: `swift test --filter SettingsFuzz_Tests/test_fuzz_cell4_*`
+plus the emitted seed reproduces the exact failure.
+
+Isolation: SettingsStore reads only from `UserDefaults.standard`
+(no suiteName injection in production), so each cell wipes every
+`Key.allCases` entry plus the legacy `screenFlash`, `version`, and
+`settingsSchemaVersion` aliases before running. Mirrors the wipe
+pattern from `MatrixSettingsMigration_Tests`.
+
+SIGSEGV note: `XCTest` cannot trap SIGSEGV in-process — the runner
+reports "test crashed" rather than a failed assertion. Cell 8
+asserts only that `ReactionToggleMatrix.decoded(from:)` and
+`NSKeyedUnarchiver.unarchivedObject(ofClasses:from:)` return
+nil-or-throw on garbage bytes, both of which ARE catchable. A
+genuine SIGSEGV-class regression in the JSON / NSKeyedUnarchiver
+path would surface as a CI crash report, not a per-assertion
+failure.
+
+These cells are NOT in `mutation-catalog.json` because they are
+boot-time / corruption-resistance regression nets, not per-gate
+anchors — the catalog's `expectedFailureSubstring` machinery
+matches against single-gate mutations on `Sources/SensorKit/*`,
+and `SettingsStore` lives in `Sources/YameteApp/`.
+
+## State-machine cells
+
+`Tests/StateMachine_Tests.swift` is a model-based companion to the
+example-by-example lifecycle tests scattered across the matrix /
+lifecycle suites. Each cell encodes the production state machine
+exactly (states + reachable transitions), drives every transition
+in a small table, asserts the post-state with a coordinate-tagged
+message (`[state-machine=<Name>] from=... action=... expected=... got=...`),
+and — critically — asserts that *illegal* transitions are rejected
+(state unchanged, no extra side-effect counter increments).
+
+| Cell | Production type | Transitions covered | Counters / observables |
+|---|---|---|---|
+| 1 | `HeadphoneMotionSource.ProbeStage` | pending → running, running → complete, running → takenOver | `_testCurrentProbeStage`, `MockHeadphoneMotionDriver.stopUpdatesCalls` |
+| 2 | `HeadphoneMotionSource.ProbeStage` (illegal) | complete →* (no-op), takenOver →* (no-op) — terminal states | same |
+| 3 | `ImpactFusion` | start@stopped, start@running (re-entrant), stop@running, stop@stopped (idempotent), interleaved | `isRunning`, `_testHooks.{stopInvocationCount, stopTeardownCount, lastStopWasNoOp}` |
+| 4 | `ReactionBus` | open(0) → open(1) → open(2) → closed → open(1); publish-before-subscribe (no replay), close-then-publish (no-op), close-then-subscribe (re-open) | `_testSubscriberCount()` |
+| 5 | `MicrophoneSource.OnceCleanup` (per-stream) | open / cancel / re-open across 5 cycles; AT MOST ONCE invariant | `MockMicrophoneEngineDriver.{stopCalls, removeTapCalls, installTapCalls}` |
+| 6 | `TrackpadActivitySource` | start@stopped, double-start@running (no-op via `guard monitor == nil`), stop@running, double-stop@stopped, restart | `MockEventMonitor.{installCount, removalCount}` |
+
+These cells are NOT in `mutation-catalog.json` because they are
+model-check regression nets — they exercise transition graphs as
+a whole rather than individual `guard` clauses. A specific gate
+within a state-machine type (e.g., the `guard stage == .running`
+in `finishProbeIfRunning`) still gets its own per-gate entry in
+the catalog when one is added; the model-check cell catches the
+broader "transition graph regressed" failure mode.
+
+## Locale rendering cells
+
+`Tests/LocaleRendering_Tests.swift` complements the existing
+`MatrixLocalization_Tests` (pool injection + fallback) /
+`MatrixLocalizationKeyCoverage_Tests` (key parity per locale) /
+`MatrixLocalizationFormatSpecifiers_Tests` (format-specifier shape
+parity per locale) with eight cells that actually RENDER strings
+under each locale's CLDR plural-rule and number / date-formatter
+context. The bug class addressed: a `Localizable.stringsdict`
+regression that drops a CLDR plural category (e.g., Polish loses
+its `few` or `many` form) would slip through the existing key /
+specifier coverage tests because they never resolve a count
+through Foundation's plural machinery.
+
+Strategy:
+
+- Discover locales from `App/Resources/*.lproj/`, same convention
+  as the other matrix-localization cells. Yamete ships 40 locales,
+  each with `Localizable.stringsdict`.
+- Load each locale's stringsdict via `NSDictionary(contentsOf:)`
+  directly (the SPM test bundle does NOT include `App/Resources/*.lproj`
+  strings — those are bundled into the `.app` only by the Makefile,
+  same constraint `MatrixLocalization_Tests` documents).
+- Resolve the CLDR plural category for `count` ∈ {0, 1, 2, 17}
+  using a hand-coded CLDR 44 rule table (Foundation does not expose
+  plural rules as public API on `Locale`). The table covers every
+  Yamete-supported language family.
+- For RTL: probe `Locale.characterDirection(forLanguage:)` for
+  `ar` / `he` / `en` and assert correct direction. Glyph probe:
+  the Arabic stringsdict's `one` form must contain Arabic Unicode
+  (U+0600..U+06FF) and the Hebrew form must contain Hebrew Unicode
+  (U+0590..U+05FF); English form must contain neither (guards
+  against bundle-load mixup).
+- Date / numeric: drive `DateFormatter` (`.full` style, UTC TZ,
+  fixed instant 2026-01-15 10:30 UTC) and `NumberFormatter`
+  (`.decimal`, value 1234.56) under each locale; assert non-empty,
+  cross-locale divergence (≥ 25 of 40 must differ from en-US),
+  must-diverge-set (`ja`, `zh_CN`, `zh_TW`, `ko`, `ar`, `he`, `ru`,
+  `th`, `hi` MUST differ from en-US — different scripts), and
+  per-locale glyph signatures (German `1.234,56`, French `1 234,56`,
+  English `1,234.56`).
+
+| Cell | Axis tested |
+|------|-------------|
+| `testPluralRenderingCountZeroForEveryLocale` | plural count=0 |
+| `testPluralRenderingCountOneForEveryLocale` | plural count=1 |
+| `testPluralRenderingCountTwoForEveryLocale` | plural count=2 (pins Slovenian/Arabic `two`, Polish/Russian `few`) |
+| `testPluralRenderingCountManyForEveryLocale` | plural count=17 (pins Polish/Russian/Ukrainian/Arabic `many`) |
+| `testPolishPluralCategoriesReachableAndCorrect` | Polish-specific: drives counts 0/1/2/3/5/12/22/25 across all 4 CLDR categories (one/few/many/other); asserts category resolution AND on-disk stem (uderzenie / uderzenia / uderzeń) |
+| `testRTLLocaleLayoutAndGlyphs` | RTL: `Locale.characterDirection(forLanguage:)` + Arabic/Hebrew glyph presence + LTR-locale negative |
+| `testDateFormatRenderingForEveryLocale` | `DateFormatter` `.full` style under every locale; non-empty + cross-locale divergence + must-diverge set |
+| `testNumericFormatRenderingForEveryLocale` | `NumberFormatter` `.decimal` under every locale; decimal separator parity + per-locale German/French/English signatures |
+
+These cells are NOT in `mutation-catalog.json` because they
+exercise CLDR-rule + Foundation-formatter behaviour, not a Yamete
+production guard — there is no `Sources/SensorKit/*.swift` gate to
+mutate. They are a regression net for resource-file drift
+(stringsdict losing categories, locale dirs disappearing) and
+Foundation API drift (plural rule selection changing across
+macOS releases), not a per-gate anchor.
+
+## Performance / soak cells
+
+`Tests/Performance_Tests.swift` is a soak / leak / throughput
+regression net that complements the functional matrix. The functional
+suite asserts that the right reaction fires for the right input;
+none of those cells assert anything about *cost*. A regression that
+re-installed an `EventMonitor` on every gesture, leaked a `Task` per
+`_injectClick`, or grew the bus subscriber dictionary without bound
+would pass the functional suite for hours and only show up as
+degraded user experience after sustained use.
+
+Each cell runs lifecycle / fan-out / inject loops at counts large
+enough to surface unbounded growth, then asserts:
+
+- process resident-set size (`task_info` with `MACH_TASK_BASIC_INFO`,
+  the macOS-supported equivalent of iOS's `os_proc_available_memory`)
+  stays within a documented byte envelope
+- mock counters (e.g. `MockEventMonitor.installCount` /
+  `removalCount`) stay balanced — every install matched by a removal
+- second-half-median wallclock per chunk stays within 3x first-half
+  median (catches per-iter cost growing with iteration index)
+
+| Cell | Invariant | Counters / observables |
+|---|---|---|
+| 1 | `TrackpadActivitySource` 1000 start/stop cycles: `installCount == removalCount` per cycle, RSS delta < 5 MB | `MockEventMonitor.installCount`, `removalCount`, `task_info.resident_size` |
+| 2 | `MouseActivitySource` 1000 start/stop cycles: same balance + RSS bound | same as cell 1 |
+| 3 | `ReactionBus` 10,000 publishes: `delivered <= published` (no fan-out amplification), RSS delta < 10 MB (busBufferDepth caps retention) | subscriber drain count, `task_info.resident_size` |
+| 4 | Per-source `_inject*` 5,000 calls (USB / Power / Bluetooth / SleepWake / AudioPeripheral), 10 chunks of 500: second-half median <= 3x first-half median (catches sustained per-iter cost drift). Identities cycle modulo 50 because production diff-state sets are bounded by physical hardware (~5-20), not by call count | per-chunk `ProcessInfo.systemUptime` deltas |
+| 5 | 20,000 `_injectClick` calls with debounce coalesce: RSS delta < 20 MB (catches orphan Task accumulation per call) | `task_info.resident_size` |
+| 6 | `ReactionBus` 500 open/subscribe/close cycles: max live `_testSubscriberCount() <= 1`, RSS delta < 10 MB | `ReactionBus._testSubscriberCount()`, `task_info.resident_size` |
+| 7 | `USBSource._injectAttach` x 1000 in tight loop: completes in < 5 s (10x of ~700 ms baseline catches gross regression without flaking on slower hosts) | `ProcessInfo.systemUptime` |
+
+These cells are NOT in `mutation-catalog.json`. A mutation that
+introduces a leak or a quadratic regression typically manifests as
+a subset of cells failing on different hosts (cell 5's RSS bound is
+sensitive to scheduler load; cell 4's median ratio is sensitive to
+a single GC pause), so anchor matching against
+`expectedFailureSubstring` would drift across CI hosts. The cells
+are a **regression net** — they catch catastrophic divergence from
+the documented baselines, not per-mutation single-gate failures.
+
+A NOTE on cell 4 calibration: an earlier draft used unique UIDs per
+inject and produced clean monotonic slowdown (`[0.09, 0.27, 0.52,
+0.46, 0.94, 0.92, 0.91, 1.55, 1.99, 2.43]` seconds) for
+`AudioPeripheralSource`. This was NOT a production bug — the test
+seam's `_injectAttach` does `var nextSet = knownDevices;
+nextSet.insert(uid); handleChange(newDevices: nextSet, ...)` which
+is O(n) per call where n = accumulated device count. In production
+n is bounded by physical hardware (~10); the test's 5000 unique
+UIDs created an artificial O(n^2) the test seam was not designed
+for. Cycling identity modulo 50 mirrors the real-world bound while
+still hammering the hot path 5000 times. The same pattern applies
+to USBSource's `lastEvent` debounce dictionary and BluetoothSource's
+`knownDevices` set.
+
+## Crash handling cells
+
+`Tests/CrashHandling_Tests.swift` is the arithmetic-trap /
+divide-by-zero / NaN-propagation / out-of-bounds-pointer audit
+suite. None of the example-based or matrix tests exercised the
+SIGSEGV / SIGTRAP / SIGABRT-adjacent paths before this file
+landed; every cell here pins a *guard* whose removal would surface
+as a process crash that takes the whole test runner down rather
+than a per-assertion failure.
+
+| Cell | Trap class | Boundary input | Pinned guard |
+|---|---|---|---|
+| 1 (cold-boot) | UInt64 underflow on `now &- lastTs` | `lastTsRaw=0, now=0` | `AccelHardware.evaluateActivity` `raw > 0` gate |
+| 1 (clock-equal) | UInt64 underflow → wrap interpreted as fresh | `lastTs=now=1000` | `now > lastTs` gate → `.clockNonMonotonic` |
+| 1 (clock-backwards) | UInt64 underflow on `now &- lastTs` | `lastTs=2e9, now=1e9` | `now > lastTs` gate → `.clockNonMonotonic` |
+| 2 (trackpad NaN) | NaN propagation from `atan2(0,0)` / `hypot(0,0)` into `circleAngleAccum` | `dx=0, dy=0` × 100 samples | `evaluateCircle` `mag > 2.0` gate |
+| 3 (mic zero-frame) | OOB pointer read on `channelData[i]` for empty buffer | `AVAudioPCMBuffer` with `frameLength == 0` | `installTap` closure `frameLength > 0` gate |
+| 4 (impact zero-mag) | Float divide-by-zero → Inf crest poisoning gate cascade | sustained `magnitude=0.0` × 100 samples | `ImpactDetector.process` `spikeThreshold` gate (short-circuits before crest) |
+| 4 (impact zero-bg) | Float divide-by-zero on first spike with empty EMA history | `intensityFloor=0`, single `magnitude=1.0` spike | `if backgroundRMS > 0` gate around `windowPeak / backgroundRMS` |
+| 5 (HID 1k matchers) | Int iteration overflow / CFArray bridge cost | 1000-element matcher list | per-matcher `for` loop bounds (Int domain) |
+| 6 (bus post-close) | Use-after-finish on `AsyncStream.Continuation` | `publish` after `close()` | `close()` clears subscriber dict; `publish` walks empty set |
+| 7 (UInt64 wrap) | Overflow on `(now &- lastTs) &* numer` at near-max boundary | `lastTs=Int.max, now=Int.max+1, stalenessNs=UInt64.max` | `&-` / `&*` wrap-arithmetic operators |
+| 8 (watchdog distant times) | TimeInterval → Int64 conversion overflow | `lastReportAt=Date.distantPast, now=Date.distantFuture` | `evaluateWatchdogTick` Double-domain math + `running` short-circuit |
+
+Degenerate cells (proposed in the original audit but not
+realisable in-process):
+
+- "Settings UInt64 overflow" — there are no UInt64-typed Settings
+  fields. All numeric Settings are `Double` (TimeInterval /
+  threshold) or `Int` (count). The wraparound arithmetic that
+  does exist lives in `AccelHardware.evaluateActivity` and is
+  covered by Cell 7.
+- "AccelerometerReader watchdog `mach_absolute_time` wraparound"
+  in-process — production watchdog uses `Date` (TimeInterval /
+  Double), not `mach_absolute_time`. `mach_absolute_time` rollover
+  is itself unreachable in-process (~584 years to wrap on
+  post-Big-Sur Apple silicon). Cell 8 pins the Date-domain
+  extreme reachable in this codebase.
+- Out-of-process SIGSEGV / SIGTRAP fault injection — XCTest cannot
+  trap SIGSEGV in-process; testing that a force-unwrap actually
+  traps requires `XCUIApplication` to spawn a child target, which
+  `swift test` does not configure here. Each cell pins the *guard*
+  that prevents the trap; the absence-of-trap assertion is the
+  test runner not crashing.
+
+These cells are NOT in `mutation-catalog.json` because the catalog
+matches single-gate mutations on `Sources/SensorKit/*` against
+`expectedFailureSubstring` — the crash-handling cells either span
+multiple files (Cell 7 hits both `&-` and `&*`) or pin idiomatic
+patterns (Cell 6's "no replay" is intrinsic to `AsyncStream`,
+not a single guard). Mutation pairs for the per-gate guards
+(`raw > 0`, `now > lastTs`, `frameLength > 0`, `backgroundRMS > 0`,
+`mag > 2.0`) are eligible for catalog entries when added; the
+crash-handling suite is the integrative regression net.
+
+## Driver parity cells
+
+`Tests/DriverParity_Tests.swift` complements the per-driver
+lifecycle / mock tests (e.g. `MicrophoneAdapterLifecycleTests`,
+`HeadphoneMotionAdapterLifecycleTests`,
+`NotificationResponderTests`, etc.) with eight cells that exercise
+each driver protocol's `Real*` and `Mock*` implementations through
+the SAME call sequence and assert the protocol's CONTRACT holds on
+both sides. Bug class addressed: every other test in the suite
+talks to ONE side of the protocol — Mocks for fast deterministic
+paths, Real impls only inside lifecycle tests gated on hardware /
+TCC. A divergence between the two (e.g. Real returns `nil` where
+Mock simulates a value, or Real adds a side effect Mock never
+records) would surface as a production-only bug the test suite
+cannot catch because no cell ever observes them under the same
+input.
+
+| Cell | Driver pair | Assertion shape |
+|------|-------------|-----------------|
+| `test_eventMonitor_parity_installAndRemove` | `RealEventMonitor` vs `MockEventMonitor` | install returns non-nil token (Mock unconditionally; Real iff Accessibility granted), remove cleans up; `XCTSkipUnless` on TCC for Real half |
+| `test_hidDeviceMonitor_parity_emptyMatcherAlwaysEmpty` | `RealHIDDeviceMonitor` vs `MockHIDDeviceMonitor` | empty matcher returns `[]` on both (CONTRACT); non-empty matcher: shape parity only (`[HIDDeviceInfo]` on both) — value diverges (Real reflects connected hw, Mock reflects test state) |
+| `test_microphoneEngineDriver_parity_installRemoveTapSymmetry` | `RealMicrophoneEngineDriver` vs `MockMicrophoneEngineDriver` | install/remove tap call sequence symmetric on both; `XCTSkipUnless` on Real input format validity |
+| `test_headphoneMotionDriver_parity_contractShape` | `RealHeadphoneMotionDriver` vs `MockHeadphoneMotionDriver` | `isDeviceMotionAvailable` and `isHeadphonesConnected` return Bool on both; `startUpdates` / `stopUpdates` call-counting symmetry on Mock; Real start/stop must not throw or crash |
+| `test_hapticEngineDriver_parity_startPlayStop` | `RealHapticEngineDriver` vs `MockHapticEngineDriver` | `start` → `playPattern` → `stop` succeeds on Mock unconditionally and on Real iff Force Touch hardware present (`XCTSkipUnless`) |
+| `test_hapticEngineDriver_parity_playWithoutStartThrows` | same | typed-throwing parity: Mock with `shouldFailPlay` throws; Real `playPattern` without prior `start` throws `HapticDriverError.engineNotStarted` |
+| `test_displayBrightnessDriver_parity_getSetShape` | `RealDisplayBrightnessDriver` vs `MockDisplayBrightnessDriver` | `get` returns `Float?` on both; Mock seeded set→get round-trips exactly; Real round-trip restores original (non-destructive) |
+| `test_systemVolumeDriver_parity_captureSetRestore` | `RealSystemVolumeDriver` vs `MockSystemVolumeDriver` | capture → set → restore round-trips on Mock; Real captures original and restores within tolerance (no-op for user); `XCTSkipUnless` when no default audio output |
+| `test_systemNotificationDriver_parity_authorizationShape` | `RealSystemNotificationDriver` vs `MockSystemNotificationDriver` | `currentAuthorization` returns `NotificationAuth` enum on both; `remove` does not throw on either; posting NOT asserted on Real (would surface a banner) |
+
+Skipped halves (Real-side only — Mock half always runs):
+- EventMonitor: skipped when Accessibility / TCC not granted to
+  the test runner (NSEvent's add returns nil in that case).
+- MicrophoneEngineDriver: skipped when no audio input device
+  (input format reports zero channels / sample rate).
+- HapticEngineDriver: skipped when host has no Force Touch trackpad
+  (Mac mini, headless CI).
+- DisplayBrightnessDriver: skipped when DisplayServices.framework
+  symbols cannot be resolved, or when the active display does not
+  report a brightness value (some external monitors).
+- SystemVolumeDriver: skipped when host has no default audio output
+  device (headless CI).
+
+These cells are NOT in `mutation-catalog.json` because parity is
+an INTEGRATIVE invariant across two implementations of the same
+protocol — a single-gate mutation in either Real or Mock would
+manifest as one half failing while the other passes, which is
+already caught by the per-side lifecycle / mock tests already in
+the catalog. The parity suite is a regression net for "the two
+implementations of this protocol have drifted apart", not a
+per-gate anchor.
+
+Divergences documented (not bugs — observed-and-captured contract
+differences):
+- `RealHIDDeviceMonitor.queryDevices` reflects connected hardware;
+  `MockHIDDeviceMonitor` reflects test-injected state. Equality of
+  return value is intentionally NOT asserted for non-empty
+  matcher lists.
+- `RealHeadphoneMotionDriver.isHeadphonesConnected` reflects
+  paired AirPods (delegate-driven); `MockHeadphoneMotionDriver` is
+  test-controlled. Real's `isDeviceMotionAvailable` returns true
+  on every Apple Silicon Mac independent of paired devices.
+- `RealSystemVolumeDriver.getVolume` reflects the host's audio
+  device state; `MockSystemVolumeDriver` reflects test seed. The
+  Real round-trip is restore-only (sets back the captured
+  original) so tests do not change the user's volume.
+- `RealSystemNotificationDriver.currentAuthorization` reflects the
+  test runner's notification grant state (any of the six
+  `NotificationAuth` cases is valid); `MockSystemNotificationDriver`
+  defaults to `.authorized`. Only enum-shape parity is asserted.
+
+## Snapshot UI cells
+
+Pixel-baseline snapshots in `Tests/SnapshotUI_Tests.swift` cover the
+menu UI's structural composition. These cells render real SwiftUI
+views into `NSHostingView`, capture the bitmap via the
+`pointfreeco/swift-snapshot-testing` `image` strategy, and compare
+against committed PNG baselines under
+`Tests/__Snapshots__/{AppStore,Direct}/SnapshotUI_Tests/` —
+per-build-variant subdirectories selected at compile time via
+`#if DIRECT_BUILD` inside the suite's `snapshotDirectory(filePath:)`
+helper. Phase 3 added the variant split because shared cells could
+render subtly differently under DIRECT_BUILD (extra DIRECT-only
+widgets, different `Updater.currentVersion` resolution, different
+feature-gate visibility); without per-build baselines one variant's
+recording would clobber the other.
+
+The bug class targeted: regressions in `AccordionCard` row-height
+geometry, `PillButton` framing, accordion expand/collapse layout,
+`Theme` color-token additions/removals/edits — all of which compile
+clean and pass `MatrixViewLabelCoverage_Tests` (string presence) and
+`MatrixAccordionExpansionSize_Tests` (numeric height deltas) but
+visually drift.
+
+Cells (14 baseline PNGs total):
+
+| Test | View rendered | Baselines |
+|------|---------------|-----------|
+| `test_cell_headerSection_lightScheme` | `HeaderSection` | 1 |
+| `test_cell_headerSection_darkScheme` | `HeaderSection` (.dark) | 1 |
+| `test_cell_deviceSection_collapsed` | `AccordionCard` wrapping `DeviceSection`, `isExpanded=false` | 1 |
+| `test_cell_deviceSection_expanded` | `AccordionCard` wrapping `DeviceSection`, `isExpanded=true` | 1 |
+| `test_cell_trackpadTuning_expanded_lightScheme` | `AccordionCard` wrapping `TrackpadTuningContent`, `isExpanded=true` | 1 |
+| `test_cell_trackpadTuning_expanded_darkScheme` | as above (.dark) | 1 |
+| `test_cell_responseSection_lightScheme` | `ResponseSection` (4-card variant, all-hardware-off) | 1 |
+| `test_cell_responseSection_darkScheme` | as above (.dark) | 1 |
+| `test_cell_footerSection` | `FooterSection` (App Store build only — DIRECT_BUILD skips) | 1 |
+| `test_cell_accordionCard_rowCounts` | `AccordionCard` with 1, 3, 5, 7 rows | 4 |
+| `test_cell_themeColorPaletteSwatches` | every `Theme.*` named color in declaration order | 1 |
+
+Determinism strategy:
+
+1. **Locale**: cells that render `NSLocalizedString`-backed Section
+   views skip via `XCTSkipUnless` when the host's preferred
+   localization is non-English. Synthetic-content cells inject
+   literal English strings.
+2. **Date / clock**: no view in scope formats a `Date()`. The
+   `MenuBarFace.impactCount` defaults to `0` and is never mutated by
+   the snapshot fixtures.
+3. **System fonts**: `precision: 0.99` and `perceptualPrecision:
+   0.98` tolerate sub-pixel hinting drift between minor macOS
+   versions. The bug classes targeted shift pixels by ≥ 4pt — well
+   outside the perceptual band.
+4. **Color schemes**: rendered explicitly via
+   `.preferredColorScheme(.light)` / `.dark` — never inherits the
+   host's appearance.
+5. **NSApplication / Bundle.main**: the FooterSection cell is
+   skipped under `#if DIRECT_BUILD` because `Updater.currentVersion`
+   reads `Bundle.main.infoDictionary`, which differs between
+   `swift test` (xctest bundle) and the shipped app.
+
+To regenerate baselines locally: leave `recordMode` at `.missing`
+and delete the existing PNGs you want re-recorded — the suite
+auto-records anything missing on the next run. For App Store
+baselines run `swift test --filter SnapshotUI_Tests`; for the
+DIRECT_BUILD variant run
+`swift test -Xswiftc -DDIRECT_BUILD --filter SnapshotUI_Tests`.
+Commit both
+`Tests/__Snapshots__/AppStore/SnapshotUI_Tests/*.png` and
+`Tests/__Snapshots__/Direct/SnapshotUI_Tests/*.png` so each build
+variant has its own ground truth. Phase 3's initial recording
+showed every shared cell rendering byte-identical between AppStore
+and Direct (the `FooterSection` cell skips under DIRECT_BUILD per
+its own `XCTSkip`); the split is forward-compat infrastructure for
+when DIRECT-only widgets land in shared sections.
+
+These cells are NOT in `mutation-catalog.json`. They are visual
+regression nets, not per-gate behaviour anchors — a single mutation
+typically perturbs more than one cell at once, which would create
+catalog-anchor drift under `make mutate`'s strict
+`expectedFailureSubstring` matching.
+
+## Direct-only snapshot cells (Phase 5)
+
+`SnapshotUI_Tests` covers the App Store build's UI; the Direct build
+adds surface that never ships on the Store and therefore never gets
+exercised by the App Store snapshot suite. Phase 5 adds a parallel,
+`#if DIRECT_BUILD`-gated suite at `Tests/SnapshotUI_Direct_Tests.swift`
+with baselines under
+`Tests/__Snapshots__/Direct/SnapshotUI_Direct_Tests/` (the
+DIRECT-variant slot of Phase 3's per-build subdirectory split — there
+is no `AppStore/SnapshotUI_Direct_Tests/` because the entire suite is
+gated out under default builds).
+
+Direct-only surface covered:
+
+- `AccelTuningSection` / `MicTuningSection` / `HeadphoneTuningSection`
+  collapsible wrappers — production `Section` views that compose an
+  `AccordionCard` around their `*TuningContent` body. Direct builds
+  surface these as standalone collapsibles whose collapsed/expanded
+  geometry must stay stable across both color schemes.
+- `FooterSection` under `#if DIRECT_BUILD` — the right column renders
+  the `Updater.state` composition (info icon + version line + check
+  chevron). The App Store baseline only captures the version-only
+  variant of this row; the Direct variant has different leading icon,
+  trailing button, and pink-accent state branches that need their own
+  pixel anchor.
+- `ResponseSection` audio card with `volumeSpikeEnabled = true` — under
+  `#if DIRECT_BUILD`, the audio `SensorAccordionCard` adds an
+  `EnableToggleRow` for "Volume Override" below the volume range
+  slider. Captured as a full-`ResponseSection` snapshot with all
+  hardware-gated cards off so only the Direct-flavoured card stack
+  contributes pixels.
+- Composite — three tuning sections (all expanded) + the
+  Direct-flavoured `FooterSection` stacked vertically. Locks the
+  cumulative panel height a Direct user sees with every collapsible
+  open.
+
+Cells (14 baseline PNGs total):
+
+| Test | View rendered | Baselines |
+|------|---------------|-----------|
+| `test_cell_accelTuningSection_collapsed` | `AccordionCard` wrapping `AccelTuningContent`, `isExpanded=false` | 1 |
+| `test_cell_accelTuningSection_expanded_lightScheme` | as above, expanded, light | 1 |
+| `test_cell_accelTuningSection_expanded_darkScheme` | as above, expanded, dark | 1 |
+| `test_cell_micTuningSection_collapsed` | `AccordionCard` wrapping `MicTuningContent`, `isExpanded=false` | 1 |
+| `test_cell_micTuningSection_expanded_lightScheme` | as above, expanded, light | 1 |
+| `test_cell_micTuningSection_expanded_darkScheme` | as above, expanded, dark | 1 |
+| `test_cell_headphoneTuningSection_collapsed` | `AccordionCard` wrapping `HeadphoneTuningContent`, `isExpanded=false` | 1 |
+| `test_cell_headphoneTuningSection_expanded_lightScheme` | as above, expanded, light | 1 |
+| `test_cell_headphoneTuningSection_expanded_darkScheme` | as above, expanded, dark | 1 |
+| `test_cell_footerSection_directBuild_lightScheme` | `FooterSection` under `DIRECT_BUILD`, idle `Updater` | 1 |
+| `test_cell_footerSection_directBuild_darkScheme` | as above, dark | 1 |
+| `test_cell_responseSection_directBuild_audioVolumeSpikeOn_lightScheme` | `ResponseSection`, all-hardware-off, `volumeSpikeEnabled=true` | 1 |
+| `test_cell_responseSection_directBuild_audioVolumeSpikeOn_darkScheme` | as above, dark | 1 |
+| `test_cell_directOnlyComposite_allExpanded_lightScheme` | three tuning sections expanded + `FooterSection` stacked | 1 |
+
+Determinism strategy mirrors `SnapshotUI_Tests` (precision 0.99,
+perceptualPrecision 0.98, English-locale skip, `.preferredColorScheme`
+explicit). The new wrinkle:
+
+- `Updater()` initializes with `.idle` state; no cell calls
+  `checkForUpdates()`, so state stays `.idle` for the entire snapshot
+  capture. `Updater.currentVersion` resolves from `Bundle.main` at
+  init — stable across runs on the same host (either the bundle's
+  `CFBundleShortVersionString` or the `?? "1.0.0"` literal fallback
+  when the SPM `xctest` runner's bundle has nil `infoDictionary`).
+  No async update transition can race the snapshot capture.
+- The composite cell stacks production views directly via
+  `VStack(spacing: 0) { … Divider() … }` rather than rendering
+  `MenuBarView` to avoid the `NSScreen.screens`-driven
+  `maxScrollHeight` host dependency.
+
+To regenerate baselines locally: leave `recordMode` at `.missing`,
+delete the PNGs you want re-recorded under
+`Tests/__Snapshots__/Direct/SnapshotUI_Direct_Tests/`, and run
+`swift test -Xswiftc -DDIRECT_BUILD --filter SnapshotUI_Direct_Tests`.
+Missing baselines auto-record on the next run; commit the PNGs.
+
+These cells are NOT in `mutation-catalog.json` for the same reason
+as the App Store snapshot cells — they're visual regression nets,
+not per-gate behaviour anchors.
+
+The default `swift test` (without `-Xswiftc -DDIRECT_BUILD`) skips
+this file entirely: every symbol it defines lives inside a single
+top-level `#if DIRECT_BUILD` block, so the file is invisible to the
+App Store-flavoured build.
+
+## UI gate cells (Phase 7)
+
+Phase 7 extended the catalog from SensorKit + ResponseKit into
+`Sources/YameteApp/`. The UI / settings / animation surfaces have
+behavioural gates that are NOT visual (snapshot tests cover those)
+but live in plain Swift control flow:
+
+- `Theme.AccordionCard.animationDuration(forRows:)` — three formula
+  clamps: 0.30s upper cap, 0.10s + (rows × 0.025) per-row scale, and
+  the `max(1, rows)` floor.
+- `Theme.SensorAccordionCard.animationDuration(forRows:)` — duplicate
+  formula on the sensor card surface; both must agree so mixed-card
+  panels animate consistently.
+- `SettingsStore.didSet` blocks across paired settings — the
+  recursive-clamp-and-return pattern for unit-range fields, plus the
+  pair-fixup gates that drag the partner up/down when the (min, max)
+  ordering invariant is violated. Cells anchor sensitivityMin clamp,
+  sensitivity / flashOpacity / volume pair invariants, the bandpass
+  pair-fixup, the `flashEnabled` ↔ `visualResponseMode` legacy sync,
+  plus the `sanitizeNonFiniteAndPairings` cold-load fixups (NaN
+  recovery + cold-load bandpass pair fixup).
+
+Anchors live in `Tests/SettingsStoreTests.swift` and
+`Tests/Integration/PanelLayoutTests.swift` under the `testUIGate_`
+prefix; each carries a stable `[ui-gate=<id>]` substring in its
+assertion message so the runner matches deterministically. The
+mutation catalog uses `id` prefix `ui-` for these entries.
+
+Coverage scan: `bash scripts/mutation-test.sh --coverage` walks both
+`Sources/SensorKit/` and `Sources/YameteApp/` (recursively, including
+`Views/`, `Views/MenuBar/`, `Views/Components/`) and emits the
+un-covered punch-list. Trace-log lines (`log.{debug,info,warning,
+error,trace,notice}`) are skipped — keywords like `threshold` /
+`debounce` appear in log format strings, not in control flow.
+
+## UI gate cells (Phase 7b)
+
+Phase 7 promoted 14 UI gates and explicitly deferred four files whose
+gates live inside SwiftUI bodies / `Layout` protocol implementations:
+`RangeSlider.swift`, `FlowLayout.swift`, `SensitivityRuler.swift`,
+`Updater.swift`. Phase 7b closes that defer for the three files whose
+gates are reachable through an offscreen `NSHostingView` render and
+documents the production seam each remaining gate would need.
+
+### `Sources/YameteApp/Views/FlowLayout.swift` — five caught gates
+
+`FlowLayout` is a `Layout` protocol implementation; its decisions
+(wrap, row-spacing accumulation, row-height max, nil-proposal
+fallback, empty-row fallback) all surface as differences in the
+`NSHostingView` intrinsic content size when a controlled set of
+fixed-size children is rendered through it. Cells live in
+`Tests/Integration/UIGatesPhase7B_Tests.swift` and pin:
+
+- `ui-flowLayout-wrap-row-full` — three 60×30 children proposed into a
+  100pt row must wrap to multiple rows (≥ 60pt height). Mutating the
+  wrap predicate to always-true collapses to one row of 30pt.
+- `ui-flowLayout-empty-row-fallback` — oversized first item (100×30 in
+  a 20pt row) must NOT leave the initial empty `Row()` orphaned.
+  Mutating `|| lastRow.indices.isEmpty` to `|| false` adds an extra
+  inter-row spacing to the rendered total.
+- `ui-flowLayout-inter-row-spacing` — three-row layout's height must
+  include `spacing × (rows − 1)`. Dropping the accumulator drops the
+  height by 40pt at spacing=20.
+- `ui-flowLayout-nil-proposal-infinity` — under
+  `.fixedSize(horizontal: true)` the parent proposes `nil` width; the
+  `?? .infinity` fallback keeps everything on one row. Flipping to
+  `?? 0` puts every item on its own row (5 children × 30pt → 166pt).
+- `ui-flowLayout-row-height-max` — a row containing a 30pt-tall child
+  followed by a 60pt-tall child must report the 60pt height. Dropping
+  the running max collapses the row to the first child's 30pt.
+
+### `Sources/YameteApp/Views/RangeSlider.swift` — one caught gate (Phase 7b — Phase 7c added five more, see below)
+
+The clamp / swap branches inside the `DragGesture.onChanged` closure
+(value-overshoot → swap, position-clamp to `half...half+usable`,
+`.clamped(to: 0...1)` projection) cannot be invoked from a unit test
+without either pumping a synthetic `NSEvent` stream or extracting the
+math into a `static` helper. Phase 7b was additive on the test side
+only — the gesture-resident gates were un-pinned. **Phase 7c closes
+this defer**: the gestural math now lives in
+`RangeSlider.applyDrag(...)` and `RangeSlider.clamp(position:half:usable:)`,
+both `internal static`. See the Phase 7c section below for the five
+new caught gates. One observable gate is reached without the
+extracted helpers:
+
+- `ui-rangeSlider-default-labelWidth` — the struct's default
+  `labelWidth: CGFloat = 40` adds 80pt to the rendered intrinsic
+  width when no caller overrides it. Cell renders with
+  `.fixedSize(horizontal: true, vertical: true)` so the natural
+  HStack width is reported; mutating the default to 0 collapses the
+  label columns.
+
+### `Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift` — two caught gates
+
+`SensitivityRuler` is a small static-content view (5-element ticks
+array, hardcoded localized labels, hardcoded gutter widths). Cells
+pin the two surface-level constants whose mutation produces an
+observable intrinsic-size delta:
+
+- `ui-sensitivityRuler-intrinsic-height` — the inner GeometryReader
+  has no intrinsic height; `.frame(height: 16)` is what gives the
+  ruler its 16pt vertical footprint. Zeroing the frame collapses the
+  rendered intrinsic height.
+- `ui-sensitivityRuler-left-gutter-width` — the leading
+  `Spacer().frame(width: 50)` provides a 50pt gutter between the
+  panel edge and the tick region. The right gutter has identical
+  surface text, so the catalog `search` is multi-line, anchored on
+  the `GeometryReader` directly following the LEFT gutter, to ensure
+  uniqueness.
+
+The `tick.position * w` per-tick placement formula and the 5-element
+ticks-array contents (positions 0.0/0.25/0.5/0.75/1.0, labels
+`tier_hard`/`firm`/`medium`/`light`/`tap`) lived in a `private static`
+constant inside a SwiftUI `body` `ForEach` and were Phase 7b deferred
+because mutating any single position or label key produces a
+bitmap-level delta that is not exposed through `intrinsicContentSize`
+— pinning these gates would have required either bitmap-fingerprint
+snapshots (heavy, host-sensitive) or a production seam. **Phase 7c
+took the production-seam path**: `ticks` is now `internal static let`
+and `tick.position * w` is now
+`SensitivityRuler.position(for:in:) -> Double`. See the Phase 7c
+section below for the two new caught gates.
+
+### `Sources/YameteApp/Updater.swift` — gates deferred (Phase 7b) — closed in Phase 7c
+
+Two distinct gates surveyed; both were Phase 7b deferred because
+they were unreachable from the test harness without modifying
+production. **Phase 7c closes both defers** by promoting visibility
+and adding a `Bundle` injection seam:
+
+1. `Updater.isNewer(remote:local:)` was `private static` inside the
+   `#if DIRECT_BUILD` branch. Phase 7c promotes it to `internal static`
+   (still gated `#if DIRECT_BUILD`) so cells can drive the semver
+   compare directly under `swift test -Xswiftc -DDIRECT_BUILD`.
+
+2. The App-Store stub init's `?? "1.0.0"` fallback was non-observable
+   under SPM `swift test` because the `xctest` runner's `Bundle.main`
+   always supplies a non-nil `CFBundleShortVersionString`. Phase 7c
+   pulls the version resolution into
+   `Updater.currentVersion(bundle: Bundle = .main) -> String` and adds
+   the seam in BOTH branches so a stub `Bundle` (subclass overriding
+   `infoDictionary` to nil) drives the fallback.
+
+See the Phase 7c section below for the catalog entries that now pin
+both gates.
+
+## Phase 7c — production seam closures
+
+Phase 7b explicitly deferred three classes of UI gate behind
+"production refactor required". The user rejected the defer; Phase 7c
+authors the seams, retains public API, and adds catalog entries
+pinning each gate. All Phase 7c cells live in
+`Tests/Integration/UIGatesPhase7B_Tests.swift` (extending the existing
+file; the DIRECT_BUILD-gated cells live in a sibling
+`UIGatesPhase7C_DirectOnly_Tests` class in the same file). The
+mutation runner (`scripts/mutation-test.sh`) verifies CAUGHT under
+bare `swift test`; DIRECT_BUILD-only cells run under
+`swift test -Xswiftc -DDIRECT_BUILD` only and are NOT catalogued (the
+runner does not pass `-DDIRECT_BUILD` so the cells would not link at
+filter time).
+
+### `Sources/YameteApp/Views/RangeSlider.swift` — five caught gates (Phase 7c)
+
+The gesture-resident clamp / pair-swap math is extracted into two
+internal statics that the cells drive directly:
+
+- `RangeSlider.clamp(position:half:usable:) -> CGFloat` — `min(max(half, x), half + usable)`.
+- `RangeSlider.applyDrag(...)` — pure projection of the gesture
+  closure's body, returning a `DragResult { low, high, active }`.
+
+Catalog entries:
+
+- `ui-rangeSlider-clamp-lower-bound` — overshoot-left coordinate must
+  clamp UP to `half`. Mutation drops the `max(half, x)` outer wrap.
+- `ui-rangeSlider-clamp-upper-bound` — overshoot-right coordinate must
+  clamp DOWN to `half + usable`. Mutation drops the `min(...)` outer
+  wrap.
+- `ui-rangeSlider-applyDrag-low-overshoot-swap` — when low overshoots
+  high, control flips to `.high` and the values swap. Mutation
+  disables the swap branch (`if false`), leaving low > high.
+- `ui-rangeSlider-applyDrag-high-overshoot-swap` — mirror of the
+  above for high overshooting low.
+- `ui-rangeSlider-applyDrag-overlap-translation` — when both thumbs
+  sit at the same x (within 2pt), translation sign picks which thumb
+  to lead. Mutation flips the comparator and the wrong thumb takes
+  the lead.
+
+### `Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift` — two caught gates (Phase 7c)
+
+The previously private `ticks` array is promoted to
+`internal static let ticks: [Tick]` (with a public `Tick` struct), and
+the `tick.position * w` placement is factored into
+`internal static func position(for:in:) -> Double`.
+
+Catalog entries:
+
+- `ui-sensitivityRuler-ticks-positions` — the five tier marks must
+  lie at the canonical `[0.0, 0.25, 0.5, 0.75, 1.0]` unit-interval
+  progression. Mutation moves the medium-tier position from 0.50 to
+  0.40 and the array-shape assertion catches it.
+- `ui-sensitivityRuler-position-formula` — every tick must place at
+  `tick.position * width`. Mutation collapses the formula to `0.0`
+  and every tick piles up at the origin; the cell asserts the middle
+  tick at 100pt for a 200pt width.
+
+### `Sources/YameteApp/Updater.swift` — four caught gates (Phase 7c) + 5 DIRECT_BUILD cells
+
+`Updater.currentVersion(bundle: Bundle = .main) -> String` is the seam
+in BOTH `#if DIRECT_BUILD` branches; tests inject a `NilInfoBundle`
+(a `Bundle` subclass overriding `infoDictionary` to nil) to drive the
+fallback.
+
+#### SemVer 2.0 ordering — fully implemented
+
+`Updater.isNewer(remote:local:)` is now defined in an extension OUTSIDE
+the `#if DIRECT_BUILD` block so the comparator compiles (and is
+catalog-able) under both build variants. The implementation follows
+SemVer 2.0.0 §11 ordering rules end-to-end:
+
+1. Strip the first `-` (pre-release) or `+` (build metadata) to obtain
+   the version core.
+2. Parse the core as up to three dot-separated integers (major, minor,
+   patch); missing components default to 0.
+3. Compare cores in (major, minor, patch) order.
+4. If cores compare equal, a release version (no pre-release suffix)
+   is strictly NEWER than any pre-release with the same core (§11.3).
+5. If both have pre-release suffixes, compare per dot-separated
+   identifier: numeric vs numeric by integer value (§11.4.1); numeric
+   is LOWER than alphanumeric (§11.4.3); alphanumeric vs alphanumeric
+   by ASCII lex (§11.4.2). Longer suffix wins as tiebreaker (§11.4.4).
+6. Build metadata (`+...`) is ignored for ordering (§10).
+
+The previously-pinned KNOWN LIMITATION (`compactMap { Int($0) }` silently
+dropping pre-release suffixes so `"1.2.3-rc1"` collapsed to `[1, 2]`)
+is now removed; the production-code comment block has been replaced
+with a SemVer 2.0 reference.
+
+Catalog entries (running under bare `swift test`):
+
+- `ui-updater-currentVersion-fallback` — when `bundle.infoDictionary`
+  is nil, the helper must return `"1.0.0"`. Mutation flips the literal
+  to `"0.0.0"`. Multi-line search anchors on the App-Store-branch doc
+  comment to disambiguate from the identical literal in the
+  DIRECT_BUILD branch.
+- `ui-updater-semver-release-beats-prerelease` — release version
+  ranks above pre-release with the same core (§11.3). Mutation flips
+  the `(nil, _?)` branch in the pre-release switch from `return true`
+  to `return false`; Cell V (`testUIGate_updater_semver_releaseBeatsPreRelease`,
+  in the new `UpdaterSemVerOrdering_Tests` class) catches it via
+  `Updater.isNewer(remote: "1.2.3", local: "1.2.3-rc1")`.
+- `ui-updater-semver-prerelease-alphanumeric` — alphanumeric
+  pre-release identifiers compare by ASCII lex order (§11.4.2).
+  Mutation inverts the `if a < b` / `if a > b` pair inside the
+  `(nil, nil)` branch (string identifiers); Cell W
+  (`testUIGate_updater_semver_alphanumericPreReleaseOrdering`)
+  asserts `rc2 > rc1` and `rc1 > alpha1` ('r' > 'a' ASCII).
+- `ui-updater-semver-prerelease-numeric` — numeric pre-release
+  identifiers compare by INTEGER value (§11.4.1), not lexicographically.
+  Mutation routes the numeric branch through the string operands
+  (`a < b` instead of `x < y`); Cell X
+  (`testUIGate_updater_semver_numericPreReleaseOrdering`) asserts
+  `rc.10 > rc.2` (string lex would give the wrong answer because
+  `"10" < "2"` lexicographically).
+
+DIRECT_BUILD-only cells (driven by `swift test -Xswiftc -DDIRECT_BUILD`,
+NOT catalogued — the mutation runner does not pass `-DDIRECT_BUILD`,
+so the named test wouldn't link at filter time):
+
+- `testUIGate_updater_isNewer_equalReturnsFalse` — equal versions
+  compare false.
+- `testUIGate_updater_isNewer_remoteNewerReturnsTrue` — major / minor
+  / patch bumps register as newer.
+- `testUIGate_updater_isNewer_remoteOlderReturnsFalse` — downgrade
+  cases never register.
+- `testUIGate_updater_isNewer_segmentPadding` — short version
+  `"1.2"` zero-pads to `[1, 2, 0]` for comparison.
+- `testUIGate_updater_isNewer_releaseBeatsPreRelease` — release
+  version `"1.2.3"` is strictly newer than pre-release `"1.2.3-rc1"`
+  per SemVer 2.0 §11.3 (Cell U, originally pinned the by-accident
+  artefact; updated to assert proper SemVer ordering).
+
+## Performance baseline (Phase 6)
+
+Functional pass/fail in `Tests/Performance_Tests.swift` already asserts
+RATIO bounds inside each cell (e.g. second-half median wallclock ≤ 3×
+first-half median; resident-set delta < N MB). What it could not catch
+on its own: a uniform 2× CPU regression that stays within the per-cell
+internal ratio, or slow drift across releases. Phase 6 adds an
+absolute-baseline layer on top.
+
+### Files
+
+- `Tests/Performance/baselines.json` — committed per-cell baselines
+  (wallclock seconds, memory delta bytes, host arch, ISO 8601 capture
+  timestamp, tolerance factor). Schema:
+
+  ```json
+  {
+    "cells": {
+      "<test_method_name>": {
+        "wallclock_seconds": 0.0,
+        "memory_delta_bytes": 0,
+        "captured_at": "2026-04-29T00:00:00Z",
+        "host_arch": "arm64",
+        "tolerance_factor": 2.0
+      }
+    }
+  }
+  ```
+
+- `scripts/perf-baseline.sh` — runs `swift test --filter
+  Performance_Tests`, parses the `PERFMETRIC: cell=… wallclock=…
+  memory=…` lines each cell prints, compares each measurement against
+  the baseline file with that cell's `tolerance_factor` (default 2.0×).
+  Pre-flight refuses a dirty `Sources/` tree (uncommitted production
+  edits would muddy a measurement) and verifies `swift build` succeeds
+  before the run. Reports per-cell PASS / FAIL plus an aggregate
+  `total / passed / regressed / missing` summary.
+
+- `scripts/perf-baseline-record.sh` — overwrites `baselines.json` with
+  fresh measurements. Foot-gun guarded behind `YAMETE_BASELINE_RECORD=1`
+  so a dropped tolerance can't silently re-bless a regression.
+
+### Make targets
+
+```
+make perf-baseline                                   # check vs baselines.json
+YAMETE_BASELINE_RECORD=1 make perf-baseline-record   # capture fresh
+```
+
+### Cell wiring
+
+Each cell in `Performance_Tests.swift` calls `emitPerfMetric(cell:
+wallclock: memory:)` once at the end of its measurement block. The
+helper prints a single stable line:
+
+```
+PERFMETRIC: cell=<test_method_name> wallclock=<seconds> memory=<bytes>
+```
+
+The driver greps these lines from `swift test` stdout — XCTest pass /
+fail is independent of baseline comparison. A cell that fails its
+internal ratio assertion still emits the line, which lets the perf
+driver report both signals separately.
+
+### Workflow
+
+1. Land a perf-relevant change. Run `make perf-baseline`.
+2. If the script reports PASS for every cell → no action.
+3. If it reports a regression → diagnose: real regression in your
+   change, host noise, or a legitimate methodology change.
+   - Real regression → fix the production code.
+   - Host noise → re-run; if persistent, investigate environment.
+   - Legitimate improvement (cell got faster or uses less memory) →
+     run `YAMETE_BASELINE_RECORD=1 make perf-baseline-record`,
+     review `git diff Tests/Performance/baselines.json`, commit the
+     update alongside the change.
+4. CI runs `make perf-baseline` on every PR (Phase 2 wiring).
+
+### Per-cell tolerance overrides
+
+The default `tolerance_factor` is 2.0× (a 2× drift fires). Cells that
+are inherently noisy (e.g. ones dominated by `Task.yield()` cost) can
+have their factor bumped per-entry in `baselines.json` — the recorder
+preserves any non-default value when re-writing.
+
+## Phase 1 — host-app xcodebuild
+
+`swift test` runs the test bundle inside the bare `xctest` runner, so
+`Bundle.main` resolves to `…/Xcode.app/Contents/Developer/usr/bin/`
+and `Bundle.main.bundleIdentifier` is nil. That makes a small set of
+real-driver cells unreachable under SPM: `UNUserNotificationCenter`
+raises an Objective-C `NSInternalInconsistencyException` (uncatchable
+from Swift) the moment `current()` is called against a non-`.app`
+host, the full `CHHapticEngine` cannot be constructed without a real
+bundle proxy, and `CGEvent.post` is rejected without an Accessibility-
+granted bundle. Those cells `XCTSkip` cleanly under `swift test` and
+their `[parity=…]` halves go uncovered.
+
+Phase 1 adds a host-app test path so those cells run.
+
+### Files
+
+- `project.yml` — second test target `YameteHostTest` (alongside
+  `YameteTests`). Same source root (`Tests/`); explicitly bundled
+  inside the `Yamete` host app via `TEST_HOST` /
+  `BUNDLE_LOADER` settings; excludes `Tests/__Snapshots__/**` and
+  `**/*.md` from the resource set so Xcode's flat `Resources/` copy
+  phase does not collide on duplicate filenames.
+- `project.yml` — companion scheme `YameteHostTest` whose `test`
+  action runs the new target's bundle inside `Yamete.app` under
+  Debug.
+- `Makefile` — `make test-host-app` target. Runs `xcodegen generate`
+  (project.yml is the source of truth; `Yamete.xcodeproj` is
+  gitignored) and then `xcodebuild test -project Yamete.xcodeproj
+  -scheme YameteHostTest -destination 'platform=macOS,arch=arm64'`.
+
+### Cells whose Real-driver halves stop XCTSkipping under host-app
+
+These cells gate their Real-driver assertions on a Bundle-URL check
+that detects whether the host process is `xctest` (skip) or
+`Yamete.app` / `Yamete Direct.app` (run). Under
+`make test-host-app` the suffix-match flips and the Real half runs:
+
+- `Tests/DriverParity_Tests.swift` —
+  `test_systemNotificationDriver_parity_authorizationShape`. Real
+  half calls `RealSystemNotificationDriver.currentAuthorization()`
+  and asserts the returned `NotificationAuth` is a member of the
+  exhaustive set; this exercises `UNUserNotificationCenter.current()
+  .getNotificationSettings(completionHandler:)` against a real
+  bundle proxy.
+- `Tests/Integration/NotificationAuthRealDriverTests.swift` —
+  `testNotificationAuthEnumCoversValidStatuses`. Now runs the
+  contract-shape assertion under host-app where it formerly skipped
+  via the `Bundle.main.bundleIdentifier == nil` SPM guard.
+
+The existing `XCTSkipUnless`-based skips elsewhere in
+`DriverParity_Tests.swift` (Haptic engine availability,
+`CGEvent.post`, AVAudioFormat shape, LED brightness, system volume)
+remain in place — they gate on hardware/availability, not on the
+process bundle, so they stay correct under both SPM and host-app.
+
+### Workflow
+
+1. Run gates locally: `swift test`, `swift test -Xswiftc
+   -DDIRECT_BUILD`, `make lint`, `make mutate`, `make test-host-app`.
+2. CI wires the host-app run alongside the SPM runs (Phase 2).
+3. When a cell's Real-driver path is the genuine integration surface,
+   prefer adding it as a host-app-aware Bundle-URL guard rather than
+   an unconditional `XCTSkip` — that keeps SPM `swift test` fast and
+   green while the host-app run gives the cell its full coverage.
+
+### Build-graph reconciliation (resolved)
+
+Phase 1 originally tickled a build-graph mismatch: `xcodebuild` builds
+each SPM library product (`YameteCore`, `SensorKit`, `ResponseKit`,
+`YameteApp`) as a separate explicit module, while the existing
+`make build` / `make lint` raw-swiftc path lumps every source file
+into a single `-module-name YameteApp` compilation. Source files
+historically used `#if canImport(YameteCore) import YameteCore #endif`
+to bridge the two paths — `canImport` returned false under the lump
+(import skipped, types resolve intra-module) and true under SPM /
+xcodebuild (import included, types resolve cross-module). Under
+xcodebuild the package-graph edge from `ResponseKit` / `SensorKit` /
+`YameteApp` to `YameteCore` was not propagated to the Xcode-side
+target dependencies, so `import YameteCore` failed to resolve and
+every type in the YameteCore module (`ReactionKind`, `Reaction`,
+`ReactionsConfig`, `FiredReaction`, `ReactionBus`, `SettingsStore`,
+`SensorSource`, …) failed lookup.
+
+The reconciliation flips the polarity of those guards:
+
+- `#if canImport(<Module>)` → `#if !RAW_SWIFTC_LUMP`, with
+  `RAW_SWIFTC_LUMP` defined ONLY in the Makefile's raw-swiftc
+  invocation (via `-D RAW_SWIFTC_LUMP` in `SWIFTFLAGS`). SPM and
+  xcodebuild leave the flag undefined so the imports are taken and
+  modules resolve cleanly. The lump build keeps treating all sources
+  as a single `YameteApp` module and skips the would-be self-imports.
+- `Sources/YameteApp/YameteApp.swift` (the `@main` file, excluded
+  from the SPM `YameteApp` library so it can compile inside Xcode's
+  app target with `-module-name Yamete`) now also takes
+  `import YameteApp` under `#if !RAW_SWIFTC_LUMP`, since under
+  xcodebuild it lives in the `Yamete` module and reaches the rest of
+  the surface (SettingsStore, Yamete, Updater, StatusBarController)
+  through the YameteApp library.
+- `StatusBarController` (and `StatusBarController.init`,
+  `Updater.checkIfNeeded`) are now `public` so the `Yamete` module's
+  `YameteApp.swift` can reach them across the module boundary.
+- `project.yml` declares the `swift-snapshot-testing` package and
+  links `SnapshotTesting` into both `YameteTests` and
+  `YameteHostTest`, mirroring `Package.swift`.
+
+Reproducer (now passes the build):
+
+```
+make test-host-app
+# → builds: YameteCore, IOHIDPublic, SensorKit, ResponseKit, YameteApp,
+#   Yamete (host app), YameteHostTest (test bundle hosted by Yamete.app)
+# → 725+ tests execute against a real .app Bundle.main
+```
+
+### Cross-bundle coverage gains and surfaced production findings
+
+With the build graph healed, the host-app run actually executes the
+test cells that previously failed to compile. Most pass; a handful
+surface real cross-bundle behavioural differences that did not show
+up under SPM. These are production findings, not new build issues:
+
+- `LEDBrightnessRealDriverTests.testCaptureSetRestoreCycle` —
+  `RealLEDBrightnessDriver.keyboardBacklightAvailable` returns true
+  even inside the App Store sandbox, where the underlying
+  `com.apple.backlightd` XPC connection is rejected
+  (`NSCocoaErrorDomain Code=4099 — Sandbox restriction`). The driver
+  then accepts `setLevel(0.42)` silently and `currentLevel()`
+  returns `nil`, so the test (which asserts `setLevel → currentLevel`
+  round-trips within tolerance) fails. The fix is in the driver:
+  `keyboardBacklightAvailable` should probe the XPC channel (or a
+  `currentLevel() != nil` smoke test) before returning true under
+  sandbox. Same backing finding applies to
+  `CombinatorialOutputBoundaryTests.testLEDFlashBoundaryCombinatorial`.
+- `NotificationPhraseTests.testEventFallbackUsesKindRawValueAsTitle`
+  — the test asserts the documented fallback (`title = kind.rawValue`,
+  `body = ""`) when no `Events.strings` resource is available. Under
+  SPM the bundle has no `.lproj` resources so the fallback fires
+  cleanly; under host-app the real `Yamete.app` ships
+  `Events.strings` and the bundle loader hands back authored
+  strings, so the fallback path never runs. The test contract was
+  written against the SPM environment only — it needs either a
+  `_testClearAndDisableLoad()` seam in `NotificationPhrase` or an
+  environment guard in the test itself, but is correctly observing
+  that the production bundle has resources.
+- `SnapshotUI_Tests.test_cell_*` (8 cells, both light/dark schemes
+  for `headerSection`, `responseSection`, `trackpadTuning_expanded`,
+  `deviceSection_expanded`, `footerSection`) — the
+  `Tests/__Snapshots__/AppStore/SnapshotUI_Tests/*.png` baselines
+  were recorded under SPM where `Bundle.main` resolves to the
+  `xctest` runner and SwiftUI's bundle-driven assets (icons, fonts,
+  string tables) fall back to defaults. Under host-app the real
+  app bundle's assets render in, so the per-pixel match drops
+  below the 0.99 / 0.98 thresholds. Re-recording the baselines
+  inside the host-app run regenerates the correct PNGs (no code
+  change required, only a one-time baseline refresh).
+
+These findings are scoped out of the build-graph fix (HARD RULE: no
+test-file edits) and tracked as follow-ups against the production
+drivers and snapshot baselines respectively.
+
+### Phase 1 follow-up — host-app finding remediation
+
+The three findings above were remediated in a follow-up pass. Net
+effect:
+
+- **LED XPC probe.** `RealLEDBrightnessDriver.keyboardBacklightAvailable`
+  now runs a one-shot read-back probe through `brightnessForKeyboard:`
+  and caches the result. Under sandbox-rejected `com.apple.backlightd`
+  the probe sees a non-finite / out-of-range value and the property
+  reports `false`, so `LEDBrightnessRealDriverTests.testCaptureSetRestoreCycle`
+  and `CombinatorialOutputBoundaryTests.testLEDFlashBoundaryCombinatorial`
+  XCTSkip cleanly via the existing "no keyboard backlight" branch
+  instead of asserting against a silently no-op'd channel.
+  `LEDBrightnessRealDriverTests.testKeyboardBacklightAvailableHonoursXPCProbe`
+  pins the contract on both SPM and host-app: when the property
+  returns `true`, `currentLevel()` MUST return a finite, in-range
+  value; otherwise the probe missed a sandbox case.
+
+- **NotificationPhrase fallback seam.** Added a
+  `_testClearAndDisableLoad()` test seam (mirroring the existing
+  `_testClear` / `_testInject` shape) that flips an internal
+  `loadDisabled` flag. With load disabled, `loadPools` and
+  `loadEventPools` short-circuit to empty regardless of bundle
+  content, so `NotificationPhraseTests.testEventFallbackUsesKindRawValueAsTitle`
+  exercises the documented fallback (`title = kind.rawValue`,
+  `body = ""`) under both SPM (bundle has no resources anyway) and
+  host-app (bundle ships `Events.strings`, but the loader is
+  bypassed). Seam intentionally left UNguarded by `#if DEBUG` because
+  the xcodebuild package-product build of `ResponseKit` does not
+  inherit `DEBUG` from the test target — gating it would orphan the
+  seam under host-app and reintroduce the failure.
+
+- **Snapshot variant directory.** Added a `HostApp` variant alongside
+  `AppStore` and `Direct`. `SnapshotUI_Tests.snapshotVariant()`
+  detects host-app via `Bundle.main.bundleURL.path.contains(...)` and
+  routes baselines through `Tests/__Snapshots__/HostApp/...`. Sandbox
+  caveat: the host-app test bundle inherits `Yamete.app`'s App Store
+  sandbox and cannot write to the source tree. The helper seeds a
+  sandbox-writable mirror under `NSTemporaryDirectory()/yamete-snapshots/HostApp/`
+  on first call (copying any committed PNGs from the source tree
+  into the mirror), then routes both reads and writes through the
+  mirror. After re-recording, the developer manually copies the
+  rendered PNGs from
+  `~/Library/Containers/com.studnicky.yamete/Data/tmp/yamete-snapshots/HostApp/`
+  back into `Tests/__Snapshots__/HostApp/` and commits. 14 host-app
+  baselines (every cell in `SnapshotUI_Tests`) are now committed.
+  `SnapshotUI_Direct_Tests` does not contribute baselines under
+  host-app: that file is `#if DIRECT_BUILD`-gated and the
+  YameteHostTest target builds against the App Store-flavoured
+  `Yamete.app` (no `DIRECT_BUILD`), so the cells do not even compile
+  in the host-app configuration — the variant routing is in place
+  for symmetry only.
+
+All gates remain green after remediation:
+
+```
+swift test                              726 tests, 37 skipped, 0 failures
+swift test -Xswiftc -DDIRECT_BUILD      751 tests, 37 skipped, 0 failures
+make lint                               OK
+make mutate                             109 / 109 caught
+make test-host-app                      726 tests, 40 skipped, 0 failures
+```
+
+## Phase 2 — CI wiring
+
+Local-only gates are necessary but insufficient: a regression slips in
+the moment a contributor pushes a branch without re-running them. Phase
+2 wires every locally-enforced gate into GitHub Actions so the same
+five commands run on every PR + push to `master`/`develop`.
+
+**New workflow files** (alongside the pre-existing `ci.yml` /
+`release.yml`):
+
+| File | Trigger | Jobs |
+|------|---------|------|
+| `.github/workflows/test.yml` | push (`master`/`develop`) + PR | `swift-test`, `swift-test-direct-build`, `lint`, `mutate` |
+| `.github/workflows/host-app-test.yml` | push (`master`/`develop`) + PR | `host-app-test` (xcodegen + xcodebuild + `make test-host-app`) |
+| `.github/workflows/perf-baseline.yml` | weekly cron (Mon 09:00 UTC) + `workflow_dispatch` | `perf-baseline` (drift detection vs. committed `Tests/Performance/baselines.json`) |
+
+All jobs run on `macos-15` to match the Xcode toolchain pinned in
+the existing `ci.yml`/`release.yml` workflows. `concurrency` keys
+cancel superseded runs on feature branches and protect master runs
+from cancellation.
+
+**Branch-protection ruleset.** See `.github/RULESET.md` for the
+recommended required-checks configuration on `master` and `develop`:
+
+- **Required:** `lint`, `swift-test`, `swift-test-direct-build`,
+  `mutate` (all from the `Test` workflow).
+- **Recommended (promote to required once stable):** `host-app-test`.
+- **Informational only (never blocking):** `perf-baseline` —
+  cron-driven drift detection that runs out-of-band of PRs.
+
+**Why three workflows, not one.**
+
+- `test.yml` is the per-PR correctness gate aggregate. Cheap,
+  parallel, blocks merge.
+- `host-app-test.yml` is split out so its xcodebuild + xcodegen
+  setup overhead doesn't slow down the parallel jobs in `test.yml`,
+  and so it can be marked recommended-not-required while the
+  Force-Touch-availability story stabilises on the runner.
+- `perf-baseline.yml` is split out because absolute-baseline
+  drift detection is best run on a stable cadence on the same
+  runner class, not per-PR (where runner heat / load variance
+  swamps real perf signals).
+
+## Flake follow-ups
+
+### `SourceLifecycleTests/test_doubleStart_isIdempotent_Keyboard` — Phase 8 transient signal-11
+
+**Reported symptom (Phase 8):** the cell once exited with SIGSEGV
+during the back-half of the suite and cleared on re-run. The crash
+was not root-caused at the time and was filed as a transient flake
+that "may resurface under load."
+
+**Reproduction attempt (2026-04-28, follow-up triage):**
+
+- Isolation: `swift test --filter SourceLifecycleTests/test_doubleStart_isIdempotent_Keyboard`
+  ran 20 times consecutively on this host. Result: **20 / 20 PASS**,
+  no signal-11, no `Crashes/*.ips` written, no `EXC_BAD_ACCESS`.
+- Full suite: `swift test` ran 5 times. Result: the keyboard cell
+  itself reported **PASS in all 5 runs**. (Other unrelated cells in
+  concurrent-agent-edited Sources files did fail in some runs;
+  those are separate issues being handled by other workers and are
+  out of scope for this triage.)
+
+Conclusion: **not currently reproducible on this host.** The crash
+was likely a one-shot interaction with load on the original Phase 8
+runner — SwiftPM XCTest under heavy concurrent CI load occasionally
+manifests SIGSEGV in framework internals (XCTest discovery /
+test-bundle teardown) rather than user code, and that path cannot
+be falsified from outside the framework.
+
+**Hardening pass applied** (no source-code changes — production
+keyboard pipeline is well-tested and unchanged):
+
+1. `Tests/SourceLifecycleTests.swift`,
+   `test_doubleStart_isIdempotent_Keyboard`:
+   - `defer { source.stop() }` placed immediately after `source.configure`
+     so the source's bus reference and `keyWindow` are always cleared
+     on test exit, regardless of XCTest assertion outcome or thrown
+     errors. Prevents a detached `Task { await bus.publish(.keyboardTyped) }`
+     spawned by `_injectKeyPress` from outliving the test method and
+     racing the next `BusHarness().setUp()`.
+   - `await Task.yield()` between the two `source.start(publishingTo:)`
+     calls drains any concurrency work the first start might have
+     queued before the second start's idempotency guard is exercised,
+     removing a same-tick race where the second start could observe
+     partially-initialised state under load.
+   - `await harness.tearDown()` after the assertion explicitly
+     closes the bus and yields once so any queued detached publish
+     Task drains into the closed-bus no-op path before the test
+     method returns.
+2. `Tests/Helpers/BusHarness.swift`: added `tearDown()` async
+   helper symmetric with `setUp()`. `tearDown()` calls `bus.close()`
+   then `Task.yield()` once. Idempotent — safe to call twice (the
+   first close finishes all subscriber continuations and clears the
+   subscribers dictionary; subsequent calls are no-ops).
+
+The hardening reduces flake surface area without changing what the
+cell asserts. Verification: 30 / 30 PASS on isolation runs after
+the change. If the flake recurs in CI under load, the next triage
+should `sample` the test process or capture a `.ips` panic to
+isolate whether the SIGSEGV originates in XCTest framework
+internals (external to user code, requiring a runner-level fix
+such as parallel-job concurrency caps) or in the IOKit shim
+(would require Sources-level investigation).
+
+## Degenerate gates (FlowLayout per-row subdivision)
+
+`Sources/YameteApp/Views/FlowLayout.swift` — `let perItem = availableWidth / max(1, nF)` in `placeSubviews`.
+
+Initial Phase 7c+post-rewrite catalog included `ui-flowLayout-per-row-subdivision` mutating the per-row even-subdivision divisor. Removed: the per-button width allocation is an INTERNAL layout detail; the container's reported size (`sizeThatFits`) still matches the proposal regardless of per-button placement, and SwiftUI's `Layout` protocol does not surface placed subview frames in a way `NSHostingView.intrinsicContentSize` observes. The other 4 FlowLayout catalog entries (balanced-rowcounts, row-count-ceiling, total-height-accumulator, uniform-row-height) cover the externally observable invariants.
