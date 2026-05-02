@@ -275,8 +275,13 @@ final class ReactiveOutputLifecycleTests: XCTestCase {
         await bus.publish(.acConnected)
         await bus.publish(.acConnected)
 
-        // Wait for coalesce (16ms) + action (5ms) + buffer
-        try await Task.sleep(for: .milliseconds(100))
+        // Poll until the action has fired — the previous fixed 100 ms
+        // tail sleep dilated past coalesce(16)+action(5)+post on the
+        // slow CI runner.
+        let finished = await awaitUntil(timeout: 1.0) {
+            spy.postActions.count >= 1
+        }
+        XCTAssertTrue(finished, "action+post must fire within timeout")
 
         XCTAssertEqual(spy.actions.count, 1, "Two simultaneous stimuli should coalesce into one action")
         let m = spy.actions.first?.1 ?? 0
@@ -298,7 +303,16 @@ final class ReactiveOutputLifecycleTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(10))
         await bus.publish(.acConnected)
         await bus.publish(.acConnected)
-        try await Task.sleep(for: .milliseconds(100))
+        // Poll until postAction has fired — round 6 applied this same
+        // fix to `testNormalSequenceFiresAllHooksInOrder`; the fixed
+        // 100 ms tail sleep dilated past the action+post lifecycle on
+        // the slow CI runner (round 9b run 25255791274 caught
+        // postAction not yet recorded), leaving `postActions.first`
+        // nil and the multiplier defaulted to `?? 0`.
+        let finished = await awaitUntil(timeout: 1.0) {
+            spy.postActions.count >= 1
+        }
+        XCTAssertTrue(finished, "postAction must fire within timeout")
 
         XCTAssertEqual(spy.preActions.first?.1  ?? 0, 1.2, accuracy: 0.01, "preAction multiplier")
         XCTAssertEqual(spy.actions.first?.1     ?? 0, 1.2, accuracy: 0.01, "action multiplier")
@@ -320,7 +334,12 @@ final class ReactiveOutputLifecycleTests: XCTestCase {
         await bus.publish(.acConnected)
         await bus.publish(.acConnected)
         await bus.publish(.acConnected)
-        try await Task.sleep(for: .milliseconds(100))
+        // Poll until the lifecycle completes — replaces the brittle
+        // 100 ms tail sleep that flaked under slow CI.
+        let finished = await awaitUntil(timeout: 1.0) {
+            spy.postActions.count >= 1
+        }
+        XCTAssertTrue(finished, "action+post must fire within timeout")
 
         let m = spy.actions.first?.1 ?? 0
         XCTAssertLessThanOrEqual(m, 2.0, "Multiplier must not exceed 2.0")
