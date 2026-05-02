@@ -123,7 +123,7 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
         if bundlePath.contains("Yamete.app") || bundlePath.contains("Yamete Direct.app") {
             return "HostApp"
         }
-        if ProcessInfo.processInfo.environment["CI"] == "true" {
+        if CITiming.isCI {
             return "CI"
         }
         #if DIRECT_BUILD

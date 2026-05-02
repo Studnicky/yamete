@@ -37,8 +37,17 @@ enum CITiming {
     /// True when running under GitHub Actions (or any environment that sets
     /// `CI=true`). Used by snapshot suites to opt into a CI-bootstrap
     /// fallback when the CI baseline directory has not yet been seeded.
+    ///
+    /// `xcodebuild test` does not always propagate the runner shell's `CI`
+    /// env var into the test bundle process — observed on host-app runs
+    /// where SPM tests see `CI=true` but the xcodebuild-driven host-app
+    /// target does not. Fall back to a path-based signal: GitHub Actions'
+    /// `macos-*` runner images host the workspace under `/Users/runner/`,
+    /// which never appears on developer macOS hosts. Either signal is
+    /// sufficient.
     static var isCI: Bool {
-        ProcessInfo.processInfo.environment["CI"] == "true"
+        if ProcessInfo.processInfo.environment["CI"] == "true" { return true }
+        return Bundle.main.bundleURL.path.hasPrefix("/Users/runner/")
     }
 }
 

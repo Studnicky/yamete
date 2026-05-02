@@ -206,7 +206,13 @@ final class SnapshotUI_Tests: XCTestCase {
     static func snapshotVariant() -> String {
         let bundlePath = Bundle.main.bundleURL.path
         let isHostApp = bundlePath.contains("Yamete.app") || bundlePath.contains("Yamete Direct.app")
-        let isCI = ProcessInfo.processInfo.environment["CI"] == "true"
+        // Use the centralised CITiming.isCI so the path-based fallback
+        // applies here too — `xcodebuild test` on the host-app target
+        // does not always propagate the runner's `CI` env var into the
+        // test bundle process, so an inline env-only check resolved to
+        // `HostApp` instead of `HostApp_CI` on round 8 and the cells
+        // ran against developer-host baselines.
+        let isCI = CITiming.isCI
         // The host-app lane has its OWN runner-vs-developer-host pixel
         // drift, distinct from the SPM AppStore/Direct lanes. Carve it
         // out as a dedicated `HostApp_CI` variant whose baselines live
