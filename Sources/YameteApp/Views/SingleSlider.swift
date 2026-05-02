@@ -81,8 +81,6 @@ struct SingleSliderInt: View {
     var labelWidth: CGFloat = 50
     let format: (Int) -> String
 
-    @State private var doubleValue: Double = 0
-
     var body: some View {
         SingleSlider(
             value: Binding(

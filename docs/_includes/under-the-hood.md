@@ -1,0 +1,6 @@
+- **Reaction Bus** — a single actor-isolated event bus. Impact sensors and seven system event sources all publish to it. A pre-fan-out enricher resolves the audio clip and face selection exactly once before any output sees the event, so durations and faces are always in sync across all outputs.
+- **Four outputs** — audio playback, screen flash with face overlay, LED flash (Caps Lock + keyboard brightness spring animation), macOS notification. Each subscribes to the bus independently and pattern-matches the events it cares about.
+- **Three impact sensors** with a six-gate consensus pipeline: accelerometer (BMI286), microphone (amplitude), and AirPods headphone motion — all fused before dispatch.
+- **Swift 6 with complete strict concurrency.** The `@unchecked Sendable` surface is two narrow framework-handle wrappers. Everything else is genuine `Sendable` or actor-isolated.
+- **Four SPM modules** with a unidirectional graph: `YameteCore` ← `SensorKit`/`ResponseKit` ← `YameteApp`.
+- **Zero network.** No analytics. No telemetry. Local logs auto-rotate every 24 hours.

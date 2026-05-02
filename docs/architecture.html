@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Architecture: Yamete</title>
-  <meta name="description" content="How Yamete works under the hood: sensor pipelines, detection gates, fusion engine, and response dispatch. With Mermaid diagrams.">
+  <meta name="description" content="How Yamete works under the hood: sensor pipelines, detection gates, fusion engine, reaction bus, and response dispatch. With Mermaid diagrams.">
   <link rel="stylesheet" href="assets/sidebar.css">
   <style>
     :root { --bg: #0d0d0d; --fg: #e8e8e8; --accent: #ff6b8a; --accent-soft: #ffb3c4; --muted: #888; --card: #1a1a1a; --sidebar-w: 200px; }
@@ -56,7 +56,7 @@
       <h1>Architecture</h1>
       <p class="subtitle">How Yamete actually does what it does. For people who would rather read a diagram than trust a privacy policy.</p>
 
-      <p>Yamete is more engineered than the concept deserves. Three parallel sensor pipelines, a six-gate per-adapter detector, a consensus fusion engine, and three response modalities. All of it Swift strict concurrency, all of it offline, all of it firing in under 50ms from impact to sound.</p>
+      <p>Yamete is more engineered than the concept deserves. Two categories of event source — three parallel impact sensors fused for consensus, and seven infrastructure sources watching USB, Bluetooth, power, audio peripherals, Thunderbolt, display hotplug, and sleep/wake. All of them publish onto a central <code>ReactionBus</code>. Four independent output consumers subscribe to the bus and react to whatever event types their per-output toggle matrix allows. All of it Swift strict concurrency, all of it offline, all of it firing in under 50 ms from impact to sound.</p>
 
       <p>What follows is the real code path, annotated for a technical audience. The diagrams are generated from the actual class and method structure, not a marketing approximation of it.</p>
 
@@ -86,12 +86,13 @@
 }}%%
 graph LR
   A["<b>IOHIDPublic</b><br/><small>IOKit HID headers<br/>C interop layer</small>"]:::iokit
-  B["<b>SensorKit</b><br/><small>Adapters, filters,<br/>ImpactDetector</small>"]:::sensor
-  C["<b>YameteCore</b><br/><small>Types, constants,<br/>SettingsStore, Logging</small>"]:::core
-  D["<b>ResponseKit</b><br/><small>AudioPlayer, ScreenFlash,<br/>NotificationResponder</small>"]:::response
-  E["<b>YameteApp</b><br/><small>ImpactController,<br/>SwiftUI shell</small>"]:::app
+  B["<b>SensorKit</b><br/><small>SensorSource, EventSource,<br/>ImpactFusion, AccelerometerSource,<br/>MicrophoneSource, HeadphoneMotionSource,<br/>USBSource, PowerSource, etc.</small>"]:::sensor
+  C["<b>YameteCore</b><br/><small>ReactionBus, Reaction, FiredReaction,<br/>FusedImpact, ReactionsConfig,<br/>types, signal processing, logging</small>"]:::core
+  D["<b>ResponseKit</b><br/><small>AudioPlayer, ScreenFlash,<br/>LEDFlash, NotificationResponder,<br/>FaceLibrary, OutputConfig</small>"]:::response
+  E["<b>YameteApp</b><br/><small>Yamete (orchestrator),<br/>SettingsStore, MenuBarFace,<br/>SwiftUI shell</small>"]:::app
 
   A --> B
+  A --> D
   C --> B
   C --> D
   B --> E
@@ -107,17 +108,17 @@ graph LR
         </div>
 
         <ul>
-          <li><code>IOHIDPublic</code> -- C header shim exposing private IOKit HID types Apple doesn't publish. Read-only; never changes.</li>
-          <li><code>SensorKit</code> -- the entire sensor abstraction: HID reader, mic tap, AirPods motion, signal filters, per-sample detector, fan-in task group.</li>
-          <li><code>YameteCore</code> -- shared types and settings. No sensor knowledge, no UI. Imported by everything.</li>
-          <li><code>ResponseKit</code> -- audio playback, screen overlay, notification dispatch. Knows about impact intensity; knows nothing about where that intensity came from.</li>
-          <li><code>YameteApp</code> -- the orchestrator. Connects pipeline to response. Also the SwiftUI menu bar shell.</li>
+          <li><code>IOHIDPublic</code> -- C header shim exposing private IOKit HID types Apple does not publish. Read-only; never changes.</li>
+          <li><code>YameteCore</code> -- shared types, the reaction bus, signal processing, and logging. No sensor knowledge, no UI. Imported by everything.</li>
+          <li><code>SensorKit</code> -- the entire sensor abstraction: impact sensors (accelerometer, microphone, AirPods motion), infrastructure event sources (USB, power, Bluetooth, audio peripherals, Thunderbolt, display hotplug, sleep/wake), ImpactFusion engine, and ImpactDetector per-sensor gate chain.</li>
+          <li><code>ResponseKit</code> -- audio playback, screen overlay, LED flash, notification dispatch, face image cache. Knows about reactions and intensity; knows nothing about where they came from.</li>
+          <li><code>YameteApp</code> -- the orchestrator. Owns the bus, wires sources and outputs, manages lifecycle. Also the SwiftUI menu bar shell.</li>
         </ul>
       </section>
 
       <section id="pipeline">
-        <h2>Full signal pipeline <span class="qual">(sensor to speaker)</span></h2>
-        <p>Three sensor streams run concurrently in a Swift task group. Each produces <code>SensorImpact</code> events independently. A fan-in layer collects them. The fusion engine gates consensus and rearm timing. <code>ImpactController</code> maps the fused intensity through a user sensitivity window and dispatches response.</p>
+        <h2>Full signal pipeline <span class="qual">(sensor or event to output)</span></h2>
+        <p>Two categories of source publish onto the <code>ReactionBus</code>. Impact sources run three parallel sensor streams through <code>ImpactFusion</code>, which applies consensus and rearm gating before publishing <code>Reaction.impact</code>. Infrastructure event sources (USB, power, Bluetooth, etc.) publish discrete <code>Reaction</code> cases directly. The bus runs a pre-fan-out enricher that resolves audio clip URL, clip duration, and face indices exactly once per reaction. Four independent outputs each subscribe to the bus via <code>bus.subscribe()</code>, receiving an <code>AsyncStream&lt;FiredReaction&gt;</code>, and pattern-match the reaction kinds their per-output toggle matrix enables.</p>
 
         <div class="diagram-wrap">
           <span class="diagram-label">End-to-end signal flow</span>
@@ -136,72 +137,72 @@ graph LR
   }
 }}%%
 flowchart TD
-  subgraph SENSORS["SENSORS  (parallel AsyncThrowingStream per adapter)"]
+  subgraph IMPACT["IMPACT SENSORS  (SensorSource, parallel AsyncThrowingStream)"]
     direction LR
-    ACC["<b>AccelerometerReader</b><br/>BMI286 via IOKit HID<br/>100 Hz decimated to 50 Hz<br/>HID run-loop thread"]:::sensor
-    MIC["<b>MicrophoneAdapter</b><br/>AVAudioEngine tap<br/>~50 Hz buffer peak<br/>audio I/O thread"]:::sensor
-    HP["<b>HeadphoneMotionAdapter</b><br/>CMHeadphoneMotionManager<br/>~100 Hz userAcceleration<br/>OperationQueue"]:::sensor
+    ACC["<b>AccelerometerSource</b><br/>BMI286 via IOKit HID<br/>bandpass 20-25 Hz<br/>ImpactDetector (6 gates)"]:::sensor
+    MIC["<b>MicrophoneSource</b><br/>AVAudioEngine tap<br/>DC-block filter<br/>ImpactDetector (6 gates)"]:::sensor
+    HP["<b>HeadphoneMotionSource</b><br/>CMHeadphoneMotionManager<br/>userAcceleration magnitude<br/>ImpactDetector (6 gates)"]:::sensor
   end
 
-  subgraph FILTER["PREPROCESSING  (per adapter, off main thread)"]
+  subgraph EVENTS["INFRASTRUCTURE SOURCES  (EventSource, each publishes directly to bus)"]
     direction LR
-    AFILT["HP filter 20 Hz<br/>LP filter 25 Hz<br/>Vec3 magnitude"]:::filter
-    MFILT["DC-block HP<br/>alpha=0.95<br/>scalar peak"]:::filter
-    HFILT["Vec3 magnitude<br/>from userAcceleration"]:::filter
+    USB["USBSource"]:::evtsrc
+    PWR["PowerSource"]:::evtsrc
+    AUD["AudioPeripheralSource"]:::evtsrc
+    BT["BluetoothSource"]:::evtsrc
+    TB["ThunderboltSource"]:::evtsrc
+    DSP["DisplayHotplugSource"]:::evtsrc
+    SW["SleepWakeSource"]:::evtsrc
   end
 
-  subgraph DETECT["IMPACT DETECTION  (ImpactDetector, 6 gates)"]
+  FUSION["<b>ImpactFusion</b><br/>fan-in task group<br/>consensus + rearm gate<br/>sensitivity remapping<br/>→ Reaction.impact"]:::fusion
+
+  BUS["<b>ReactionBus</b> (actor)<br/>pre-fan-out enricher:<br/>resolve audio clip URL + duration<br/>FaceLibrary.selectIndices(count:)<br/>stamp publishedAt<br/>→ FiredReaction"]:::bus
+
+  subgraph OUTPUTS["OUTPUTS  (each independently subscribes, pattern-matches ReactionKind)"]
     direction LR
-    ADET["Accel detector<br/>spike / rise / crest<br/>confirmations x3"]:::detect
-    MDET["Mic detector<br/>spike / rise / crest<br/>confirmations x2"]:::detect
-    HDET["Headphone detector<br/>spike / rise / crest<br/>confirmations x2"]:::detect
+    AP["<b>AudioPlayer</b><br/>plays pre-selected clip<br/>on enabled Core Audio devices"]:::resp
+    SF["<b>ScreenFlash</b><br/>borderless NSWindow overlays<br/>per-screen face + radial gradient"]:::resp
+    LED["<b>LEDFlash</b><br/>Caps Lock LED PWM<br/>keyboard brightness spring oscillation"]:::resp
+    NR["<b>NotificationResponder</b><br/>UNUserNotificationCenter<br/>tier-phrase, 40 locales"]:::resp
   end
 
-  SM["<b>SensorManager</b><br/>withTaskGroup fan-in<br/>SensorEvent stream"]:::fanin
+  MBF["<b>MenuBarFace</b><br/>subscribes to bus<br/>impact-only face swap<br/>NSStatusItem icon"]:::menubar
 
-  FE["<b>ImpactFusionEngine</b><br/>150 ms window<br/>consensus gate<br/>500 ms rearm"]:::fusion
+  ACC -->|"SensorImpact"| FUSION
+  MIC -->|"SensorImpact"| FUSION
+  HP  -->|"SensorImpact"| FUSION
 
-  SG["<b>Sensitivity gate</b><br/>map intensity through<br/>user sensitivity window"]:::gate
+  FUSION -->|"Reaction.impact"| BUS
+  USB -->|"Reaction.usb*"| BUS
+  PWR -->|"Reaction.ac*"| BUS
+  AUD -->|"Reaction.audioPeripheral*"| BUS
+  BT  -->|"Reaction.bluetooth*"| BUS
+  TB  -->|"Reaction.thunderbolt*"| BUS
+  DSP -->|"Reaction.displayConfigured"| BUS
+  SW  -->|"Reaction.willSleep / .didWake"| BUS
 
-  subgraph RESPONSE["RESPONSE DISPATCH  (MainActor)"]
-    direction LR
-    AUD["<b>AudioPlayer</b><br/>select clip by intensity<br/>play on chosen devices"]:::resp
-    FACE["<b>Menu bar face</b><br/>11 SVG expressions<br/>duration-gated"]:::resp
-    VIS["<b>ScreenFlash or<br/>NotificationResponder</b><br/>mode-routed"]:::resp
-  end
-
-  ACC --> AFILT
-  MIC --> MFILT
-  HP  --> HFILT
-
-  AFILT --> ADET
-  MFILT --> MDET
-  HFILT --> HDET
-
-  ADET -->|"SensorImpact(accel)"| SM
-  MDET -->|"SensorImpact(mic)"| SM
-  HDET -->|"SensorImpact(hp)"| SM
-
-  SM -->|"SensorEvent.impact"| FE
-  FE -->|"FusedImpact or nil"| SG
-  SG -->|"remapped intensity"| AUD
-  SG -->|"remapped intensity"| FACE
-  SG -->|"remapped intensity"| VIS
+  BUS -->|"AsyncStream&lt;FiredReaction&gt;"| AP
+  BUS -->|"AsyncStream&lt;FiredReaction&gt;"| SF
+  BUS -->|"AsyncStream&lt;FiredReaction&gt;"| LED
+  BUS -->|"AsyncStream&lt;FiredReaction&gt;"| NR
+  BUS -->|"AsyncStream&lt;FiredReaction&gt;"| MBF
 
   classDef sensor fill:#1a0a14,stroke:#ff6b8a,color:#e8e8e8
-  classDef filter fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
-  classDef detect fill:#0f1a10,stroke:#34d399,color:#e8e8e8
-  classDef fanin fill:#1a1520,stroke:#c084fc,color:#e8e8e8,stroke-width:2px
+  classDef evtsrc fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
   classDef fusion fill:#1a1500,stroke:#fbbf24,color:#e8e8e8,stroke-width:2px
-  classDef gate fill:#1a0f00,stroke:#f97316,color:#e8e8e8
+  classDef bus fill:#0a1a15,stroke:#34d399,color:#e8e8e8,stroke-width:2px
   classDef resp fill:#1a0a0e,stroke:#ff6b8a,color:#ffb3c4
+  classDef menubar fill:#1a1520,stroke:#c084fc,color:#e8e8e8
           </div>
         </div>
+
+        <div class="callout"><p>The bus enricher runs once per reaction before fan-out. All subscribers receive a <code>FiredReaction</code> with identical, pre-resolved values: the same <code>soundURL</code>, the same <code>clipDuration</code>, the same <code>faceIndices</code> array, and the same <code>publishedAt</code> timestamp. No output re-selects a clip or picks a face — they just consume what the enricher resolved.</p></div>
       </section>
 
       <section id="detection-gates">
         <h2>Per-sensor detection gates <span class="qual">(ImpactDetector, all six)</span></h2>
-        <p>Every adapter runs an <code>ImpactDetector</code> independently. Each sample passes through six gates in order. All six must pass to produce an intensity value. Any gate failure returns nil for that sample -- no event emitted, no noise downstream.</p>
+        <p>Every impact sensor runs an <code>ImpactDetector</code> independently. Each sample passes through six gates in order. All six must pass to produce an intensity value. Any gate failure returns nil for that sample — no event emitted, no noise downstream.</p>
 
         <div class="diagram-wrap">
           <span class="diagram-label">ImpactDetector.process() -- per-sample gate chain</span>
@@ -281,11 +282,11 @@ flowchart TD
       </section>
 
       <section id="fusion">
-        <h2>Fusion engine <span class="qual">(ImpactFusionEngine, consensus + rearm)</span></h2>
-        <p>Individual sensor impacts feed into a fusion engine that enforces two additional constraints before allowing a response to fire: consensus (enough sensors must agree within a time window) and rearm (minimum gap between consecutive responses).</p>
+        <h2>Fusion engine <span class="qual">(ImpactFusion, consensus + rearm)</span></h2>
+        <p>Individual sensor impacts feed into <code>ImpactFusion</code>, which enforces two additional constraints before publishing a <code>Reaction.impact</code> onto the bus: consensus (enough sensors must agree within a time window) and rearm (minimum gap between consecutive responses). Before publishing, the sensitivity gate — an <code>intensityGate</code> closure set by the orchestrator — maps raw fused intensity through the user's sensitivity band and drops impacts that fall below the floor.</p>
 
         <div class="diagram-wrap">
-          <span class="diagram-label">ImpactFusionEngine.ingest() -- one call per SensorImpact</span>
+          <span class="diagram-label">ImpactFusion.ingest() -- one call per SensorImpact</span>
           <div class="mermaid">
 %%{init: {
   "theme": "base",
@@ -306,17 +307,20 @@ flowchart TD
 
   APPEND["append new impact<br/>to time window"]:::proc
 
-  REARM{"now &gt;= lastTriggerAt<br/>+ rearmDuration (500ms)?"}:::gate
+  REARM{"now &gt;= lastTriggerAt<br/>+ rearmDuration?"}:::gate
   REARMF(["nil -- too soon<br/>cooldown active"]):::drop
 
-  CONS{"unique sources in window<br/>&gt;= consensusRequired?"}:::gate
+  CONS{"unique sources in window<br/>&gt;= consensusRequired<br/>(clamped to active count)?"}:::gate
   CONSF(["nil -- not enough<br/>sensors agree yet"]):::drop
 
   FUSE["best impact per source<br/>average intensity across sources<br/>confidence = participants / active"]:::proc
 
+  SENS{"intensityGate(intensity)<br/>returns non-nil?"}:::gate
+  SENSF(["nil -- below<br/>sensitivity floor"]):::drop
+
   MARK["lastTriggerAt = now<br/>clear window"]:::proc
 
-  OUT(["FusedImpact<br/>intensity, confidence, sources"]):::io
+  OUT(["bus.publish(Reaction.impact)<br/>remapped intensity, confidence, sources"]):::io
 
   IN --> PRUNE
   PRUNE --> APPEND
@@ -325,7 +329,9 @@ flowchart TD
   REARM -->|"yes"| CONS
   CONS -->|"no"| CONSF
   CONS -->|"yes"| FUSE
-  FUSE --> MARK
+  FUSE --> SENS
+  SENS -->|"no"| SENSF
+  SENS -->|"yes"| MARK
   MARK --> OUT
 
   classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
@@ -335,24 +341,24 @@ flowchart TD
           </div>
         </div>
 
-        <div class="callout"><p>The default <code>consensusRequired = 1</code> means any single sensor can trigger a response. Set it to 2 and both the accelerometer and microphone have to agree within 150ms before anything fires -- eliminates most false positives at the cost of some missed detections on very clean impacts.</p></div>
+        <div class="callout"><p>The default <code>consensusRequired = 1</code> means any single sensor can trigger a response. Set it to 2 and both the accelerometer and microphone have to agree within 150 ms before anything fires — eliminates most false positives at the cost of some missed detections on very clean impacts. The engine clamps <code>consensusRequired</code> to the active source count at runtime, so "require 2" against a single connected sensor still emits.</p></div>
 
         <table>
           <thead><tr><th>Parameter</th><th>Default</th><th>Effect</th></tr></thead>
           <tbody>
             <tr><td><code>fusionWindow</code></td><td>150 ms</td><td>Time window within which multiple sensors must all fire to count as consensus</td></tr>
-            <tr><td><code>consensusRequired</code></td><td>1</td><td>Minimum distinct sensor sources in window before firing</td></tr>
-            <tr><td><code>rearmDuration</code></td><td>500 ms</td><td>Minimum gap between consecutive responses (combined with user debounce)</td></tr>
+            <tr><td><code>consensusRequired</code></td><td>1</td><td>Minimum distinct sensor sources in window before firing (clamped to active count)</td></tr>
+            <tr><td><code>rearmDuration</code></td><td>user debounce</td><td>Minimum gap between consecutive fused impacts; set from <code>SettingsStore.debounce</code></td></tr>
           </tbody>
         </table>
       </section>
 
       <section id="sensitivity">
-        <h2>Sensitivity gate <span class="qual">(ImpactController, pre-response)</span></h2>
-        <p>After fusion, intensity passes through one more mapping before dispatch. The user's sensitivity sliders define a window over the [0,1] intensity range. The gate rejects impacts below the lower edge and linearly rescales survivors to fill [0,1] for the response layer. This is what makes "sensitivity" feel like a threshold rather than a volume knob.</p>
+        <h2>Sensitivity gate <span class="qual">(FusedImpact.applySensitivity, pre-publish)</span></h2>
+        <p>After fusion but before publishing to the bus, intensity passes through one more mapping. The user's sensitivity sliders define a window over the [0,1] intensity range. The gate rejects impacts below the lower edge and linearly rescales survivors to fill [0,1]. This is implemented as an <code>intensityGate</code> closure on <code>ImpactFusion</code>, set by <code>Yamete</code> during init. Infrastructure event sources bypass this gate entirely — they carry synthesized intensities from <code>ReactionsConfig.eventIntensity</code>.</p>
 
         <div class="diagram-wrap">
-          <span class="diagram-label">Sensitivity window mapping</span>
+          <span class="diagram-label">Sensitivity window mapping (FusedImpact.applySensitivity)</span>
           <div class="mermaid">
 %%{init: {
   "theme": "base",
@@ -367,27 +373,22 @@ flowchart TD
   }
 }}%%
 flowchart LR
-  FI(["FusedImpact<br/>intensity [0,1]"]):::io
+  FI(["raw intensity [0,1]<br/>(from ImpactFusion)"]):::io
 
   COMP["thresholdLow  = 1 - sensitivityMax<br/>thresholdHigh = 1 - sensitivityMin<br/>band = thresholdHigh - thresholdLow"]:::proc
 
   GATE{"intensity &gt;=<br/>thresholdLow?"}:::gate
-  GATEF(["nil -- below<br/>sensitivity floor"]):::drop
+  GATEF(["nil -- drop impact<br/>below sensitivity floor"]):::drop
 
   MAP["mappedIntensity =<br/>(intensity - thresholdLow) / band<br/>clamped to [0,1]"]:::proc
 
-  RARM{"now &gt;=<br/>rearmUntil?"}:::gate
-  RARMF(["nil -- still<br/>in cooldown"]):::drop
-
-  OUT(["dispatch response<br/>intensity: mappedIntensity"]):::io
+  OUT(["bus.publish(Reaction.impact)<br/>intensity: mappedIntensity"]):::io
 
   FI --> COMP
   COMP --> GATE
   GATE -->|"no"| GATEF
   GATE -->|"yes"| MAP
-  MAP --> RARM
-  RARM -->|"no"| RARMF
-  RARM -->|"yes"| OUT
+  MAP --> OUT
 
   classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
   classDef gate fill:#141414,stroke:#fbbf24,color:#e8e8e8
@@ -397,12 +398,24 @@ flowchart LR
         </div>
       </section>
 
+      <section id="enricher">
+        <h2>Bus enricher <span class="qual">(pre-fan-out, runs once per reaction)</span></h2>
+        <p>Before any subscriber receives a reaction, <code>ReactionBus</code> runs a registered enricher closure exactly once. The enricher resolves all per-reaction metadata so that every subscriber operates on identical, pre-computed values. The bus stamps <code>publishedAt</code> at the moment <code>publish(_:)</code> is called — before enrichment begins — so the timestamp is stable regardless of enrichment latency. If enrichment takes longer than 500 ms, the bus publishes a minimal fallback <code>FiredReaction</code>.</p>
+
+        <p>The enricher, registered by <code>Yamete.startOutputs()</code>, does three things:</p>
+        <ul>
+          <li>Calls <code>AudioPlayer.peekSound(intensity:reaction:)</code> to dedup-filter and intensity-select an audio clip URL and duration. For non-impact reactions, <code>peekSound</code> returns nil and the bus falls back to <code>ReactionsConfig.eventResponseDuration</code>.</li>
+          <li>Calls <code>FaceLibrary.shared.selectIndices(count:)</code> with the current connected screen count to pick one face index per display, scored for recency dedup.</li>
+          <li>Returns a <code>FiredReaction</code> carrying the resolved <code>soundURL</code>, <code>clipDuration</code>, <code>faceIndices</code>, and <code>publishedAt</code>.</li>
+        </ul>
+      </section>
+
       <section id="response">
-        <h2>Response dispatch <span class="qual">(three paths, all MainActor)</span></h2>
-        <p>A confirmed, sensitivity-gated impact triggers three parallel response paths. All three run on the main actor. Audio and face always fire if enabled. Visual is routed to either the overlay or notification path based on the user's Flash Mode setting.</p>
+        <h2>Response dispatch <span class="qual">(four independent bus subscribers)</span></h2>
+        <p>Each output independently subscribes to the bus via <code>bus.subscribe()</code>, which returns a fresh <code>AsyncStream&lt;FiredReaction&gt;</code>. The consumer loop reads a live config snapshot on every reaction and gates by: the output's master enable, the per-output per-reaction toggle matrix, and an internal playback-ends-at guard that prevents overlapping responses.</p>
 
         <div class="diagram-wrap">
-          <span class="diagram-label">Response dispatch -- after sensitivity gate</span>
+          <span class="diagram-label">Output consumer loop (same structure for all four outputs)</span>
           <div class="mermaid">
 %%{init: {
   "theme": "base",
@@ -417,57 +430,31 @@ flowchart LR
   }
 }}%%
 flowchart TD
-  IN(["impact dispatched<br/>intensity [0,1]"]):::io
+  BUS(["bus.subscribe()<br/>AsyncStream&lt;FiredReaction&gt;"]):::io
 
-  subgraph AUDIO["AUDIO PATH"]
-    A1{"soundEnabled?"}:::gate
-    A2["select clip by intensity<br/>avoid last 2 clips"]:::proc
-    A3["NSSound.play() on<br/>enabled Core Audio devices<br/>volume = min + intensity * range"]:::proc
-    A4["return clip duration"]:::proc
-    A1 -->|"yes"| A2 --> A3 --> A4
-    A1 -->|"no"| A1E(["skip"]):::drop
-  end
+  CFG["configProvider.xyzConfig()<br/>read live settings snapshot"]:::proc
 
-  subgraph FACE["FACE PATH  (always active)"]
-    F1["pick random face<br/>from 11 SVG cache"]:::proc
-    F2["show in menu bar<br/>for max(clipDuration, debounce)"]:::proc
-    F3["Task.sleep → restore<br/>default icon"]:::proc
-    F1 --> F2 --> F3
-  end
+  EN{"config.enabled?"}:::gate
+  ENF(["skip"]):::drop
 
-  subgraph VISUAL["VISUAL PATH"]
-    V1{"visualResponseMode?"}:::gate
-    V1 -->|"off"| V1E(["skip"]):::drop
+  MATRIX{"perReaction[fired.kind]<br/>!= false?"}:::gate
+  MATRIXF(["skip"]):::drop
 
-    subgraph OVERLAY["Overlay mode  (ScreenFlash)"]
-      V2["opacity = opacityMin + intensity * range"]:::proc
-      V3["select face per display<br/>recency dedup"]:::proc
-      V4["borderless NSWindow over screen<br/>FlashOverlayView radial gradient"]:::proc
-      V5["animate: fadeIn → hold → fadeOut<br/>timing scaled to intensity"]:::proc
-      V6["Task.sleep(clipDuration) → orderOut"]:::proc
-      V2 --> V3 --> V4 --> V5 --> V6
-    end
+  GUARD{"now &gt;= outputEndsAt?"}:::gate
+  GUARDF(["skip -- still playing"]):::drop
 
-    subgraph NOTIF["Notification mode  (NotificationResponder)"]
-      N1["resolve locale<br/>user pref or system fallback"]:::proc
-      N2["pick phrase from tier pool<br/>ImpactTier: tap/light/medium/firm/hard"]:::proc
-      N3["post UNMutableNotificationContent"]:::proc
-      N4["Task.sleep(dismissAfter) →<br/>removeDeliveredNotifications"]:::proc
-      N1 --> N2 --> N3 --> N4
-    end
+  ACT["perform output action<br/>(play / flash / pulse / notify)"]:::proc
 
-    V1 -->|"overlay"| V2
-    V1 -->|"notification"| N1
-  end
+  REARM["outputEndsAt = now + fired.clipDuration"]:::proc
 
-  REARM["rearmUntil = now +<br/>max(clipDuration, debounce)"]:::proc
-
-  IN --> A1
-  IN --> F1
-  IN --> V1
-  A4 --> REARM
-  V6 --> REARM
-  N3 --> REARM
+  BUS --> CFG --> EN
+  EN -->|"no"| ENF
+  EN -->|"yes"| MATRIX
+  MATRIX -->|"no"| MATRIXF
+  MATRIX -->|"yes"| GUARD
+  GUARD -->|"no"| GUARDF
+  GUARD -->|"yes"| ACT
+  ACT --> REARM
 
   classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
   classDef gate fill:#141414,stroke:#fbbf24,color:#e8e8e8
@@ -475,11 +462,33 @@ flowchart TD
   classDef drop fill:#1a0a0a,stroke:#555,color:#888
           </div>
         </div>
+
+        <table>
+          <thead><tr><th>Output</th><th>Config type</th><th>Action</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>AudioPlayer</code></td><td><code>AudioOutputConfig</code></td><td>Plays the pre-selected <code>fired.soundURL</code> on each enabled Core Audio device. Volume = <code>volumeMin + intensity * range</code>.</td><td>For non-impact reactions, <code>soundURL</code> is nil — audio skips.</td></tr>
+            <tr><td><code>ScreenFlash</code></td><td><code>FlashOutputConfig</code></td><td>Renders a borderless <code>NSWindow</code> overlay per enabled screen: radial gradient + face image. Fade-in / hold / fade-out envelope, timing scaled to intensity.</td><td>Window pool reused across reactions. Face pulled from <code>fired.faceIndices</code>.</td></tr>
+            <tr><td><code>LEDFlash</code></td><td><code>LEDOutputConfig</code></td><td>PWM-dithers the Caps Lock LED via IOKit HID at 60 Hz. Optionally animates keyboard backlight via <code>KeyboardBrightnessClient</code> (CoreBrightness private framework) with a spring oscillation envelope. Restores both to pre-pulse state on completion.</td><td>Crash-recovery sentinel file written before first pulse; deleted on clean restore.</td></tr>
+            <tr><td><code>NotificationResponder</code></td><td><code>NotificationOutputConfig</code></td><td>Posts a <code>UNMutableNotificationContent</code> with a tier-matched phrase from a 40-locale string table. Auto-dismisses after <code>dismissAfter</code>.</td><td>Locale: user override or system fallback.</td></tr>
+          </tbody>
+        </table>
+
+        <p><code>MenuBarFace</code> also subscribes to the bus independently. It only reacts to <code>.impact</code> reactions, swaps the <code>NSStatusItem</code> icon to the face at <code>fired.faceIndices[0]</code> for <code>max(0.5, debounce)</code> seconds, then restores the template icon. It is not an output in the sense of the four above — it has no config provider and no toggle matrix.</p>
+      </section>
+
+      <section id="led">
+        <h2>LED flash detail <span class="qual">(Caps Lock PWM + keyboard backlight)</span></h2>
+        <p><code>LEDFlash</code> drives two separate hardware paths simultaneously on each reaction.</p>
+        <ul>
+          <li><b>Caps Lock LED</b>: discovered via <code>IOHIDManagerCopyDevices</code> filtered for keyboard HID usage page, then element usage page LED / usage Caps Lock. On each 60 Hz tick, a duty cycle computed from the spring oscillation level controls whether the element value is written 0 or 1. This approximates a PWM opacity ramp on a binary LED.</li>
+          <li><b>Keyboard backlight</b> (optional): uses the <code>KeyboardBrightnessClient</code> class loaded at runtime from <code>CoreBrightness.framework</code> (private). The level follows the same spring oscillation envelope: <code>base + amplitude * easeIn * exp(-decay * t) * cos(omega * t)</code> at 60 Hz. Idle dimming is suspended for the pulse duration to prevent the system from fighting the writes. A dirty-sentinel file at app support/<code>kb_dirty</code> captures the pre-pulse level so a crash does not permanently alter backlight state.</li>
+        </ul>
+        <p>On <code>Yamete.shutdown()</code>, <code>LEDFlash.resetHardware()</code> restores keyboard brightness to the snapshot taken before the first pulse and re-enables idle dimming.</p>
       </section>
 
       <section id="concurrency">
         <h2>Concurrency model <span class="qual">(threads, locks, actors)</span></h2>
-        <p>Three different thread contexts produce sensor data. A single lock per adapter serializes state. The fan-in task group bridges to Swift concurrency. The main actor serializes all response work.</p>
+        <p>Three different thread contexts produce sensor data for the impact pipeline. Each sensor implementation serializes its own hardware-callback state with an <code>OSAllocatedUnfairLock</code>, then yields to an <code>AsyncThrowingStream</code> outside that lock. <code>ImpactFusion</code> fans those streams into a private <code>AsyncStream</code> via detached tasks, then drains on a MainActor task. Infrastructure event sources use run-loop callbacks or dispatch-main-queue callbacks and also publish asynchronously to the bus. The bus is an actor; subscribers iterate their <code>AsyncStream&lt;FiredReaction&gt;</code> on MainActor tasks.</p>
 
         <div class="diagram-wrap">
           <span class="diagram-label">Thread and actor boundaries</span>
@@ -497,13 +506,13 @@ flowchart TD
   }
 }}%%
 flowchart LR
-  subgraph THREADS["OFF-MAIN THREADS"]
-    T1["HID run-loop thread<br/>IOHIDManager callbacks<br/>AccelerometerReader"]:::thread
-    T2["audio I/O thread<br/>AVAudioEngine tap<br/>MicrophoneAdapter"]:::thread
-    T3["OperationQueue<br/>CoreMotion updates<br/>HeadphoneMotionAdapter"]:::thread
+  subgraph THREADS["OFF-MAIN THREADS  (impact sensors)"]
+    T1["HID run-loop thread<br/>IOHIDManager callbacks<br/>AccelerometerSource"]:::thread
+    T2["audio I/O thread<br/>AVAudioEngine tap<br/>MicrophoneSource"]:::thread
+    T3["OperationQueue<br/>CoreMotion updates<br/>HeadphoneMotionSource"]:::thread
   end
 
-  subgraph LOCKS["OSAllocatedUnfairLock per adapter"]
+  subgraph LOCKS["OSAllocatedUnfairLock per sensor"]
     L1["serialize: running flag<br/>continuation ref<br/>detector state"]:::lock
   end
 
@@ -511,13 +520,23 @@ flowchart LR
     B1["continuation.yield()<br/>called OUTSIDE lock<br/>(avoids recursive os_unfair_lock)"]:::bridge
   end
 
-  subgraph SWIFT["Swift Concurrency"]
-    TG["withTaskGroup<br/>SensorManager<br/>one child task per adapter"]:::swift
-    MC["for await in sensorManager.events()<br/>MainActor<br/>ImpactController"]:::main
+  subgraph FUSION["ImpactFusion  (MainActor)"]
+    TG["detached tasks<br/>fan-in AsyncStream<br/>one per SensorSource"]:::swift
+    FT["fusion task: @MainActor<br/>ingest, gate, sensitivityGate<br/>→ bus.publish(.impact)"]:::main
   end
 
-  subgraph MAIN["MainActor"]
-    R1["ImpactController<br/>FusionEngine<br/>response dispatch"]:::mainactor
+  subgraph EVT["Event sources  (DispatchQueue.main / CFRunLoop)"]
+    ES["USBSource / PowerSource / ...<br/>publish direct to bus<br/>via Task { await bus.publish(...) }"]:::thread
+  end
+
+  subgraph BUS_ACTOR["ReactionBus  (actor)"]
+    ENR["enricher async closure<br/>audio selection + face indices<br/>→ FiredReaction"]:::main
+    FAN["fan-out: subscribers.values<br/>continuation.yield(fired)"]:::main
+  end
+
+  subgraph OUTPUTS["Output consumers  (MainActor tasks)"]
+    R1["AudioPlayer.consume()<br/>ScreenFlash.consume()<br/>LEDFlash.consume()<br/>NotificationResponder.consume()"]:::mainactor
+    MBF["MenuBarFace.consume()"]:::mainactor
   end
 
   T1 --> L1
@@ -525,8 +544,11 @@ flowchart LR
   T3 --> L1
   L1 --> B1
   B1 --> TG
-  TG --> MC
-  MC --> R1
+  TG --> FT
+  FT --> BUS_ACTOR
+  ES --> BUS_ACTOR
+  ENR --> FAN
+  BUS_ACTOR --> OUTPUTS
 
   classDef thread fill:#1a0a14,stroke:#ff6b8a,color:#e8e8e8
   classDef lock fill:#1a1500,stroke:#fbbf24,color:#e8e8e8
@@ -537,15 +559,15 @@ flowchart LR
           </div>
         </div>
 
-        <div class="callout"><p>A subtle constraint lives here: <code>continuation.finish()</code> and <code>continuation.yield()</code> must be called <em>outside</em> the adapter's <code>OSAllocatedUnfairLock</code>. <code>AsyncThrowingStream._Storage</code> acquires its own <code>os_unfair_lock</code> inside those methods, and <code>os_unfair_lock</code> is non-reentrant — calling yield or finish while already holding an unfair lock abort-traps with cause 89859. Each adapter captures the continuation reference as the critical section's return value, releases the lock, then calls the stream method outside the lock.</p></div>
+        <div class="callout"><p>A subtle constraint: <code>continuation.finish()</code> and <code>continuation.yield()</code> must be called <em>outside</em> each sensor's <code>OSAllocatedUnfairLock</code>. <code>AsyncThrowingStream._Storage</code> acquires its own <code>os_unfair_lock</code> inside those methods, and <code>os_unfair_lock</code> is non-reentrant — calling yield or finish while already holding an unfair lock abort-traps (cause 89859). Each sensor captures the continuation reference as the critical section's return value, releases the lock, then calls the stream method outside the lock.</p></div>
       </section>
 
       <section id="lifecycle">
-        <h2>Pipeline lifecycle <span class="qual">(ImpactController state machine)</span></h2>
-        <p><code>ImpactController</code> manages a start/stop pipeline keyed to whether any response output is enabled. If both sound and visual are off, the pipeline stops entirely. Settings changes rebuild the pipeline from scratch with fresh adapters.</p>
+        <h2>Pipeline lifecycle <span class="qual">(Yamete orchestrator state)</span></h2>
+        <p><code>Yamete</code> manages the pipeline with <code>bootstrap()</code> / <code>shutdown()</code> entry points. At bootstrap, outputs subscribe to the bus and the settings observation loop starts. On settings changes, <code>rebuildPipeline()</code> restarts the impact sensor pipeline and reconciles the enabled event source set. Outputs do not restart on settings changes — they read a live config snapshot on every reaction via <code>OutputConfigProvider</code>.</p>
 
         <div class="diagram-wrap">
-          <span class="diagram-label">ImpactController pipeline state machine</span>
+          <span class="diagram-label">Yamete pipeline lifecycle</span>
           <div class="mermaid">
 %%{init: {
   "theme": "base",
@@ -560,30 +582,19 @@ flowchart LR
   }
 }}%%
 stateDiagram-v2
-  [*] --> Stopped : app launch
+  [*] --> Initialised : Yamete.init()
 
-  Stopped --> Starting : shouldBeEnabled = true
-  Starting --> Running : adapters built\ntask group started
+  Initialised --> Running : bootstrap()\n— register bus enricher\n— start output consumers\n— rebuildPipeline()\n— start settings observation
 
-  Running --> Stopping : settings changed\nor shouldBeEnabled = false
-  Stopping --> Stopped : sensorTask cancelled\nfusion engine reset
+  Running --> Running : settings changed\n→ rebuildPipeline()\n (sensor pipeline restarts;\n event sources reconciled;\n outputs read live config)
+
+  Running --> Stopped : shutdown()\n— cancel output tasks\n— cancel settings task\n— fusion.stop()\n— bus.close()\n— ledFlash.resetHardware()
 
   Stopped --> [*] : app quit
-
-  Running --> Running : settings change triggers\nrebuildPipeline()\nstop then start
-
-  note right of Running
-    Adapter set determined by:
-    - enabledSensorIDs
-    - isAvailable probe
-    - current threshold settings
-  end note
-
-  note right of Stopping
-    OnceCleanup ensures\nHID device and run loop\nreleased exactly once
-  end note
           </div>
         </div>
+
+        <div class="callout"><p>The sensor pipeline (ImpactFusion) only runs when at least one output is enabled AND at least one sensor source is enabled. If the user disables all outputs, fusion stops entirely and no HID/mic/CoreMotion resources are held.</p></div>
       </section>
 
       <section id="files">
@@ -591,26 +602,66 @@ stateDiagram-v2
         <table>
           <thead><tr><th>File</th><th>Module</th><th>Role</th></tr></thead>
           <tbody>
+            <tr><td><code>ReactionBus.swift</code></td><td>YameteCore</td><td>Actor: multi-subscriber fan-out, pre-fan-out enricher, 500 ms timeout fallback</td></tr>
+            <tr><td><code>Reaction.swift</code></td><td>YameteCore</td><td>Reaction enum (impact + 13 event cases), ReactionKind, FusedImpact, sensitivity gate math</td></tr>
+            <tr><td><code>FiredReaction.swift</code></td><td>YameteCore</td><td>Enriched reaction: soundURL, clipDuration, faceIndices, publishedAt</td></tr>
+            <tr><td><code>ReactionsConfig.swift</code></td><td>YameteCore</td><td>Per-event synthesized intensities, debounce windows, bus buffer depth, LED PWM constants</td></tr>
+            <tr><td><code>Constants.swift</code></td><td>YameteCore</td><td>Detection parameter ranges, hardware constants</td></tr>
+            <tr><td><code>Defaults.swift</code></td><td>YameteCore</td><td>Factory default values for all thresholds and timing</td></tr>
+            <tr><td><code>Domain.swift</code></td><td>YameteCore</td><td>Vec3, SensorID, ImpactTier enum, OnceCleanup, responder protocols</td></tr>
+            <tr><td><code>Envelope.swift</code></td><td>YameteCore</td><td>Shared LED/flash animation envelope: attack, hold, decay timing from clipDuration + intensity</td></tr>
+            <tr><td><code>SignalProcessing.swift</code></td><td>YameteCore</td><td>HighPassFilter, LowPassFilter (first-order IIR, 3-axis)</td></tr>
+            <tr><td><code>Logging.swift</code></td><td>YameteCore</td><td>AppLog dual-sink (os.Logger + file), 24-hour retention</td></tr>
+            <tr><td><code>VisualResponseMode.swift</code></td><td>YameteCore</td><td>VisualResponseMode enum (off / overlay / notification) for legacy compat</td></tr>
+            <tr><td><code>SensorAdapter.swift</code></td><td>SensorKit</td><td>SensorSource and EventSource protocols, SensorImpact, SensorError</td></tr>
+            <tr><td><code>ImpactDetection.swift</code></td><td>SensorKit</td><td>ImpactFusion: fan-in, consensus gate, rearm, sensitivity gate, publishes Reaction.impact</td></tr>
+            <tr><td><code>ImpactDetector.swift</code></td><td>SensorKit</td><td>Per-sensor 6-gate pipeline: warmup, spike, rise, crest, confirm, intensity</td></tr>
             <tr><td><code>AccelerometerReader.swift</code></td><td>SensorKit</td><td>BMI286 HID reader, bandpass filters, ImpactDetector, watchdog</td></tr>
             <tr><td><code>MicrophoneAdapter.swift</code></td><td>SensorKit</td><td>AVAudioEngine tap, DC-block filter, ImpactDetector</td></tr>
             <tr><td><code>HeadphoneMotionAdapter.swift</code></td><td>SensorKit</td><td>CMHeadphoneMotionManager, connection probe, ImpactDetector</td></tr>
-            <tr><td><code>SensorAdapter.swift</code></td><td>SensorKit</td><td>SensorImpact/Event/Error types, SensorManager task group fan-in</td></tr>
-            <tr><td><code>ImpactDetection.swift</code></td><td>SensorKit</td><td>ImpactFusionEngine: window, consensus gate, rearm, intensity fusion</td></tr>
-            <tr><td><code>ImpactDetector.swift</code></td><td>SensorKit</td><td>Per-adapter 6-gate pipeline: warmup, spike, rise, crest, confirm, intensity</td></tr>
-            <tr><td><code>Constants.swift</code></td><td>YameteCore</td><td>Detection parameter ranges, hardware constants</td></tr>
-            <tr><td><code>Defaults.swift</code></td><td>YameteCore</td><td>Factory default values for all thresholds and timing</td></tr>
-            <tr><td><code>Domain.swift</code></td><td>YameteCore</td><td>Vec3, ImpactTier enum, responder protocols, OnceCleanup</td></tr>
-            <tr><td><code>SignalProcessing.swift</code></td><td>YameteCore</td><td>HighPassFilter, LowPassFilter (first-order IIR, 3-axis)</td></tr>
-            <tr><td><code>Logging.swift</code></td><td>YameteCore</td><td>AppLog dual-sink (os.Logger + file), 24-hour retention</td></tr>
-            <tr><td><code>SettingsStore.swift</code></td><td>YameteApp</td><td>UserDefaults persistence, all detection/response params, validation</td></tr>
-            <tr><td><code>ImpactController.swift</code></td><td>YameteApp</td><td>Main orchestrator: pipeline lifecycle, fusion, sensitivity gate, dispatch</td></tr>
-            <tr><td><code>AudioPlayer.swift</code></td><td>ResponseKit</td><td>Sound pool, intensity-based clip selection, NSSound multi-device playback</td></tr>
-            <tr><td><code>ScreenFlash.swift</code></td><td>ResponseKit</td><td>Borderless overlay windows, per-screen face dedup, animated envelope</td></tr>
+            <tr><td><code>EventSources.swift</code></td><td>SensorKit</td><td>All 7 EventSource implementations: USBSource, PowerSource, AudioPeripheralSource, BluetoothSource, ThunderboltSource, DisplayHotplugSource, SleepWakeSource</td></tr>
+            <tr><td><code>AudioPlayer.swift</code></td><td>ResponseKit</td><td>Sound pool, intensity-based clip selection (peekSound), NSSound multi-device playback</td></tr>
+            <tr><td><code>ScreenFlash.swift</code></td><td>ResponseKit</td><td>Borderless overlay windows, window pool, per-screen face rendering, animated envelope</td></tr>
+            <tr><td><code>LEDFlash.swift</code></td><td>ResponseKit</td><td>Caps Lock LED PWM (IOKit HID), keyboard brightness spring oscillation (CoreBrightness), crash-recovery sentinel</td></tr>
             <tr><td><code>NotificationResponder.swift</code></td><td>ResponseKit</td><td>UNUserNotificationCenter, tier phrases, 40-locale resolution</td></tr>
+            <tr><td><code>FaceLibrary.swift</code></td><td>ResponseKit</td><td>Shared singleton face image cache, selectIndices() dedup scoring for enricher</td></tr>
             <tr><td><code>FaceRenderer.swift</code></td><td>ResponseKit</td><td>SVG template loader, placeholder resolution, light/dark palette</td></tr>
             <tr><td><code>AudioDevice.swift</code></td><td>ResponseKit</td><td>Core Audio device enumeration, UID resolution, change notifications</td></tr>
+            <tr><td><code>OutputConfig.swift</code></td><td>ResponseKit</td><td>AudioOutputConfig, FlashOutputConfig, LEDOutputConfig, NotificationOutputConfig, OutputConfigProvider protocol</td></tr>
+            <tr><td><code>Yamete.swift</code></td><td>YameteApp</td><td>Orchestrator: owns bus, all sources, all outputs, lifecycle wiring, settings observation</td></tr>
+            <tr><td><code>SettingsStore.swift</code></td><td>YameteApp</td><td>@Observable UserDefaults persistence, all detection/response params, validation, OutputConfigProvider</td></tr>
+            <tr><td><code>MenuBarFace.swift</code></td><td>YameteApp</td><td>Bus subscriber: impact-only face swap in NSStatusItem, daily impact counter</td></tr>
+            <tr><td><code>StatusBarController.swift</code></td><td>YameteApp</td><td>NSStatusItem ownership, menu bar icon and popover management</td></tr>
+            <tr><td><code>EventSettings.swift</code></td><td>YameteApp</td><td>EventSourceDefaults, ReactionToggleMatrix for per-output per-reaction toggle persistence</td></tr>
+            <tr><td><code>Updater.swift</code></td><td>YameteApp</td><td>GitHub releases version check, update prompt (Direct build only)</td></tr>
           </tbody>
         </table>
+      </section>
+
+      <section id="testing">
+        <h2>Test surface <span class="qual">(every layer, every gate, every reasonable input)</span></h2>
+        <p>The test suite is organised as concentric rings, each driving the production code from one layer further out than the previous. Failures isolate to the ring that broke.</p>
+        <table>
+          <thead><tr><th>Ring / Layer</th><th>Files</th><th>What it asserts</th></tr></thead>
+          <tbody>
+            <tr><td>Ring 0 — bus contract</td><td><code>BusRoutingContractTests.swift</code></td><td>Bus fan-out, enricher, gate matrix in isolation. Drives <code>_testEmit</code> straight to the bus, no source detection.</td></tr>
+            <tr><td>Ring 1 — source detection (mocked transport)</td><td><code>Matrix*OSEvents_Tests.swift</code>, <code>Matrix*Source_Tests.swift</code>, <code>StimulusSourceContractTests.swift</code></td><td>Per-source detection pipeline driven through internal seams (<code>_inject*</code>, <code>_injectKeyPress</code>, <code>_injectClick</code>). MockEventMonitor / MockHIDDeviceMonitor stand in for the OS.</td></tr>
+            <tr><td>Ring 2 — real OS event tap</td><td><code>MatrixL2_Trackpad_Tests.swift</code>, <code>MatrixL2_Mouse_Tests.swift</code>, <code>MatrixL2_Keyboard_Tests.swift</code>, <code>MatrixL2_System_*_Tests.swift</code></td><td>Same assertions, but synthesised events go through CGEvent.post / NSWorkspace / NotificationCenter so RealEventMonitor and friends fire end-to-end. Cells <code>XCTSkip</code> cleanly when Accessibility/Input-Monitoring TCC is denied.</td></tr>
+            <tr><td>Ring 3 — host-app bundle</td><td><code>make test-host-app</code> (xcodebuild scheme <code>YameteHostTest</code>)</td><td>Same suite but run inside <code>Yamete.app</code>'s real bundle so UNUserNotificationCenter, RealHapticEngineDriver, real Accessibility paths execute.</td></tr>
+            <tr><td>Cross-source conflation</td><td><code>MatrixCrossSourceConflation_Tests.swift</code>, <code>MatrixDeviceAttribution_Tests.swift</code></td><td>Trackpad/mouse/keyboard event-tap conflation regression suite. Catches the kind of bug where one external mouse click would be credited to BOTH MouseActivitySource and TrackpadActivitySource.</td></tr>
+            <tr><td>Concurrent / interleaved fuzz</td><td><code>MatrixConcurrentInterleaved_Tests.swift</code>, <code>CrossBoundaryFaultInjection_Tests.swift</code></td><td>2+ sources publishing simultaneously under deterministic seeds; cross-boundary kernel-failure injection (USB-fail-during-BT-fail, sleep-mid-tap, IOHID-register-flood-with-listener-fault, etc.).</td></tr>
+            <tr><td>Property-based</td><td><code>PropertyBased_Tests.swift</code></td><td>8 invariants × 200 deterministic xorshift64 seeds = 1600 cases. Asserts rate-debounce bounds, RMS thresholding, attribution gates, bus delivery order/completeness, coalesce monotonicity, per-mode enable invariants for every random input in the property's domain.</td></tr>
+            <tr><td>State machines</td><td><code>StateMachine_Tests.swift</code></td><td>Exhaustive transition graphs for ProbeStage, ImpactFusion, ReactionBus, OnceCleanup, TrackpadActivitySource. Asserts every reachable transition AND that every illegal transition is rejected (terminal states stay terminal, no-op gates fire).</td></tr>
+            <tr><td>Real-vs-Mock parity</td><td><code>DriverParity_Tests.swift</code></td><td>Every driver protocol's RealXxxDriver and MockXxxDriver assert the same observable contract on the same input shape. Catches Real-vs-Mock divergence that would cause production-only bugs.</td></tr>
+            <tr><td>Snapshot UI (4 variants)</td><td><code>SnapshotUI_Tests.swift</code>, <code>SnapshotUI_Direct_Tests.swift</code></td><td>SwiftUI views rendered into NSHostingView and pixel-compared (precision 0.99, perceptualPrecision 0.98). Per-build baselines: <code>__Snapshots__/AppStore/</code>, <code>Direct/</code>, <code>HostApp/</code>, <code>CI/</code>.</td></tr>
+            <tr><td>Locale rendering</td><td><code>LocaleRendering_Tests.swift</code></td><td>40 locales × 4 plural axes (count=0/1/2/many) + Polish 4-category sweep + RTL glyph assertions + date / numeric format rendering. Catches stringsdict regressions per CLDR rules.</td></tr>
+            <tr><td>Settings corruption fuzz</td><td><code>SettingsFuzz_Tests.swift</code></td><td>200-trial random plist fuzz: empty / type-mismatch / truncated / NaN / future-version / NSKeyedUnarchiver malicious input. Pins SettingsStore's sanitize-non-finite-and-pairings pass.</td></tr>
+            <tr><td>Crash boundary audit</td><td><code>CrashHandling_Tests.swift</code></td><td>Arithmetic-trap audit: <code>mach_absolute_time</code> wraparound, atan2(0,0) NaN propagation, zero-frame buffers, divide-by-zero, integer overflow, closed-bus publish, <code>UInt64.max</code> staleness.</td></tr>
+            <tr><td>Performance baselines</td><td><code>Performance_Tests.swift</code>, <code>Tests/Performance/baselines.json</code></td><td>7 cells with absolute wallclock + memory baselines committed to the repo. <code>make perf-baseline</code> compares each run against the baseline within a 2× tolerance and fails on regression.</td></tr>
+            <tr><td>Mutation testing</td><td><code>Tests/Mutation/mutation-catalog.json</code>, <code>scripts/mutation-test.sh</code></td><td>112 declarative mutation entries (search/replace pair + expected failing test + substring anchor). <code>make mutate</code> applies each mutation, runs <code>swift test --filter</code>, asserts non-zero exit + substring match, then reverts. <code>make mutate-pr</code> slices the catalog to entries whose <code>targetFile</code> the PR touched (~1-2 min on a typical PR vs ~20 min for the full catalog). The <code>--coverage</code> flag enumerates un-mutated production gates as a punch-list.</td></tr>
+          </tbody>
+        </table>
+        <p class="qual">Local headline: <code>swift test</code> 729 passing / 37 skipped / 0 failures · <code>swift test -Xswiftc -DDIRECT_BUILD</code> 754 / 38 / 0 · <code>make lint</code> exit 0 · <code>make mutate</code> 112/112 caught · <code>make test-host-app</code> 726 / 40 / 0 · <code>make perf-baseline</code> 7/7 within tolerance.</p>
       </section>
 
       <footer>
@@ -653,10 +704,13 @@ stateDiagram-v2
       { href: '#detection-gates', label: 'Detection gates' },
       { href: '#fusion',      label: 'Fusion engine' },
       { href: '#sensitivity', label: 'Sensitivity gate' },
+      { href: '#enricher',    label: 'Bus enricher' },
       { href: '#response',    label: 'Response dispatch' },
+      { href: '#led',         label: 'LED flash detail' },
       { href: '#concurrency', label: 'Concurrency model' },
       { href: '#lifecycle',   label: 'Pipeline lifecycle' },
       { href: '#files',       label: 'Source map' },
+      { href: '#testing',     label: 'Test surface' },
     ], 'architecture.html');
   </script>
 </body>

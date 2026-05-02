@@ -202,6 +202,141 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
+    // MARK: - UI-gate mutation anchors (Phase 7)
+    //
+    // These cells exist to give the mutation catalog stable single-purpose
+    // anchors for individual SettingsStore gates. Each assertion message
+    // carries a `[ui-gate=...]` tag so `scripts/mutation-test.sh` can match
+    // the failure deterministically when the corresponding gate is removed.
+
+    /// Sensitivity clamp gate. Writing 1.5 must be snapped into the [0,1]
+    /// unit range. Removing the `if c != sensitivityMin { sensitivityMin = c; return }`
+    /// recursive-clamp-and-return makes the out-of-range value persist.
+    func testUIGate_sensitivityMinClamp_snapsAboveRangeToBound() {
+        let store = freshStore()
+        store.sensitivityMin = 1.5
+        XCTAssertLessThanOrEqual(store.sensitivityMin, 1.0,
+            "[ui-gate=sensitivityMin-clamp] above-range write must clamp to ≤1.0; got \(store.sensitivityMin)")
+        XCTAssertGreaterThanOrEqual(store.sensitivityMin, 0.0,
+            "[ui-gate=sensitivityMin-clamp] above-range write must clamp to ≥0.0; got \(store.sensitivityMin)")
+    }
+
+    /// Sensitivity pair invariant: setting min above max must drag max up.
+    /// Removing the `if sensitivityMin > sensitivityMax { sensitivityMax = sensitivityMin }`
+    /// pair-fixup leaves the pair inverted.
+    func testUIGate_sensitivityMinAboveMax_dragsMaxUp() {
+        let store = freshStore()
+        store.sensitivityMax = 0.3
+        store.sensitivityMin = 0.8
+        XCTAssertLessThanOrEqual(store.sensitivityMin, store.sensitivityMax,
+            "[ui-gate=sensitivity-min-drags-max] min=\(store.sensitivityMin) must be ≤ max=\(store.sensitivityMax)")
+    }
+
+    /// Sensitivity pair invariant: setting max below min must drag min down.
+    /// Removing the `if sensitivityMax < sensitivityMin { sensitivityMin = sensitivityMax }`
+    /// pair-fixup leaves the pair inverted.
+    func testUIGate_sensitivityMaxBelowMin_dragsMinDown() {
+        let store = freshStore()
+        store.sensitivityMin = 0.7
+        store.sensitivityMax = 0.2
+        XCTAssertLessThanOrEqual(store.sensitivityMin, store.sensitivityMax,
+            "[ui-gate=sensitivity-max-drags-min] min=\(store.sensitivityMin) must be ≤ max=\(store.sensitivityMax)")
+    }
+
+    /// Volume clamp gate. Removing the recursive-clamp `if c != volumeMax`
+    /// allows out-of-range writes through.
+    func testUIGate_volumeMaxClamp_snapsAboveRangeToBound() {
+        let store = freshStore()
+        store.volumeMax = 5.0
+        XCTAssertLessThanOrEqual(store.volumeMax, 1.0,
+            "[ui-gate=volumeMax-clamp] above-range write must clamp to ≤1.0; got \(store.volumeMax)")
+    }
+
+    /// Flash-opacity pair invariant: setting min above max must drag max up.
+    /// Removing the pair-fixup leaves the pair inverted.
+    func testUIGate_flashOpacityMinAboveMax_dragsMaxUp() {
+        let store = freshStore()
+        store.flashOpacityMax = 0.2
+        store.flashOpacityMin = 0.9
+        XCTAssertLessThanOrEqual(store.flashOpacityMin, store.flashOpacityMax,
+            "[ui-gate=flashOpacity-min-drags-max] min=\(store.flashOpacityMin) must be ≤ max=\(store.flashOpacityMax)")
+    }
+
+    /// Bandpass pair invariant on writes (didSet path): setting low above
+    /// high must drag high up. Removing
+    /// `if accelBandpassLowHz > accelBandpassHighHz { accelBandpassHighHz = accelBandpassLowHz }`
+    /// leaves the pair inverted, which the bandpass filter would then mis-apply.
+    func testUIGate_bandpassLowAboveHigh_dragsHighUp() {
+        let store = freshStore()
+        store.accelBandpassHighHz = 12.0
+        store.accelBandpassLowHz  = 22.0
+        XCTAssertLessThanOrEqual(store.accelBandpassLowHz, store.accelBandpassHighHz,
+            "[ui-gate=bandpass-low-drags-high] low=\(store.accelBandpassLowHz) must be ≤ high=\(store.accelBandpassHighHz)")
+    }
+
+    /// Cold-load isFinite sanitization: a NaN persisted under sensitivityMin
+    /// must be replaced by the default at boot. Removing
+    /// `if !store.sensitivityMin.isFinite { store.sensitivityMin = Defaults.sensitivityMin }`
+    /// from `sanitizeNonFiniteAndPairings` lets NaN propagate to the live
+    /// settings graph (where every clamp / pair-fixup downstream malfunctions
+    /// because every comparison with NaN returns false).
+    func testUIGate_sanitizeNaN_sensitivityMin_restoredToDefault() {
+        // Wipe + write NaN under the raw key, then construct a fresh store.
+        for key in SettingsStore.Key.allCases {
+            UserDefaults.standard.removeObject(forKey: key.rawValue)
+        }
+        UserDefaults.standard.set(Double.nan, forKey: SettingsStore.Key.sensitivityMin.rawValue)
+        let store = SettingsStore()
+        XCTAssertTrue(store.sensitivityMin.isFinite,
+            "[ui-gate=sanitize-nan-sensitivityMin] NaN persisted in UserDefaults must be sanitized to a finite default; got \(store.sensitivityMin)")
+        XCTAssertEqual(store.sensitivityMin, Defaults.sensitivityMin, accuracy: 0.0001,
+            "[ui-gate=sanitize-nan-sensitivityMin] NaN must be replaced by Defaults.sensitivityMin; got \(store.sensitivityMin)")
+    }
+
+    /// Cold-load pair invariant in sanitize: an inverted bandpass low/high
+    /// pair on disk must be re-ordered at boot. Removing the
+    /// `if store.accelBandpassLowHz > store.accelBandpassHighHz` block in
+    /// `sanitizeNonFiniteAndPairings` allows the inverted pair to land in
+    /// the live store, where the bandpass filter would reject all input.
+    func testUIGate_sanitizeBandpassInverted_pairFixedAtBoot() {
+        for key in SettingsStore.Key.allCases {
+            UserDefaults.standard.removeObject(forKey: key.rawValue)
+        }
+        UserDefaults.standard.set(22.0, forKey: SettingsStore.Key.accelBandpassLowHz.rawValue)
+        UserDefaults.standard.set(12.0, forKey: SettingsStore.Key.accelBandpassHighHz.rawValue)
+        let store = SettingsStore()
+        XCTAssertLessThanOrEqual(store.accelBandpassLowHz, store.accelBandpassHighHz,
+            "[ui-gate=sanitize-bandpass-pair] inverted bandpass on disk must be re-ordered at boot; low=\(store.accelBandpassLowHz) high=\(store.accelBandpassHighHz)")
+    }
+
+    /// `flashEnabled` didSet must turn `visualResponseMode` from .overlay
+    /// back to .off when toggled false. Removing
+    /// `if !flashEnabled && visualResponseMode == .overlay { visualResponseMode = .off }`
+    /// leaves the legacy mode key advertising .overlay even though flash is off,
+    /// breaking call sites that still consult the legacy key.
+    func testUIGate_flashEnabledOff_clearsVisualResponseModeOverlay() {
+        let store = freshStore()
+        store.visualResponseMode = .overlay  // baseline
+        store.flashEnabled = true            // sync no-op
+        store.flashEnabled = false           // exercise the gate
+        XCTAssertEqual(store.visualResponseMode, .off,
+            "[ui-gate=flashEnabled-off-clears-mode] turning flash off must reset visualResponseMode to .off; got \(store.visualResponseMode)")
+    }
+
+    /// `flashEnabled` didSet must promote `visualResponseMode` from .off
+    /// to .overlay when toggled on. Removing
+    /// `if flashEnabled && visualResponseMode == .off { visualResponseMode = .overlay }`
+    /// leaves the legacy mode key advertising .off even though flash was just
+    /// enabled, suppressing the overlay through every legacy consumer.
+    func testUIGate_flashEnabledOn_promotesVisualResponseModeToOverlay() {
+        let store = freshStore()
+        store.visualResponseMode = .off
+        store.flashEnabled = false
+        store.flashEnabled = true
+        XCTAssertEqual(store.visualResponseMode, .overlay,
+            "[ui-gate=flashEnabled-on-promotes-mode] turning flash on must promote visualResponseMode to .overlay; got \(store.visualResponseMode)")
+    }
+
     // MARK: - Same-value no-op (all properties)
 
     func testSameValueNoOp() {

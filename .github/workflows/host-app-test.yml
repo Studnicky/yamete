@@ -1,0 +1,44 @@
+name: Host-app test
+
+# Phase 2 CI wiring (Phase 1 host-app companion): runs the
+# YameteHostTest xcodebuild scheme so cells that XCTSkip under
+# raw `swift test` (UN center, full Haptic engine, CGEvent.post under
+# Accessibility, Force-Touch trackpad probes) execute their Real-driver
+# halves inside a real `Yamete.app` bundle. Hardware-gated cells
+# (Force Touch trackpad, keyboard backlight, on-bus accelerometer)
+# self-skip via XCTSkip when the runner lacks the hardware — the
+# existing test bundle already handles this, no flag needed.
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-app-test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  host-app-test:
+    name: make test-host-app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install xcodegen
+        # Yamete.xcodeproj is gitignored; project.yml is the source of
+        # truth and `make test-host-app` regenerates the project on the
+        # fly via xcodegen.
+        run: brew install xcodegen
+      - name: Run host-app xcodebuild test
+        run: make test-host-app
+      - name: Upload xcresult on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-app-test-results
+          path: |
+            **/*.xcresult
+          retention-days: 7

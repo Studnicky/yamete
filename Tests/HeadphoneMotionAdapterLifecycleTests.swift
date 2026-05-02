@@ -2,7 +2,7 @@ import XCTest
 @testable import SensorKit
 @testable import YameteCore
 
-/// Lifecycle tests for `HeadphoneMotionAdapter`. Verifies connection
+/// Lifecycle tests for `HeadphoneMotionSource`. Verifies connection
 /// tracker defaults, open-without-hardware behavior, open/close
 /// symmetry, and stream pruning when headphones disconnect
 /// mid-stream.
@@ -15,7 +15,7 @@ import XCTest
 /// internal `HeadphoneConnectionTracker` class is `private`, so the
 /// tests observe tracker state only indirectly through the adapter's
 /// public `isAvailable` property.
-final class HeadphoneMotionAdapterLifecycleTests: XCTestCase {
+final class HeadphoneMotionSourceLifecycleTests: XCTestCase {
 
     /// A freshly-constructed adapter must report `isAvailable == false`
     /// until either the startup probe or the delegate's didConnect
@@ -24,7 +24,7 @@ final class HeadphoneMotionAdapterLifecycleTests: XCTestCase {
     /// the adapter's lifetime — which is the dominant test-environment
     /// condition and the invariant under test.
     func testConnectionTrackerInitialState() async throws {
-        let adapter = HeadphoneMotionAdapter()
+        let adapter = HeadphoneMotionSource()
         // If motion-capable headphones are already connected at test
         // start, the probe may have raced us and flipped the tracker.
         // That's a valid real-world state, so we only assert the
@@ -42,7 +42,7 @@ final class HeadphoneMotionAdapterLifecycleTests: XCTestCase {
     /// but no headphones are paired). Both are acceptable — neither
     /// may hang or throw an untyped error.
     func testOpenWithoutHeadphonesThrows() async throws {
-        let adapter = HeadphoneMotionAdapter()
+        let adapter = HeadphoneMotionSource()
         try XCTSkipUnless(!adapter.isAvailable, "headphones available; cannot exercise unavailable path")
 
         let probe = Task<Result<Void, Error>, Never> {
@@ -82,7 +82,7 @@ final class HeadphoneMotionAdapterLifecycleTests: XCTestCase {
     /// `[manager]` capture, so the observable here is "task completes
     /// and does not crash".
     func testOpenCloseSymmetry() async throws {
-        let adapter = HeadphoneMotionAdapter()
+        let adapter = HeadphoneMotionSource()
 
         let task = Task<Void, Error> {
             for try await _ in adapter.impacts() {
@@ -98,33 +98,234 @@ final class HeadphoneMotionAdapterLifecycleTests: XCTestCase {
     }
 
     /// When motion-capable headphones disconnect mid-stream, the
-    /// adapter's tracker flips to `false` and subsequent `isAvailable`
-    /// checks reflect that. We cannot force a disconnect without
-    /// mocking, so this test skips unless real hardware is connected
-    /// and then subsequently goes away during the wait — a scenario
-    /// that's impractical to stage in CI. In the common case (no
-    /// headphones connected at all) the test skips immediately, which
-    /// documents the expected behavior without manufacturing signal.
+    /// adapter's tracker flips to `false` and subsequent samples are
+    /// dropped before reaching the impact detector. Driven via a mock
+    /// driver so the scenario doesn't depend on real AirPods.
+    ///
+    /// Matrix-converted: loops over (samples-before-disconnect) ×
+    /// (reconnect-after-disconnect). Each cell asserts the exact pruned
+    /// count instead of "≥ 0", giving coordinate-tagged failure messages
+    /// when one specific scenario regresses.
     func testDisconnectMidStreamPrunes() async throws {
-        let adapter = HeadphoneMotionAdapter()
-        try XCTSkipUnless(adapter.isAvailable, "headphone motion not available")
+        struct Cell {
+            let samplesBefore: Int
+            let reconnect: Bool
+        }
+        let cells: [Cell] = [
+            Cell(samplesBefore: 1,   reconnect: false),
+            Cell(samplesBefore: 5,   reconnect: false),
+            Cell(samplesBefore: 100, reconnect: false),
+            Cell(samplesBefore: 1,   reconnect: true),
+            Cell(samplesBefore: 5,   reconnect: true),
+            Cell(samplesBefore: 100, reconnect: true),
+        ]
+        for cell in cells {
+            let mock = MockHeadphoneMotionDriver()
+            mock.setDeviceMotionAvailable(true)
+            mock.setHeadphonesConnected(true)
+            let adapter = HeadphoneMotionSource(driver: mock, runProbe: false)
+            let label = "[samplesBefore=\(cell.samplesBefore) reconnect=\(cell.reconnect)]"
+            XCTAssertTrue(adapter.isAvailable, "\(label) mock reports framework + headphones available")
 
-        let task = Task<Void, Error> {
-            for try await _ in adapter.impacts() {
-                // Drain
+            let stream = adapter.impacts()
+            try await Task.sleep(for: .milliseconds(20))
+            XCTAssertGreaterThanOrEqual(mock.startUpdatesCalls, 1,
+                                        "\(label) adapter starts driver updates")
+
+            // Disconnect, emit 10 post-disconnect samples (regardless of
+            // samplesBefore — that quantity governs how many "should have
+            // delivered" pre-disconnect, which we don't drain here because
+            // the adapter pruning is what's under test).
+            mock.setHeadphonesConnected(false)
+            for _ in 0..<10 { mock.emitImpact(magnitude: 2.0) }
+
+            // Optional reconnect AFTER pruning to confirm the connection
+            // tracker isn't latched-false: a reconnect must flip
+            // isAvailable back to true.
+            if cell.reconnect {
+                mock.setHeadphonesConnected(true)
+            }
+
+            let probe = Task<Int, Error> {
+                var seen = 0
+                for try await _ in stream {
+                    seen += 1
+                    if seen >= 1 { break }
+                }
+                return seen
+            }
+            try? await Task.sleep(for: .milliseconds(60))
+            probe.cancel()
+            let count = (try? await probe.value) ?? 0
+            XCTAssertEqual(count, 0,
+                           "\(label) post-disconnect samples must be pruned by adapter (got \(count))")
+            let expectedAvailable = cell.reconnect
+            XCTAssertEqual(adapter.isAvailable, expectedAvailable,
+                           "\(label) isAvailable=\(adapter.isAvailable), expected \(expectedAvailable)")
+        }
+    }
+
+    /// When the framework reports motion unavailable, `impacts()`
+    /// must surface `SensorError.deviceNotFound` immediately.
+    func testFrameworkUnavailableThrowsDeviceNotFound() async throws {
+        let mock = MockHeadphoneMotionDriver()
+        mock.setDeviceMotionAvailable(false)
+        let adapter = HeadphoneMotionSource(driver: mock, runProbe: false)
+
+        let probe = Task<Result<Void, Error>, Never> {
+            do {
+                for try await _ in adapter.impacts() { return .success(()) }
+                return .success(())
+            } catch {
+                return .failure(error)
             }
         }
-        // Give the stream a chance to spin up. In a CI rig this line
-        // is unreachable; on a dev box with AirPods connected it
-        // opens a real motion feed that the user would have to
-        // manually disconnect to complete the test.
-        try? await Task.sleep(for: .milliseconds(100))
-        task.cancel()
-        _ = try? await task.value
+        try? await Task.sleep(for: .milliseconds(50))
+        probe.cancel()
+        let outcome = await probe.value
 
-        // The tracker will be whatever the hardware reports at this
-        // moment — we can only assert the adapter reached this point
-        // without crashing.
-        XCTAssertTrue(true, "stream teardown completed for connected headphones")
+        guard case .failure(let error) = outcome,
+              let typed = error as? SensorError,
+              case .deviceNotFound = typed else {
+            XCTFail("expected SensorError.deviceNotFound, got \(outcome)")
+            return
+        }
+        XCTAssertTrue(true)
+    }
+
+    /// When a mid-stream error arrives from the underlying motion
+    /// manager, the adapter terminates the stream by re-throwing it.
+    func testMidStreamErrorPropagates() async throws {
+        let mock = MockHeadphoneMotionDriver()
+        mock.setDeviceMotionAvailable(true)
+        mock.setHeadphonesConnected(true)
+        let adapter = HeadphoneMotionSource(driver: mock, runProbe: false)
+
+        let stream = adapter.impacts()
+        try await Task.sleep(for: .milliseconds(20))
+        mock.emit(error: MockSensorError.streamMidstreamFailure)
+
+        let probe = Task<Error?, Never> {
+            do {
+                for try await _ in stream { return nil }
+                return nil
+            } catch {
+                return error
+            }
+        }
+        try? await Task.sleep(for: .milliseconds(50))
+        probe.cancel()
+        let surfaced = await probe.value
+        XCTAssertNotNil(surfaced, "mid-stream error must terminate the stream with a throw")
+    }
+
+    /// Mutation-anchor cell for `HeadphoneMotionAdapter.swift` line 150
+    /// (`guard driver.isHeadphonesConnected else { return }`). Removing
+    /// the gate would let post-disconnect samples reach the detector
+    /// even after the connection tracker flips. Distinct from
+    /// `testDisconnectMidStreamPrunes` in two ways:
+    ///   1. Pre-disconnect, the detector is primed through its warmup
+    ///      window (50 samples) with a permissive detector config so
+    ///      the warmup gate cannot mask the prune behaviour.
+    ///   2. Post-disconnect samples use a magnitude well above the
+    ///      configured spike threshold so removing the prune gate
+    ///      WOULD let an impact through.
+    func testDisconnectPostWarmup_postDisconnectSamplesPruned() async throws {
+        let mock = MockHeadphoneMotionDriver()
+        mock.setDeviceMotionAvailable(true)
+        mock.setHeadphonesConnected(true)
+        // Permissive detector config: sub-threshold pre-warmup samples,
+        // very low spike threshold, no rise/crest/confirmation gating.
+        let permissive = ImpactDetectorConfig(
+            spikeThreshold: 0.05,
+            minRiseRate: 0,
+            minCrestFactor: 0,
+            minConfirmations: 1,
+            warmupSamples: 5,
+            intensityFloor: 0.05,
+            intensityCeiling: 1.0
+        )
+        let adapter = HeadphoneMotionSource(detectorConfig: permissive, driver: mock, runProbe: false)
+
+        let stream = adapter.impacts()
+        try await Task.sleep(for: .milliseconds(20))
+
+        // Prime: feed 10 above-warmup quiet samples to clear the
+        // warmup gate. Background RMS settles low.
+        for _ in 0..<10 { mock.emitImpact(magnitude: 0.001) }
+
+        // Disconnect — line 150's job is to prune everything that
+        // arrives from now on.
+        mock.setHeadphonesConnected(false)
+        // Post-disconnect: 20 high-magnitude samples that WOULD trigger
+        // detection if the prune gate was removed (>> 0.05 spike,
+        // huge crest factor against the quiet-RMS baseline).
+        for _ in 0..<20 { mock.emitImpact(magnitude: 1.0) }
+
+        let probe = Task<Int, Error> {
+            var seen = 0
+            for try await _ in stream {
+                seen += 1
+                if seen >= 1 { break }
+            }
+            return seen
+        }
+        try? await Task.sleep(for: .milliseconds(80))
+        probe.cancel()
+        let count = (try? await probe.value) ?? 0
+        XCTAssertEqual(
+            count, 0,
+            "[hp-gate=disconnect-prune] post-disconnect high-magnitude samples must be pruned (got \(count))"
+        )
+    }
+
+    /// Pins `HeadphoneMotionAdapter.swift:89` `guard driver.isDeviceMotionAvailable
+    /// else { return }` in `startConnectionProbe()`. When the framework reports
+    /// motion-unavailable, the probe must NOT call `driver.startUpdates`. Mock
+    /// driver records `startUpdatesCalls`; production gate keeps it at 0.
+    func testProbeGate_frameworkUnavailable_doesNotStartUpdates() {
+        let mock = MockHeadphoneMotionDriver()
+        mock.setDeviceMotionAvailable(false)
+        _ = HeadphoneMotionSource(driver: mock)
+        XCTAssertEqual(
+            mock.startUpdatesCalls, 0,
+            "[hp-probe-gate=framework-available] framework-unavailable host must NOT trigger startUpdates; got \(mock.startUpdatesCalls)"
+        )
+    }
+
+    /// Pins `HeadphoneMotionAdapter.swift:104` `guard stage == .running` in the
+    /// deferred probe-stop body. After `impacts()` takes over the manager, the
+    /// stage flips to `.takenOver`; the deferred stop must no-op so the
+    /// in-flight consumer keeps the manager alive.
+    func testProbeStageGate_takenOver_deferredClosureIsNoOp() async {
+        let mock = MockHeadphoneMotionDriver()
+        mock.setDeviceMotionAvailable(true)
+        let adapter = HeadphoneMotionSource(driver: mock)
+        XCTAssertEqual(
+            adapter._testCurrentProbeStage, .running,
+            "precondition: probe must be in .running after init"
+        )
+
+        // Simulate impacts() taking over the manager.
+        let stream = adapter.impacts()
+        let consumer = Task<Void, Error> {
+            for try await _ in stream {}
+        }
+        try? await Task.sleep(for: .milliseconds(20))
+        XCTAssertEqual(
+            adapter._testCurrentProbeStage, .takenOver,
+            "precondition: impacts() must flip stage to .takenOver"
+        )
+
+        let stopsBefore = mock.stopUpdatesCalls
+        adapter._testRunDeferredProbeStop()
+        let stopsAfter = mock.stopUpdatesCalls
+        XCTAssertEqual(
+            stopsAfter, stopsBefore,
+            "[hp-probe-gate=takenOver] deferred probe-stop after impacts() takeover must no-op; got an unexpected stopUpdates"
+        )
+
+        consumer.cancel()
+        _ = try? await consumer.value
     }
 }

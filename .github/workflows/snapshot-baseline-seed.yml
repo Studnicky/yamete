@@ -1,0 +1,113 @@
+name: Snapshot baseline seed
+
+# Phase 2.1 one-shot helper: GitHub-Actions macos-15 runners render
+# AppKit views with subtly different antialiasing / font metrics than
+# developer macOS hosts (older Xcode point releases on developer
+# machines vs. the runner image's pinned point release). Pixel-baseline
+# snapshots recorded on a developer host therefore always fail on CI
+# even when the SwiftUI tree is unchanged. The fix is to record a
+# CI-runner-captured baseline set under `Tests/__Snapshots__/CI/` and
+# have the test runtime pick that variant when `CI=true`.
+#
+# This workflow is workflow_dispatch only — it should be triggered ONCE
+# after the CI surface is first wired up, then again only when a
+# deliberate visual change to a snapshotted view requires re-baselining.
+# It runs `swift test` with `SNAPSHOT_RECORD_MODE=true` so
+# swift-snapshot-testing writes new baselines instead of asserting,
+# captures the resulting `Tests/__Snapshots__/CI/` directory, and opens
+# a PR adding those files. The maintainer reviews the diff and merges.
+#
+# Why a PR instead of pushing to the branch directly?
+#   Two reasons. (a) GitHub branch-protection rejects automated pushes
+#   to protected branches; even with a token a direct push would need
+#   admin override. (b) A PR forces a human to eyeball the rendered PNGs
+#   so an accidental black-square-because-the-sandbox-was-misconfigured
+#   baseline doesn't get committed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_suffix:
+        description: 'Optional suffix for the seed branch (e.g. "round-2")'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: snapshot-baseline-seed-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  snapshot-baseline-seed:
+    name: Record CI snapshot baselines
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Resolve Xcode version
+        id: xcode
+        run: echo "version=$(xcodebuild -version | head -1 | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: Cache Swift build artifacts
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-snapshot-seed-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            spm-snapshot-seed-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-
+      - name: Record CI snapshot baselines (default config)
+        env:
+          CI: 'true'
+          SNAPSHOT_RECORD_MODE: 'true'
+        # `swift-snapshot-testing` interprets a non-empty record mode as
+        # "write the baseline, then assert the file existed" — which is
+        # always a fail on first record. We accept a non-zero exit here
+        # because the goal is to land the new files; the next CI run on
+        # the seed PR re-asserts in compare mode.
+        run: swift test --filter SnapshotUI_Tests || true
+      - name: Record CI snapshot baselines (DIRECT_BUILD)
+        env:
+          CI: 'true'
+          SNAPSHOT_RECORD_MODE: 'true'
+        run: swift test -Xswiftc -DDIRECT_BUILD --filter SnapshotUI_Direct_Tests || true
+      - name: Verify CI baseline directory was populated
+        run: |
+          if [[ ! -d "Tests/__Snapshots__/CI" ]] || [[ -z "$(ls -A Tests/__Snapshots__/CI 2>/dev/null)" ]]; then
+            echo "::error::Tests/__Snapshots__/CI was not populated; check record-mode env wiring"
+            exit 1
+          fi
+          echo "Recorded baselines:"
+          find Tests/__Snapshots__/CI -name '*.png' | sort
+      - name: Create seed PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/snapshot-baseline-seed${{ inputs.branch_suffix && format('-{0}', inputs.branch_suffix) || '' }}
+          base: develop
+          title: 'chore(test): seed CI snapshot baselines'
+          commit-message: |
+            chore(test): seed CI snapshot baselines
+
+            Captures pixel baselines under Tests/__Snapshots__/CI/ from the
+            macos-15 GitHub Actions runner. The snapshot-variant resolver
+            in Tests/SnapshotUI_Tests.swift selects this directory when
+            CI=true so SPM runs on the runner assert against runner-rendered
+            baselines instead of developer-host baselines.
+          body: |
+            Automated PR from `.github/workflows/snapshot-baseline-seed.yml`.
+
+            ## Review checklist
+
+            - [ ] PNGs in `Tests/__Snapshots__/CI/` look like the views,
+                  not black squares or solid-colour debug placeholders.
+            - [ ] Diff against `Tests/__Snapshots__/AppStore/` shows only
+                  expected antialiasing / font-metric drift, not layout
+                  breakage.
+            - [ ] CI checks (`swift-test`, `swift-test-direct-build`)
+                  pass on this PR — confirms the runner-recorded baselines
+                  match a fresh runner-rendered comparison.
+
+            See `Tests/Mutation/README.md` "CI architecture (Phase 2.1)"
+            for the variant-resolver design.
+          add-paths: |
+            Tests/__Snapshots__/CI/**

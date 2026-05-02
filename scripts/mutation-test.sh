@@ -1,0 +1,451 @@
+#!/usr/bin/env bash
+# Yamete — Mutation Test Runner
+#
+# Drives the catalog at Tests/Mutation/mutation-catalog.json, applying each
+# declarative production-code mutation on a clean working tree, running the
+# named XCTest (which MUST fail), then reverting via `git checkout --`. The
+# runner is a meta-test: it asserts that for every entry, the production gate
+# under mutation is genuinely covered by a behavioural test cell that fails
+# with the expected error substring.
+#
+# Why not a `swift test` target?
+#   The runner mutates production source. Putting it inside `swift test` is
+#   circular (the same target the runner mutates would be the harness host).
+#   Keeping it as a sibling shell driver isolates the mutation phase from
+#   the test harness and lets us treat any non-zero `swift test` exit as the
+#   signal of a caught mutation.
+#
+# Why JSON catalog?
+#   Shell-friendly. `jq` parses each entry; Python performs the literal
+#   in-place string replacement. No regex DSL, no line numbers (which drift
+#   the moment formatting changes).
+#
+# Mutation strategy:
+#   Each catalog entry encodes a (search, replace) pair. The search string
+#   MUST be unique in its target file (the runner asserts this). Mutations
+#   are applied via Python's `str.replace(..., 1)` for byte-exact substitution,
+#   then reverted via `git checkout -- <file>` — which restores the working
+#   tree copy from HEAD (or staged state) without touching the index. The
+#   runner refuses to run on a dirty tree so the revert path is always safe.
+#
+# Outcome semantics for each mutation:
+#   - CAUGHT     — `swift test --filter <id>` exited non-zero AND captured
+#                  output contained the expected failure substring.
+#   - ESCAPED    — test passed despite mutation, OR failed with a different
+#                  substring (drift between catalog and test message), OR the
+#                  named test could not be found.
+#   - INFRA-FAIL — search pattern not unique / not present, or the underlying
+#                  swift compile failed independent of the test assertion.
+#
+# Exit code:
+#   0   when total == caught (every catalogued mutation was detected).
+#   1   when any mutation escaped or any infrastructure check failed.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+CATALOG="Tests/Mutation/mutation-catalog.json"
+SWIFT_TEST_TARGET="YameteTests"
+MODE="run"
+
+for arg in "$@"; do
+    case "$arg" in
+        --coverage|-c)  MODE="coverage" ;;
+        --help|-h)
+            echo "Usage: $0 [--coverage]"
+            echo ""
+            echo "  (default)    apply each catalog mutation, run its expected"
+            echo "               failing test, assert CAUGHT, revert."
+            echo "  --coverage   list gate-shaped lines under Sources/SensorKit/"
+            echo "               and Sources/YameteApp/ (guard|if|threshold|"
+            echo "               debounce|gate) that have NO catalog entry"
+            echo "               covering them. A punch-list of un-mutated"
+            echo "               production gates."
+            exit 0
+            ;;
+    esac
+done
+
+# ── colours ───────────────────────────────────────────────────
+if [[ -t 1 ]]; then
+    C_RED=$'\033[31m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'
+    C_DIM=$'\033[2m'; C_BOLD=$'\033[1m'; C_RESET=$'\033[0m'
+else
+    C_RED=""; C_GREEN=""; C_YELLOW=""; C_DIM=""; C_BOLD=""; C_RESET=""
+fi
+
+# ── pre-flight ────────────────────────────────────────────────
+if [[ ! -f "$CATALOG" ]]; then
+    printf "  ${C_RED}FAIL${C_RESET}      catalog not found: %s\n" "$CATALOG" >&2
+    exit 1
+fi
+
+command -v jq >/dev/null 2>&1 || {
+    printf "  ${C_RED}FAIL${C_RESET}      jq required (brew install jq)\n" >&2
+    exit 1
+}
+command -v python3 >/dev/null 2>&1 || {
+    printf "  ${C_RED}FAIL${C_RESET}      python3 required\n" >&2
+    exit 1
+}
+
+# ── coverage mode ─────────────────────────────────────────────
+# Emits a punch-list of gate-shaped production lines under
+# Sources/SensorKit/ AND Sources/YameteApp/ (recursively) that have NO
+# catalog entry covering them. A line is "covered" if the file appears
+# as the targetFile of any catalog entry AND any catalog `search`
+# snippet is a substring of the line's source text. Gate-shaped =
+# matches the regex `(guard|threshold|debounce)|^\s*if\s+!`
+# (case-insensitive). We exclude `guard let`, presence-check
+# `if !monitor`, comments, and empty-line noise to avoid drowning real
+# gates in plumbing.
+if [[ "$MODE" == "coverage" ]]; then
+    printf "${C_BOLD}  coverage  un-mutated production gates${C_RESET}\n\n"
+    python3 - "$CATALOG" <<'PY'
+import json, pathlib, re, sys
+
+catalog = json.loads(pathlib.Path(sys.argv[1]).read_text())
+# Map file → list of (search, id) pairs from the catalog.
+covered = {}
+for m in catalog["mutations"]:
+    covered.setdefault(m["targetFile"], []).append((m["search"], m["id"]))
+
+GATE_RE = re.compile(r"\b(guard|threshold|debounce)\b|^\s*if\s+!", re.IGNORECASE)
+NOISE_RE = re.compile(r"guard\s+(let|var)\s|guard\s+self\b|guard\s+!\s*Task\.isCancelled")
+# Trace-log lines are not gates — keywords like "threshold" / "debounce"
+# appear inside log format strings, not in any control-flow check.
+LOG_RE = re.compile(r"^\s*log\.(debug|info|warning|error|trace|notice)\s*\(")
+
+# Walk both SensorKit (kernel-side gates) and YameteApp (UI / settings /
+# layout / animation gates). YameteApp ships nested Views/ + MenuBar/ +
+# Components/ subdirectories, so use rglob to pick up every .swift.
+src_roots = [
+    pathlib.Path("Sources/SensorKit"),
+    pathlib.Path("Sources/YameteApp"),
+]
+total = 0
+uncovered = 0
+covered_count = 0
+files = []
+for root in src_roots:
+    if root.is_dir():
+        files.extend(sorted(root.rglob("*.swift")))
+
+for swift in files:
+    rel = str(swift)
+    file_searches = covered.get(rel, [])
+    # Multi-line catalog searches can't be substring-matched against a
+    # single source line. Treat any source line that matches the FIRST
+    # line of a catalog `search` snippet as covered — that's the line the
+    # mutation runner anchors to.
+    first_lines = {s.splitlines()[0].rstrip() for s, _ in file_searches}
+    for lineno, line in enumerate(swift.read_text().splitlines(), 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//") or stripped.startswith("///"):
+            continue
+        if not GATE_RE.search(line):
+            continue
+        if NOISE_RE.search(line):
+            continue
+        if LOG_RE.match(line):
+            continue
+        total += 1
+        is_covered = any(s in line for s, _ in file_searches) or line.rstrip() in first_lines
+        if is_covered:
+            covered_count += 1
+            continue
+        uncovered += 1
+        print(f"  - {rel}:{lineno:4d}  {stripped[:120]}")
+
+print()
+print(f"  total gate-shaped lines: {total}")
+print(f"  covered by catalog:      {covered_count}")
+print(f"  un-mutated punch-list:   {uncovered}")
+PY
+    exit 0
+fi
+
+# Refuse to run if any catalog target file has uncommitted modifications.
+# The runner reverts via `git checkout -- <file>`, which would clobber
+# unstaged edits on those files. We scope the dirty check to files the
+# runner will actually touch — unrelated edits (Makefile, this script,
+# the catalog, other Tests/) may be dirty without affecting safety.
+TARGET_FILES=$(jq -r '.mutations[].targetFile' "$CATALOG" | sort -u)
+DIRTY_TARGETS=""
+for f in $TARGET_FILES; do
+    if [[ -n "$(git status --porcelain -- "$f")" ]]; then
+        DIRTY_TARGETS="$DIRTY_TARGETS $f"
+    fi
+done
+if [[ -n "$DIRTY_TARGETS" ]]; then
+    printf "  ${C_RED}FAIL${C_RESET}      mutation target files are dirty — refuse to run\n" >&2
+    printf "            The runner reverts via 'git checkout -- <file>', which would\n" >&2
+    printf "            clobber unstaged edits on these files:\n" >&2
+    for f in $DIRTY_TARGETS; do
+        printf "              %s\n" "$f" >&2
+    done
+    printf "            Stash or commit changes to the listed files first:\n" >&2
+    printf "              git stash push --${DIRTY_TARGETS}\n" >&2
+    exit 1
+fi
+
+# ── helpers ───────────────────────────────────────────────────
+
+# Tracks every file that currently has a mutation applied on disk. The
+# EXIT/INT/TERM trap walks this set and force-reverts each entry, so any
+# exit path — clean, `set -e` abort, signal — leaves the working tree as
+# clean as the pre-flight required it to be on entry.
+declare -a MUTATED_FILES=()
+
+# Add a file to the tracked-mutated set BEFORE writing the mutation.
+# Idempotent: a file already in the list is not re-added.
+remember_mutation() {
+    local file="$1"
+    local existing
+    for existing in "${MUTATED_FILES[@]:-}"; do
+        [[ "$existing" == "$file" ]] && return 0
+    done
+    MUTATED_FILES+=("$file")
+}
+
+# Drop a file from the tracked-mutated set after a successful, verified
+# revert. Rebuilds the array element-by-element to avoid the substring
+# replacement pitfalls of `${ARR[@]/pattern/}` (which performs a glob /
+# substring match and can silently drop unrelated entries that happen to
+# share a prefix or contain pattern metacharacters).
+forget_mutation() {
+    local file="$1"
+    local -a remaining=()
+    local existing
+    for existing in "${MUTATED_FILES[@]:-}"; do
+        [[ -z "$existing" ]] && continue
+        [[ "$existing" == "$file" ]] && continue
+        remaining+=("$existing")
+    done
+    # Reset cleanly. Avoid `("${remaining[@]:-}")` — when `remaining` is
+    # empty under `set -u`, that expansion injects a single empty-string
+    # element instead of producing a true zero-length array.
+    if [[ ${#remaining[@]} -eq 0 ]]; then
+        MUTATED_FILES=()
+    else
+        MUTATED_FILES=("${remaining[@]}")
+    fi
+}
+
+# EXIT/INT/TERM trap. Walks MUTATED_FILES and force-reverts each. Runs
+# under `set +e` so a failure on one entry does not stop us from trying
+# the rest. Belt-and-braces: also re-reverts the union of catalog target
+# files at the end, so even if MUTATED_FILES bookkeeping was somehow
+# bypassed (e.g., a SIGKILL between `remember_mutation` and the actual
+# write — impossible in this script's flow, but cheap to defend against)
+# the working tree still ends clean.
+cleanup_mutations() {
+    local rc=$?
+    set +e
+    local f
+    if [[ ${#MUTATED_FILES[@]} -gt 0 ]]; then
+        for f in "${MUTATED_FILES[@]:-}"; do
+            [[ -z "$f" ]] && continue
+            git checkout -- "$f" 2>/dev/null
+        done
+    fi
+    # Final sweep: revert any catalog target file that still shows as
+    # dirty. Cheap (one git invocation per dirty target) and only acts
+    # on files the runner is authorised to touch.
+    if [[ -n "${TARGET_FILES:-}" ]]; then
+        for f in $TARGET_FILES; do
+            if [[ -n "$(git status --porcelain -- "$f" 2>/dev/null)" ]]; then
+                git checkout -- "$f" 2>/dev/null
+            fi
+        done
+    fi
+    return $rc
+}
+trap cleanup_mutations EXIT INT TERM
+
+# Apply a literal search→replace mutation to a file. Refuses if the search
+# pattern is not present, or appears more than once. Uses Python for
+# byte-exact substitution (no regex). The caller MUST have already added
+# `file` to MUTATED_FILES via `remember_mutation` so the trap can recover
+# even if the python write fails partway.
+apply_mutation() {
+    local file="$1" search="$2" replace="$3"
+    python3 - "$file" "$search" "$replace" <<'PY'
+import sys, pathlib
+path = pathlib.Path(sys.argv[1])
+search = sys.argv[2]
+replace = sys.argv[3]
+text = path.read_text()
+count = text.count(search)
+if count == 0:
+    print(f"INFRA-FAIL: search pattern not found in {path}", file=sys.stderr)
+    sys.exit(2)
+if count > 1:
+    print(f"INFRA-FAIL: search pattern matches {count} times in {path} (must be unique)", file=sys.stderr)
+    sys.exit(2)
+path.write_text(text.replace(search, replace, 1))
+PY
+}
+
+# Revert a single file to the HEAD/staged state and verify the revert
+# actually took. Returns 0 on confirmed-clean, 1 on persistent residual.
+# Retries once on mismatch (defensive against transient filesystem
+# weirdness, e.g., a still-flushing `swift test` child holding the file
+# in cache).
+revert_file() {
+    local file="$1"
+    local attempt
+    for attempt in 1 2; do
+        git checkout -- "$file" 2>/dev/null || true
+        if git diff --quiet -- "$file"; then
+            forget_mutation "$file"
+            return 0
+        fi
+        # brief pause before retry
+        sleep 0.2
+    done
+    printf "  ${C_RED}REVERT-FAIL${C_RESET}  %s still dirty after 2 checkout attempts\n" "$file" >&2
+    return 1
+}
+
+# ── catalog walk ──────────────────────────────────────────────
+total=0
+caught=0
+escaped=0
+infra=0
+escape_details=()
+
+mutation_count=$(jq '.mutations | length' "$CATALOG")
+printf "${C_BOLD}  mutate    catalog: %d entries${C_RESET}\n" "$mutation_count"
+printf "  mutate    target:  %s\n" "$SWIFT_TEST_TARGET"
+printf "\n"
+
+for i in $(seq 0 $((mutation_count - 1))); do
+    total=$((total + 1))
+    id=$(jq -r ".mutations[$i].id" "$CATALOG")
+    target_file=$(jq -r ".mutations[$i].targetFile" "$CATALOG")
+    search=$(jq -r ".mutations[$i].search" "$CATALOG")
+    replace=$(jq -r ".mutations[$i].replace" "$CATALOG")
+    expected_test=$(jq -r ".mutations[$i].expectedFailingTest" "$CATALOG")
+    expected_substr=$(jq -r ".mutations[$i].expectedFailureSubstring" "$CATALOG")
+
+    printf "  ${C_BOLD}[%2d/%d]${C_RESET}    %s\n" "$((i + 1))" "$mutation_count" "$id"
+    printf "  ${C_DIM}          file: %s${C_RESET}\n" "$target_file"
+    printf "  ${C_DIM}          test: %s${C_RESET}\n" "$expected_test"
+
+    # Pre-flight: target file must exist
+    if [[ ! -f "$target_file" ]]; then
+        printf "  ${C_RED}INFRA${C_RESET}     target file missing: %s\n\n" "$target_file"
+        infra=$((infra + 1))
+        escape_details+=("[$id] INFRA: target file missing: $target_file")
+        continue
+    fi
+
+    # Track the file as (about to be) mutated BEFORE the write, so the
+    # EXIT trap can recover even if `apply_mutation` is interrupted
+    # mid-write or fails after a partial replace.
+    remember_mutation "$target_file"
+
+    # Apply mutation
+    if ! apply_mutation "$target_file" "$search" "$replace" 2>/tmp/mutate_apply.err; then
+        printf "  ${C_RED}INFRA${C_RESET}     %s\n\n" "$(cat /tmp/mutate_apply.err)"
+        infra=$((infra + 1))
+        escape_details+=("[$id] INFRA: $(cat /tmp/mutate_apply.err)")
+        # Even on apply-failure, the file may have been partially written
+        # (e.g., python crashed between read and write_text). Revert
+        # unconditionally and verify clean before continuing.
+        if ! revert_file "$target_file"; then
+            printf "  ${C_RED}FATAL${C_RESET}     %s could not be reverted; aborting catalog walk\n\n" "$target_file" >&2
+            exit 1
+        fi
+        continue
+    fi
+
+    # Run targeted test. We expect it to FAIL.
+    test_filter="${SWIFT_TEST_TARGET}.${expected_test}"
+    test_log=$(mktemp)
+    set +e
+    swift test --filter "$test_filter" >"$test_log" 2>&1
+    test_exit=$?
+    set -e
+
+    # Always revert before evaluating, so a runner crash doesn't leave the
+    # tree mutated. Verified revert: if the file is still dirty after two
+    # checkout attempts, abort the entire catalog walk rather than
+    # compound residuals across subsequent mutations.
+    if ! revert_file "$target_file"; then
+        rm -f "$test_log"
+        printf "  ${C_RED}FATAL${C_RESET}     %s could not be reverted; aborting catalog walk\n\n" "$target_file" >&2
+        exit 1
+    fi
+
+    # Evaluate outcome
+    output="$(cat "$test_log")"
+    rm -f "$test_log"
+
+    if [[ $test_exit -eq 0 ]]; then
+        printf "  ${C_RED}ESCAPED${C_RESET}   test passed despite mutation\n\n"
+        escaped=$((escaped + 1))
+        escape_details+=("[$id] ESCAPED: test '$expected_test' passed despite mutation")
+        continue
+    fi
+
+    # Distinguish "test failed because of our mutation" (CAUGHT) from
+    # "test failed for some other reason" (compile error, missing test, etc).
+    if echo "$output" | grep -qF "Build complete!"; then
+        : # build succeeded → mutation took effect; failure was test assertion
+    else
+        # Compile failure means the mutation broke the syntax (or unrelated
+        # build error) — we cannot conclude the test gate caught the mutation.
+        printf "  ${C_RED}INFRA${C_RESET}     mutated code failed to compile — mutation invalid\n\n"
+        infra=$((infra + 1))
+        escape_details+=("[$id] INFRA: mutated code did not compile")
+        continue
+    fi
+
+    if echo "$output" | grep -qE "no tests matched|No matching test"; then
+        printf "  ${C_RED}ESCAPED${C_RESET}   test '%s' not found\n\n" "$expected_test"
+        escaped=$((escaped + 1))
+        escape_details+=("[$id] ESCAPED: test '$expected_test' not found")
+        continue
+    fi
+
+    if echo "$output" | grep -qF "$expected_substr"; then
+        printf "  ${C_GREEN}CAUGHT${C_RESET}    expected substring matched\n\n"
+        caught=$((caught + 1))
+    else
+        printf "  ${C_YELLOW}ESCAPED${C_RESET}   test failed but substring missing: %s\n\n" "$expected_substr"
+        escaped=$((escaped + 1))
+        # Capture the actual XCTest failure for diagnostics
+        actual_msg=$(echo "$output" | grep -E "XCTAssert|failed:" | head -3 | tr '\n' ' ')
+        escape_details+=("[$id] ESCAPED: substring '$expected_substr' missing; actual: ${actual_msg:0:200}")
+    fi
+done
+
+# ── final report ──────────────────────────────────────────────
+printf "${C_BOLD}  ─────────────────────────────────────────${C_RESET}\n"
+printf "  mutate    total:   %d\n" "$total"
+printf "  mutate    ${C_GREEN}caught:  %d${C_RESET}\n" "$caught"
+if [[ $escaped -gt 0 ]]; then
+    printf "  mutate    ${C_RED}escaped: %d${C_RESET}\n" "$escaped"
+fi
+if [[ $infra -gt 0 ]]; then
+    printf "  mutate    ${C_RED}infra:   %d${C_RESET}\n" "$infra"
+fi
+
+if [[ ${#escape_details[@]} -gt 0 ]]; then
+    printf "\n${C_BOLD}  Details:${C_RESET}\n"
+    for d in "${escape_details[@]}"; do
+        printf "    - %s\n" "$d"
+    done
+fi
+
+if [[ $caught -eq $total ]]; then
+    printf "\n  ${C_GREEN}OK${C_RESET}        all %d catalogued mutations caught\n" "$total"
+    exit 0
+else
+    printf "\n  ${C_RED}FAIL${C_RESET}      %d / %d mutations caught\n" "$caught" "$total"
+    exit 1
+fi

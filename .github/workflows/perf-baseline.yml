@@ -1,0 +1,50 @@
+name: Perf baseline
+
+# Phase 2 CI wiring: absolute-baseline regression detection for
+# Tests/Performance_Tests.swift cells. The cells themselves assert
+# RATIO bounds (median(second_half) ≤ 3× first_half); this workflow
+# layers absolute drift detection on top by running
+# `make perf-baseline` and comparing each cell's wallclock + memory
+# samples against the committed Tests/Performance/baselines.json
+# with each cell's tolerance_factor (default 2.0×). Fails loud
+# on regression past tolerance.
+#
+# Schedule rationale: weekly cron keeps long-term drift visible
+# without burning macOS-runner minutes on every PR. workflow_dispatch
+# lets a maintainer trigger it on demand (e.g., before a release,
+# or when investigating a suspected slowdown).
+
+on:
+  schedule:
+    # Mondays 09:00 UTC. Picked off-peak vs. typical PR traffic so
+    # cron runs don't queue behind PR CI on macOS-15 runners.
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-baseline-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  perf-baseline:
+    name: make perf-baseline
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run perf-baseline regression check
+        # Runs Performance_Tests cells, captures PERFMETRIC lines, and
+        # diffs against Tests/Performance/baselines.json with per-cell
+        # tolerance_factor. Exit non-zero on any cell out of tolerance.
+        run: make perf-baseline
+      - name: Upload perf-baseline report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-baseline-report
+          path: |
+            .build/**/perf-baseline*.log
+            .build/**/*.xcresult
+          retention-days: 30
