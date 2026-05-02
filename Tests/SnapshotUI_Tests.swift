@@ -116,13 +116,27 @@ final class SnapshotUI_Tests: XCTestCase {
         let variant = Self.snapshotVariant()
         let testFileURL = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
         let testsDir = testFileURL.deletingLastPathComponent()
-        let sourceTreeDir = testsDir
-            .appendingPathComponent("__Snapshots__")
-            .appendingPathComponent(variant)
-            .appendingPathComponent("SnapshotUI_Tests")
-        guard variant == "HostApp" else { return sourceTreeDir.path }
+        // `HostApp_CI` resolves to the on-disk subtree
+        // `Tests/__Snapshots__/HostApp/CI/SnapshotUI_Tests`. The base
+        // `HostApp` lane uses developer-host-recorded baselines that
+        // diverge in pixels from the GitHub Actions macos-15 runner;
+        // routing the host-app+CI combination to its own subdirectory
+        // keeps the two baseline sets from overwriting each other and
+        // lets `skipIfCIBaselineMissing` short-circuit the cell until
+        // the seed workflow has populated this lane.
+        let pathSegments: [String] = (variant == "HostApp_CI")
+            ? ["HostApp", "CI"]
+            : [variant]
+        var sourceTreeDir = testsDir.appendingPathComponent("__Snapshots__")
+        for segment in pathSegments {
+            sourceTreeDir = sourceTreeDir.appendingPathComponent(segment)
+        }
+        sourceTreeDir = sourceTreeDir.appendingPathComponent("SnapshotUI_Tests")
+        let isHostAppLane = variant == "HostApp" || variant == "HostApp_CI"
+        guard isHostAppLane else { return sourceTreeDir.path }
         return Self.sandboxSeededDirectory(sourceTreeDir: sourceTreeDir,
-                                           leaf: "SnapshotUI_Tests")
+                                           leaf: "SnapshotUI_Tests",
+                                           variant: variant)
     }
 
     /// Seeds a sandbox-writable mirror of the source-tree snapshot
@@ -132,10 +146,19 @@ final class SnapshotUI_Tests: XCTestCase {
     /// committed baselines from the source tree (read-only OK from
     /// sandbox) so changes to committed baselines are honoured on the
     /// next run.
-    static func sandboxSeededDirectory(sourceTreeDir: URL, leaf: String) -> String {
+    static func sandboxSeededDirectory(sourceTreeDir: URL,
+                                       leaf: String,
+                                       variant: String = "HostApp") -> String {
+        // Namespace the writable mirror by variant so `HostApp` and
+        // `HostApp_CI` (added when running the host-app target on a
+        // GitHub Actions runner) keep distinct sandbox copies. Without
+        // this, a CI run reads the seeded developer-host PNGs and
+        // diverges on pixel comparison; with it, the CI mirror starts
+        // empty and `skipIfCIBaselineMissing` short-circuits the cell
+        // until the seed workflow records baselines for the lane.
         let mirror = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("yamete-snapshots", isDirectory: true)
-            .appendingPathComponent("HostApp", isDirectory: true)
+            .appendingPathComponent(variant, isDirectory: true)
             .appendingPathComponent(leaf, isDirectory: true)
         let fm = FileManager.default
         try? fm.createDirectory(at: mirror, withIntermediateDirectories: true)
@@ -182,10 +205,22 @@ final class SnapshotUI_Tests: XCTestCase {
     /// so both lanes' baselines land in the same `CI/` subtree).
     static func snapshotVariant() -> String {
         let bundlePath = Bundle.main.bundleURL.path
-        if bundlePath.contains("Yamete.app") || bundlePath.contains("Yamete Direct.app") {
+        let isHostApp = bundlePath.contains("Yamete.app") || bundlePath.contains("Yamete Direct.app")
+        let isCI = ProcessInfo.processInfo.environment["CI"] == "true"
+        // The host-app lane has its OWN runner-vs-developer-host pixel
+        // drift, distinct from the SPM AppStore/Direct lanes. Carve it
+        // out as a dedicated `HostApp_CI` variant whose baselines live
+        // under `__Snapshots__/HostApp/CI/`; until the seed workflow
+        // has recorded those, `skipIfCIBaselineMissing` short-circuits
+        // each cell, restoring CI green without weakening the
+        // assertion on developer hosts.
+        if isHostApp && isCI {
+            return "HostApp_CI"
+        }
+        if isHostApp {
             return "HostApp"
         }
-        if ProcessInfo.processInfo.environment["CI"] == "true" {
+        if isCI {
             return "CI"
         }
         #if DIRECT_BUILD

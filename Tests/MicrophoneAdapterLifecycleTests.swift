@@ -91,8 +91,15 @@ final class MicrophoneSourceLifecycleTests: XCTestCase {
         }
         try? await Task.sleep(for: .milliseconds(150))
         task.cancel()
-        let count = try? await task.value
-        XCTAssertNotNil(count, "stream task terminated (possibly 0 samples)")
+        // Termination is the only assertion this cell makes. On
+        // developer hosts with a real mic the stream usually yields a
+        // sample before cancellation and the task returns a count; on
+        // headless CI runners `AVAudioEngine.start()` can fail because
+        // the runner has no real audio input, in which case the
+        // adapter surfaces `SensorError.permissionDenied` and the task
+        // throws. Both outcomes prove cancellation works; a stuck
+        // stream would hang this `await`.
+        _ = try? await task.value
     }
 
     /// If `AVAudioEngine.start()` fails the adapter MUST surface a
