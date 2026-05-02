@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-02
+
 ### Added
 - **Reaction Bus architecture.** Single multi-subscriber `ReactionBus` actor
   in `YameteCore` with `bufferingNewest(8)` per subscriber. Sources publish
@@ -135,6 +137,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Trackpad Tuning section.** New collapsible accordion in the menu bar (shown
   when Trackpad Activity source is enabled) with sliders for activity window
   duration, sensitivity threshold, and intensity scale.
+- **Test infrastructure overhaul.** Multi-layer test suite landed alongside
+  the reactive-output pipeline:
+  - **Onion-skin Ring 1 / Ring 2 architecture** for the matrix bus tests.
+    Ring 1 cells exercise pure logic with mock outputs; Ring 2 cells round-trip
+    through a real `ReactionBus` with `MatrixSpyOutput` fixtures and assert
+    cross-source interleavings, drop-not-cancel semantics, and coalesce
+    fan-out invariants.
+  - **Mutation runner with 111 catalog entries.** `make mutate` walks
+    `Tests/Mutation/mutation-catalog.json`, applies each mutation to its
+    target source file in-place, runs the suite, and asserts the mutation
+    is caught by at least one failing test. Per-target slice runner
+    (`scripts/mutation-test-slice.sh`) drives the GitHub Actions
+    `Mutation catalog (PR slice)` lane.
+  - **Property-based fuzz cells** (`Tests/Property_*Tests.swift`) — bus
+    invariants over randomised stimulus streams, locale × plural fuzz
+    against the localisation matrix, settings-corruption fuzz against
+    `SettingsStore`, and state-machine model checks for the lifecycle
+    state transitions.
+  - **Concurrent-interleaved fuzz** that publishes from multiple sources
+    on overlapping timelines and asserts no double-action / no missed
+    drop / no leaked task across a randomised interleave space.
+  - **~28 SwiftUI snapshot baselines per build variant** across four
+    variants (`AppStore`, `Direct`, `HostApp`, `CI`) covering header,
+    device, response, footer, accordion-card row counts, theme palette
+    swatches, trackpad-tuning expand/collapse, and (Direct) headphone /
+    accel tuning. Records via `SNAPSHOT_RECORD_MODE=true`; reads via
+    `precision: 0.99 / perceptualPrecision: 0.98` to tolerate antialiasing
+    drift.
+  - **Performance baselines** (`Tests/Performance/baselines.json`) with
+    absolute thresholds and a `make perf-baseline` regression gate
+    (`tolerance_factor: 2.0×` default).
+  - **Driver Real-vs-Mock parity tests** that run the same matrix
+    against the production driver and the mock and assert byte-equal
+    outputs.
+  - **Crash-handling boundary audit** and **cross-boundary fault
+    injection** cells that verify each Source / Bus / Output boundary
+    surfaces typed errors rather than silently swallowing them.
+  - **CI-tolerance helpers** (`Tests/Helpers/AwaitUntil.swift`) with
+    `CITiming.envelopeMultiplier` (3× under CI), `awaitUntil(...)`
+    polling primitive, and `skipIfCIBaselineMissing(...)` snapshot
+    bootstrap. Detects CI via either the `CI=true` env var or a
+    `/Users/runner/` bundle-path prefix (xcodebuild does not always
+    propagate the env var into the test bundle).
+  - **Host-app xcodebuild lane** (`make test-host-app`,
+    `.github/workflows/host-app-test.yml`) that runs the YameteHostTest
+    scheme inside a real `Yamete.app` bundle so cells gated on UN
+    center, full Haptic engine, CGEvent.post under Accessibility, and
+    Force-Touch trackpad probes execute their Real-driver halves
+    rather than skipping under SPM `xctest`.
+  - **Snapshot-baseline-seed workflow** (`.github/workflows/snapshot-baseline-seed.yml`)
+    — workflow_dispatch helper that records macos-15-runner-rendered
+    baselines under `Tests/__Snapshots__/CI/` and opens a PR adding
+    them, addressing runner-vs-developer-host pixel drift.
 
 ### Changed
 - **`SensorAdapter` protocol → `SensorSource` protocol.** Three concrete
