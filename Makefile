@@ -101,7 +101,7 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 SIGNING_ID ?= -
 
 .PHONY: all build test test-host-app install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
-        appstore appstore-install appstore-lint mutate mutate-pr perf-baseline perf-baseline-record check-versions
+        appstore appstore-install appstore-lint mutate mutate-pr perf-baseline perf-baseline-record check-versions hooks
 
 all: build
 
@@ -138,7 +138,7 @@ endif
 	@touch $(BUILD)/.minified
 
 # ── Stage 3: Bundle ───────────────────────────────────────────
-build: $(BUILD_BINARY) $(BUILD)/.minified
+build: hooks $(BUILD_BINARY) $(BUILD)/.minified
 	@rm -rf "$(TARGET)"
 	@mkdir -p "$(TARGET)/Contents/MacOS" "$(RES_DIR)"
 	@cp "$(BUILD_BINARY)" "$(BINARY)"
@@ -272,7 +272,7 @@ test:
 # Regenerates Yamete.xcodeproj on the fly (project.yml is the source of
 # truth; .xcodeproj is gitignored) and then drives xcodebuild against
 # the YameteHostTest scheme on macOS arm64.
-test-host-app:
+test-host-app: hooks
 	@printf "  xcodegen  Yamete.xcodeproj\n"
 	@xcodegen generate --quiet
 	@printf "  xcodebuild test  -scheme YameteHostTest\n"
@@ -281,6 +281,19 @@ test-host-app:
 		-scheme YameteHostTest \
 		-destination 'platform=macOS,arch=arm64' \
 		-quiet
+	@mkdir -p build && touch build/.host-app-test-fresh
+	@printf "  ok        host-app sentinel touched (build/.host-app-test-fresh)\n"
+
+# ── Local pre-push gate setup ────────────────────────────────
+# Installs the repo's checked-in git hooks under .githooks. Idempotent;
+# safe to run repeatedly (and on CI — the hooks themselves bail when
+# CI=true). Wired into `build` and `test-host-app` so a fresh checkout
+# self-bootstraps on first build.
+hooks:
+	@if [ "$$(git config --get core.hooksPath 2>/dev/null)" != ".githooks" ]; then \
+		git config core.hooksPath .githooks; \
+		printf "  hooks     core.hooksPath = .githooks\n"; \
+	fi
 
 # ── Performance baseline regression detection ────────────────
 # `Tests/Performance_Tests.swift` cells assert RATIO bounds (second-half
