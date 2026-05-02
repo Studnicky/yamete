@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Repo's checked-in pre-push hook. Activated via `make hooks` (sets
+# core.hooksPath = .githooks). Forwards stdin to the host-app freshness
+# gate. Add additional pre-push checks below as needed.
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+exec "$ROOT/scripts/check-host-app-tests-fresh.sh"

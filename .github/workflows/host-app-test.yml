@@ -10,16 +10,25 @@ name: Host-app test
 # existing test bundle already handles this, no flag needed.
 
 on:
+  # Restricted to master only. The 2-hour host-app xcodebuild lane on
+  # macos-15 was burning CI minutes on every feature PR to assert
+  # error-handling paths on a hardware-absent runner; actual feature
+  # validation already runs in `swift test`. The pre-push hook
+  # (.githooks/pre-push → scripts/check-host-app-tests-fresh.sh) is
+  # the local gate that release/* and hotfix/* branches cannot be
+  # pushed without a fresh local host-app integration check, so CI
+  # only needs to re-run host-app once at the master merge moment.
+  # Manual reruns via `workflow_dispatch` for ad-hoc validation.
   push:
-    branches: [master, develop]
-  pull_request:
+    branches: [master]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: host-app-test-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  cancel-in-progress: true
 
 jobs:
   host-app-test:

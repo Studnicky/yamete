@@ -11,12 +11,13 @@ on:
 permissions:
   contents: read
 
-# Cancel in-progress CI runs for the same ref when a new push lands. Saves
-# runner minutes and stops stale builds from racing newer ones. Not applied
-# to the `master` ref (the default branch keeps every run visible).
+# Cancel in-progress CI runs for the same ref when a new push lands.
+# Supersedence policy: a newer push always invalidates an older run on
+# the same ref, including master. Saves runner minutes and avoids
+# stale results being mistaken for the current state of the branch.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  cancel-in-progress: true
 
 jobs:
   actionlint:
