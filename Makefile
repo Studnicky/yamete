@@ -101,7 +101,7 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 SIGNING_ID ?= -
 
 .PHONY: all build test test-host-app install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
-        appstore appstore-install appstore-lint mutate mutate-pr perf-baseline perf-baseline-record
+        appstore appstore-install appstore-lint mutate mutate-pr perf-baseline perf-baseline-record check-versions
 
 all: build
 
@@ -214,6 +214,15 @@ docs-check:
 	    test -f "$$f" || { echo "  ✗ docs references missing file: $$f"; exit 1; }; \
 	  done
 	@printf "  ok        all source references valid\n"
+
+# ── Version consistency gate ─────────────────────────────────
+# project.yml MARKETING_VERSION is the canonical version; docs files that
+# embed a version string must match it. Caught a real miss on v2.0.0
+# where MARKETING_VERSION was left at 1.3.2 and the release.yml
+# workflow only flagged it AFTER the tag was pushed.
+check-versions:
+	@printf "  check     version consistency\n"
+	@scripts/check-versions.sh
 
 # ── App Store build convenience targets ──────────────────────
 # These wrappers force BUILD_VARIANT=appstore so the right resources,
