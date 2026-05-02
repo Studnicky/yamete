@@ -216,15 +216,19 @@ final class MatrixCoalesceTiming_Tests: XCTestCase {
         let task = Task { await spy.consume(from: bus, configProvider: provider) }
         defer { task.cancel() }
 
-        try await Task.sleep(for: CITiming.scaledDuration(ms: 10))
-        // Spacing of 5ms × 3 publishes = 10ms span; under CI the cumulative
-        // sleep can drift to 20-30ms (past the 16ms coalesce window) and
-        // produce 2 actions instead of 1. Drop to 1ms spacing so even with
-        // 5x scheduler drift the three publishes still land inside coalesce.
+        // Wait for subscriber to register before any publishes.
+        _ = await awaitUntil(timeout: 1.0) {
+            await bus._testSubscriberCount() > 0
+        }
+        // Back-to-back publishes via Task.yield only — even 1ms scaled to
+        // CI's 5x envelope can drift the 3rd publish past the 16ms coalesce
+        // window and produce 2 actions instead of 1 (which then makes
+        // multiplier=1.2 instead of 1.4). Zero inter-arrival eliminates
+        // the scheduler-drift path entirely.
         await bus.publish(.acConnected)
-        try await Task.sleep(for: .milliseconds(1))
+        await Task.yield()
         await bus.publish(.acConnected)
-        try await Task.sleep(for: .milliseconds(1))
+        await Task.yield()
         await bus.publish(.acConnected)
         // Wait for the coalesce timer + action to run, scaled for CI.
         try await Task.sleep(for: CITiming.scaledDuration(ms: 120))
