@@ -83,12 +83,16 @@ final class MatrixBusStressRapidFire_Tests: XCTestCase {
         let task = Task { await spy.consume(from: bus, configProvider: provider) }
         defer { task.cancel() }
 
-        try await Task.sleep(for: .milliseconds(10))
+        _ = await awaitUntil(timeout: 1.0) {
+            await bus._testSubscriberCount() > 0
+        }
         let info = USBDeviceInfo(name: "test", vendorID: 1, productID: 1)
         for i in 0..<100 {
             await bus.publish(i % 2 == 0 ? .acConnected : .usbAttached(info))
         }
-        try await Task.sleep(for: .milliseconds(120))
+        _ = await awaitUntil(timeout: 2.0) {
+            spy.actions().count >= 1
+        }
 
         let actions = spy.actions()
         XCTAssertEqual(actions.count, 1,
