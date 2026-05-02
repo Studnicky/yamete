@@ -2,7 +2,7 @@ import XCTest
 @testable import YameteCore
 @testable import SensorKit
 
-// MARK: - ImpactFusionEngine end-to-end tests
+// MARK: - ImpactFusion end-to-end tests
 //
 // Tests multi-sensor consensus, fusion window timing, rearm cooldown,
 // and intensity averaging without any hardware dependency.
@@ -21,7 +21,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - Single sensor with consensus=2 does NOT trigger
 
     func testSingleSensorDoesNotTriggerWithConsensusTwo() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -33,7 +33,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testMultipleSameSensorDoNotTriggerConsensus() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -50,7 +50,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - Two sensors within fusion window triggers
 
     func testTwoSensorsWithinWindowTriggersConsensus() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -67,7 +67,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testThreeSensorsConsensusTwo() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -85,7 +85,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testThreeSensorsConsensusThree() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 3, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -110,7 +110,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - Impacts outside fusion window
 
     func testImpactsOutsideFusionWindowDontCountTogether() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.10, rearmDuration: 0.50
         ))
         let now = Date()
@@ -129,7 +129,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testImpactJustInsideFusionWindowTriggers() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -147,7 +147,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testImpactJustOutsideFusionWindowRejects() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -167,7 +167,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - Rearm cooldown
 
     func testRearmCooldownBlocksRapidRetriggers() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 1, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -193,7 +193,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testImpactAfterRearmCooldownTriggers() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 1, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -211,7 +211,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testRearmWithMultiSensorConsensus() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -240,7 +240,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - FusedImpact intensity averaging
 
     func testFusedIntensityIsAverageOfSources() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -258,7 +258,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testFusedIntensityThreeSources() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 3, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -278,7 +278,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testFusedIntensityUsesStrongestPerSource() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -302,7 +302,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - Confidence value
 
     func testFusedConfidenceReflectsSensorParticipation() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -322,7 +322,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testFusedConfidenceAllSensors() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -342,7 +342,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - Sources list
 
     func testFusedImpactContainsParticipatingSourceIDs() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 2, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -364,7 +364,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - Reset behavior
 
     func testResetClearsStateAllowsImmediateRetrigger() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 1, fusionWindow: 0.15, rearmDuration: 1.0
         ))
         let now = Date()
@@ -394,7 +394,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - Consensus clamping
 
     func testConsensusClampedToActiveSensorCount() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 5, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -410,7 +410,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     }
 
     func testConsensusSingleActiveClampedToOne() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 3, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -423,7 +423,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - Configure mid-stream
 
     func testConfigureChangesRuntimeBehavior() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 1, fusionWindow: 0.15, rearmDuration: 0.50
         ))
         let now = Date()
@@ -448,7 +448,7 @@ final class ImpactFusionE2ETests: XCTestCase {
     // MARK: - Rapid fire sequence
 
     func testRapidFireSequenceRespectsRearm() {
-        let engine = ImpactFusionEngine(config: FusionConfig(
+        let engine = ImpactFusion(config: FusionConfig(
             consensusRequired: 1, fusionWindow: 0.15, rearmDuration: 0.30
         ))
         let now = Date()

@@ -2,19 +2,20 @@ import SwiftUI
 import AppKit
 
 public struct MenuBarLabel: View {
-    @Environment(ImpactController.self) var controller
+    @Environment(MenuBarFace.self) var menuBarFace
+    @Environment(Yamete.self) var yamete
 
     public init() {}
 
     public var body: some View {
         Group {
-            if let face = controller.reactionFace {
+            if let face = menuBarFace.reactionFace {
                 Image(nsImage: face)
                     .resizable()
                     .scaledToFit()
             } else {
                 FaceIcon()
-                    .opacity(controller.isEnabled ? 1.0 : 0.4)
+                    .opacity(yamete.fusion.isRunning ? 1.0 : 0.4)
             }
         }
         .frame(width: 18, height: 18)

@@ -83,6 +83,8 @@
 	<string>Yamete can use the microphone to detect impact sounds on your desk.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Yamete uses the accelerometer to detect physical impacts on your MacBook.</string>
+	<key>NSInputMonitoringUsageDescription</key>
+	<string>Yamete uses Input Monitoring access to flash the Caps Lock LED when a reaction fires. Without this permission, the keyboard brightness animation still works but the Caps Lock LED will not respond.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

@@ -83,16 +83,25 @@ BUNDLE_RESOURCES := $(shell find $(RESOURCE_SRC) $(RESOURCE_DIRECT) -type f 2>/d
 # Keep the list sorted in normalized form (framework basename, no `.framework`
 # suffix, case-sensitive) to make diffs readable.
 FRAMEWORKS := AppKit AVFoundation CoreAudio CoreMotion IOKit ServiceManagement SwiftUI UserNotifications
+# RAW_SWIFTC_LUMP: Set during Makefile-driven raw-swiftc compilation, where
+# every Sources/**/*.swift file is fed to a single `-module-name YameteApp`
+# invocation. Under SPM (`swift test`) and xcodebuild (`make test-host-app`)
+# each module compiles to its own .swiftmodule and the symbol resolves via
+# `import YameteCore` / `import SensorKit` / `import ResponseKit` /
+# `import YameteApp`. Source files use `#if !RAW_SWIFTC_LUMP` to skip those
+# imports under the lump (where the symbols are intra-module and a self-import
+# is a no-op warning that becomes an error under -warnings-as-errors).
 SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as-library \
               -swift-version 6 \
+              -D RAW_SWIFTC_LUMP \
               $(VARIANT_FLAGS) \
               $(addprefix -framework ,$(FRAMEWORKS)) \
               -I Sources/IOHIDPublic/include
 
 SIGNING_ID ?= -
 
-.PHONY: all build test install uninstall clean dmg lint lint-frameworks verify release notarize \
-        appstore appstore-install appstore-lint
+.PHONY: all build test test-host-app install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
+        appstore appstore-install appstore-lint mutate mutate-pr perf-baseline perf-baseline-record
 
 all: build
 
@@ -154,9 +163,12 @@ build: $(BUILD_BINARY) $(BUILD)/.minified
 	 printf "  bundle    $(TARGET) ($$SIZE)\n"
 
 # ── Lint ──────────────────────────────────────────────────────
-lint: lint-frameworks
-	@printf "  lint      strict concurrency\n"
+lint: lint-frameworks docs-check
+	@printf "  lint      strict concurrency (Sources/)\n"
 	@swiftc -typecheck $(SWIFTFLAGS) -strict-concurrency=complete -warnings-as-errors $(SOURCES)
+	@printf "  lint      strict concurrency (Tests/ via SPM)\n"
+	@swift build --build-tests -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors >/dev/null
+	@printf "  lint      Tests target compiled clean under strict concurrency\n"
 
 # ── Lint: framework-list drift guard ─────────────────────────
 # Fails if the framework list in the Makefile (FRAMEWORKS), Package.swift
@@ -191,6 +203,17 @@ lint-frameworks:
 		exit 1; \
 	fi
 	@printf "  lint      ✓ frameworks aligned across Makefile, Package.swift, project.yml\n"
+
+# ── Docs: source reference check ─────────────────────────────
+# Validates that every Sources/**/*.swift path mentioned in docs/*.html
+# still exists. Prevents docs from silently referencing deleted files.
+docs-check:
+	@printf "  check     doc source references\n"
+	@grep -oh 'Sources/[A-Za-z]*/[A-Za-z]*\.swift' docs/*.html 2>/dev/null | \
+	  sort -u | while read f; do \
+	    test -f "$$f" || { echo "  ✗ docs references missing file: $$f"; exit 1; }; \
+	  done
+	@printf "  ok        all source references valid\n"
 
 # ── App Store build convenience targets ──────────────────────
 # These wrappers force BUILD_VARIANT=appstore so the right resources,
@@ -229,6 +252,72 @@ appstore-lint:
 # ── Test ──────────────────────────────────────────────────────
 test:
 	@swift test
+
+# ── Test (host-app, Phase 1) ─────────────────────────────────
+# Runs the YameteHostTest test bundle inside the bundled `Yamete.app`
+# host so `Bundle.main` resolves to a real `.app` at runtime. Cells
+# that XCTSkip under SPM (UN center, full Haptic engine, CGEvent.post
+# under Accessibility) execute their Real-driver halves here. See
+# Tests/Mutation/README.md → "Phase 1 — host-app xcodebuild".
+#
+# Regenerates Yamete.xcodeproj on the fly (project.yml is the source of
+# truth; .xcodeproj is gitignored) and then drives xcodebuild against
+# the YameteHostTest scheme on macOS arm64.
+test-host-app:
+	@printf "  xcodegen  Yamete.xcodeproj\n"
+	@xcodegen generate --quiet
+	@printf "  xcodebuild test  -scheme YameteHostTest\n"
+	@xcodebuild test \
+		-project Yamete.xcodeproj \
+		-scheme YameteHostTest \
+		-destination 'platform=macOS,arch=arm64' \
+		-quiet
+
+# ── Performance baseline regression detection ────────────────
+# `Tests/Performance_Tests.swift` cells assert RATIO bounds (second-half
+# median ≤ 3× first-half median) inside each cell, but a 2× CPU
+# regression that stays within that ratio slips through. The
+# perf-baseline pair adds absolute-baseline tracking on top:
+#
+#   make perf-baseline         compare current run vs Tests/Performance/baselines.json
+#                              fails on any cell exceeding its tolerance_factor
+#                              (default 2.0×). Use in PR/CI gates.
+#
+#   make perf-baseline-record  capture a fresh baselines.json. Foot-gun
+#                              guarded behind YAMETE_BASELINE_RECORD=1
+#                              so accidental "blessing" of a regression
+#                              is impossible. Use only after a deliberate
+#                              perf-improving change has landed.
+perf-baseline:
+	@scripts/perf-baseline.sh
+
+perf-baseline-record:
+	@scripts/perf-baseline-record.sh
+
+# ── Mutate (mutation-test runner) ─────────────────────────────
+# Drives Tests/Mutation/mutation-catalog.json: applies each declarative
+# (search→replace) mutation to a clean Sources/ tree, runs the named XCTest
+# and asserts it FAILS with the catalogued substring, then reverts via
+# `git checkout --`. Refuses to run on a dirty tree (the revert path would
+# clobber unstaged work). Exit 0 only when total == caught, so this target
+# can be wired into release gating without further wrapping. Catalog
+# additions happen in JSON, not here — never commits, never modifies
+# Sources/ permanently.
+mutate:
+	@scripts/mutation-test.sh
+
+# Phase 2.1 sustainability target. Sliced mutate: filters
+# Tests/Mutation/mutation-catalog.json down to entries whose targetFile
+# was touched on this branch vs. the PR base (BASE_REF env or
+# origin/develop fallback), then runs only those mutations through the
+# canonical runner. Typical PR touches 1–5 files (1–10 mutations) so a
+# slice run completes in ~1–2 minutes — fast enough to stay a required
+# PR gate without burning ~20 minutes of macOS-runner time. The full
+# `make mutate` still runs nightly + on push to master/develop to catch
+# drift the slice can miss (catalog edits on un-touched files, refactors
+# that move a search snippet without renaming targetFile, etc.).
+mutate-pr:
+	@scripts/mutation-test-slice.sh
 
 # ── Verify ────────────────────────────────────────────────────
 verify: build

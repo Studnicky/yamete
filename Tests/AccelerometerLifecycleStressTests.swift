@@ -2,7 +2,7 @@ import XCTest
 @testable import SensorKit
 @testable import YameteCore
 
-/// Stress test for `SPUAccelerometerAdapter` lifecycle: opens and closes the
+/// Stress test for `AccelerometerSource` lifecycle: opens and closes the
 /// HID stream many times in sequence to catch callback-after-free races,
 /// double-free, leaked OnceCleanup state, or stuck run-loop threads.
 ///
@@ -27,7 +27,7 @@ final class AccelerometerLifecycleStressTests: XCTestCase {
     /// iteration count is small enough to keep CI fast but large enough
     /// to surface state-leak races on a real device.
     func testRepeatedOpenClose() async throws {
-        let adapter = SPUAccelerometerAdapter()
+        let adapter = AccelerometerSource()
         try XCTSkipUnless(adapter.hardwarePresent, "SPU accelerometer not available on this host")
 
         let cycles = 25
@@ -67,7 +67,7 @@ final class AccelerometerLifecycleStressTests: XCTestCase {
     /// Catches the "cancelled before first delivery" race where the cleanup
     /// closure runs before the report callback has been registered.
     func testCancelBeforeFirstReport() async throws {
-        let adapter = SPUAccelerometerAdapter()
+        let adapter = AccelerometerSource()
         try XCTSkipUnless(adapter.hardwarePresent, "SPU accelerometer not available on this host")
 
         for _ in 0..<10 {

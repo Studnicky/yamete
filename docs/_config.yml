@@ -1,0 +1,8 @@
+title: Yamete
+description: An app that reacts when you smack your MacBook.
+url: https://studnicky.github.io
+baseurl: /yamete
+theme: null
+exclude:
+  - assets/
+  - sensor-kickstart/

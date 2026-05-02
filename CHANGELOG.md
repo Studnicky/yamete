@@ -8,10 +8,194 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Reaction Bus architecture.** Single multi-subscriber `ReactionBus` actor
+  in `YameteCore` with `bufferingNewest(8)` per subscriber. Sources publish
+  onto the bus; outputs subscribe independently and pattern-match the unified
+  `Reaction` envelope. `Reaction.impact(FusedImpact)` is just one case
+  alongside cable/power/device events — the case IS the contract, no nested
+  payload type, no dispatch table, no event-router. Adding a new event class
+  is one new `Reaction` case + one new source class + the compiler tells
+  every output what it now needs to handle.
+- **LED flash output.** New `LEDFlash` (`Sources/ResponseKit/LEDFlash.swift`)
+  pulses the keyboard's Caps Lock LED on every reaction the user has enabled,
+  gated through the same intensity envelope as `ScreenFlash`. Brightness is
+  PWM-dithered at 60Hz against the shared `Envelope` since Caps Lock is
+  binary on/off. Caps Lock state is captured before the pulse and restored
+  after — there is a brief window during which Caps Lock toggles rapidly.
+  Joke app, accept the inaccuracy. Toggleable in the new LED Flash menu bar
+  section with brightness min/max sliders. No new entitlements required
+  (uses existing `com.apple.security.device.usb`).
+- **Cable / power / device event sources.** Seven new IOKit / CoreAudio /
+  IOPS notification sources publishing onto the bus:
+  - `USBSource` — IOServiceMatching `kIOUSBDeviceClassName`, suppresses
+    initial replay burst, debounces vendor/product 50ms.
+  - `PowerSource` — `IOPSNotificationCreateRunLoopSource`, edge-triggered on
+    AC connect / disconnect transitions.
+  - `AudioPeripheralSource` — `AudioObjectAddPropertyListener` on
+    `kAudioHardwarePropertyDevices` with set diffing for per-device events.
+  - `BluetoothSource` — IOServiceMatching `IOBluetoothDevice` (pure IOKit
+    path, avoids private `IOBluetooth.framework` symbols).
+  - `ThunderboltSource` — IOServiceMatching `IOThunderboltPort`.
+  - `DisplayHotplugSource` — `CGDisplayRegisterReconfigurationCallback`,
+    debounced 200ms to collapse macOS's 3–4 callbacks per real change.
+  - `SleepWakeSource` — `IORegisterForSystemPower` for `willSleep` /
+    `didWake` (same API the sensor-kickstart helper uses to re-warm the
+    BMI286 on wake).
+  Per-event default intensities live in `ReactionsConfig` (single tuning
+  surface). All seven sources ship enabled by default; user toggles each
+  on/off in the new Cable & Power Events menu bar section.
+- **Per-(output × event) toggle matrix.** Each of the four configurable
+  outputs (sound, screen flash, notification, LED) has an independent
+  per-`ReactionKind` enable/disable toggle persisted as a JSON-encoded
+  `ReactionToggleMatrix`. The user can have sound-only on USB attach,
+  flash-only on AC unplug, notification-only on display reconfiguration,
+  etc. — fully orthogonal across outputs.
+- **`Events.strings` notification table.** New
+  `App/Resources/en.lproj/Events.strings` with `title_<kind>_<n>` /
+  `body_<kind>_<n>` pools per reaction kind, mirroring the existing
+  `Moans.strings` numbered-suffix convention. Loader caches the table
+  separately so impact-pool clears don't blow it away.
+- **`com.apple.security.device.bluetooth` entitlement** added to the App
+  Store build for `IOBluetoothDevice` IOService matching.
+
+- **`FiredReaction` enriched event envelope.** `ReactionBus` now resolves
+  `clipDuration`, `soundURL`, `faceIndices` (one per connected display), and
+  `publishedAt` exactly once before fan-out via a registered `ReactionEnricher`
+  closure. All subscribers receive identical pre-resolved values — no per-output
+  duration math, no duplicate face/clip selection. Enricher has a 0.5 s timeout
+  with a safe fallback and a set-once precondition to prevent post-bootstrap
+  replacement.
+- **`FaceLibrary` shared face cache.** Centralized face image cache and
+  per-event recency dedup scoring (`selectIndices(count:)`). Called once by the
+  enricher; `ScreenFlash` and `MenuBarFace` both look up by index. Appearance-
+  aware (reloads on dark/light mode change). Replaces the two independent caches
+  that were in `ScreenFlash` and `MenuBarFace`.
+- **Per-display face matching.** `FiredReaction.faceIndices[i]` maps to
+  `NSScreen.screens[i]`. `ScreenFlash` shows a different scored face on each
+  display; `MenuBarFace` shows `faceIndices[0]` (primary display). Added
+  `faceIndex(for:)` bounds-safe accessor to handle display count changes between
+  enrichment and rendering.
+- **Keyboard brightness spring animation in `LEDFlash`.** `KeyboardBrightnessClient`
+  (CoreBrightness private framework) controls keyboard backlight. Animation uses
+  a damped spring centred on the user's current brightness level so it never
+  drives the backlight to zero. Includes: idle-dimming suspension, launch-time
+  brightness snapshot with crash-recovery sentinel file (`kb_dirty`), and
+  `validateArgCount` guard on every `unsafeBitCast` dispatch to
+  `KeyboardBrightnessClient` selectors.
+- **`EventSource` protocol.** Separate from `SensorSource` — the seven
+  infrastructure event sources (`USBSource`, `PowerSource`, etc.) now conform to
+  `EventSource` rather than the impact-sensor `SensorSource`.
+- **`ImpactFusionConfig` rename.** `FusionConfig` renamed to `ImpactFusionConfig`
+  for naming consistency with `ImpactFusion` and the `*OutputConfig` family.
+- **`Yamete.shutdown()` and app-quit cleanup.** `applicationWillTerminate(_:)`
+  calls `yamete.shutdown()`, which cancels all output tasks, stops the fusion
+  pipeline, closes the bus, and calls `ledFlash.resetHardware()` to restore
+  keyboard brightness before process exit.
+- **Canonical docs source system.** `docs/_includes/what-it-does.md` and
+  `docs/_includes/under-the-hood.md` are the canonical prose for the project
+  description; HTML pages and README reference them. `make docs-check` validates
+  all source file references in `docs/*.html` at lint time. `docs/_config.yml`
+  enables Jekyll on GitHub Pages without changing the visual design.
+- **New test files.** `FiredReactionTests`, `BusEnricherTests`,
+  `ReactionsConfigTests` (exhaustiveness check for `eventIntensity` map).
+
+- **Haptic feedback output.** New `HapticResponder` fires rapid Force Touch
+  haptic pulses on each reaction. Pulse density scales with the `Envelope`
+  level — dense at the attack peak, sparse through the decay tail. Intensity
+  is a user-adjustable multiplier (0.5×–3.0×). Works on any Mac with a Force
+  Touch trackpad. No entitlements required.
+- **Display brightness flash output.** New `DisplayBrightnessFlash` spikes
+  the main display's brightness above the user's current level on hard
+  impacts, then restores it over the `Envelope` fade window. Peak = current +
+  user-configured boost × intensity. Uses `DisplayServicesGetBrightness` /
+  `DisplayServicesSetBrightness` loaded at runtime via `dlopen` (private
+  framework, no entitlements required). Gated by a minimum-intensity threshold.
+- **Screen tint output.** New `DisplayTintFlash` briefly tints the display
+  pink by crushing the green and blue gamma channels via
+  `CGSetDisplayTransferByTable` (public CoreGraphics). Tint depth scales with
+  `Envelope` level. Automatically skipped on macOS 26+ where the gamma table
+  path is unreliable. No entitlements required.
+- **Volume spike output (Direct build only).** New `VolumeSpikeResponder`
+  temporarily raises system output volume to a target level on hard impacts,
+  then restores the original volume after the reaction window. Uses
+  `kAudioHardwareServiceDeviceProperty_VirtualMainVolume` via AudioObjectAPI.
+  Gated by a minimum-intensity threshold. Compiled only with `#if DIRECT_BUILD`.
+- **Trackpad activity event source.** New `TrackpadActivitySource` (`EventSource`,
+  not part of impact fusion) uses `NSEvent.addGlobalMonitorForEvents` with a
+  sliding RMS window to detect two patterns: `trackpadTouching` (sustained
+  scroll/gesture activity) and `trackpadSliding` (high-velocity scrolling).
+  Both publish directly to the `ReactionBus`, independent of the impact
+  pipeline. Configurable window duration and activity threshold. Enabled by
+  default. Tunable via the new Trackpad Tuning accordion in the menu bar.
+- **Per-(output × event) matrix for new outputs.** Haptic, display brightness,
+  display tint, and volume spike each have their own `ReactionToggleMatrix`
+  persisted in UserDefaults. Event matrix rows in the menu bar UI now show two
+  rows of output toggles: core (audio, flash, notification, LED) and hardware
+  (haptic, brightness, tint, volume spike).
+- **Trackpad Tuning section.** New collapsible accordion in the menu bar (shown
+  when Trackpad Activity source is enabled) with sliders for activity window
+  duration, sensitivity threshold, and intensity scale.
 
 ### Changed
+- **`SensorAdapter` protocol → `SensorSource` protocol.** Three concrete
+  implementations renamed: `SPUAccelerometerAdapter` → `AccelerometerSource`,
+  `MicrophoneAdapter` → `MicrophoneSource`, `HeadphoneMotionAdapter` →
+  `HeadphoneMotionSource`. Public surface preserved.
+- **`ImpactFusionEngine` → `ImpactFusion`.** Now owns the multi-source task
+  fan-in lifecycle (start/stop) and publishes `Reaction.impact` onto the
+  bus. The old `ingest(_:activeSources:)` API is preserved for tests;
+  runtime path uses the engine's internal `activeSources` state.
+- **`ImpactController` deleted.** The router-style controller dissolved into
+  three pieces: sensor lifecycle moved into each `*Source` class, fusion is
+  now `ImpactFusion`, response dispatch became per-output
+  `consume(from:configProvider:)` loops on each `ResponseKit` output. The
+  new `Yamete` orchestrator (`Sources/YameteApp/Yamete.swift`) owns the
+  bus, sources, fusion, outputs, and lifecycle wiring — no routing.
+- **`AudioResponder` / `VisualResponder` protocols deleted.** Outputs are
+  now concrete classes with `consume(from: ReactionBus, configProvider:)`
+  methods — no shared protocol because there's no polymorphic dispatch
+  surface.
+- **Menu bar reaction face moved to `MenuBarFace`**
+  (`Sources/YameteApp/MenuBarFace.swift`), an `@Observable` class that
+  subscribes to the bus and updates its own `reactionFace` /
+  `lastImpactTier` / `impactCount` state. `StatusBarController` reads from
+  `yamete.menuBarFace.reactionFace` instead of `controller.reactionFace`.
+- **Sensitivity gate is now `FusedImpact.applySensitivity(...)`** (a static
+  method in `YameteCore`). The orchestrator installs it on
+  `ImpactFusion.intensityGate` so the bus pipeline applies the user's
+  sensitivity band before any output sees the impact.
 
 ### Fixed
+- **`NSSound` lifetime.** `AudioPlayer` retains `NSSound` instances in
+  `activeSounds: [NSSound]` and releases them only in
+  `sound(_:didFinishPlaying:)`. Previously sounds were deallocated immediately
+  after `.play()`, silently truncating playback.
+- **IOKit NULL device guard in `LEDFlash.writeLED`.** `IOHIDElementGetDevice`
+  can return nil when the keyboard disconnects mid-animation. Added a service-
+  port validity check before calling `IOHIDDeviceSetValue`.
+- **`IOHIDManager` closed on deallocation.** `LEDFlash.deinit` now calls
+  `IOHIDManagerClose` so the kernel-side manager reference is released promptly
+  rather than waiting for process exit.
+- **`IONotificationPort` iterator cleanup on partial setup failure.** USB,
+  Bluetooth, and Thunderbolt event sources now release any already-created
+  IOKit iterators in the failure branch of `start()` before destroying the port.
+- **IOKit context lifetime in event sources.** USB, Bluetooth, and Thunderbolt
+  sources switched from `passUnretained` to `passRetained` context pointers,
+  with explicit `release()` in `stop()` after iterator release, matching the
+  accelerometer pattern.
+- **`ReactionBus` enricher set-once precondition.** `setEnricher(_:)` now
+  asserts `self.enricher == nil`; calling it twice is a programmer error.
+- **`LogStore` file I/O errors surfaced.** `createDirectory`, `createFile`, and
+  `FileHandle(forWritingTo:)` failures now log to `os.Logger` directly rather
+  than silently no-op.
+- **`ReactionToggleMatrix` encode/decode failures logged.** Previously returned
+  empty data / empty matrix silently; now logs at `.error` level.
+- **Consensus clamping logged.** When `consensusRequired` exceeds active source
+  count, the effective value and reason are now logged at `.info`.
+- **`HeadphoneMotionAdapter` probe timeout weak capture.** Changed from strong
+  `[self]` to `[weak self]` in the `asyncAfter` closure, preventing the adapter
+  from outliving its expected lifetime if deallocated before the 0.4 s probe
+  fires.
 
 ## [1.3.2] - 2026-04-17
 

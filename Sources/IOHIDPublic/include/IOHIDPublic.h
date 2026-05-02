@@ -11,5 +11,6 @@
 
 #include <IOKit/hidsystem/IOHIDEventSystemClient.h>
 #include <IOKit/hidsystem/IOHIDServiceClient.h>
+#include <IOKit/pwr_mgt/IOPMLib.h>
 
 #endif /* IOHIDPublic_h */

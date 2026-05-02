@@ -18,7 +18,7 @@ public struct AppLog: Sendable {
 
     /// Controls whether debug-level messages are emitted.
     /// Direct builds wire this to the UI debug logging toggle; App Store builds force it off.
-    /// Atomic: read from background sensor threads, written from @MainActor.
+    /// Thread-safe via `OSAllocatedUnfairLock`. May be read or written from any actor or thread.
     private static let _debugEnabled = OSAllocatedUnfairLock(initialState: false)
     public static var debugEnabled: Bool {
         get { supportsDebugLogging && _debugEnabled.withLock { $0 } }
@@ -121,7 +121,12 @@ public final class LogStore: Sendable {
         directory = support
             .appendingPathComponent(Self.supportDirectoryName, isDirectory: true)
             .appendingPathComponent("logs", isDirectory: true)
-        try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        do {
+            try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            os.Logger(subsystem: "com.studnicky.yamete", category: "LogStore")
+                .error("LogStore: cannot create log directory \(self.directory.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
         state = OSAllocatedUnfairLock(initialState: State())
         state.withLock { s in
             pruneStaleFiles()
@@ -167,9 +172,18 @@ public final class LogStore: Sendable {
         let url = directory.appendingPathComponent("yamete-\(today).log")
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
-            fm.createFile(atPath: url.path, contents: nil)
+            let created = fm.createFile(atPath: url.path, contents: nil)
+            if !created {
+                os.Logger(subsystem: "com.studnicky.yamete", category: "LogStore")
+                    .error("LogStore: failed to create log file \(url.path, privacy: .public)")
+            }
         }
-        s.fileHandle = try? FileHandle(forWritingTo: url)
+        do {
+            s.fileHandle = try FileHandle(forWritingTo: url)
+        } catch {
+            os.Logger(subsystem: "com.studnicky.yamete", category: "LogStore")
+                .error("LogStore: cannot open log file \(url.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
         s.fileHandle?.seekToEndOfFile()
     }
 }

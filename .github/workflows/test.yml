@@ -1,0 +1,136 @@
+name: Test
+
+# Phase 2.1 CI wiring: every PR + push to master/develop runs the
+# correctness gate suite — default-config swift test, DIRECT_BUILD-flag
+# swift test, strict-concurrency lint, and a SLICED mutation runner that
+# only re-tests catalog entries whose targetFile was touched on this
+# branch. The full mutation catalog still runs nightly + on push to
+# master/develop via .github/workflows/mutate-nightly.yml; that kept the
+# per-PR matrix from blowing past 20 minutes wall-clock. Each job pins
+# macOS-15 (matches existing ci.yml/release.yml) so the Xcode toolchain
+# version is consistent across workflows.
+#
+# Build cache: every Swift-touching job restores .build/ keyed on
+# Package.resolved + Xcode version + runner OS so subsequent runs can
+# reuse incremental compile. Cache misses are silent — a fresh build
+# just takes the original wall-clock; cache hits drop swift-test from
+# ~3 minutes to ~30 seconds.
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+
+# Least-privilege default. None of these jobs need write access.
+permissions:
+  contents: read
+
+# Cancel superseded runs for the same ref. Keeps master runs visible.
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  swift-test:
+    name: swift test (default)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Resolve Xcode version
+        id: xcode
+        run: echo "version=$(xcodebuild -version | head -1 | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: Cache Swift build artifacts
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-default-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            spm-default-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-
+      - name: Run swift test (default config)
+        run: swift test
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-test-default-results
+          path: |
+            .build/**/*.xcresult
+          retention-days: 7
+
+  swift-test-direct-build:
+    name: swift test (DIRECT_BUILD)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Resolve Xcode version
+        id: xcode
+        run: echo "version=$(xcodebuild -version | head -1 | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: Cache Swift build artifacts
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-direct-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            spm-direct-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-
+      - name: Run swift test with -DDIRECT_BUILD
+        run: swift test -Xswiftc -DDIRECT_BUILD
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-test-direct-build-results
+          path: |
+            .build/**/*.xcresult
+          retention-days: 7
+
+  lint:
+    name: Lint (strict concurrency)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Resolve Xcode version
+        id: xcode
+        run: echo "version=$(xcodebuild -version | head -1 | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: Cache Swift build artifacts
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-lint-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            spm-lint-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-
+      - name: Verify framework lists
+        run: make lint-frameworks
+      - name: Type-check with strict concurrency
+        run: make lint
+
+  mutate-pr:
+    name: Mutation catalog (PR slice)
+    runs-on: macos-15
+    # Only fetch enough history to diff against the PR base. Full
+    # `fetch-depth: 0` would be wasteful — we only need the merge-base
+    # plus this branch's commits.
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Resolve Xcode version
+        id: xcode
+        run: echo "version=$(xcodebuild -version | head -1 | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: Cache Swift build artifacts
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-mutate-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            spm-mutate-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-
+      - name: Run sliced mutation catalog (changed files only)
+        # The slice script reads BASE_REF (or GITHUB_BASE_REF on
+        # pull_request events), filters mutation-catalog.json to entries
+        # whose targetFile was touched on this branch, and delegates to
+        # scripts/mutation-test.sh. Push events to master/develop fall
+        # back to diffing against `develop` — typically a no-op slice
+        # (master/develop tips already match) so the job exits 0 fast;
+        # the full nightly catches drift on those branches.
+        env:
+          BASE_REF: ${{ github.base_ref || 'develop' }}
+        run: make mutate-pr
