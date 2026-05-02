@@ -27,6 +27,14 @@ jobs:
       - name: Run actionlint
         uses: raven-actions/actionlint@v2
 
+  check-versions:
+    name: Version consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify project.yml ↔ docs version match
+        run: scripts/check-versions.sh
+
   lint:
     name: Lint (strict concurrency)
     runs-on: macos-15
