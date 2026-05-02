@@ -223,8 +223,16 @@ final class MatrixBusInteractionTests: IntegrationTestCase {
         try? await Task.sleep(for: .milliseconds(20))
 
         await harness.bus.publish(reactionFor(kind: kindA))
-        // Let coalesce fire and action begin.
-        try? await Task.sleep(for: .milliseconds(80))
+        // Wait until A's `.action` phase is observably in flight, then
+        // cancelAndReset before the 200 ms action sleep completes. The
+        // prior `Task.sleep(80 ms)` raced the action duration: under
+        // slow CI the 80 ms sleep dilated past 200 ms and A's
+        // `.post` fired before cancelAndReset arrived (caught on round
+        // 9, run 25254849962). Polling for the `.action` phase ties
+        // the cancel to a deterministic event mid-action.
+        _ = await awaitUntil(timeout: 1.0) {
+            spy.calls.contains { $0.phase == .action && $0.kind == kindA }
+        }
         spy.cancelAndReset()
         // Give cancellation/reset a moment to settle.
         try? await Task.sleep(for: .milliseconds(50))
