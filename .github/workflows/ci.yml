@@ -32,6 +32,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v6
+      - name: Verify framework lists
+        run: make lint-frameworks
       - name: Type-check with strict concurrency
         run: make lint
 
@@ -64,5 +66,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       # Route through Makefile so local `make test` and CI stay in sync.
+      # Hardware-dependent integration tests self-skip via XCTSkip when the
+      # specific hardware (keyboard backlight, built-in trackpad, accessible
+      # audio device, bundle resources) isn't present on the runner.
       - name: Run tests
         run: make test
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            .build/**/*.xcresult
+          retention-days: 7

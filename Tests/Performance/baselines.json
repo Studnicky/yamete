@@ -1,0 +1,53 @@
+{
+  "cells": {
+    "testBusOpenSubscribeCloseCycle": {
+      "captured_at": "2026-04-29T20:18:41Z",
+      "host_arch": "arm64",
+      "memory_delta_bytes": 950272,
+      "tolerance_factor": 2.0,
+      "wallclock_seconds": 0.09508712496608496
+    },
+    "testIOKitSourceInjectSustainedThroughput": {
+      "captured_at": "2026-04-29T20:18:41Z",
+      "host_arch": "arm64",
+      "memory_delta_bytes": 5324800,
+      "tolerance_factor": 2.0,
+      "wallclock_seconds": 1.5936167916515842
+    },
+    "testMouseInjectClickCoalescePressure": {
+      "captured_at": "2026-04-29T20:18:41Z",
+      "host_arch": "arm64",
+      "memory_delta_bytes": 49152,
+      "tolerance_factor": 2.0,
+      "wallclock_seconds": 1.1165439583128318
+    },
+    "testMouseStartStopCycleLeakGuard": {
+      "captured_at": "2026-04-29T20:18:41Z",
+      "host_arch": "arm64",
+      "memory_delta_bytes": 311296,
+      "tolerance_factor": 2.0,
+      "wallclock_seconds": 0.023735874914564192
+    },
+    "testReactionBusHighPublishVolumeRetention": {
+      "captured_at": "2026-04-29T20:18:41Z",
+      "host_arch": "arm64",
+      "memory_delta_bytes": 2506752,
+      "tolerance_factor": 2.0,
+      "wallclock_seconds": 0.9694022083422169
+    },
+    "testTrackpadStartStopCycleLeakGuard": {
+      "captured_at": "2026-04-29T20:18:41Z",
+      "host_arch": "arm64",
+      "memory_delta_bytes": 65536,
+      "tolerance_factor": 2.0,
+      "wallclock_seconds": 0.027372458367608488
+    },
+    "testUSBInjectThroughputCPUUpperBound": {
+      "captured_at": "2026-04-29T20:18:41Z",
+      "host_arch": "arm64",
+      "memory_delta_bytes": 114688,
+      "tolerance_factor": 2.0,
+      "wallclock_seconds": 0.07001233333721757
+    }
+  }
+}

@@ -92,6 +92,31 @@
         </details>
       </section>
 
+      <section id="events">
+        <h2>Event triggers</h2>
+
+        <details>
+          <summary>What are the event triggers?</summary>
+          <p>Beyond physical impacts, yamete reacts to a range of system events. Each can be toggled independently under the Events section of the menu bar dropdown:</p>
+          <ul>
+            <li><strong>USB</strong> — device attach and detach</li>
+            <li><strong>Power</strong> — AC adapter plug and unplug</li>
+            <li><strong>Audio</strong> — audio peripheral attach and detach (USB DACs, headsets, etc.)</li>
+            <li><strong>Bluetooth</strong> — device connect and disconnect</li>
+            <li><strong>Thunderbolt</strong> — port attach and detach</li>
+            <li><strong>Display</strong> — monitor hotplug / reconfiguration</li>
+            <li><strong>Sleep / Wake</strong> — system will sleep and system has powered on</li>
+          </ul>
+          <p>All event sources are enabled by default. Toggling one off stops yamete from reacting to it; the impact detection pipeline is unaffected.</p>
+        </details>
+
+        <details>
+          <summary>How do I control which events trigger which outputs?</summary>
+          <p>Each event type has its own row of per-output toggles in the Events section. The four outputs — Sound, Flash, LED, and Notification — can be enabled or disabled independently for every event type. For example, you can have USB attach play a sound and flash the screen but stay silent on power events, or keep Bluetooth connect notifications enabled while muting the sound for those reactions.</p>
+          <p>Impact detections from the accelerometer, microphone, and headphone motion channels have the same per-output toggles, controlled from the Outputs section. The matrix applies on top of each output's master toggle: an output must be enabled globally <em>and</em> enabled for the specific reaction kind before it fires.</p>
+        </details>
+      </section>
+
       <section id="setup">
         <h2>Setup &amp; usage</h2>
 
@@ -158,6 +183,23 @@
         </details>
 
         <details>
+          <summary>The keyboard LED/backlight isn't responding</summary>
+          <p>Work through these in order:</p>
+          <ol>
+            <li>Open the menu bar dropdown and expand Outputs. The Keyboard section has a master toggle at the top — make sure it is on.</li>
+            <li>Inside the Keyboard section there are two separate sub-controls: the Caps Lock LED toggle and the keyboard backlight brightness slider. Both are independent. Check that whichever one you want is enabled.</li>
+            <li>Keyboard backlight control requires macOS 14+ and uses the CoreBrightness private framework. It may not work on all hardware configurations — some externally attached keyboards and some older Mac models are not supported.</li>
+            <li>The brightness animation is a spring that oscillates around your current brightness level, not a fixed target. If the backlight is already at zero when the reaction fires, the app falls back to the brightness level it read at launch. The net motion may be subtle at very low baseline brightness.</li>
+          </ol>
+        </details>
+
+        <details>
+          <summary>The keyboard brightness is stuck off after a crash</summary>
+          <p>If yamete crashes mid-animation, the keyboard brightness can be left at the animated (near-zero) level. On the next launch, the app reads a <code>kb_dirty</code> sentinel file it wrote before the pulse began, recovers the pre-crash brightness level from it, restores the backlight, and deletes the sentinel. This happens automatically with no user action required.</p>
+          <p>If the brightness does not restore on relaunch — for example if the sentinel file was lost or the recovery path didn't reach your hardware — use the F5/F6 brightness keys to set the level manually, or toggle keyboard backlight in System Settings → Keyboard.</p>
+        </details>
+
+        <details>
           <summary>Notifications aren't appearing</summary>
           <p>Flash Mode needs to be set to Notification. macOS prompts for notification permission the first time. If you denied it: System Settings, Notifications, Yamete, enable banners. Notification language is switchable independently (40 locales, under Flash Mode).</p>
         </details>
@@ -209,6 +251,11 @@
         </details>
 
         <details>
+          <summary>Can I choose which face appears on each screen?</summary>
+          <p>Not manually, but yamete handles multiple displays automatically. When a reaction fires across more than one screen, each display gets a different face. The selection runs a deduplication pass so the same expression doesn't repeat across screens within a single reaction. The menu bar icon always shows the face assigned to the primary display.</p>
+        </details>
+
+        <details>
           <summary>Is hitting my Mac bad for my Mac?</summary>
           <p>The app isn't bad for your Mac. Hitting your Mac hard enough to trigger it repeatedly might be bad for your Mac. Please be gentle. It has feelings now.</p>
         </details>
@@ -229,6 +276,7 @@
   <script>
     initSidebar([
       { href: '#what-is-this', label: 'What is this?' },
+      { href: '#events',       label: 'Event triggers' },
       { href: '#setup',        label: 'Setup &amp; usage' },
       { href: '#tuning',       label: 'Tuning' },
       { href: '#questions',    label: 'Questions' },

@@ -1,0 +1,1586 @@
+{
+  "description": "Topology projection for project",
+  "displayRules": {
+    "excludePathPatterns": [
+      "__fixtures__",
+      "dist/",
+      "node_modules/",
+      ".test.",
+      ".spec.",
+      "tests/"
+    ],
+    "excludeTypes": [],
+    "includeCallables": "all",
+    "includeEdges": true,
+    "maxTokens": 0,
+    "pathFilter": null,
+    "taskKeywords": []
+  },
+  "edgeProfiles": {
+    "default": {
+      "arrow-scale": 1,
+      "curve-style": "bezier",
+      "line-color": "#475569",
+      "line-style": "solid",
+      "opacity": 0.9,
+      "target-arrow-color": "#475569",
+      "target-arrow-shape": "triangle",
+      "width": 2
+    },
+    "sigil:aliasOf": {
+      "curve-style": "bezier",
+      "line-color": "#fde047",
+      "line-style": "dotted",
+      "opacity": 0.7,
+      "target-arrow-color": "#fde047",
+      "target-arrow-shape": "circle",
+      "width": 1
+    },
+    "sigil:calls": {
+      "arrow-scale": 1,
+      "curve-style": "bezier",
+      "line-color": "#60a5fa",
+      "line-style": "solid",
+      "opacity": 0.9,
+      "target-arrow-color": "#60a5fa",
+      "target-arrow-shape": "triangle",
+      "width": 2
+    },
+    "sigil:catches": {
+      "arrow-scale": 1,
+      "curve-style": "bezier",
+      "line-color": "#fb7185",
+      "line-style": "dashed",
+      "opacity": 0.85,
+      "target-arrow-color": "#fb7185",
+      "target-arrow-shape": "triangle-cross",
+      "width": 1.5
+    },
+    "sigil:conformsTo": {
+      "arrow-scale": 1.1,
+      "curve-style": "bezier",
+      "line-color": "#6ee7b7",
+      "line-style": "solid",
+      "opacity": 0.9,
+      "target-arrow-color": "#6ee7b7",
+      "target-arrow-fill": "hollow",
+      "target-arrow-shape": "triangle",
+      "width": 1.25
+    },
+    "sigil:decoratedBy": {
+      "arrow-scale": 0.9,
+      "curve-style": "bezier",
+      "line-color": "#f472b6",
+      "line-style": "dotted",
+      "opacity": 0.8,
+      "target-arrow-color": "#f472b6",
+      "target-arrow-shape": "diamond",
+      "width": 1.25
+    },
+    "sigil:dependsOn": {
+      "arrow-scale": 1,
+      "curve-style": "bezier",
+      "line-color": "#64748b",
+      "line-style": "dashed",
+      "opacity": 0.7,
+      "target-arrow-color": "#64748b",
+      "target-arrow-shape": "triangle",
+      "width": 1.5
+    },
+    "sigil:exports": {
+      "arrow-scale": 1,
+      "curve-style": "bezier",
+      "line-color": "#c4b5fd",
+      "line-style": "dotted",
+      "opacity": 0.85,
+      "target-arrow-color": "#c4b5fd",
+      "target-arrow-shape": "triangle-backcurve",
+      "width": 1.5
+    },
+    "sigil:extends": {
+      "arrow-scale": 1.1,
+      "curve-style": "bezier",
+      "line-color": "#34d399",
+      "line-style": "solid",
+      "opacity": 0.9,
+      "target-arrow-color": "#34d399",
+      "target-arrow-fill": "hollow",
+      "target-arrow-shape": "triangle",
+      "width": 2
+    },
+    "sigil:hasBound": {
+      "arrow-scale": 1.1,
+      "curve-style": "bezier",
+      "line-color": "#10b981",
+      "line-style": "dashed",
+      "opacity": 0.9,
+      "target-arrow-color": "#10b981",
+      "target-arrow-fill": "hollow",
+      "target-arrow-shape": "triangle",
+      "width": 1.25
+    },
+    "sigil:hasMember": {
+      "curve-style": "taxi",
+      "line-color": "#475569",
+      "line-style": "solid",
+      "opacity": 0.4,
+      "target-arrow-shape": "none",
+      "width": 1
+    },
+    "sigil:hasParam": {
+      "curve-style": "taxi",
+      "line-color": "#475569",
+      "line-style": "solid",
+      "opacity": 0.5,
+      "target-arrow-shape": "none",
+      "width": 1
+    },
+    "sigil:hasReturn": {
+      "curve-style": "taxi",
+      "line-color": "#475569",
+      "line-style": "solid",
+      "opacity": 0.55,
+      "target-arrow-shape": "none",
+      "width": 1
+    },
+    "sigil:hasSubtype": {
+      "arrow-scale": 1.1,
+      "curve-style": "bezier",
+      "line-color": "#34d399",
+      "line-style": "dashed",
+      "opacity": 0.9,
+      "target-arrow-color": "#34d399",
+      "target-arrow-fill": "hollow",
+      "target-arrow-shape": "triangle",
+      "width": 1.5
+    },
+    "sigil:hasTypeParam": {
+      "curve-style": "taxi",
+      "line-color": "#475569",
+      "line-style": "dotted",
+      "opacity": 0.5,
+      "target-arrow-shape": "none",
+      "width": 1
+    },
+    "sigil:implements": {
+      "arrow-scale": 1.1,
+      "curve-style": "bezier",
+      "line-color": "#10b981",
+      "line-style": "dashed",
+      "opacity": 0.9,
+      "target-arrow-color": "#10b981",
+      "target-arrow-fill": "hollow",
+      "target-arrow-shape": "triangle",
+      "width": 2
+    },
+    "sigil:imports": {
+      "arrow-scale": 1,
+      "curve-style": "bezier",
+      "line-color": "#a78bfa",
+      "line-style": "dotted",
+      "opacity": 0.85,
+      "target-arrow-color": "#a78bfa",
+      "target-arrow-shape": "triangle-backcurve",
+      "width": 1.5
+    },
+    "sigil:mixesIn": {
+      "arrow-scale": 1.1,
+      "curve-style": "bezier",
+      "line-color": "#6ee7b7",
+      "line-style": "dashed",
+      "opacity": 0.9,
+      "target-arrow-color": "#6ee7b7",
+      "target-arrow-fill": "hollow",
+      "target-arrow-shape": "triangle",
+      "width": 1.5
+    },
+    "sigil:overloads": {
+      "curve-style": "bezier",
+      "line-color": "#facc15",
+      "line-style": "dashed",
+      "opacity": 0.65,
+      "target-arrow-shape": "none",
+      "width": 1
+    },
+    "sigil:paramType": {
+      "arrow-scale": 0.9,
+      "curve-style": "bezier",
+      "line-color": "#fbbf24",
+      "opacity": 0.7,
+      "target-arrow-color": "#fbbf24",
+      "target-arrow-shape": "vee",
+      "width": 1.25
+    },
+    "sigil:reads": {
+      "arrow-scale": 0.9,
+      "curve-style": "bezier",
+      "line-color": "#14b8a6",
+      "line-style": "solid",
+      "opacity": 0.7,
+      "target-arrow-color": "#14b8a6",
+      "target-arrow-shape": "vee",
+      "width": 1
+    },
+    "sigil:reexports": {
+      "arrow-scale": 1,
+      "curve-style": "bezier",
+      "line-color": "#c4b5fd",
+      "line-style": "dotted",
+      "opacity": 0.6,
+      "target-arrow-color": "#c4b5fd",
+      "target-arrow-shape": "triangle-backcurve",
+      "width": 1.5
+    },
+    "sigil:references": {
+      "arrow-scale": 0.9,
+      "curve-style": "bezier",
+      "line-color": "#14b8a6",
+      "line-style": "dotted",
+      "opacity": 0.7,
+      "target-arrow-color": "#14b8a6",
+      "target-arrow-shape": "vee",
+      "width": 1
+    },
+    "sigil:returnsType": {
+      "arrow-scale": 0.9,
+      "curve-style": "bezier",
+      "line-color": "#fb923c",
+      "opacity": 0.7,
+      "target-arrow-color": "#fb923c",
+      "target-arrow-shape": "vee",
+      "width": 1.25
+    },
+    "sigil:throws": {
+      "arrow-scale": 1,
+      "curve-style": "bezier",
+      "line-color": "#ef4444",
+      "line-style": "solid",
+      "opacity": 0.85,
+      "target-arrow-color": "#ef4444",
+      "target-arrow-shape": "triangle-cross",
+      "width": 1.5
+    },
+    "sigil:usesType": {
+      "arrow-scale": 0.9,
+      "curve-style": "bezier",
+      "line-color": "#94a3b8",
+      "opacity": 0.7,
+      "target-arrow-color": "#94a3b8",
+      "target-arrow-shape": "vee",
+      "width": 1.25
+    },
+    "sigil:writes": {
+      "arrow-scale": 0.9,
+      "curve-style": "bezier",
+      "line-color": "#2dd4bf",
+      "line-style": "solid",
+      "opacity": 0.7,
+      "target-arrow-color": "#2dd4bf",
+      "target-arrow-shape": "triangle",
+      "width": 1
+    }
+  },
+  "generatorLayout": {},
+  "hiddenNodes": [],
+  "layout": {
+    "fit": true,
+    "name": "preset",
+    "padding": 56
+  },
+  "parentMap": {},
+  "sigilTree": [
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:Attribute"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Decorator"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Diagnostic"
+        }
+      ],
+      "sigil": "sigil:Annotation"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:Constructor"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Function"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Macro"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Method"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Operator"
+        }
+      ],
+      "sigil": "sigil:Callable"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:ImplBlock"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Namespace"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Package"
+        }
+      ],
+      "sigil": "sigil:Container"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:Constant"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Parameter"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:TypeParameter"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Variable"
+        }
+      ],
+      "sigil": "sigil:Declaration"
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:exports"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:imports"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:reexports"
+            }
+          ],
+          "sigil": "sigil:BoundaryEdge"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:reads"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:references"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:writes"
+            }
+          ],
+          "sigil": "sigil:DataFlowEdge"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:decoratedBy"
+            }
+          ],
+          "sigil": "sigil:DecorationEdge"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:reportedOn"
+            }
+          ],
+          "sigil": "sigil:DiagnosticEdge"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:catches"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:throws"
+            }
+          ],
+          "sigil": "sigil:EffectEdge"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:calls"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:dependsOn"
+            }
+          ],
+          "sigil": "sigil:FlowEdge"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:conformsTo"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:extends"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:hasBound"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:hasSubtype"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:implements"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:mixesIn"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:overriddenBy"
+            }
+          ],
+          "sigil": "sigil:InheritanceEdge"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:aliasOf"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:overloads"
+            }
+          ],
+          "sigil": "sigil:PeerRelation"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:declares"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:enclosedBy"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:hasMember"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:hasOverload"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:hasParam"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:hasReturn"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:hasTypeParam"
+            }
+          ],
+          "sigil": "sigil:StructureEdge"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:paramType"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:returnsType"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:usesType"
+            }
+          ],
+          "sigil": "sigil:TypeRefEdge"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:usesDeprecated"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:usesStdlib"
+            }
+          ],
+          "sigil": "sigil:UsageEdge"
+        }
+      ],
+      "sigil": "sigil:Edge"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:ExternalSymbol"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:ForeignKeyTo"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:HasColumn"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:IndexedBy"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:TerraformBlock"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:TerraformDataSource"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:TerraformLocal"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:TerraformOutput"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:TerraformProvider"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:TerraformResource"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:TerraformVariable"
+        }
+      ],
+      "sigil": "sigil:InfrastructureBlock"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:EnumMember"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Event"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Field"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Property"
+        }
+      ],
+      "sigil": "sigil:Member"
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:JsonModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:TomlModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:YamlModule"
+            }
+          ],
+          "sigil": "sigil:DataFormatModule"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:DockerfileModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:TerraformModule"
+            }
+          ],
+          "sigil": "sigil:InfrastructureFileModule"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:CssModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:HtmlModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:MarkdownModule"
+            }
+          ],
+          "sigil": "sigil:MarkupModule"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:BashModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:CModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:DartModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:GoModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:JavaModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:KotlinModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:LuaModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:PhpModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:PythonModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:RubyModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:RustModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:SwiftModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:TypeScriptModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:ZigModule"
+            }
+          ],
+          "sigil": "sigil:ProgrammingLanguageModule"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "sigil": "sigil:GraphqlModule"
+            },
+            {
+              "children": [],
+              "sigil": "sigil:SqlModule"
+            }
+          ],
+          "sigil": "sigil:QueryLanguageModule"
+        }
+      ],
+      "sigil": "sigil:Module"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:ExportSpec"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:ImportSpec"
+        }
+      ],
+      "sigil": "sigil:ModuleBoundarySymbol"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:OverloadSignature"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:PolicyOnTable"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:GraphQLEnum"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:GraphQLField"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:GraphQLInterface"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:GraphQLType"
+        }
+      ],
+      "sigil": "sigil:SchemaType"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:Block"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:CommentBlock"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:ImportBlock"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Region"
+        }
+      ],
+      "sigil": "sigil:Scope"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlColumn"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlConstraint"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlExtension"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlFunction"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlIndex"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlPolicy"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlProcedure"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlSchema"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlTable"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlTrigger"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlType"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:SqlView"
+    },
+    {
+      "children": [],
+      "sigil": "sigil:Symbol"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:Class"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Enum"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Interface"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Record"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Struct"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Trait"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:TypeAlias"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:Union"
+        }
+      ],
+      "sigil": "sigil:Type"
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "sigil": "sigil:ArrayType"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:FunctionType"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:GenericType"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:IntersectionType"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:LiteralType"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:OptionType"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:TupleType"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:TypeRef"
+        },
+        {
+          "children": [],
+          "sigil": "sigil:UnionType"
+        }
+      ],
+      "sigil": "sigil:TypeExpression"
+    }
+  ],
+  "sourceBlueprint": "blueprint.jsonld",
+  "version": "1.0.0",
+  "viewId": "project-view",
+  "visualProfiles": {
+    "default": {
+      "background-color": "#1e293b",
+      "background-opacity": 1,
+      "border-color": "#334155",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:Annotation": {
+      "background-color": "#9d174d",
+      "background-opacity": 1,
+      "border-color": "#f472b6",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "diamond",
+      "width": 100
+    },
+    "sigil:ArrayType": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:Attribute": {
+      "background-color": "#831843",
+      "background-opacity": 1,
+      "border-color": "#f9a8d4",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "diamond",
+      "width": 100
+    },
+    "sigil:Callable": {
+      "background-color": "#047857",
+      "background-opacity": 1,
+      "border-color": "#10b981",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:Class": {
+      "background-color": "#1e3a8a",
+      "background-opacity": 1,
+      "border-color": "#3b82f6",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:Constant": {
+      "background-color": "#78350f",
+      "background-opacity": 1,
+      "border-color": "#f59e0b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:Constructor": {
+      "background-color": "#065f46",
+      "background-opacity": 1,
+      "border-color": "#fbbf24",
+      "border-style": "solid",
+      "border-width": 2,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:Container": {
+      "background-color": "#334155",
+      "background-opacity": 0.4,
+      "border-color": "#94a3b8",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:Declaration": {
+      "background-color": "#334155",
+      "background-opacity": 1,
+      "border-color": "#94a3b8",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:Decorator": {
+      "background-color": "#a21caf",
+      "background-opacity": 1,
+      "border-color": "#e879f9",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "diamond",
+      "width": 100
+    },
+    "sigil:Enum": {
+      "background-color": "#4c1d95",
+      "background-opacity": 1,
+      "border-color": "#a78bfa",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-octagon",
+      "width": 170
+    },
+    "sigil:EnumMember": {
+      "background-color": "#3f3f46",
+      "background-opacity": 1,
+      "border-color": "#a1a1aa",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "ellipse",
+      "width": 100
+    },
+    "sigil:Event": {
+      "background-color": "#44403c",
+      "background-opacity": 1,
+      "border-color": "#78716c",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-pentagon",
+      "width": 100
+    },
+    "sigil:ExportSpec": {
+      "background-color": "#6d28d9",
+      "background-opacity": 1,
+      "border-color": "#a78bfa",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "tag",
+      "width": 100
+    },
+    "sigil:Field": {
+      "background-color": "#1f2937",
+      "background-opacity": 1,
+      "border-color": "#6b7280",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:Function": {
+      "background-color": "#047857",
+      "background-opacity": 1,
+      "border-color": "#10b981",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:FunctionType": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "cut-rectangle",
+      "width": 100
+    },
+    "sigil:GenericType": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:GraphQLEnum": {
+      "background-color": "#86198f",
+      "background-opacity": 1,
+      "border-color": "#e879f9",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-octagon",
+      "width": 170
+    },
+    "sigil:GraphQLField": {
+      "background-color": "#86198f",
+      "background-opacity": 1,
+      "border-color": "#e879f9",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:GraphQLInterface": {
+      "background-color": "#86198f",
+      "background-opacity": 1,
+      "border-color": "#e879f9",
+      "border-style": "dashed",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-hexagon",
+      "width": 170
+    },
+    "sigil:GraphQLType": {
+      "background-color": "#86198f",
+      "background-opacity": 1,
+      "border-color": "#e879f9",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-hexagon",
+      "width": 170
+    },
+    "sigil:ImplBlock": {
+      "background-color": "#155e75",
+      "background-opacity": 0.4,
+      "border-color": "#22d3ee",
+      "border-style": "dashed",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:ImportSpec": {
+      "background-color": "#5b21b6",
+      "background-opacity": 1,
+      "border-color": "#8b5cf6",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "tag",
+      "width": 100
+    },
+    "sigil:InfrastructureBlock": {
+      "background-color": "#713f12",
+      "background-opacity": 1,
+      "border-color": "#d97706",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "concave-hexagon",
+      "width": 170
+    },
+    "sigil:Interface": {
+      "background-color": "#164e63",
+      "background-opacity": 1,
+      "border-color": "#06b6d4",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-diamond",
+      "width": 170
+    },
+    "sigil:IntersectionType": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-hexagon",
+      "width": 100
+    },
+    "sigil:LiteralType": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "ellipse",
+      "width": 100
+    },
+    "sigil:Member": {
+      "background-color": "#1f2937",
+      "background-opacity": 1,
+      "border-color": "#6b7280",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:Method": {
+      "background-color": "#064e3b",
+      "background-opacity": 1,
+      "border-color": "#34d399",
+      "border-style": "solid",
+      "border-width": 1.25,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:Module": {
+      "background-color": "#1e293b",
+      "background-opacity": 0.55,
+      "border-color": "#334155",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 11,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:Namespace": {
+      "background-color": "#334155",
+      "background-opacity": 0.4,
+      "border-color": "#94a3b8",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:Operator": {
+      "background-color": "#134e4a",
+      "background-opacity": 1,
+      "border-color": "#2dd4bf",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "diamond",
+      "width": 170
+    },
+    "sigil:OptionType": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "ellipse",
+      "width": 100
+    },
+    "sigil:Package": {
+      "background-color": "#1e293b",
+      "background-opacity": 0.4,
+      "border-color": "#cbd5e1",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:Parameter": {
+      "background-color": "#422006",
+      "background-opacity": 1,
+      "border-color": "#fbbf24",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "ellipse",
+      "width": 100
+    },
+    "sigil:Property": {
+      "background-color": "#27272a",
+      "background-opacity": 1,
+      "border-color": "#9ca3af",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:SchemaType": {
+      "background-color": "#86198f",
+      "background-opacity": 1,
+      "border-color": "#e879f9",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-hexagon",
+      "width": 170
+    },
+    "sigil:Struct": {
+      "background-color": "#1e40af",
+      "background-opacity": 1,
+      "border-color": "#60a5fa",
+      "border-style": "dashed",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:Symbol": {
+      "background-color": "#334155",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:TerraformBlock": {
+      "background-color": "#713f12",
+      "background-opacity": 1,
+      "border-color": "#d97706",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "concave-hexagon",
+      "width": 170
+    },
+    "sigil:TerraformDataSource": {
+      "background-color": "#713f12",
+      "background-opacity": 1,
+      "border-color": "#d97706",
+      "border-style": "dashed",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:TerraformLocal": {
+      "background-color": "#713f12",
+      "background-opacity": 1,
+      "border-color": "#d97706",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:TerraformOutput": {
+      "background-color": "#713f12",
+      "background-opacity": 1,
+      "border-color": "#d97706",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "tag",
+      "width": 100
+    },
+    "sigil:TerraformProvider": {
+      "background-color": "#713f12",
+      "background-opacity": 1,
+      "border-color": "#d97706",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-pentagon",
+      "width": 170
+    },
+    "sigil:TerraformResource": {
+      "background-color": "#713f12",
+      "background-opacity": 1,
+      "border-color": "#d97706",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:TerraformVariable": {
+      "background-color": "#713f12",
+      "background-opacity": 1,
+      "border-color": "#d97706",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:Trait": {
+      "background-color": "#0e7490",
+      "background-opacity": 1,
+      "border-color": "#22d3ee",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-hexagon",
+      "width": 170
+    },
+    "sigil:TupleType": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:Type": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1.5,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:TypeAlias": {
+      "background-color": "#374151",
+      "background-opacity": 1,
+      "border-color": "#9ca3af",
+      "border-style": "dotted",
+      "border-width": 1,
+      "font-size": 12,
+      "height": 60,
+      "shape": "round-rectangle",
+      "width": 170
+    },
+    "sigil:TypeExpression": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:TypeParameter": {
+      "background-color": "#0c4a6e",
+      "background-opacity": 1,
+      "border-color": "#38bdf8",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "ellipse",
+      "width": 100
+    },
+    "sigil:TypeRef": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    },
+    "sigil:UnionType": {
+      "background-color": "#475569",
+      "background-opacity": 1,
+      "border-color": "#64748b",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-pentagon",
+      "width": 100
+    },
+    "sigil:Variable": {
+      "background-color": "#334155",
+      "background-opacity": 1,
+      "border-color": "#94a3b8",
+      "border-style": "solid",
+      "border-width": 1,
+      "font-size": 10,
+      "height": 24,
+      "shape": "round-rectangle",
+      "width": 100
+    }
+  }
+}

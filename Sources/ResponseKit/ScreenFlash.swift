@@ -1,4 +1,4 @@
-#if canImport(YameteCore)
+#if !RAW_SWIFTC_LUMP
 import YameteCore
 #endif
 import AppKit
@@ -7,25 +7,41 @@ import SwiftUI
 private let log = AppLog(category: "ScreenFlash")
 
 /// Flashes face overlays on impact across selected screens.
-/// Uses per-screen history to reduce immediate face repeats.
+/// Face selection is pre-resolved by the bus enricher — all screens show the same face.
 @MainActor
-public final class ScreenFlash: VisualResponder {
-    /// Rotation matrix: `history[monitorIndex]` is the ordered list of face indices
-    /// previously shown on that monitor, most recent last. The matrix drives all
-    /// dedup logic from a single data structure — no separate event/monitor tracking.
-    private var history: [[Int]] = []
+public final class ScreenFlash: ReactiveOutput {
 
-    public init() {}
-    private var cachedFaces: [NSImage] = []
-    private var cachedAppearance: NSAppearance.Name?
+    public override init() { super.init() }
 
-    private var faceImages: [NSImage] {
-        let current = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
-        if cachedFaces.isEmpty || current != cachedAppearance {
-            cachedFaces = loadFaceImages()
-            cachedAppearance = current
-        }
-        return cachedFaces
+    // MARK: - ReactiveOutput lifecycle
+
+    override public func shouldFire(_ fired: FiredReaction, provider: OutputConfigProvider) -> Bool {
+        let c = provider.flashConfig()
+        return c.enabled && c.perReaction[fired.kind] != false
+    }
+
+    override public func action(_ fired: FiredReaction, multiplier: Float, provider: OutputConfigProvider) async {
+        let c = provider.flashConfig()
+        flash(
+            intensity: min(1.0, fired.intensity * multiplier),
+            opacityMin: c.opacityMin,
+            opacityMax: c.opacityMax,
+            clipDuration: fired.clipDuration,
+            enabledDisplayIDs: c.enabledDisplayIDs,
+            faceIndices: fired.faceIndices,
+            activeDisplayOnly: c.activeDisplayOnly
+        )
+        try? await Task.sleep(for: .seconds(fired.clipDuration + 0.05))
+    }
+
+    override public func postAction(_ fired: FiredReaction, multiplier: Float, provider: OutputConfigProvider) async {
+        windowPool.values.forEach { $0.orderOut(nil) }
+    }
+
+    override public func reset() {
+        hideTask?.cancel()
+        hideTask = nil
+        windowPool.values.forEach { $0.orderOut(nil) }
     }
 
     /// Reusable window pool keyed by screen index. Avoids NSWindow creation per impact.
@@ -35,25 +51,44 @@ public final class ScreenFlash: VisualResponder {
 
     /// Flashes all screens with a face overlay gated inside `clipDuration`.
     /// - Parameter enabledDisplayIDs: display IDs to flash. Empty = all displays.
-    public func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, dismissAfter _: Double, enabledDisplayIDs: [Int] = []) {
+    /// - Parameter activeDisplayOnly: when true, flash only NSScreen.main at fire time.
+    public func flash(intensity: Float, opacityMin: Float, opacityMax: Float, clipDuration: Double, enabledDisplayIDs: [Int] = [], faceIndices: [Int] = [], activeDisplayOnly: Bool = false) {
         guard clipDuration > 0 else { return }
 
-        let screens = selectScreens(enabledIDs: enabledDisplayIDs)
+        let screens = activeDisplayOnly ? [NSScreen.main].compactMap { $0 } : selectScreens(enabledIDs: enabledDisplayIDs)
         guard !screens.isEmpty else { return }
 
         let peak = CGFloat(opacityMin + intensity * (opacityMax - opacityMin))
         let env = Self.envelope(clipDuration: clipDuration, intensity: intensity)
-        let faces = faceImages
-        let picks = pickFaces(count: screens.count, total: faces.count)
 
         pruneWindowPool(activeCount: screens.count)
-        let windows = renderOverlays(screens: screens, faces: faces, picks: picks, peak: peak, env: env)
+        let windows = renderOverlays(screens: screens, faceIndices: faceIndices, peak: peak, env: env)
         scheduleHide(windows: windows, after: clipDuration)
     }
 
     private func selectScreens(enabledIDs: [Int]) -> [NSScreen] {
         let enabled = Set(enabledIDs)
         return NSScreen.screens.filter { enabled.contains($0.displayID) }
+    }
+
+    /// Pure helper exposing the screen-selection rules used by `flash(...)`
+    /// without binding to live `NSScreen` objects. Mirrors the production
+    /// branching exactly:
+    ///   - `activeDisplayOnly == true`  → just the main screen if present (else empty)
+    ///   - `enabledIDs.isEmpty == true` → empty array (production filter contains nothing)
+    ///   - otherwise                    → intersection of allScreenIDs and enabledIDs,
+    ///                                    preserving allScreenIDs ordering
+    public static func selectScreenIDs(
+        allScreenIDs: [Int],
+        mainScreenID: Int?,
+        enabledIDs: [Int],
+        activeDisplayOnly: Bool
+    ) -> [Int] {
+        if activeDisplayOnly {
+            return mainScreenID.map { [$0] } ?? []
+        }
+        let enabled = Set(enabledIDs)
+        return allScreenIDs.filter { enabled.contains($0) }
     }
 
     private func pruneWindowPool(activeCount: Int) {
@@ -63,10 +98,10 @@ public final class ScreenFlash: VisualResponder {
         }
     }
 
-    private func renderOverlays(screens: [NSScreen], faces: [NSImage], picks: [Int?],
+    private func renderOverlays(screens: [NSScreen], faceIndices: [Int],
                                 peak: CGFloat, env: (fadeIn: Double, hold: Double, fadeOut: Double)) -> [NSWindow] {
         screens.enumerated().map { i, screen in
-            let face = picks[i].map { faces[$0] }
+            let face = FaceLibrary.shared.image(at: faceIndices.indices.contains(i) ? faceIndices[i] : (faceIndices.first ?? 0))
             let win = windowForScreen(index: i, screen: screen)
             let hosting = NSHostingView(rootView:
                 FlashOverlayView(peak: peak, face: face, fadeIn: env.fadeIn, hold: env.hold, fadeOut: env.fadeOut)
@@ -99,44 +134,6 @@ public final class ScreenFlash: VisualResponder {
         let decay  = 0.30 + (1.0 - t) * 0.20
         let hold   = 1.0 - attack - decay
         return (fadeIn: clipDuration * attack, hold: clipDuration * hold, fadeOut: clipDuration * decay)
-    }
-
-    // MARK: - Face selection
-
-    /// Picks face indices using recency scoring across monitors and events.
-    private func pickFaces(count: Int, total: Int) -> [Int?] {
-        guard total > 0 else { return Array(repeating: nil, count: count) }
-        while history.count < count { history.append([]) }
-
-        let recentGlobal = Set(history.flatMap { $0.suffix(count) })
-        var usedThisEvent = Set<Int>()
-        var picks: [Int?] = []
-
-        for monitor in 0..<count {
-            guard let best = FaceScoring.selectBest(
-                total: total, monitorHistory: history[monitor],
-                recentGlobal: recentGlobal, usedThisEvent: usedThisEvent
-            ) else { picks.append(nil); continue }
-
-            picks.append(best)
-            usedThisEvent.insert(best)
-            history[monitor].append(best)
-            FaceScoring.pruneHistory(&history[monitor], maxLength: total * 2)
-        }
-
-        return picks
-    }
-
-    // MARK: - Resource loading
-
-    private func loadFaceImages() -> [NSImage] {
-        let images = FaceRenderer.loadFaces()
-        if images.isEmpty {
-            log.error("entity:FaceLibrary wasInvalidatedBy activity:ResourceLoad — no face images in bundle/faces")
-        } else {
-            log.info("entity:FaceLibrary wasGeneratedBy activity:ResourceLoad count=\(images.count)")
-        }
-        return images
     }
 
     // MARK: - Window pool
@@ -205,24 +202,3 @@ private struct FlashOverlayView: View {
     }
 }
 
-// MARK: - Face scoring
-
-private enum FaceScoring {
-    static func selectBest(total: Int, monitorHistory: [Int],
-                           recentGlobal: Set<Int>, usedThisEvent: Set<Int>) -> Int? {
-        let scores = (0..<total).map { idx -> (index: Int, score: Int) in
-            let recency = monitorHistory.lastIndex(of: idx)
-                .map { monitorHistory.count - $0 } ?? (total + 1)
-            let globalPenalty = recentGlobal.contains(idx) ? total : 0
-            let eventPenalty = usedThisEvent.contains(idx) ? total * 2 : 0
-            return (idx, -(recency) + globalPenalty + eventPenalty)
-        }
-        return scores.min(by: { $0.score < $1.score })?.index
-    }
-
-    static func pruneHistory(_ history: inout [Int], maxLength: Int) {
-        if history.count > maxLength {
-            history.removeFirst(history.count - maxLength)
-        }
-    }
-}

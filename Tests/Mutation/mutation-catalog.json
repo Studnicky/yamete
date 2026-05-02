@@ -1,0 +1,1005 @@
+{
+  "$schema": "./mutation-catalog.schema.txt",
+  "_comment": "Single source of truth for Yamete's mutation-test catalog. Each entry encodes one production gate that has a corresponding behavioural test cell. The runner (scripts/mutation-test.sh) applies each mutation to a clean working tree, runs the named XCTest, asserts the test FAILS with the expected substring, then reverts via git. See Tests/Mutation/README.md for full architecture.",
+  "mutations": [
+    {
+      "description": "TrackpadActivitySource.handleTapDown \u2014 drop tap-attribution recency gate; external mouse clicks must not be credited as trackpad taps.",
+      "expectedFailingTest": "MatrixDeviceAttributionTests/testExternalMouseClick_doesNotFireTrackpadTap",
+      "expectedFailureSubstring": "[scenario=external-mouse-click]",
+      "id": "trackpad-gesture-recency-gate",
+      "replace": "guard sinceGesture >= -1 else {",
+      "search": "guard sinceGesture <= tapAttributionWindow else {",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource scrollMonitor \u2014 drop empty-phase guard; trackpad-flavoured (phased) scrolls must not be credited as mouse scrolls.",
+      "expectedFailingTest": "MatrixMouseOSEvents_Tests/testTrackpadScrollOnMouseSource_doesNotFireMouseScrolled",
+      "expectedFailureSubstring": "[cell=cross-attribution-trackpad-on-mouse]",
+      "id": "mouse-empty-phase-guard",
+      "replace": "if false { return }",
+      "search": "guard event.phase.isEmpty, event.momentumPhase.isEmpty else { return }",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.handleScrollEvent \u2014 drop the phase guard around lastTrackpadGestureAt stamp; mouse-wheel events must not register the user's hand as on the trackpad.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testMouseWheelScrollDoesNotStampTrackpadGesture",
+      "expectedFailureSubstring": "[cell=mouse-wheel-no-gesture-stamp]",
+      "id": "trackpad-mousewheel-stamp-guard",
+      "replace": "lastTrackpadGestureAt = now",
+      "search": "if !event.phase.isEmpty { lastTrackpadGestureAt = now }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource \u2014 change tapRateThreshold default from 3.0 to 0.0; below-threshold rates must not fire keyboardTyped.",
+      "expectedFailingTest": "MatrixKeyboardOSEvents_Tests/testRateBelowThreshold_noReactions",
+      "expectedFailureSubstring": "[cell=rate-below-threshold]",
+      "id": "keyboard-rate-threshold-default",
+      "replace": "private var tapRateThreshold: Double = 0.0  // key presses / second",
+      "search": "private var tapRateThreshold: Double = 3.0  // key presses / second",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.handleTapDown \u2014 drop the per-mode enable gate; toggling tappingEnabled=false must suppress all .trackpadTapping reactions.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testTappingDisabled_noReactions",
+      "expectedFailureSubstring": "[cell=tapping-disabled]",
+      "id": "trackpad-tapping-enabled-gate",
+      "replace": "if false { return }",
+      "search": "guard tappingEnabled else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.handleScroll \u2014 drop empty-phase guard; mouse-wheel scrolls (phase==[]) must not drive trackpad scroll RMS / contact / circle paths.",
+      "expectedFailingTest": "MatrixCrossSourceConflationTests/test_mouseWheelScroll_trackpadDoesNotFire",
+      "expectedFailureSubstring": "[cell=mouseWheel] trackpad must NOT publish",
+      "id": "trackpad-scroll-empty-phase-guard",
+      "replace": "if false { return }",
+      "search": "guard !phase.isEmpty else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.handleMouseScroll \u2014 invert magnitude floor so all events drop; sustained high-magnitude wheel events must fire .mouseScrolled, so dropping all events fails the cell.",
+      "expectedFailingTest": "MatrixMouseOSEvents_Tests/testMouseScrollHighMagnitude_firesAtLeastOne",
+      "expectedFailureSubstring": "[cell=mouse-mag-floor-passthrough]",
+      "id": "mouse-scroll-mag-floor",
+      "replace": "if true { return }  // mutated: drop ALL events",
+      "search": "guard mag > 0.5 else { return }  // filter tiny accidental movements",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.handleHIDClick \u2014 drop transport/product attribution filter; SPI built-in trackpads and USB Magic Trackpad clicks must NOT fire .mouseClicked.",
+      "expectedFailingTest": "MatrixCrossSourceConflationTests/test_hidClick_USB_MagicTrackpad_doesNotFireMouseClicked",
+      "expectedFailureSubstring": "[cell=hidClick-USB-MagicTrackpad]",
+      "id": "mouse-hid-click-attribution-filter",
+      "replace": "if false {",
+      "search": "guard transport != \"SPI\", !product.lowercased().contains(\"trackpad\") else {",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.handleHIDClick \u2014 slam click-gate shut so no click ever fires; legitimate USB mouse clicks must publish .mouseClicked.",
+      "expectedFailingTest": "MatrixCrossSourceConflationTests/test_hidClick_USB_LogitechMouse_firesMouseClicked_noTrackpadTap",
+      "expectedFailureSubstring": "[cell=hidClick-USB-Logitech-noGesture] non-trackpad USB click must fire .mouseClicked",
+      "id": "mouse-click-debounce-gate",
+      "replace": "if true { return }",
+      "search": "guard now >= clickGate else { return }",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.handleTapDown \u2014 slam tap-rate / debounce gate shut; gesture+click within attribution window must still fire .trackpadTapping.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testTapping_gestureThenClickFires",
+      "expectedFailureSubstring": "[cell=tapping-gesture-then-click]",
+      "id": "trackpad-tap-rate-floor",
+      "replace": "if true { return }",
+      "search": "guard rate >= tapMin, now >= tappingGate else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.evaluateScroll \u2014 drop the per-mode sliding enable gate; toggling slidingEnabled=false must suppress all .trackpadSliding reactions.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testSlidingDisabled_noReactions",
+      "expectedFailureSubstring": "[cell=sliding-disabled]",
+      "id": "trackpad-sliding-enabled-gate",
+      "replace": "if false { return }",
+      "search": "guard slidingEnabled else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.evaluateScroll \u2014 drop the per-mode touching enable gate; toggling touchingEnabled=false must suppress all .trackpadTouching reactions.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testTouchingDisabled_noReactions",
+      "expectedFailureSubstring": "[cell=touching-disabled]",
+      "id": "trackpad-touching-enabled-gate",
+      "replace": "if false { return }",
+      "search": "guard touchingEnabled else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.handleScroll \u2014 slam tiny-magnitude filter shut; sustained scroll above touching threshold must still fire .trackpadTouching.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testTouching_aboveThresholdFiresReaction",
+      "expectedFailureSubstring": "[cell=touching-above-threshold]",
+      "id": "trackpad-scroll-mag-floor",
+      "replace": "if true { return }",
+      "search": "guard mag > 0.01 else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.handleKeyPress \u2014 slam the rate/debounce gate shut; an at-threshold keypress burst must still fire .keyboardTyped exactly once.",
+      "expectedFailingTest": "MatrixKeyboardOSEvents_Tests/testRateAtThreshold_firesExactlyOneReaction",
+      "expectedFailureSubstring": "[cell=rate-at-threshold]",
+      "id": "keyboard-rate-floor-guard",
+      "replace": "if true { return }",
+      "search": "guard rate >= tapRateThreshold, now >= typingGate else { return }",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource._testEmit \u2014 drop the kind-guard so non-.keyboardTyped kinds incorrectly publish .keyboardTyped (the unconditional publish below the guard is hardcoded).",
+      "expectedFailingTest": "MatrixKeyboardOSEvents_Tests/test_testEmit_nonKeyboardKind_doesNotPublish",
+      "expectedFailureSubstring": "[cell=testEmit-kind-guard]",
+      "id": "keyboard-testEmit-kind-guard",
+      "replace": "if false { return }",
+      "search": "guard kind == .keyboardTyped else { return }",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.handleMouseScroll \u2014 slam the RMS/debounce gate shut; sustained high-magnitude wheel events must still fire .mouseScrolled.",
+      "expectedFailingTest": "MatrixMouseOSEvents_Tests/testMouseScrollHighMagnitude_firesAtLeastOne",
+      "expectedFailureSubstring": "[cell=mouse-mag-floor-passthrough]",
+      "id": "mouse-rms-threshold-gate",
+      "replace": "if true { return }",
+      "search": "guard rms > scrollThreshold, now >= scrollGate else { return }",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.start \u2014 drop the monitor-idempotency guard; a second start() must not double-install NSEvent monitors. Without the guard, every click is processed twice, doubling the tap-rate count and firing .trackpadTapping at half the configured tapMin.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testDoubleStart_doesNotDoubleInstallMonitors",
+      "expectedFailureSubstring": "[cell=double-start-idempotency]",
+      "id": "trackpad-start-monitor-idempotency",
+      "replace": "if false { return }",
+      "search": "guard monitor == nil else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "PowerSource.handlePowerChange(onAC:) \u2014 drop the edge-trigger guard against lastWasOnAC; same-state IOPS callbacks (battery percent, charge state, time-remaining estimates) must NOT republish .acConnected / .acDisconnected.",
+      "expectedFailingTest": "MatrixPowerSourceTests/testRepeatedSameState_publishesOnce",
+      "expectedFailureSubstring": "[scenario=repeated-same-state]",
+      "id": "power-edge-trigger-gate",
+      "replace": "if false { return }",
+      "search": "guard onAC != lastWasOnAC else { return }",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "PowerSource.start \u2014 drop the runLoopSource-nil idempotency guard; a second start() call must NOT re-seed lastWasOnAC from currentlyOnAC(), or a previously-no-op inject becomes a fresh edge and the bus republishes the AC state.",
+      "expectedFailingTest": "MatrixPowerSourceTests/testStartIsIdempotent_preservesEdgeBaseline",
+      "expectedFailureSubstring": "[scenario=idempotent-start-baseline]",
+      "id": "power-start-idempotency-gate",
+      "replace": "if false { return }",
+      "search": "guard runLoopSource == nil else { return }",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "DisplayHotplugSource.dispatchDebounced \u2014 drop the 200ms shouldFire window guard; the 3-4 callbacks macOS emits per real reconfigure must collapse to 1 .displayConfigured publish, not 4.",
+      "expectedFailingTest": "MatrixDisplayHotplugSourceTests/testRapidFourCallbacks_debouncedToOne",
+      "expectedFailureSubstring": "[scenario=rapid-four-callbacks]",
+      "id": "display-hotplug-debounce-gate",
+      "replace": "if false { return }",
+      "search": "guard shouldFire else { return }",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "ImpactDetector.process \u2014 drop the warmup gate; samples processed before sampleCount reaches warmupSamples must be rejected so filter state can settle.",
+      "expectedFailingTest": "MatrixImpactDetector_Tests/testWarmupGate_belowSampleCount_returnsNil",
+      "expectedFailureSubstring": "[gate=warmup]",
+      "id": "impact-detector-warmup-gate",
+      "replace": "guard s.sampleCount >= 0 else { return nil }",
+      "search": "guard s.sampleCount >= config.warmupSamples else { return nil }",
+      "targetFile": "Sources/SensorKit/ImpactDetector.swift"
+    },
+    {
+      "description": "ImpactDetector.process \u2014 drop the spike threshold gate; magnitudes below the configured spikeThreshold must NOT detect.",
+      "expectedFailingTest": "MatrixImpactDetector_Tests/testSpikeGate_belowThreshold_returnsNil",
+      "expectedFailureSubstring": "[gate=spike]",
+      "id": "impact-detector-spike-threshold-gate",
+      "replace": "guard magnitude >= 0 else { return nil }",
+      "search": "guard magnitude >= config.spikeThreshold else { return nil }",
+      "targetFile": "Sources/SensorKit/ImpactDetector.swift"
+    },
+    {
+      "description": "ImpactDetector.process \u2014 drop the rise rate gate; a slow ramp whose peak consecutive rise is below minRiseRate must NOT detect (separates impacts from gradual changes).",
+      "expectedFailingTest": "MatrixImpactDetector_Tests/testRiseRateGate_gradualRamp_returnsNil",
+      "expectedFailureSubstring": "[gate=riseRate]",
+      "id": "impact-detector-rise-rate-gate",
+      "replace": "guard windowPeakRise >= 0 else {",
+      "search": "guard windowPeakRise >= config.minRiseRate else {",
+      "targetFile": "Sources/SensorKit/ImpactDetector.swift"
+    },
+    {
+      "description": "ImpactDetector.process \u2014 drop the crest factor gate; a sample marginally above an elevated background RMS must NOT detect (separates impacts from sustained noise).",
+      "expectedFailingTest": "MatrixImpactDetector_Tests/testCrestFactorGate_elevatedBackground_returnsNil",
+      "expectedFailureSubstring": "[gate=crestFactor]",
+      "id": "impact-detector-crest-factor-gate",
+      "replace": "guard crest >= 0 else {",
+      "search": "guard crest >= config.minCrestFactor else {",
+      "targetFile": "Sources/SensorKit/ImpactDetector.swift"
+    },
+    {
+      "description": "ImpactDetector.process \u2014 drop the confirmations gate; a single above-threshold sample must NOT meet a multi-confirmation requirement (one-shot transients are noise).",
+      "expectedFailingTest": "MatrixImpactDetector_Tests/testConfirmationsGate_singleSample_returnsNil",
+      "expectedFailureSubstring": "[gate=confirmations]",
+      "id": "impact-detector-confirmations-gate",
+      "replace": "guard confirmed >= 0 else {",
+      "search": "guard confirmed >= config.minConfirmations else {",
+      "targetFile": "Sources/SensorKit/ImpactDetector.swift"
+    },
+    {
+      "description": "ImpactFusion.start \u2014 drop the empty-availability gate; calling start() with zero available sources must invoke onError with noAdaptersAvailable and NOT mark the engine running.",
+      "expectedFailingTest": "ImpactFusionAvailabilityGateTests/testStartWithNoAvailableSources_invokesOnError_doesNotMarkRunning",
+      "expectedFailureSubstring": "[fusion-gate=empty-available]",
+      "id": "impact-fusion-empty-available-gate",
+      "replace": "if false {",
+      "search": "guard !available.isEmpty else {",
+      "targetFile": "Sources/SensorKit/ImpactDetection.swift"
+    },
+    {
+      "description": "ImpactFusion.ingest \u2014 drop the rearm-duration gate; an impact arriving inside the configured rearmDuration after a prior trigger must NOT re-trigger.",
+      "expectedFailingTest": "ImpactFusionTests/testFusionRearmGate_withinRearm_returnsNil",
+      "expectedFailureSubstring": "[fusion-gate=rearm]",
+      "id": "impact-fusion-rearm-gate",
+      "replace": "guard now.timeIntervalSince(lastTriggerAt) >= -1 else { return nil }",
+      "search": "guard now.timeIntervalSince(lastTriggerAt) >= config.rearmDuration else { return nil }",
+      "targetFile": "Sources/SensorKit/ImpactDetection.swift"
+    },
+    {
+      "description": "ImpactFusion.ingest \u2014 drop the participating-sources consensus gate; one source reporting against a 2-of-2 consensus requirement must NOT trigger.",
+      "expectedFailingTest": "ImpactFusionTests/testFusionConsensusGate_singleSource_belowRequired_returnsNil",
+      "expectedFailureSubstring": "[fusion-gate=consensus]",
+      "id": "impact-fusion-consensus-gate",
+      "replace": "guard participatingSources.count >= 0 else { return nil }",
+      "search": "guard participatingSources.count >= required else { return nil }",
+      "targetFile": "Sources/SensorKit/ImpactDetection.swift"
+    },
+    {
+      "description": "HeadphoneMotionSource.impacts \u2014 drop the framework-availability gate; opening the stream when CMHeadphoneMotionManager reports motion unavailable must throw SensorError.deviceNotFound, not silently start updates.",
+      "expectedFailingTest": "HeadphoneMotionSourceLifecycleTests/testFrameworkUnavailableThrowsDeviceNotFound",
+      "expectedFailureSubstring": "expected SensorError.deviceNotFound",
+      "id": "headphone-motion-framework-available-gate",
+      "replace": "        if false {\n            continuation.finish(throwing: SensorError.deviceNotFound)\n            return stream\n        }",
+      "search": "        guard driver.isDeviceMotionAvailable else {\n            continuation.finish(throwing: SensorError.deviceNotFound)\n            return stream\n        }",
+      "targetFile": "Sources/SensorKit/HeadphoneMotionAdapter.swift"
+    },
+    {
+      "description": "HeadphoneMotionSource.impacts \u2014 drop the mid-stream connection check; samples arriving after the headphones disconnect must be pruned (not delivered to the impact detector).",
+      "expectedFailingTest": "HeadphoneMotionSourceLifecycleTests/testDisconnectPostWarmup_postDisconnectSamplesPruned",
+      "expectedFailureSubstring": "[hp-gate=disconnect-prune]",
+      "id": "headphone-motion-disconnect-prune-gate",
+      "replace": "if false { return }",
+      "search": "guard driver.isHeadphonesConnected else { return }",
+      "targetFile": "Sources/SensorKit/HeadphoneMotionAdapter.swift"
+    },
+    {
+      "description": "MicrophoneSource.impacts \u2014 drop the input-format validity gate; a driver reporting a zero-channel or zero-sample-rate format must surface SensorError.deviceNotFound and MUST NOT install a tap.",
+      "expectedFailingTest": "MicrophoneSourceLifecycleTests/testInvalidInputFormat_throwsDeviceNotFound_doesNotInstallTap",
+      "expectedFailureSubstring": "[mic-gate=invalid-format]",
+      "id": "microphone-invalid-format-gate",
+      "replace": "guard format.channelCount >= 0, format.sampleRate >= 0 else {",
+      "search": "guard format.channelCount > 0, format.sampleRate > 0 else {",
+      "targetFile": "Sources/SensorKit/MicrophoneAdapter.swift"
+    },
+    {
+      "description": "ImpactFusion.stop \u2014 drop the isRunning idempotency gate; calling stop() against a not-running engine must take the no-op path (lastStopWasNoOp == true, stopTeardownCount stays 0). Removing the guard would let the teardown body run, bumping stopTeardownCount.",
+      "expectedFailingTest": "ImpactFusionStopIdempotencyGateTests/testStopWhenNotRunning_isNoOp",
+      "expectedFailureSubstring": "[fusion-gate=stop-idempotency]",
+      "id": "impact-fusion-stop-idempotency-gate",
+      "replace": "if false {\n            #if DEBUG\n            _testHooks.lastStopWasNoOp = true",
+      "search": "guard isRunning else {\n            #if DEBUG\n            _testHooks.lastStopWasNoOp = true",
+      "targetFile": "Sources/SensorKit/ImpactDetection.swift"
+    },
+    {
+      "description": "HeadphoneMotionSource.startConnectionProbe \u2014 drop the framework-availability gate; constructing the adapter with a driver that reports motion unavailable must NOT call driver.startUpdates from the probe. Removing the guard would let the probe touch the driver against an unsupported framework.",
+      "expectedFailingTest": "HeadphoneMotionSourceLifecycleTests/testProbeGate_frameworkUnavailable_doesNotStartUpdates",
+      "expectedFailureSubstring": "[hp-probe-gate=framework-available]",
+      "id": "headphone-probe-framework-available-gate",
+      "replace": "if false { return }",
+      "search": "guard driver.isDeviceMotionAvailable else { return }",
+      "targetFile": "Sources/SensorKit/HeadphoneMotionAdapter.swift"
+    },
+    {
+      "description": "HeadphoneMotionSource.finishProbeIfRunning \u2014 drop the probeStage state-machine guard. After impacts() takes the manager (stage == .takenOver), the deferred probe-stop closure must NOT call stopUpdates again or flip the stage to .complete. Removing the guard would invalidate the active impact stream.",
+      "expectedFailingTest": "HeadphoneMotionSourceLifecycleTests/testProbeStageGate_takenOver_deferredClosureIsNoOp",
+      "expectedFailureSubstring": "[hp-probe-gate=takenOver]",
+      "id": "headphone-probe-stage-gate",
+      "replace": "guard stage == .running || true else { return false }",
+      "search": "guard stage == .running else { return false }",
+      "targetFile": "Sources/SensorKit/HeadphoneMotionAdapter.swift"
+    },
+    {
+      "description": "MicrophoneSource.impacts tap callback \u2014 slam the frameLength > 0 gate shut so EVERY buffer is dropped. Strong-transient buffers driven through the permissive detector must yield \u2265 1 impact under the production gate; with the gate inverted the loop short-circuits and no impacts are emitted.",
+      "expectedFailingTest": "MicrophoneSourceLifecycleTests/testFrameLengthGate_validBuffers_yieldImpact",
+      "expectedFailureSubstring": "[mic-gate=frameLength]",
+      "id": "microphone-frame-length-gate",
+      "replace": "guard frameLength <= 0 else { return }",
+      "search": "guard frameLength > 0 else { return }",
+      "targetFile": "Sources/SensorKit/MicrophoneAdapter.swift"
+    },
+    {
+      "description": "AccelerometerReader.ReportContext.handleReport \u2014 drop the minimum-length floor; a payload shorter than the BMI286 24-byte report must NOT yield an impact (the misaligned int32 reads at offsets 6/10/14 would otherwise consume garbage).",
+      "expectedFailingTest": "MatrixAccelerometerReader_Tests/testHandleReport_shortPayloadBelowMin_yieldsNothing",
+      "expectedFailureSubstring": "[accel-gate=length-floor]",
+      "id": "accel-handleReport-length-floor",
+      "replace": "guard length >= -1 else { return }",
+      "search": "guard length >= minReportLength else { return }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.ReportContext.handleReport \u2014 drop the running guard; reports arriving after ctx.invalidate() (the teardown phase-1 silence step) must NOT reach the impact detector or yield onto the continuation.",
+      "expectedFailingTest": "MatrixAccelerometerReader_Tests/testHandleReport_afterInvalidate_yieldsNothing",
+      "expectedFailureSubstring": "[accel-gate=handleReport-running]",
+      "id": "accel-handleReport-running-gate",
+      "replace": "guard true else { return nil }",
+      "search": "guard s.running else { return nil }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.ReportContext.handleReport \u2014 drop the decimation gate; with decimationFactor=2 the cell drives 10 reports and asserts exactly 5 yields. Removing the gate yields on every report (10 yields), failing the equality check.",
+      "expectedFailingTest": "MatrixAccelerometerReader_Tests/testHandleReport_decimation_yieldsEveryNthReport",
+      "expectedFailureSubstring": "[accel-gate=decimation]",
+      "id": "accel-handleReport-decimation-gate",
+      "replace": "guard true else { return nil }",
+      "search": "guard s.sampleCounter % decimationFactor == 0 else { return nil }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.ReportContext.handleReport \u2014 drop the magnitude bounds gate; sub-floor (rawMag < magnitudeMin) and super-ceiling (rawMag > magnitudeMax) raw vectors must NOT pass through to the bandpass filter and detector.",
+      "expectedFailingTest": "MatrixAccelerometerReader_Tests/testHandleReport_belowMagnitudeMin_yieldsNothing",
+      "expectedFailureSubstring": "[accel-gate=magnitude-bounds]",
+      "id": "accel-handleReport-magnitude-bounds-gate",
+      "replace": "guard true else { return nil }",
+      "search": "guard rawMag > magnitudeMin && rawMag < magnitudeMax else { return nil }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.ReportContext.surfaceStall \u2014 drop the running guard; after ctx.invalidate() a late-arriving stall must NOT re-finish the consumer continuation with a spurious error.",
+      "expectedFailingTest": "MatrixAccelerometerReader_Tests/testSurfaceStall_afterInvalidate_yieldsNothing",
+      "expectedFailureSubstring": "[accel-gate=surfaceStall-running]",
+      "id": "accel-surfaceStall-running-gate",
+      "replace": "guard true else { return nil /* already-stalled */ }",
+      "search": "guard s.running else { return nil /* already-stalled */ }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.evaluateWatchdogTick \u2014 drop the running guard; an invalidated snapshot must decode as .invalidated, NOT proceed into staleness math (which could surface a spurious .stalled and re-fire surfaceStall after the consumer has already torn down).",
+      "expectedFailingTest": "MatrixAccelerometerReader_Tests/testWatchdogTick_invalidatedSnapshot_returnsInvalidated",
+      "expectedFailureSubstring": "[accel-gate=watchdog-running]",
+      "id": "accel-watchdog-running-gate",
+      "replace": "guard true else { return .invalidated }",
+      "search": "guard snapshot.running else { return .invalidated }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.evaluateActivity \u2014 drop the dispatchAccel filter; SPU services with dispatchAccel=false (gyro / temperature / hinge-angle siblings) must decode as .skip so the iterator keeps looking for the accelerometer service rather than mis-treating a sibling as the accelerometer.",
+      "expectedFailingTest": "MatrixAccelerometerReader_Tests/testEvaluateActivity_dispatchAccelFalse_returnsSkip",
+      "expectedFailureSubstring": "[accel-gate=dispatchAccel]",
+      "id": "accel-activity-dispatchAccel-gate",
+      "replace": "guard true else { return .skip }",
+      "search": "guard dispatchAccel else { return .skip }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.evaluateActivity \u2014 drop the monotonic-clock guard; a non-monotonic snapshot (now \u2264 lastTs, e.g. clock reset / overflow) must decode as .clockNonMonotonic, NOT proceed into the (now - lastTs) UInt64 subtraction (which would underflow to a huge bogus deltaNs and decode as .stale).",
+      "expectedFailingTest": "MatrixAccelerometerReader_Tests/testEvaluateActivity_clockNotMonotonic_returnsClockNonMonotonic",
+      "expectedFailureSubstring": "[accel-gate=clock-monotonicity]",
+      "id": "accel-activity-clock-monotonicity-gate",
+      "replace": "guard now >= 0 else { return .clockNonMonotonic }",
+      "search": "guard now > lastTs else { return .clockNonMonotonic }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.SensorActivation.activate \u2014 drop the IOServiceGetMatchingServices KERN_SUCCESS guard; a forced kernel failure must short-circuit before the iterator loop body runs (no registrySetCFProperty calls). Reachable via the AccelerometerKernelDriver injection seam.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testActivate_matchingFailure_shortCircuitsBeforeRegistryWrites",
+      "expectedFailureSubstring": "[accel-kernel-gate=activate-matching-fidelity]",
+      "id": "accel-kernel-activate-matching-gate",
+      "replace": "guard kr == kr else { return false }",
+      "search": "guard kr == KERN_SUCCESS else { return false }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.SensorActivation.activate \u2014 invert the iterator sentinel; mock yields one synthetic service then 0, so the gate must let the loop body run on the service before breaking on 0. Inverting the comparison breaks before the body and the registry-write counter stays at 0.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testActivate_iteratorYieldsOneService_loopBodyExecutesThreeWrites",
+      "expectedFailureSubstring": "[accel-kernel-gate=activate-iterator-sentinel]",
+      "id": "accel-kernel-activate-iterator-sentinel-gate",
+      "replace": "guard service == 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            let r1 = driver.registrySetCFProperty(service, key: \"ReportInterval\" as CFString, value: reportIntervalUS as CFNumber)",
+      "search": "guard service != 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            let r1 = driver.registrySetCFProperty(service, key: \"ReportInterval\" as CFString, value: reportIntervalUS as CFNumber)",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.SensorActivation.deactivate \u2014 drop the IOServiceGetMatchingServices KERN_SUCCESS guard; forced kernel failure must short-circuit before the iterator loop body runs (no registrySetCFProperty calls).",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testDeactivate_matchingFailure_shortCircuitsBeforeRegistryWrites",
+      "expectedFailureSubstring": "[accel-kernel-gate=deactivate-matching-fidelity]",
+      "id": "accel-kernel-deactivate-matching-gate",
+      "replace": "guard kr == kr else { return }",
+      "search": "guard kr == KERN_SUCCESS else { return }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.SensorActivation.deactivate \u2014 invert the iterator sentinel; mock yields one synthetic service then 0, so the gate must let the loop body run on the service before breaking on 0. Inverting the comparison breaks before the body and the registry-write counter stays at 0.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testDeactivate_iteratorYieldsOneService_loopBodyExecutesThreeWrites",
+      "expectedFailureSubstring": "[accel-kernel-gate=deactivate-iterator-sentinel]",
+      "id": "accel-kernel-deactivate-iterator-sentinel-gate",
+      "replace": "guard service == 0 else { break }\n            defer { driver.objectRelease(service) }\n            #if DIRECT_BUILD",
+      "search": "guard service != 0 else { break }\n            defer { driver.objectRelease(service) }\n            #if DIRECT_BUILD",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.isSPUDevicePresent \u2014 drop the IOHIDManagerOpen kIOReturnSuccess guard; forced manager-open failure must yield false and short-circuit before transport probing.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testIsSPUDevicePresent_managerOpenFailure_returnsFalseShortCircuit",
+      "expectedFailureSubstring": "[accel-kernel-gate=isSPUDevicePresent-managerOpen-fidelity]",
+      "id": "accel-kernel-isSPUDevicePresent-managerOpen-gate",
+      "replace": "guard driver.hidManagerOpen(manager) != driver.hidManagerOpen(manager) else { return false }",
+      "search": "guard driver.hidManagerOpen(manager) == kIOReturnSuccess else { return false }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.isSensorActivelyReporting \u2014 drop the IOServiceGetMatchingServices KERN_SUCCESS guard; forced kernel failure must yield false and short-circuit before iterator polling.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testIsSensorActivelyReporting_matchingFailure_returnsFalseShortCircuit",
+      "expectedFailureSubstring": "[accel-kernel-gate=isSensorActivelyReporting-matching-fidelity]",
+      "id": "accel-kernel-isSensorActivelyReporting-matching-gate",
+      "replace": "guard kr == kr else {\n            return false\n        }",
+      "search": "guard kr == KERN_SUCCESS else {\n            return false\n        }",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.isSensorActivelyReporting \u2014 invert the iterator sentinel; mock yields one synthetic service then 0, so the gate must let the loop body probe dispatchAccel + DebugState before breaking on 0. Inverting the comparison breaks before the body and registryCreateCFProperty stays at 0.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testIsSensorActivelyReporting_iteratorYieldsOneService_loopBodyProbesTwoProperties",
+      "expectedFailureSubstring": "[accel-kernel-gate=isSensorActivelyReporting-iterator-sentinel]",
+      "id": "accel-kernel-isSensorActivelyReporting-iterator-sentinel-gate",
+      "replace": "guard service == 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            // The SPU bus also hosts gyro, temperature, and hinge-angle\n            // services. Only the one carrying `dispatchAccel = Yes` is\n            // ours.\n            let dispatchAccel = driver.registryCreateCFProperty(",
+      "search": "guard service != 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            // The SPU bus also hosts gyro, temperature, and hinge-angle\n            // services. Only the one carrying `dispatchAccel = Yes` is\n            // ours.\n            let dispatchAccel = driver.registryCreateCFProperty(",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.openStream \u2014 drop the IOHIDManagerOpen kIOReturnSuccess guard; forced manager-open failure must surface SensorError.ioKitError on the consumer stream and short-circuit before IOHIDDeviceOpen is reached.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testOpenStream_managerOpenFailure_surfacesIoKitErrorShortCircuit",
+      "expectedFailureSubstring": "[accel-kernel-gate=openStream-managerOpen-fidelity]",
+      "id": "accel-kernel-openStream-managerOpen-gate",
+      "replace": "guard openResult == openResult else {",
+      "search": "guard openResult == kIOReturnSuccess else {",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.openStream \u2014 drop the IOHIDDeviceOpen kIOReturnSuccess guard; forced device-open failure must surface SensorError.ioKitError and short-circuit before hidDeviceMaxReportSize is reached.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testOpenStream_deviceOpenFailure_surfacesIoKitErrorShortCircuit",
+      "expectedFailureSubstring": "[accel-kernel-gate=openStream-deviceOpen-fidelity]",
+      "id": "accel-kernel-openStream-deviceOpen-gate",
+      "replace": "guard devOpenResult == devOpenResult else {",
+      "search": "guard devOpenResult == kIOReturnSuccess else {",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "AccelerometerReader.AccelHardware.openStream \u2014 drop the maxSize > 0 guard; mock returns 0 and the production path must surface SensorError.ioKitError with kIOReturnInternalError rather than allocate a zero-length buffer.",
+      "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testOpenStream_maxSizeZero_surfacesIoKitError",
+      "expectedFailureSubstring": "[accel-kernel-gate=openStream-maxSize-fidelity]",
+      "id": "accel-kernel-openStream-maxSize-gate",
+      "replace": "guard maxSize >= 0 else {",
+      "search": "guard maxSize > 0 else {",
+      "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
+    },
+    {
+      "description": "USBSource.start \u2014 drop notifyPort==nil idempotency guard; second start must NOT re-register IOKit matching notifications. _testInstallationCount tracks each successful install path.",
+      "expectedFailingTest": "MatrixUSBSourceTests/testDoubleStart_doesNotDoubleInstallNotifications",
+      "expectedFailureSubstring": "[scenario=usb-double-start-idempotency]",
+      "id": "usb-start-idempotency-gate",
+      "replace": "if false { return }\n        #if DEBUG\n        self._testBus = bus\n        #endif\n        let port = IONotificationPortCreate(kIOMainPortDefault)\n        IONotificationPortSetDispatchQueue(port, DispatchQueue.main)\n        self.notifyPort = port",
+      "search": "guard notifyPort == nil else { return }\n        #if DEBUG\n        self._testBus = bus\n        #endif\n        let port = IONotificationPortCreate(kIOMainPortDefault)\n        IONotificationPortSetDispatchQueue(port, DispatchQueue.main)\n        self.notifyPort = port",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "USBSource.start \u2014 drop kernel-success guard; failed IOServiceAddMatchingNotification must NOT advance to publishTask install. _forceKernelFailureKr seam injects a non-success return so the cell observes whether the cleanup branch ran.",
+      "expectedFailingTest": "MatrixUSBSourceTests/testKernelFailure_doesNotInstall",
+      "expectedFailureSubstring": "[scenario=usb-kernel-failure]",
+      "id": "usb-kernel-success-gate",
+      "replace": "        if false {\n            log.warning(\"activity:USBSource wasInvalidatedBy entity:IOService \u2014 attachKr=\\(attachKr) detachKr=\\(detachKr)\")",
+      "search": "        guard attachKr == KERN_SUCCESS, detachKr == KERN_SUCCESS else {\n            log.warning(\"activity:USBSource wasInvalidatedBy entity:IOService \u2014 attachKr=\\(attachKr) detachKr=\\(detachKr)\")",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "AudioPeripheralSource.start \u2014 drop listenerInstalled idempotency guard; second start must NOT re-install the CoreAudio property listener.",
+      "expectedFailingTest": "MatrixAudioPeripheralSourceTests/testDoubleStart_doesNotDoubleInstallListener",
+      "expectedFailureSubstring": "[scenario=audio-double-start-idempotency]",
+      "id": "audio-peripheral-start-idempotency-gate",
+      "replace": "if false { return }",
+      "search": "guard !listenerInstalled else { return }",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "AudioPeripheralSource.start \u2014 drop kernel-success guard; failed AudioObjectAddPropertyListenerBlock must NOT advance to listenerInstalled=true. _forceListenerStatus seam injects a non-noErr OSStatus.",
+      "expectedFailingTest": "MatrixAudioPeripheralSourceTests/testKernelFailure_doesNotInstall",
+      "expectedFailureSubstring": "[scenario=audio-kernel-failure]",
+      "id": "audio-peripheral-kernel-success-gate",
+      "replace": "        if false {\n            log.warning(\"activity:AudioPeripheralSource wasInvalidatedBy entity:CoreAudio status=\\(status)\")",
+      "search": "        guard status == noErr else {\n            log.warning(\"activity:AudioPeripheralSource wasInvalidatedBy entity:CoreAudio status=\\(status)\")",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "BluetoothSource.start \u2014 drop notifyPort==nil idempotency guard; second start must NOT re-register IOKit matching notifications.",
+      "expectedFailingTest": "MatrixBluetoothSourceTests/testDoubleStart_doesNotDoubleInstallNotifications",
+      "expectedFailureSubstring": "[scenario=bt-double-start-idempotency]",
+      "id": "bluetooth-start-idempotency-gate",
+      "replace": "        if false { return }\n        #if DEBUG\n        self._testBus = bus\n        #endif\n        let port = IONotificationPortCreate(kIOMainPortDefault)\n        IONotificationPortSetDispatchQueue(port, DispatchQueue.main)\n        notifyPort = port\n\n        let (stream, continuation) = AsyncStream<Reaction>.makeStream(bufferingPolicy: .bufferingNewest(8))\n        self.streamContinuation = continuation\n\n        let attachContext = BluetoothContext",
+      "search": "        guard notifyPort == nil else { return }\n        #if DEBUG\n        self._testBus = bus\n        #endif\n        let port = IONotificationPortCreate(kIOMainPortDefault)\n        IONotificationPortSetDispatchQueue(port, DispatchQueue.main)\n        notifyPort = port\n\n        let (stream, continuation) = AsyncStream<Reaction>.makeStream(bufferingPolicy: .bufferingNewest(8))\n        self.streamContinuation = continuation\n\n        let attachContext = BluetoothContext",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "BluetoothSource.start \u2014 drop kernel-success guard; failed IOServiceAddMatchingNotification must NOT advance to publishTask install.",
+      "expectedFailingTest": "MatrixBluetoothSourceTests/testKernelFailure_doesNotInstall",
+      "expectedFailureSubstring": "[scenario=bt-kernel-failure]",
+      "id": "bluetooth-kernel-success-gate",
+      "replace": "        if false {\n            log.warning(\"activity:BluetoothSource wasInvalidatedBy entity:IOService \u2014 attachKr=\\(attachKr) detachKr=\\(detachKr)\")",
+      "search": "        guard attachKr == KERN_SUCCESS, detachKr == KERN_SUCCESS else {\n            log.warning(\"activity:BluetoothSource wasInvalidatedBy entity:IOService \u2014 attachKr=\\(attachKr) detachKr=\\(detachKr)\")",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "ThunderboltSource.start \u2014 drop notifyPort==nil idempotency guard; second start must NOT re-register IOKit matching notifications.",
+      "expectedFailingTest": "MatrixThunderboltSourceTests/testDoubleStart_doesNotDoubleInstallNotifications",
+      "expectedFailureSubstring": "[scenario=tb-double-start-idempotency]",
+      "id": "thunderbolt-start-idempotency-gate",
+      "replace": "        if false { return }\n        #if DEBUG\n        self._testBus = bus\n        #endif\n        let port = IONotificationPortCreate(kIOMainPortDefault)\n        IONotificationPortSetDispatchQueue(port, DispatchQueue.main)\n        notifyPort = port\n\n        let (stream, continuation) = AsyncStream<Reaction>.makeStream(bufferingPolicy: .bufferingNewest(8))\n        self.streamContinuation = continuation\n\n        let attachContext = ThunderboltContext",
+      "search": "        guard notifyPort == nil else { return }\n        #if DEBUG\n        self._testBus = bus\n        #endif\n        let port = IONotificationPortCreate(kIOMainPortDefault)\n        IONotificationPortSetDispatchQueue(port, DispatchQueue.main)\n        notifyPort = port\n\n        let (stream, continuation) = AsyncStream<Reaction>.makeStream(bufferingPolicy: .bufferingNewest(8))\n        self.streamContinuation = continuation\n\n        let attachContext = ThunderboltContext",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "ThunderboltSource.start \u2014 drop kernel-success guard; failed IOServiceAddMatchingNotification must NOT advance to publishTask install.",
+      "expectedFailingTest": "MatrixThunderboltSourceTests/testKernelFailure_doesNotInstall",
+      "expectedFailureSubstring": "[scenario=tb-kernel-failure]",
+      "id": "thunderbolt-kernel-success-gate",
+      "replace": "        if false {\n            log.warning(\"activity:ThunderboltSource wasInvalidatedBy entity:IOService \u2014 attachKr=\\(attachKr) detachKr=\\(detachKr)\")",
+      "search": "        guard attachKr == KERN_SUCCESS, detachKr == KERN_SUCCESS else {\n            log.warning(\"activity:ThunderboltSource wasInvalidatedBy entity:IOService \u2014 attachKr=\\(attachKr) detachKr=\\(detachKr)\")",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "DisplayHotplugSource.start \u2014 drop !registered idempotency guard; second start must NOT re-register the CGDisplay reconfiguration callback.",
+      "expectedFailingTest": "MatrixDisplayHotplugSourceTests/testDoubleStart_doesNotDoubleRegister",
+      "expectedFailureSubstring": "[scenario=display-double-start-idempotency]",
+      "id": "display-hotplug-start-idempotency-gate",
+      "replace": "if false { return }",
+      "search": "guard !registered else { return }",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "SleepWakeSource.start \u2014 drop rootPort==0 idempotency guard; second start must NOT re-register IORegisterForSystemPower.",
+      "expectedFailingTest": "MatrixSleepWakeSourceTests/testDoubleStart_doesNotDoubleRegister",
+      "expectedFailureSubstring": "[scenario=sleepwake-double-start-idempotency]",
+      "id": "sleepwake-start-idempotency-gate",
+      "replace": "if false { return }",
+      "search": "guard rootPort == 0 else { return }",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "SleepWakeSource.start \u2014 drop the connect!=0 half of the kernel-success guard so a 0-connect failure proceeds; the residual let-port keeps the file syntactically valid. _forceRegistrationFailure seam injects a 0 connect; with the guard relaxed the cleanup branch is skipped and _testInstallationCount bumps.",
+      "expectedFailingTest": "MatrixSleepWakeSourceTests/testKernelFailure_doesNotInstall",
+      "expectedFailureSubstring": "[scenario=sleepwake-kernel-failure]",
+      "id": "sleepwake-kernel-success-gate",
+      "replace": "        guard let port else {\n            log.warning(\"activity:SleepWakeSource wasInvalidatedBy entity:IORegisterForSystemPower\")\n            return\n        }\n        _ = connect",
+      "search": "        guard connect != 0, let port else {\n            log.warning(\"activity:SleepWakeSource wasInvalidatedBy entity:IORegisterForSystemPower\")\n            return\n        }",
+      "targetFile": "Sources/SensorKit/EventSources.swift"
+    },
+    {
+      "description": "MouseActivitySource.shouldDispatchClick \u2014 drop the result-success half of the result/context guard. Predicate now admits non-success IOReturns; cell asserts admit==false.",
+      "expectedFailingTest": "MouseHIDCallbackPredicateTests/test_callback_resultFailure_doesNotDispatch",
+      "expectedFailureSubstring": "[mouse-callback=result-failure]",
+      "id": "mouse-callback-result-failure",
+      "replace": "guard !contextIsNil else { return false }\n        guard usagePage == 0x09",
+      "search": "guard result == kIOReturnSuccess, !contextIsNil else { return false }\n        guard usagePage == 0x09",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.shouldDispatchClick \u2014 drop the contextIsNil half of the result/context guard. Predicate now admits nil-context; cell asserts admit==false.",
+      "expectedFailingTest": "MouseHIDCallbackPredicateTests/test_callback_contextNil_doesNotDispatch",
+      "expectedFailureSubstring": "[mouse-callback=context-nil]",
+      "id": "mouse-callback-context-nil",
+      "replace": "guard result == kIOReturnSuccess else { return false }",
+      "search": "guard result == kIOReturnSuccess, !contextIsNil else { return false }",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.shouldDispatchClick \u2014 drop the usagePage==0x09 guard. Predicate now admits non-mouse usage pages.",
+      "expectedFailingTest": "MouseHIDCallbackPredicateTests/test_callback_wrongUsagePage_doesNotDispatch",
+      "expectedFailureSubstring": "[mouse-callback=usage-page]",
+      "id": "mouse-callback-usage-page",
+      "replace": "guard usage == 0x01, value != 0 else { return false }",
+      "search": "guard usagePage == 0x09, usage == 0x01, value != 0 else { return false }",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.shouldDispatchClick \u2014 drop the usage==0x01 button-1 guard. Predicate now admits non-button-1 usages.",
+      "expectedFailingTest": "MouseHIDCallbackPredicateTests/test_callback_wrongButton_doesNotDispatch",
+      "expectedFailureSubstring": "[mouse-callback=usage-button]",
+      "id": "mouse-callback-usage-button",
+      "replace": "guard usagePage == 0x09, value != 0 else { return false }\n        return true",
+      "search": "guard usagePage == 0x09, usage == 0x01, value != 0 else { return false }\n        return true",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.shouldDispatchClick \u2014 drop the value!=0 guard so button releases (value=0) also dispatch.",
+      "expectedFailingTest": "MouseHIDCallbackPredicateTests/test_callback_buttonRelease_doesNotDispatch",
+      "expectedFailureSubstring": "[mouse-callback=value-zero]",
+      "id": "mouse-callback-value-zero",
+      "replace": "guard usagePage == 0x09, usage == 0x01 else { return false }\n        return true\n    }\n}",
+      "search": "guard usagePage == 0x09, usage == 0x01, value != 0 else { return false }\n        return true\n    }\n}",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "MouseActivitySource.start \u2014 drop the double-start idempotency guard. Calling start() twice now installs the scrollWheel monitor twice; MockEventMonitor.installCount catches it.",
+      "expectedFailingTest": "MouseScrollMonitorIdempotencyTests/test_doubleStart_doesNotDoubleInstallScrollMonitor",
+      "expectedFailureSubstring": "[mouse-gate=scroll-monitor-idempotency]",
+      "id": "mouse-scroll-monitor-idempotency",
+      "replace": "if false { return }",
+      "search": "guard scrollMonitor == nil else { return }",
+      "targetFile": "Sources/SensorKit/MouseActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.shouldDispatchKeyPress \u2014 drop the result-success half. Predicate now admits non-success IOReturns.",
+      "expectedFailingTest": "KeyboardHIDCallbackPredicateTests/test_callback_resultFailure_doesNotDispatch",
+      "expectedFailureSubstring": "[keyboard-callback=result-failure]",
+      "id": "keyboard-callback-result-failure",
+      "replace": "guard !contextIsNil else { return false }\n        guard usagePage == 0x07",
+      "search": "guard result == kIOReturnSuccess, !contextIsNil else { return false }\n        guard usagePage == 0x07",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.shouldDispatchKeyPress \u2014 drop the contextIsNil half.",
+      "expectedFailingTest": "KeyboardHIDCallbackPredicateTests/test_callback_contextNil_doesNotDispatch",
+      "expectedFailureSubstring": "[keyboard-callback=context-nil]",
+      "id": "keyboard-callback-context-nil",
+      "replace": "guard result == kIOReturnSuccess else { return false }",
+      "search": "guard result == kIOReturnSuccess, !contextIsNil else { return false }",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.shouldDispatchKeyPress \u2014 drop the usagePage==0x07 keyboard-page guard.",
+      "expectedFailingTest": "KeyboardHIDCallbackPredicateTests/test_callback_wrongUsagePage_doesNotDispatch",
+      "expectedFailureSubstring": "[keyboard-callback=usage-page]",
+      "id": "keyboard-callback-usage-page",
+      "replace": "guard usage > 0, value != 0 else { return false }",
+      "search": "guard usagePage == 0x07, usage > 0, value != 0 else { return false }",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.shouldDispatchKeyPress \u2014 drop the usage>0 guard so zero-usage keys dispatch.",
+      "expectedFailingTest": "KeyboardHIDCallbackPredicateTests/test_callback_zeroUsage_doesNotDispatch",
+      "expectedFailureSubstring": "[keyboard-callback=usage-zero]",
+      "id": "keyboard-callback-usage-zero",
+      "replace": "guard usagePage == 0x07, value != 0 else { return false }\n        return true",
+      "search": "guard usagePage == 0x07, usage > 0, value != 0 else { return false }\n        return true",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "KeyboardActivitySource.shouldDispatchKeyPress \u2014 drop the value!=0 guard so key releases dispatch.",
+      "expectedFailingTest": "KeyboardHIDCallbackPredicateTests/test_callback_keyRelease_doesNotDispatch",
+      "expectedFailureSubstring": "[keyboard-callback=value-zero]",
+      "id": "keyboard-callback-value-zero",
+      "replace": "guard usagePage == 0x07, usage > 0 else { return false }\n        return true\n    }\n}",
+      "search": "guard usagePage == 0x07, usage > 0, value != 0 else { return false }\n        return true\n    }\n}",
+      "targetFile": "Sources/SensorKit/KeyboardActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.attemptFireContact \u2014 drop the dur<=contactMax gate. Test seam fires with a synthesized `now` 10s past contactStart; mutation lets it through and publishes .trackpadContact.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testContactMaxDurationGate_pastMaxDur_doesNotFire",
+      "expectedFailureSubstring": "[cell=contact-max-duration]",
+      "id": "trackpad-contact-max-duration-gate",
+      "replace": "if false { return }",
+      "search": "guard dur <= contactMax else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.evaluateCircle \u2014 drop the mag>2.0 floor. Tiny samples now accumulate and a sub-floor full revolution fires .trackpadCircling.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testCircleMagFloor_belowFloor_doesNotAccumulate",
+      "expectedFailureSubstring": "[cell=circle-mag-floor]",
+      "id": "trackpad-circle-mag-floor",
+      "replace": "if false { return }  // ignore tiny movements",
+      "search": "guard mag > 2.0 else { return }  // ignore tiny movements",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.evaluateCircle \u2014 drop the rotation+event-count threshold. Half-revolutions now fire .trackpadCircling.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testCircleRotationGate_belowThreshold_doesNotFire",
+      "expectedFailureSubstring": "[cell=circle-rotation-gate]",
+      "id": "trackpad-circle-rotation-gate",
+      "replace": "if false { return }",
+      "search": "guard abs(circleAngleAccum) > 2 * .pi, circleEventCount >= 15 else { return }",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "TrackpadActivitySource.evaluateCircle \u2014 drop the circlingEnabled+gate guard. Disabled circling now fires when a full revolution accumulates.",
+      "expectedFailingTest": "MatrixTrackpadOSEvents_Tests/testCircleEnabledGate_disabled_doesNotFire",
+      "expectedFailureSubstring": "[cell=circle-enabled-gate]",
+      "id": "trackpad-circle-enabled-gate",
+      "replace": "if false {",
+      "search": "guard circlingEnabled, now >= circlingGate else {",
+      "targetFile": "Sources/SensorKit/TrackpadActivitySource.swift"
+    },
+    {
+      "description": "Theme.AccordionCard.animationDuration(forRows:) \u2014 drop the 0.30s upper cap. Large row counts now exceed the easeInOut perceptual budget.",
+      "expectedFailingTest": "PanelLayoutTests/testUIGate_accordionAnimationDuration_capsAt0_30",
+      "expectedFailureSubstring": "[ui-gate=accordion-anim-cap]",
+      "id": "ui-accordion-anim-cap",
+      "replace": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return raw\n    }",
+      "search": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return min(0.30, max(0.10, raw))\n    }",
+      "targetFile": "Sources/YameteApp/Views/Theme.swift"
+    },
+    {
+      "description": "Theme.AccordionCard.animationDuration(forRows:) \u2014 drop the per-row scale (multiply by 0). Duration collapses to the floor for every row count.",
+      "expectedFailingTest": "PanelLayoutTests/testUIGate_accordionAnimationDuration_scalesPerRow",
+      "expectedFailureSubstring": "[ui-gate=accordion-anim-scale]",
+      "id": "ui-accordion-anim-scale",
+      "replace": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * 0.0\n        return min(0.30, max(0.10, raw))\n    }",
+      "search": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return min(0.30, max(0.10, raw))\n    }",
+      "targetFile": "Sources/YameteApp/Views/Theme.swift"
+    },
+    {
+      "description": "Theme.AccordionCard.animationDuration(forRows:) \u2014 drop the rows>=1 floor. Negative row inputs produce sub-floor durations before the outer max(0.10) clamp.",
+      "expectedFailingTest": "PanelLayoutTests/testUIGate_accordionAnimationDuration_floorAtRow1",
+      "expectedFailureSubstring": "[ui-gate=accordion-anim-floor]",
+      "id": "ui-accordion-anim-floor",
+      "replace": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(rows) * perRow\n        return min(0.30, max(0.10, raw))\n    }",
+      "search": "/// without overshooting easeInOut's perceptual peak.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return min(0.30, max(0.10, raw))\n    }",
+      "targetFile": "Sources/YameteApp/Views/Theme.swift"
+    },
+    {
+      "description": "Theme.SensorAccordionCard.animationDuration(forRows:) mirror \u2014 drop the 0.30s ceiling on the sensor card surface; mixed-card panels now animate at different speeds.",
+      "expectedFailingTest": "PanelLayoutTests/testUIGate_sensorAccordionAnimationDuration_mirrorsCap",
+      "expectedFailureSubstring": "[ui-gate=sensor-accordion-anim-cap]",
+      "id": "ui-sensor-accordion-anim-cap",
+      "replace": "/// instantiating a SwiftUI body.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return raw\n    }",
+      "search": "/// instantiating a SwiftUI body.\n    static func animationDuration(forRows rows: Int) -> Double {\n        let base = 0.10\n        let perRow = 0.025\n        let raw = base + Double(max(1, rows)) * perRow\n        return min(0.30, max(0.10, raw))\n    }",
+      "targetFile": "Sources/YameteApp/Views/Theme.swift"
+    },
+    {
+      "description": "SettingsStore.sensitivityMin didSet \u2014 drop the recursive-clamp-and-return; out-of-range writes now persist instead of being snapped into [0,1].",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_sensitivityMinClamp_snapsAboveRangeToBound",
+      "expectedFailureSubstring": "[ui-gate=sensitivityMin-clamp]",
+      "id": "ui-sensitivityMin-clamp",
+      "replace": "if c != sensitivityMin { _ = c; return }",
+      "search": "if c != sensitivityMin { sensitivityMin = c; return }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.sensitivityMin didSet \u2014 drop the pair-fixup that drags max up when min exceeds it; the (min, max) ordering invariant breaks.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_sensitivityMinAboveMax_dragsMaxUp",
+      "expectedFailureSubstring": "[ui-gate=sensitivity-min-drags-max]",
+      "id": "ui-sensitivity-min-drags-max",
+      "replace": "if false { sensitivityMax = sensitivityMin }",
+      "search": "if sensitivityMin > sensitivityMax { sensitivityMax = sensitivityMin }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.sensitivityMax didSet \u2014 drop the pair-fixup that drags min down when max falls below it; (min, max) ordering invariant breaks.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_sensitivityMaxBelowMin_dragsMinDown",
+      "expectedFailureSubstring": "[ui-gate=sensitivity-max-drags-min]",
+      "id": "ui-sensitivity-max-drags-min",
+      "replace": "if false { sensitivityMin = sensitivityMax }",
+      "search": "if sensitivityMax < sensitivityMin { sensitivityMin = sensitivityMax }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.volumeMax didSet \u2014 drop the recursive-clamp-and-return; above-range writes now persist past the unit-range bound.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_volumeMaxClamp_snapsAboveRangeToBound",
+      "expectedFailureSubstring": "[ui-gate=volumeMax-clamp]",
+      "id": "ui-volumeMax-clamp",
+      "replace": "if c != volumeMax { _ = c; return }",
+      "search": "if c != volumeMax { volumeMax = c; return }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.flashOpacityMin didSet \u2014 drop the pair-fixup; min above max no longer drags max up, leaving an inverted opacity band.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_flashOpacityMinAboveMax_dragsMaxUp",
+      "expectedFailureSubstring": "[ui-gate=flashOpacity-min-drags-max]",
+      "id": "ui-flashOpacity-min-drags-max",
+      "replace": "if false { flashOpacityMax = flashOpacityMin }",
+      "search": "if flashOpacityMin > flashOpacityMax { flashOpacityMax = flashOpacityMin }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.accelBandpassLowHz didSet \u2014 drop the pair-fixup that drags high up when low exceeds it; the bandpass filter is mis-applied.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_bandpassLowAboveHigh_dragsHighUp",
+      "expectedFailureSubstring": "[ui-gate=bandpass-low-drags-high]",
+      "id": "ui-bandpass-low-drags-high",
+      "replace": "if false { accelBandpassHighHz = accelBandpassLowHz }",
+      "search": "if accelBandpassLowHz > accelBandpassHighHz { accelBandpassHighHz = accelBandpassLowHz }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.sanitizeNonFiniteAndPairings \u2014 drop the sensitivityMin isFinite check; a NaN persisted under the key now propagates into the live store.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_sanitizeNaN_sensitivityMin_restoredToDefault",
+      "expectedFailureSubstring": "[ui-gate=sanitize-nan-sensitivityMin]",
+      "id": "ui-sanitize-nan-sensitivityMin",
+      "replace": "if false                                { store.sensitivityMin       = Defaults.sensitivityMin }",
+      "search": "if !store.sensitivityMin.isFinite       { store.sensitivityMin       = Defaults.sensitivityMin }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.sanitizeNonFiniteAndPairings \u2014 drop the cold-load bandpass pair-fixup; a disk-corrupted (low > high) pair survives boot and the bandpass filter rejects every input.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_sanitizeBandpassInverted_pairFixedAtBoot",
+      "expectedFailureSubstring": "[ui-gate=sanitize-bandpass-pair]",
+      "id": "ui-sanitize-bandpass-pair",
+      "replace": "if false {",
+      "search": "if store.accelBandpassLowHz > store.accelBandpassHighHz {",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.flashEnabled didSet \u2014 drop the legacy-mode sync that resets visualResponseMode to .off when flash is turned off; legacy consumers see stale .overlay even though flash is off.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_flashEnabledOff_clearsVisualResponseModeOverlay",
+      "expectedFailureSubstring": "[ui-gate=flashEnabled-off-clears-mode]",
+      "id": "ui-flashEnabled-off-clears-mode",
+      "replace": "if false { visualResponseMode = .off }",
+      "search": "if !flashEnabled && visualResponseMode == .overlay { visualResponseMode = .off }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "SettingsStore.flashEnabled didSet \u2014 drop the legacy-mode sync that promotes visualResponseMode to .overlay when flash is turned on; legacy consumers see stale .off even though flash is on.",
+      "expectedFailingTest": "SettingsStoreTests/testUIGate_flashEnabledOn_promotesVisualResponseModeToOverlay",
+      "expectedFailureSubstring": "[ui-gate=flashEnabled-on-promotes-mode]",
+      "id": "ui-flashEnabled-on-promotes-mode",
+      "replace": "if false { visualResponseMode = .overlay }",
+      "search": "if flashEnabled && visualResponseMode == .off { visualResponseMode = .overlay }",
+      "targetFile": "Sources/YameteApp/SettingsStore.swift"
+    },
+    {
+      "description": "RangeSlider \u2014 collapse the default labelWidth from 40 to 0; default-call sites lose all label real estate and the slider's intrinsic width drops by 80pt.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_defaultLabelWidth",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-default-labelWidth]",
+      "id": "ui-rangeSlider-default-labelWidth",
+      "replace": "var labelWidth: CGFloat = 0",
+      "search": "var labelWidth: CGFloat = 40",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "SensitivityRuler \u2014 zero out the GeometryReader's vertical frame; the ruler must retain its 16pt vertical footprint so the menu-bar layout stays stable.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_intrinsicHeight",
+      "expectedFailureSubstring": "[ui-gate=sensitivityRuler-intrinsic-height]",
+      "id": "ui-sensitivityRuler-intrinsic-height",
+      "replace": ".frame(height: 0)",
+      "search": ".frame(height: 16)",
+      "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
+    },
+    {
+      "description": "SensitivityRuler \u2014 collapse the LEFT-gutter Spacer width from 50 to 0; the menu-bar tick region must keep its left padding so labels never crowd the panel edge. Multi-line search disambiguates the left gutter (followed by the GeometryReader) from the right gutter (followed by the HStack close).",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_leftGutterWidth",
+      "expectedFailureSubstring": "[ui-gate=sensitivityRuler-left-gutter-width]",
+      "id": "ui-sensitivityRuler-left-gutter-width",
+      "replace": "Spacer().frame(width: 0)\n            GeometryReader",
+      "search": "Spacer().frame(width: 50)\n            GeometryReader",
+      "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
+    },
+    {
+      "description": "RangeSlider.clamp(position:half:usable:) \u2014 drop the lower-bound max() so an overshoot-left x-coordinate runs negative; clamp must hold the position at `half` regardless of how far left the user drags.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_clampLowerBound",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-clamp-lower-bound]",
+      "id": "ui-rangeSlider-clamp-lower-bound",
+      "replace": "min(x, half + usable)",
+      "search": "min(max(half, x), half + usable)",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "RangeSlider.clamp(position:half:usable:) \u2014 drop the upper-bound min() so an overshoot-right x-coordinate runs past the track; clamp must hold the position at `half + usable` regardless of how far right the user drags.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_clampUpperBound",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-clamp-upper-bound]",
+      "id": "ui-rangeSlider-clamp-upper-bound",
+      "replace": "max(half, x)",
+      "search": "min(max(half, x), half + usable)",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "RangeSlider.applyDrag \u2014 disable the low-overshoots-high pair-swap branch so a drag of the low thumb past the high thumb leaves the (low, high) pair in an invalid low > high state.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_applyDrag_lowOvershootSwapsToHigh",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-applyDrag-low-overshoot-swap]",
+      "id": "ui-rangeSlider-applyDrag-low-overshoot-swap",
+      "replace": "if false {\n                return DragResult(low: high, high: value, active: .high)",
+      "search": "if value > high {\n                return DragResult(low: high, high: value, active: .high)",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "RangeSlider.applyDrag \u2014 disable the high-overshoots-low pair-swap branch so a drag of the high thumb past the low thumb leaves the (low, high) pair in an invalid high < low state.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_applyDrag_highOvershootSwapsToLow",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-applyDrag-high-overshoot-swap]",
+      "id": "ui-rangeSlider-applyDrag-high-overshoot-swap",
+      "replace": "if false {\n                return DragResult(low: value, high: low, active: .low)",
+      "search": "if value < low {\n                return DragResult(low: value, high: low, active: .low)",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "RangeSlider.applyDrag \u2014 flip the overlap-disambiguation translation-sign comparator so a positive-direction drag on overlapped thumbs grabs the LOW thumb instead of HIGH (and vice versa); the wrong thumb leads under thumb overlap.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_rangeSlider_applyDrag_overlapPicksByTranslation",
+      "expectedFailureSubstring": "[ui-gate=rangeSlider-applyDrag-overlap-translation]",
+      "id": "ui-rangeSlider-applyDrag-overlap-translation",
+      "replace": "active = translationWidth < 0 ? .high : .low",
+      "search": "active = translationWidth >= 0 ? .high : .low",
+      "targetFile": "Sources/YameteApp/Views/RangeSlider.swift"
+    },
+    {
+      "description": "SensitivityRuler.ticks \u2014 mutate the medium-tier position from 0.50 to 0.40; the five tier marks must lie at the canonical [0.0, 0.25, 0.5, 0.75, 1.0] unit-interval positions so the ruler aligns with the slider track endpoints and SettingsStore tier thresholds.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_ticksArrayShape",
+      "expectedFailureSubstring": "[ui-gate=sensitivityRuler-ticks-positions]",
+      "id": "ui-sensitivityRuler-ticks-positions",
+      "replace": "Tick(position: 0.40, label: NSLocalizedString(\"tier_medium\", comment: \"Ruler label: medium impact (abbreviated)\")),",
+      "search": "Tick(position: 0.50, label: NSLocalizedString(\"tier_medium\", comment: \"Ruler label: medium impact (abbreviated)\")),",
+      "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
+    },
+    {
+      "description": "SensitivityRuler.position(for:in:) \u2014 collapse the per-tick placement formula to 0; every tick must sit at `tick.position * width` so the five tier marks spread across the available width instead of piling up at the origin.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_sensitivityRuler_positionFormula",
+      "expectedFailureSubstring": "[ui-gate=sensitivityRuler-position-formula]",
+      "id": "ui-sensitivityRuler-position-formula",
+      "replace": "0.0",
+      "search": "tick.position * width",
+      "targetFile": "Sources/YameteApp/Views/MenuBar/SensitivityRuler.swift"
+    },
+    {
+      "description": "Updater.currentVersion(bundle:) \u2014 mutate the App-Store-stub fallback literal from \"1.0.0\" to \"0.0.0\"; when Bundle.infoDictionary is nil the helper must return the canonical \"1.0.0\" so the menu-bar footer never displays a degraded version. Multi-line search anchors on the App-Store-branch doc comment to disambiguate from the identical literal in the DIRECT_BUILD branch.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_updater_currentVersion_fallbackWhenInfoDictionaryNil",
+      "expectedFailureSubstring": "[ui-gate=updater-currentVersion-fallback]",
+      "id": "ui-updater-currentVersion-fallback",
+      "replace": "own `Bundle.main` always supplies a non-nil version, so without\n    /// the seam the `?? \"1.0.0\"` branch would be unreachable.\n    internal static func currentVersion(bundle: Bundle = .main) -> String {\n        bundle.infoDictionary?[\"CFBundleShortVersionString\"] as? String ?? \"0.0.0\"",
+      "search": "own `Bundle.main` always supplies a non-nil version, so without\n    /// the seam the `?? \"1.0.0\"` branch would be unreachable.\n    internal static func currentVersion(bundle: Bundle = .main) -> String {\n        bundle.infoDictionary?[\"CFBundleShortVersionString\"] as? String ?? \"1.0.0\"",
+      "targetFile": "Sources/YameteApp/Updater.swift"
+    },
+    {
+      "description": "Updater.isNewer SemVer 2.0 \u00a711.3 \u2014 flip the (nil, _?) case to return false so a release version no longer ranks above its own pre-release with the same core. Cell V asserts release \"1.2.3\" > pre-release \"1.2.3-rc1\"; this mutation regresses to the pre-7c \"by-accident\" answer where the pre-release branch was unreachable.",
+      "expectedFailingTest": "UpdaterSemVerOrdering_Tests/testUIGate_updater_semver_releaseBeatsPreRelease",
+      "expectedFailureSubstring": "[ui-gate=updater-semver-release-beats-prerelease]",
+      "id": "ui-updater-semver-release-beats-prerelease",
+      "replace": "case (nil, _?):\n            return false                  // release > pre-release",
+      "search": "case (nil, _?):\n            return true                   // release > pre-release",
+      "targetFile": "Sources/YameteApp/Updater.swift"
+    },
+    {
+      "description": "Updater.isNewer SemVer 2.0 \u00a711.4.2 \u2014 invert the alphanumeric pre-release identifier comparison so ASCII order is reversed. Cell W asserts \"rc2\" > \"rc1\" and \"rc1\" > \"alpha1\" by ASCII lex; this mutation flips both comparisons in the (nil, nil) branch (string identifiers) so the comparator returns the opposite ordering.",
+      "expectedFailingTest": "UpdaterSemVerOrdering_Tests/testUIGate_updater_semver_alphanumericPreReleaseOrdering",
+      "expectedFailureSubstring": "[ui-gate=updater-semver-prerelease-alphanumeric]",
+      "id": "ui-updater-semver-prerelease-alphanumeric",
+      "replace": "if a < b { return .orderedDescending }\n                if a > b { return .orderedAscending }",
+      "search": "if a < b { return .orderedAscending }\n                if a > b { return .orderedDescending }",
+      "targetFile": "Sources/YameteApp/Updater.swift"
+    },
+    {
+      "description": "Updater.isNewer SemVer 2.0 \u00a711.4.1 \u2014 break the numeric pre-release identifier comparison by routing it through the string operands instead of integer values. Cell X asserts \"rc.10\" > \"rc.2\" by INTEGER comparison (string lex would give the wrong answer because \"10\" < \"2\" lexicographically). The mutation swaps `x < y` / `x > y` for `a < b` / `a > b`, forcing string lex on numeric identifiers and inverting the test's expected ordering.",
+      "expectedFailingTest": "UpdaterSemVerOrdering_Tests/testUIGate_updater_semver_numericPreReleaseOrdering",
+      "expectedFailureSubstring": "[ui-gate=updater-semver-prerelease-numeric]",
+      "id": "ui-updater-semver-prerelease-numeric",
+      "replace": "if a < b { return .orderedAscending }\n                if a > b { return .orderedDescending }",
+      "search": "if x < y { return .orderedAscending }\n                if x > y { return .orderedDescending }",
+      "targetFile": "Sources/YameteApp/Updater.swift"
+    },
+    {
+      "description": "FlowLayout.balancedRowCounts \u2014 flip the smaller-row-on-top ordering so 5 \u2192 [3, 2] instead of [2, 3].",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_balancedRowCounts",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-balanced-rowcounts]",
+      "id": "ui-flowLayout-balanced-rowcounts",
+      "replace": "out.append(r < (rowCount - extras) ? base + 1 : base)",
+      "search": "out.append(r < (rowCount - extras) ? base : base + 1)",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.balancedRowCounts \u2014 replace ceiling with floor division; 5/4 collapses to 1 row, 13/4 to 3.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_rowCountCeiling",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-row-count-ceiling]",
+      "id": "ui-flowLayout-row-count-ceiling",
+      "replace": "let rowCount = max(1, total / cap)",
+      "search": "let rowCount = max(1, (total + cap - 1) / cap)",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.sizeThatFits \u2014 drop the inter-row spacing accumulator; multi-row reports collapse by (rows-1)*spacing.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_totalHeightAccumulator",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-total-height-accumulator]",
+      "id": "ui-flowLayout-total-height-accumulator",
+      "replace": "let totalH = rowH * CGFloat(counts.count)",
+      "search": "let totalH = rowH * CGFloat(counts.count) + spacing * CGFloat(max(0, counts.count - 1))",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "FlowLayout.uniformRowHeight \u2014 flip max to min so the global row height shrinks to the smallest child rather than the largest.",
+      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_flowLayout_uniformRowHeightAcrossRows",
+      "expectedFailureSubstring": "[ui-gate=flowLayout-uniform-row-height]",
+      "id": "ui-flowLayout-uniform-row-height",
+      "replace": "for s in subviews { h = min(h == 0 ? .infinity : h, s.sizeThatFits(.unspecified).height) }",
+      "search": "for s in subviews { h = max(h, s.sizeThatFits(.unspecified).height) }",
+      "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    }
+  ]
+}

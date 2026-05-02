@@ -11,6 +11,12 @@ let package = Package(
         .library(name: "ResponseKit", targets: ["ResponseKit"]),
         .library(name: "YameteApp", targets: ["YameteApp"]),
     ],
+    dependencies: [
+        // Test-only: SwiftUI/NSView snapshot baselines for the menu UI.
+        // Linked into the YameteTests target only — main library/app targets
+        // do not depend on it.
+        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.19.0"),
+    ],
     targets: [
         // Shared types: Vec3, SensorID, ImpactTier, protocols, logging, signal processing
         .target(
@@ -43,14 +49,15 @@ let package = Package(
             ]
         ),
 
-        // Audio playback, device enumeration, screen flash overlay
+        // Audio playback, device enumeration, screen flash overlay, LED flash
         .target(
             name: "ResponseKit",
-            dependencies: ["YameteCore"],
+            dependencies: ["YameteCore", "IOHIDPublic"],
             path: "Sources/ResponseKit",
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("CoreAudio"),
+                .linkedFramework("IOKit"),
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("UserNotifications"),
             ]
@@ -71,7 +78,10 @@ let package = Package(
 
         .testTarget(
             name: "YameteTests",
-            dependencies: ["YameteCore", "SensorKit", "ResponseKit", "YameteApp"],
+            dependencies: [
+                "YameteCore", "SensorKit", "ResponseKit", "YameteApp",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+            ],
             path: "Tests"
         ),
     ],

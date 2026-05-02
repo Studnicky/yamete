@@ -30,6 +30,12 @@ settings:
 packages:
   Yamete:
     path: .
+  # Test-only package for SwiftUI/NSView snapshot baselines. Also declared
+  # in Package.swift dependencies for SPM `swift test`. Linked into test
+  # targets only — main app target has no dependency.
+  swift-snapshot-testing:
+    url: https://github.com/pointfreeco/swift-snapshot-testing
+    from: 1.19.0
 
 targets:
   Yamete:
@@ -116,9 +122,63 @@ targets:
         product: ResponseKit
       - package: Yamete
         product: YameteApp
+      - package: swift-snapshot-testing
+        product: SnapshotTesting
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete.tests
+
+  # Host-app test target — same sources as YameteTests, but explicitly
+  # bundled inside Yamete.app so Bundle.main resolves to a real .app
+  # at runtime. Real driver paths that XCTSkip under SPM (UN center,
+  # full Haptic engine, CGEvent.post under Accessibility) RUN here.
+  # Driven by `make test-host-app` → xcodebuild test -scheme YameteHostTest.
+  YameteHostTest:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      # Exclude `Tests/__Snapshots__` from the bundle resource set —
+      # SPM's `process` strategy de-dupes filenames across nested
+      # directories, but Xcode's CopyResources phase flattens them and
+      # would otherwise duplicate every `test_cell_*.png` baseline
+      # between the AppStore/ and Direct/ subtrees. The snapshot suite
+      # opens its baselines via path, not via Bundle.main, so excluding
+      # them from the bundle does NOT hurt cell behaviour.
+      - path: Tests
+        excludes:
+          # SPM's process(...) rule de-dupes nested resources; Xcode's
+          # CopyResources phase flattens them. Exclude the snapshot
+          # baselines (they're loaded by path, not Bundle.main) and the
+          # markdown sidecars (READMEs / PLAN.md) that collide on the
+          # bundle's flat Resources/ directory.
+          - "__Snapshots__/**"
+          - "**/*.md"
+    dependencies:
+      - target: Yamete
+      - package: Yamete
+        product: YameteCore
+      - package: Yamete
+        product: SensorKit
+      - package: Yamete
+        product: ResponseKit
+      - package: Yamete
+        product: YameteApp
+      - package: swift-snapshot-testing
+        product: SnapshotTesting
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.studnicky.yamete.hosttest
+        # XcodeGen does not auto-write an Info.plist for bundle.unit-test
+        # targets; let the toolchain generate one from the standard
+        # template so codesigning has something to embed.
+        GENERATE_INFOPLIST_FILE: "YES"
+        # XcodeGen auto-derives TEST_HOST / BUNDLE_LOADER from the
+        # `target: Yamete` dependency, but we pin them here to make
+        # the host-app contract explicit and so the cell-level guards
+        # in DriverParity_Tests / NotificationAuthRealDriverTests can
+        # rely on Bundle.main.bundleURL resolving to "Yamete.app".
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Yamete.app/Contents/MacOS/yamete"
+        BUNDLE_LOADER: "$(TEST_HOST)"
 
 schemes:
   # NOTE: run config is Debug — sandbox entitlements only apply via 'make appstore' or archive. Do not rely on Xcode Run button for sandboxing checks.
@@ -155,6 +215,25 @@ schemes:
       config: DebugDirect
     archive:
       config: ReleaseDirect
+
+  # Phase 1 — host-app xcodebuild test. Runs the YameteHostTest bundle
+  # inside the bundled Yamete.app so Bundle.main resolves to a real
+  # .app and Real-driver test cells stop XCTSkipping. See
+  # `make test-host-app` and Tests/Mutation/README.md "Phase 1 —
+  # host-app xcodebuild" section.
+  YameteHostTest:
+    build:
+      targets:
+        Yamete: all
+        YameteHostTest: test
+    test:
+      config: Debug
+      targets:
+        - YameteHostTest
+    run:
+      config: Debug
+    analyze:
+      config: Debug
 
 fileGroups:
   - App

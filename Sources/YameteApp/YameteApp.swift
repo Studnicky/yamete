@@ -1,17 +1,26 @@
 import SwiftUI
 import AppKit
-#if canImport(YameteCore)
+#if !RAW_SWIFTC_LUMP
 import YameteCore
 #endif
-#if canImport(SensorKit)
+#if !RAW_SWIFTC_LUMP
 import SensorKit
 #endif
-#if canImport(ResponseKit)
+#if !RAW_SWIFTC_LUMP
 import ResponseKit
 #endif
-// Note: no `import YameteApp` — in the Makefile build, all YameteApp/*.swift
-// files (plus this one) compile into a single module named YameteApp, so a
-// self-import is a no-op warning that becomes an error under -warnings-as-errors.
+#if !RAW_SWIFTC_LUMP
+// Under xcodebuild, this file compiles as part of the `Yamete` target
+// (module name: Yamete), and pulls in the rest of the YameteApp surface
+// (SettingsStore, Yamete, Updater, StatusBarController) via the YameteApp
+// SPM library. Package.swift excludes this file from the YameteApp library
+// itself, so an import here is NOT a self-import. Under the Makefile's
+// raw-swiftc lump (RAW_SWIFTC_LUMP), every YameteApp/*.swift file (plus
+// this one) compiles into a single module named YameteApp, so importing
+// YameteApp from inside that module would be a self-import (warning →
+// error under -warnings-as-errors), hence the guard.
+import YameteApp
+#endif
 
 @main
 struct YameteApp: App {
@@ -31,24 +40,28 @@ struct YameteApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let settings = SettingsStore()
-    lazy var controller = ImpactController(settings: settings)
+    lazy var yamete = Yamete(settings: settings)
     let updater = Updater()
     private var statusBar: StatusBarController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppWindow.configureAsMenuBarApp()
-        Migration.applyDeviceDefaults(settings: settings, adapters: controller.allAdapters)
-        Migration.reconcileSensors(settings: settings, adapters: controller.allAdapters)
+        Migration.applyDeviceDefaults(settings: settings, sources: yamete.allSensorSources)
+        Migration.reconcileSensors(settings: settings, sources: yamete.allSensorSources)
         Onboarding.promptMicrophoneIfNeeded(settings: settings)
-        controller.bootstrap()
-        Onboarding.playWelcomeSoundIfFirstLaunch(controller: controller)
+        yamete.bootstrap()
+        Onboarding.playWelcomeSoundIfFirstLaunch(yamete: yamete)
         updater.checkIfNeeded()
 
         statusBar = StatusBarController(
             settings: settings,
-            controller: controller,
+            yamete: yamete,
             updater: updater
         )
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        yamete.shutdown()
     }
 }
 
@@ -57,9 +70,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor private enum AppWindow {
     static func configureAsMenuBarApp() {
         // LSUIElement app: no dock icon, no menu bar app menu, no app windows.
-        // Setting the activation policy to .accessory pins it to the menu bar
-        // extra only. There is intentionally no NSApp.applicationIconImage
-        // setup here — Yamete has no dock tile to render an icon into.
         NSApp.setActivationPolicy(.accessory)
     }
 }
@@ -87,11 +97,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    static func playWelcomeSoundIfFirstLaunch(controller: ImpactController) {
+    static func playWelcomeSoundIfFirstLaunch(yamete: Yamete) {
         let d = UserDefaults.standard
         guard !d.bool(forKey: firstLaunchKey) else { return }
         d.set(true, forKey: firstLaunchKey)
-        controller.playWelcomeSound()
+        yamete.playWelcomeSound()
     }
 }
 
@@ -100,12 +110,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor private enum Migration {
     private static let versionKey = "deviceSettingsVersion"
 
-    static func applyDeviceDefaults(settings: SettingsStore, adapters: [any SensorAdapter]) {
+    static func applyDeviceDefaults(settings: SettingsStore, sources: [any SensorSource]) {
         let d = UserDefaults.standard
         guard d.integer(forKey: versionKey) < 1 else { return }
 
         if settings.enabledSensorIDs.isEmpty {
-            settings.enabledSensorIDs = adapters
+            settings.enabledSensorIDs = sources
                 .filter { $0.isAvailable }
                 .map(\.id.rawValue)
         }
@@ -120,29 +130,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         d.set(1, forKey: versionKey)
     }
 
-    /// Runs on every launch (not just first install). Removes any sensor IDs
-    /// from `enabledSensorIDs` whose adapter currently reports unavailable.
-    /// If pruning leaves the user with no enabled sensors at all, falls back
-    /// to enabling every currently-available adapter so the pipeline still
-    /// works. This handles two real cases:
-    ///   1. App Store build where the accelerometer is permanently
-    ///      unavailable (sandbox blocks IORegistry writes) but the user's
-    ///      persisted settings list it as enabled.
-    ///   2. Headphone motion adapter that becomes unavailable when AirPods
-    ///      disconnect (re-runs whenever the menu refreshes).
-    static func reconcileSensors(settings: SettingsStore, adapters: [any SensorAdapter]) {
-        let availableIDs = Set(adapters.filter { $0.isAvailable }.map { $0.id.rawValue })
+    /// Removes sensor IDs whose source currently reports unavailable. If
+    /// pruning leaves an empty set, falls back to enabling every available
+    /// source so the pipeline still works.
+    static func reconcileSensors(settings: SettingsStore, sources: [any SensorSource]) {
+        let availableIDs = Set(sources.filter { $0.isAvailable }.map { $0.id.rawValue })
         let currentEnabled = Set(settings.enabledSensorIDs)
         let stillEnabled = currentEnabled.intersection(availableIDs)
 
         if stillEnabled.isEmpty && !availableIDs.isEmpty {
-            // No previously enabled sensors are available — fall back to all
-            // currently-available adapters so the pipeline still detects
-            // impacts. Without this the user sees a working app with no
-            // active inputs.
             settings.enabledSensorIDs = Array(availableIDs).sorted()
         } else if stillEnabled.count != currentEnabled.count {
-            // Prune unavailable IDs but keep the rest.
             settings.enabledSensorIDs = Array(stillEnabled).sorted()
         }
     }
