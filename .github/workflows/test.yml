@@ -28,7 +28,7 @@ permissions:
 # Cancel superseded runs for the same ref. Keeps master runs visible.
 concurrency:
   group: test-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  cancel-in-progress: true
 
 jobs:
   swift-test:
