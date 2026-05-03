@@ -112,6 +112,21 @@
         <p>It's a menu bar app (<code>LSUIElement</code>). No Dock icon, no app windows, no onboarding wizard asking how you heard about it. All controls live in the menu bar dropdown, because some of us have standards.</p>
       </section>
 
+      <section id="how-seriously-tested">
+        <h2>How seriously is this tested <span style="font-weight: 400; color: var(--muted); font-size: 0.9rem;">(too)</span></h2>
+        <p>For a joke app whose entire value proposition is "your laptop yells when you smack it," the test apparatus is genuinely disproportionate. It includes:</p>
+        <ul>
+          <li>~750 unit and integration cells across two SPM build variants (default and <code>DIRECT_BUILD</code>).</li>
+          <li>A 111-entry <strong>mutation catalog</strong> — every entry is a deliberate code change to a production gate that must cause a named test to fail. Every gate is caught.</li>
+          <li>Property-based fuzz over the bus invariants (1600 random cases per cell). Concurrent-interleaved fuzz that spawns multiple producers on overlapping timelines and asserts no missed drop, no double-action, no leaked task. Settings-corruption fuzz against the <code>SettingsStore</code>. Locale × plural fuzz across 40 locales.</li>
+          <li>~28 SwiftUI snapshot baselines per build variant across 4 variants (<code>AppStore</code>, <code>Direct</code>, <code>HostApp</code>, <code>CI</code>) so that a regression in accordion row-height geometry shows up as pixel diff before it ships.</li>
+          <li>Performance baselines with a 2× tolerance band. Crash-handling boundary audit. Driver Real-vs-Mock parity. Cross-boundary fault injection at every Source / Bus / Output seam.</li>
+          <li>A two-hour <code>xcodebuild</code> host-app integration lane that runs the test bundle inside a real <code>Yamete.app</code> so cells gated on Accessibility, the full Haptic engine, and the macOS notification center exercise their real-driver paths instead of skipping. (Locally on Apple Silicon: 4 minutes.)</li>
+          <li>A pre-push hook that refuses to push a release branch unless the host-app run is fresh, because once was enough.</li>
+        </ul>
+        <p>None of this proves the laptop actually flinches when you hit it. That part you have to verify yourself. Sorry.</p>
+      </section>
+
       <section id="privacy">
         <h2>Privacy <span style="font-weight: 400; color: var(--muted); font-size: 0.9rem;">(nothing leaves. nothing.)</span></h2>
         <p>Zero network connections. All sensor data processed locally, in real time. Microphone audio is analyzed for transient peaks and immediately discarded. Nothing is recorded. Logs auto-delete after 24 hours. No accounts, no tracking, no ads, no telemetry, no analytics, no "just this once" exceptions to any of the above.</p>
@@ -166,6 +181,7 @@
       { href: '#features',      label: 'Features' },
       { href: '#why',           label: 'Why though?' },
       { href: '#how-it-works',  label: 'How it works' },
+      { href: '#how-seriously-tested', label: 'How seriously tested' },
       { href: '#privacy',       label: 'Privacy' },
       { href: '#requirements',  label: 'Requirements' },
       { href: '#two-builds',    label: 'Two builds' },
