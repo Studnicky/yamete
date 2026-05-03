@@ -28,6 +28,8 @@ public final class SettingsStore {
         case accelWarmupSamples, accelReportInterval, accelBandpassLowHz, accelBandpassHighHz
         // Gyroscope detection
         case gyroSpikeThreshold, gyroCrestFactor, gyroRiseRate, gyroConfirmations, gyroWarmupSamples
+        // Lid angle detection
+        case lidOpenThresholdDeg, lidClosedThresholdDeg, lidSlamRateDegPerSec, lidSmoothingWindowMs
         // Microphone detection
         case micSpikeThreshold, micCrestFactor, micRiseRate, micConfirmations, micWarmupSamples
         // Headphone motion detection
@@ -100,6 +102,11 @@ public final class SettingsStore {
         Key.gyroRiseRate.rawValue:         Defaults.gyroRiseRate,
         Key.gyroConfirmations.rawValue:    Defaults.gyroConfirmations,
         Key.gyroWarmupSamples.rawValue:    Defaults.gyroWarmup,
+        // Lid angle detection
+        Key.lidOpenThresholdDeg.rawValue:    Defaults.lidOpenThresholdDeg,
+        Key.lidClosedThresholdDeg.rawValue:  Defaults.lidClosedThresholdDeg,
+        Key.lidSlamRateDegPerSec.rawValue:   Defaults.lidSlamRateDegPerSec,
+        Key.lidSmoothingWindowMs.rawValue:   Defaults.lidSmoothingWindowMs,
         // Microphone detection
         Key.micSpikeThreshold.rawValue: Defaults.micSpikeThreshold,
         Key.micCrestFactor.rawValue:    Defaults.micCrestFactor,
@@ -445,6 +452,44 @@ public final class SettingsStore {
             let c = gyroWarmupSamples.clamped(to: Detection.Gyro.warmupRange)
             if c != gyroWarmupSamples { gyroWarmupSamples = c; return }
             persist(gyroWarmupSamples, .gyroWarmupSamples)
+        }
+    }
+
+    // MARK: - Lid angle detection
+
+    var lidOpenThresholdDeg: Double {
+        didSet {
+            guard lidOpenThresholdDeg != oldValue else { return }
+            let c = lidOpenThresholdDeg.clamped(to: Detection.Lid.openThresholdDegRange)
+            if c != lidOpenThresholdDeg { lidOpenThresholdDeg = c; return }
+            persist(lidOpenThresholdDeg, .lidOpenThresholdDeg)
+        }
+    }
+
+    var lidClosedThresholdDeg: Double {
+        didSet {
+            guard lidClosedThresholdDeg != oldValue else { return }
+            let c = lidClosedThresholdDeg.clamped(to: Detection.Lid.closedThresholdDegRange)
+            if c != lidClosedThresholdDeg { lidClosedThresholdDeg = c; return }
+            persist(lidClosedThresholdDeg, .lidClosedThresholdDeg)
+        }
+    }
+
+    var lidSlamRateDegPerSec: Double {
+        didSet {
+            guard lidSlamRateDegPerSec != oldValue else { return }
+            let c = lidSlamRateDegPerSec.clamped(to: Detection.Lid.slamRateRange)
+            if c != lidSlamRateDegPerSec { lidSlamRateDegPerSec = c; return }
+            persist(lidSlamRateDegPerSec, .lidSlamRateDegPerSec)
+        }
+    }
+
+    var lidSmoothingWindowMs: Int {
+        didSet {
+            guard lidSmoothingWindowMs != oldValue else { return }
+            let c = lidSmoothingWindowMs.clamped(to: Detection.Lid.smoothingWindowMsRange)
+            if c != lidSmoothingWindowMs { lidSmoothingWindowMs = c; return }
+            persist(lidSmoothingWindowMs, .lidSmoothingWindowMs)
         }
     }
 
@@ -960,6 +1005,11 @@ public final class SettingsStore {
         gyroRiseRate          = d.double(forKey: Key.gyroRiseRate.rawValue)
         gyroConfirmations     = d.integer(forKey: Key.gyroConfirmations.rawValue)
         gyroWarmupSamples     = d.integer(forKey: Key.gyroWarmupSamples.rawValue)
+        // Lid angle
+        lidOpenThresholdDeg   = d.double(forKey: Key.lidOpenThresholdDeg.rawValue)
+        lidClosedThresholdDeg = d.double(forKey: Key.lidClosedThresholdDeg.rawValue)
+        lidSlamRateDegPerSec  = d.double(forKey: Key.lidSlamRateDegPerSec.rawValue)
+        lidSmoothingWindowMs  = d.integer(forKey: Key.lidSmoothingWindowMs.rawValue)
         // Microphone
         micSpikeThreshold = d.double(forKey: Key.micSpikeThreshold.rawValue)
         micCrestFactor    = d.double(forKey: Key.micCrestFactor.rawValue)
@@ -1145,6 +1195,9 @@ public final class SettingsStore {
         if !store.gyroSpikeThreshold.isFinite   { store.gyroSpikeThreshold   = Defaults.gyroSpikeThreshold }
         if !store.gyroCrestFactor.isFinite      { store.gyroCrestFactor      = Defaults.gyroCrestFactor }
         if !store.gyroRiseRate.isFinite         { store.gyroRiseRate         = Defaults.gyroRiseRate }
+        if !store.lidOpenThresholdDeg.isFinite  { store.lidOpenThresholdDeg  = Defaults.lidOpenThresholdDeg }
+        if !store.lidClosedThresholdDeg.isFinite { store.lidClosedThresholdDeg = Defaults.lidClosedThresholdDeg }
+        if !store.lidSlamRateDegPerSec.isFinite { store.lidSlamRateDegPerSec = Defaults.lidSlamRateDegPerSec }
         if !store.micSpikeThreshold.isFinite    { store.micSpikeThreshold    = Defaults.micSpikeThreshold }
         if !store.micCrestFactor.isFinite       { store.micCrestFactor       = Defaults.micCrestFactor }
         if !store.micRiseRate.isFinite          { store.micRiseRate          = Defaults.micRiseRate }
@@ -1196,6 +1249,10 @@ public final class SettingsStore {
         gyroRiseRate          = Defaults.gyroRiseRate
         gyroConfirmations     = Defaults.gyroConfirmations
         gyroWarmupSamples     = Defaults.gyroWarmup
+        lidOpenThresholdDeg   = Defaults.lidOpenThresholdDeg
+        lidClosedThresholdDeg = Defaults.lidClosedThresholdDeg
+        lidSlamRateDegPerSec  = Defaults.lidSlamRateDegPerSec
+        lidSmoothingWindowMs  = Defaults.lidSmoothingWindowMs
         micSpikeThreshold     = Defaults.micSpikeThreshold
         micCrestFactor        = Defaults.micCrestFactor
         micRiseRate           = Defaults.micRiseRate

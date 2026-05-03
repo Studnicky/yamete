@@ -1045,6 +1045,51 @@
       "replace": "let rawX = raw.loadUnaligned(fromByteOffset: 0, as: Int32.self)",
       "search": "let rawX = raw.loadUnaligned(fromByteOffset: 6, as: Int32.self)",
       "targetFile": "Sources/SensorKit/GyroscopeSource.swift"
+    },
+    {
+      "description": "LidAngleStateMachine.process \u2014 drop the slam-rate gate; gentle close traces erroneously fire .lidSlammed.",
+      "expectedFailingTest": "MatrixLidAngleSource_Tests/testLidAngle_slamRateGate_isCaught",
+      "expectedFailureSubstring": "[lid-gate=slam-rate]",
+      "id": "lid-slam-rate-gate",
+      "replace": "if s.smoothedRate < 0\n                && angleDeg < config.closedThresholdDeg {",
+      "search": "if s.smoothedRate < config.slamRateDegPerSec\n                && angleDeg < config.closedThresholdDeg {",
+      "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
+    },
+    {
+      "description": "LidAngleStateMachine.process \u2014 drop the open-threshold guard inside .opening; .lidOpened fires for sub-threshold angles.",
+      "expectedFailingTest": "MatrixLidAngleSource_Tests/testLidAngle_openThreshold_isCaught",
+      "expectedFailureSubstring": "[lid-gate=open-threshold]",
+      "id": "lid-open-threshold",
+      "replace": "case .opening:\n                if angleDeg >= 0 {",
+      "search": "case .opening:\n                if angleDeg >= config.openThresholdDeg {",
+      "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
+    },
+    {
+      "description": "LidAngleStateMachine.process \u2014 widen the closed-threshold guard inside .closing to always trip; a closing trace that never reaches the canonical 5\u00b0 threshold (descends only to 8\u00b0) erroneously fires .lidClosed under the loosened gate.",
+      "expectedFailingTest": "MatrixLidAngleSource_Tests/testLidAngle_closedThreshold_isCaught",
+      "expectedFailureSubstring": "[lid-gate=closed-threshold]",
+      "id": "lid-closed-threshold",
+      "replace": "case .closing:\n                if angleDeg <= 360 {",
+      "search": "case .closing:\n                if angleDeg <= config.closedThresholdDeg {",
+      "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
+    },
+    {
+      "description": "LidAngleStateMachine.process \u2014 invert the dt-sign guard; non-monotonic timestamps (or any positive dt) take the wrong branch and the slam path never sees a positive-dt rate computation.",
+      "expectedFailingTest": "MatrixLidAngleSource_Tests/testLidAngle_timeDeltaSign_isCaught",
+      "expectedFailureSubstring": "[lid-gate=time-delta-sign]",
+      "id": "lid-time-delta-sign",
+      "replace": "guard dt < 0 else {",
+      "search": "guard dt > 0 else {",
+      "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
+    },
+    {
+      "description": "LidAngleStateMachine.process \u2014 drop EMA smoothing; the smoothedRate becomes the raw instantaneous rate and a single 90\u21920\u00b0 jump immediately trips the slam path even on noisy single samples.",
+      "expectedFailingTest": "MatrixLidAngleSource_Tests/testLidAngle_emaSmoothing_isCaught",
+      "expectedFailureSubstring": "[lid-gate=ema-smoothing]",
+      "id": "lid-ema-smoothing",
+      "replace": "s.smoothedRate = instantaneousRate",
+      "search": "s.smoothedRate = alpha * instantaneousRate + (1 - alpha) * s.smoothedRate",
+      "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
     }
   ]
 }

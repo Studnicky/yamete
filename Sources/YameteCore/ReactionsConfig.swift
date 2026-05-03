@@ -34,6 +34,9 @@ public enum ReactionsConfig {
         .mouseScrolled:             0.40,
         .keyboardTyped:             0.35,
         .gyroSpike:                 0.7,
+        .lidOpened:                 0.4,
+        .lidClosed:                 0.3,
+        .lidSlammed:                0.95,
     ]
 
     // MARK: - Per-source debounce windows

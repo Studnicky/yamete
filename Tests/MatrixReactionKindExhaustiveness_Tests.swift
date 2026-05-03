@@ -145,6 +145,9 @@ final class MatrixReactionKindExhaustiveness_Tests: XCTestCase {
             (.mouseScrolled, "mouseScrolled"),
             (.keyboardTyped, "keyboardTyped"),
             (.gyroSpike, "gyroSpike"),
+            (.lidOpened, "lidOpened"),
+            (.lidClosed, "lidClosed"),
+            (.lidSlammed, "lidSlammed"),
         ]
         // Drift detection: every allCases must appear in the pinned list.
         let pinnedKinds = Set(expected.map { $0.0 })

@@ -54,6 +54,7 @@ public final class Yamete {
     // fusion); declared here so its lifecycle hooks into `rebuildEventSources`
     // alongside trackpad / mouse / keyboard.
     public let gyroscopeSource = GyroscopeSource()
+    public let lidAngleSource = LidAngleSource()
 
     // Event sources
     public let usbSource = USBSource()
@@ -365,6 +366,12 @@ public final class Yamete {
                 if AppleSPUDevice.isHardwarePresent() {
                     gyroscopeSource.start(publishingTo: bus)
                 }
+            case SensorID.lidAngle.rawValue:
+                // Lid angle is direct-publish, state-machine over hinge angle.
+                // Same SPU-broker hardware-presence gate as gyroscope.
+                if AppleSPUDevice.isHardwarePresent() {
+                    lidAngleSource.start(publishingTo: bus)
+                }
             default: break
             }
         }
@@ -381,6 +388,7 @@ public final class Yamete {
             case SensorID.mouseActivity.rawValue:    mouseActivitySource.stop()
             case SensorID.keyboardActivity.rawValue: keyboardActivitySource.stop()
             case SensorID.gyroscope.rawValue:        gyroscopeSource.stop()
+            case SensorID.lidAngle.rawValue:         lidAngleSource.stop()
             default: break
             }
         }

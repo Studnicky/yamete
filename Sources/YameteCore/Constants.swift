@@ -32,6 +32,20 @@ public enum Detection {
         public static let intensityCeiling: Float = 500.0
     }
 
+    // MARK: - Lid angle (hinge angle in degrees, BMI286 + Apple SPU broker)
+
+    public enum Lid {
+        /// Angle past which the lid is considered open (deg).
+        public static let openThresholdDegRange: ClosedRange<Double> = 5.0...30.0
+        /// Angle below which the lid is considered closed (deg).
+        public static let closedThresholdDegRange: ClosedRange<Double> = 1.0...10.0
+        /// Closing rate (deg/s) below which a transition counts as a slam.
+        /// Negative — slam rate is signed (closing reduces angle).
+        public static let slamRateRange: ClosedRange<Double> = -500.0 ... -50.0
+        /// EMA window over Δangle/Δt for jitter suppression (ms).
+        public static let smoothingWindowMsRange: ClosedRange<Int> = 50...500
+    }
+
     // MARK: - Microphone (HP-filtered PCM amplitude, AVAudioEngine)
 
     public enum Mic {

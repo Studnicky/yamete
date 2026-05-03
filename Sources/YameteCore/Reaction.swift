@@ -81,6 +81,9 @@ public enum Reaction: Sendable {
     case mouseScrolled  // sustained scroll-wheel activity from a mouse
     case keyboardTyped  // keyboard typing rate threshold crossed
     case gyroSpike      // angular velocity spike from the BMI286 gyroscope
+    case lidOpened      // hinge angle crossed the open threshold from below
+    case lidClosed      // hinge angle dropped below the closed threshold gently
+    case lidSlammed     // hinge angle dropped below the closed threshold at slam rate
 
     /// Payload-less mirror used as a settings dictionary key.
     public var kind: ReactionKind {
@@ -108,6 +111,9 @@ public enum Reaction: Sendable {
         case .mouseScrolled:            .mouseScrolled
         case .keyboardTyped:            .keyboardTyped
         case .gyroSpike:                .gyroSpike
+        case .lidOpened:                .lidOpened
+        case .lidClosed:                .lidClosed
+        case .lidSlammed:               .lidSlammed
         }
     }
 
@@ -167,4 +173,7 @@ public enum ReactionKind: String, CaseIterable, Sendable, Codable {
     case mouseScrolled
     case keyboardTyped
     case gyroSpike
+    case lidOpened
+    case lidClosed
+    case lidSlammed
 }

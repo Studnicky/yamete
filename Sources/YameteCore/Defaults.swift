@@ -44,6 +44,13 @@ public enum Defaults {
     public static let gyroConfirmations: Int = 3
     public static let gyroWarmup: Int = 50
 
+    // MARK: - Lid angle detection (degrees / deg-per-second)
+
+    public static let lidOpenThresholdDeg: Double = 10.0
+    public static let lidClosedThresholdDeg: Double = 5.0
+    public static let lidSlamRateDegPerSec: Double = -180.0
+    public static let lidSmoothingWindowMs: Int = 100
+
     // MARK: - Microphone detection
 
     public static let micSpikeThreshold: Double = 0.020

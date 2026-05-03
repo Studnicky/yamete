@@ -460,3 +460,23 @@
 "help_gyro_spike_threshold"     = "Angular velocity required to fire.";
 "setting_gyro_rise_rate"        = "Rise rate (deg/s²)";
 "help_gyro_rise_rate"           = "Minimum angular acceleration to fire.";
+
+/* Lid angle detection */
+"section_lid_tuning"            = "Lid Tuning";
+"sensor_lid_angle"              = "Lid angle";
+"event_lid_angle"               = "Lid angle";
+"help_source_lid_angle"         = "Fires reactions when the BMI286 hinge sensor detects the lid opening, closing, or slamming shut.";
+"reaction_lidOpened"            = "Lid opened";
+"reaction_lidClosed"            = "Lid closed";
+"reaction_lidSlammed"           = "Lid slammed";
+"kind_lid_opened"               = "Lid opened";
+"kind_lid_closed"               = "Lid closed";
+"kind_lid_slammed"              = "Lid slammed";
+"setting_lid_open_threshold"    = "Open threshold (°)";
+"help_lid_open_threshold"       = "Angle past which the lid is considered open.";
+"setting_lid_closed_threshold"  = "Closed threshold (°)";
+"help_lid_closed_threshold"     = "Angle below which the lid is considered closed.";
+"setting_lid_slam_rate"         = "Slam rate (°/s)";
+"help_lid_slam_rate"            = "Closing rate that qualifies as a slam (negative).";
+"setting_lid_smoothing"         = "Smoothing window (ms)";
+"help_lid_smoothing"            = "EMA window over Δangle to suppress jitter.";

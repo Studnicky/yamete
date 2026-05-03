@@ -101,6 +101,13 @@ internal struct StimuliSection: View {
                 help: NSLocalizedString("help_source_gyroscope", comment: "Gyroscope source help"),
                 kinds: [.gyroSpike]
             ))
+            result.append(.init(
+                sourceID: SensorID.lidAngle.rawValue,
+                title: NSLocalizedString("event_lid_angle", comment: "Lid angle events"),
+                icon: "laptopcomputer",
+                help: NSLocalizedString("help_source_lid_angle", comment: "Lid angle source help"),
+                kinds: [.lidOpened, .lidClosed, .lidSlammed]
+            ))
         }
         return result
     }
@@ -379,6 +386,9 @@ internal struct StimuliSection: View {
         case .mouseScrolled:            NSLocalizedString("kind_mouse_scrolled", comment: "Mouse scrolled label")
         case .keyboardTyped:            NSLocalizedString("kind_keyboard_typed", comment: "Keyboard typed label")
         case .gyroSpike:                NSLocalizedString("kind_gyro_spike",     comment: "Gyroscope spike label")
+        case .lidOpened:                NSLocalizedString("kind_lid_opened",     comment: "Lid opened label")
+        case .lidClosed:                NSLocalizedString("kind_lid_closed",     comment: "Lid closed label")
+        case .lidSlammed:               NSLocalizedString("kind_lid_slammed",    comment: "Lid slammed label")
         case .impact:                   ""
         }
     }

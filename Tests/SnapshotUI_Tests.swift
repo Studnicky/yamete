@@ -604,4 +604,69 @@ final class SnapshotUI_Tests: XCTestCase {
         .frame(width: 320, height: 64)
         assertImageSnapshot(of: view, size: CGSize(width: 320, height: 64))
     }
+
+    // MARK: - Cell 9: LidTuningSection collapsed / expanded
+    //
+    // Lid tuning is a universal (non-Direct) surface — the section
+    // ships in both AppStore and Direct builds. Cells live in BOTH
+    // SnapshotUI_Tests AND SnapshotUI_Direct_Tests so the AppStore
+    // and Direct PNG baselines stay in sync.
+    func test_cell_lidTuningSection_collapsed() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_lidTuningSection_collapsed.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_lid_tuning", comment: "Lid tuning section header"),
+            isExpanded: .constant(false)
+        ) {
+            LidTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 60)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 60))
+    }
+
+    func test_cell_lidTuningSection_expanded_lightScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_lidTuningSection_expanded_lightScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_lid_tuning", comment: "Lid tuning section header"),
+            contentRowCount: 7,
+            isExpanded: .constant(true)
+        ) {
+            LidTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 320)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 320))
+    }
+
+    func test_cell_lidTuningSection_expanded_darkScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_lidTuningSection_expanded_darkScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_lid_tuning", comment: "Lid tuning section header"),
+            contentRowCount: 7,
+            isExpanded: .constant(true)
+        ) {
+            LidTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 320)
+        .preferredColorScheme(.dark)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 320))
+    }
 }

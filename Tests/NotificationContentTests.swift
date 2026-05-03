@@ -96,6 +96,9 @@ final class NotificationContentTests: XCTestCase {
         case .mouseScrolled:            return .mouseScrolled
         case .keyboardTyped:            return .keyboardTyped
         case .gyroSpike:            return .gyroSpike
+        case .lidOpened:            return .lidOpened
+        case .lidClosed:            return .lidClosed
+        case .lidSlammed:           return .lidSlammed
         }
     }
 }
