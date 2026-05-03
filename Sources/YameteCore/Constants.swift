@@ -46,6 +46,17 @@ public enum Detection {
         public static let smoothingWindowMsRange: ClosedRange<Int> = 50...500
     }
 
+    // MARK: - Ambient light (lux, BMI286 + Apple SPU broker)
+
+    public enum AmbientLight {
+        public static let coverDropThresholdRange: ClosedRange<Double> = 0.5...0.99
+        public static let offDropPercentRange: ClosedRange<Double> = 0.5...0.99
+        public static let offFloorLuxRange: ClosedRange<Double> = 1.0...300.0
+        public static let onRisePercentRange: ClosedRange<Double> = 0.5...5.0
+        public static let onCeilingLuxRange: ClosedRange<Double> = 50.0...1000.0
+        public static let windowSecRange: ClosedRange<Double> = 0.5...10.0
+    }
+
     // MARK: - Microphone (HP-filtered PCM amplitude, AVAudioEngine)
 
     public enum Mic {

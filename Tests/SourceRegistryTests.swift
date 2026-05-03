@@ -31,12 +31,12 @@ final class SourceRegistryTests: XCTestCase {
                       "SourceContract.all IDs must be a subset of StimulusSourceDefaults — missing in defaults: \(contractIDs.subtracting(defaults))")
         let extras = defaults.subtracting(contractIDs)
         // Legal extras are sources that subscribe to the SPU HID
-        // broker — gyroscope and lidAngle. Both have off-MainActor
-        // HID-callback handlers and cannot conform to the
-        // `@MainActor`-isolated `StimulusSource` protocol. See the
+        // broker — gyroscope, lidAngle, ambientLight. All have
+        // off-MainActor HID-callback handlers and cannot conform to
+        // the `@MainActor`-isolated `StimulusSource` protocol. See the
         // `SourceContract.nonContractKinds` doc for the rationale.
-        XCTAssertEqual(extras, [SensorID.gyroscope.rawValue, SensorID.lidAngle.rawValue],
-                       "StimulusSourceDefaults entries with no SourceContract must be {gyroscope, lidAngle}, got \(extras)")
+        XCTAssertEqual(extras, [SensorID.gyroscope.rawValue, SensorID.lidAngle.rawValue, SensorID.ambientLight.rawValue],
+                       "StimulusSourceDefaults entries with no SourceContract must be {gyroscope, lidAngle, ambientLight}, got \(extras)")
     }
 
     func testEveryEmittedKindIsAccountedForAcrossContracts() {

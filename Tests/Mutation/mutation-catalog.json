@@ -1090,6 +1090,51 @@
       "replace": "s.smoothedRate = instantaneousRate",
       "search": "s.smoothedRate = alpha * instantaneousRate + (1 - alpha) * s.smoothedRate",
       "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
+    },
+    {
+      "description": "AmbientLightDetector.process \u2014 drop the windowSec * 0.5 elapsed gate; sub-window drops erroneously fire .lightsOff before the buffer has accumulated a full window.",
+      "expectedFailingTest": "MatrixAmbientLightSource_Tests/testAmbientLight_windowRateGate_isCaught",
+      "expectedFailureSubstring": "[als-gate=window-rate]",
+      "id": "als-window-rate-gate",
+      "replace": "if elapsed >= 0 {",
+      "search": "if elapsed >= config.windowSec * 0.5 {",
+      "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
+    },
+    {
+      "description": "AmbientLightDetector.process \u2014 widen the off-floor gate to always trip; a small percent drop with high absolute lux erroneously fires .lightsOff under the loosened gate.",
+      "expectedFailingTest": "MatrixAmbientLightSource_Tests/testAmbientLight_floorGate_isCaught",
+      "expectedFailureSubstring": "[als-gate=off-floor]",
+      "id": "als-floor-gate",
+      "replace": "if drop >= config.offDropPercent && lux < 100000 {",
+      "search": "if drop >= config.offDropPercent && lux < config.offFloorLux {",
+      "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
+    },
+    {
+      "description": "AmbientLightDetector.process \u2014 invert the rise-percent comparison; .lightsOn never fires under any rise.",
+      "expectedFailingTest": "MatrixAmbientLightSource_Tests/testAmbientLight_risePercentComparison_isCaught",
+      "expectedFailureSubstring": "[als-gate=rise-percent-comparison]",
+      "id": "als-rise-percent-comparison",
+      "replace": "if rise < config.onRisePercent && lux > config.onCeilingLux {",
+      "search": "if rise >= config.onRisePercent && lux > config.onCeilingLux {",
+      "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
+    },
+    {
+      "description": "AmbientLightDetector.process \u2014 drop the cover rate gate; gradual dims erroneously fire .alsCovered when the rate constraint is removed.",
+      "expectedFailingTest": "MatrixAmbientLightSource_Tests/testAmbientLight_coverRateGate_isCaught",
+      "expectedFailureSubstring": "[als-gate=cover-rate]",
+      "id": "als-cover-rate-gate",
+      "replace": "timestamp.timeIntervalSince(recent.timestamp) <= 86400,",
+      "search": "timestamp.timeIntervalSince(recent.timestamp) <= 0.2,",
+      "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
+    },
+    {
+      "description": "AmbientLightDetector.process \u2014 drop the cooldown gate; back-to-back rapid covers bypass debounce and surface multiple emissions.",
+      "expectedFailingTest": "MatrixAmbientLightSource_Tests/testAmbientLight_cooldownGate_isCaught",
+      "expectedFailureSubstring": "[als-gate=cooldown]",
+      "id": "als-cooldown-gate",
+      "replace": "return timestamp.timeIntervalSince(last) < 0",
+      "search": "return timestamp.timeIntervalSince(last) < config.debounceSec",
+      "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
     }
   ]
 }

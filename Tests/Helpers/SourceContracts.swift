@@ -55,15 +55,20 @@ struct SourceContract: Sendable {
 
     /// `ReactionKind`s that are emitted by sources NOT covered by
     /// `SourceContract.all`. Includes `.gyroSpike` (direct-publish from
-    /// `GyroscopeSource`) and `.lidOpened` / `.lidClosed` /
-    /// `.lidSlammed` (direct-publish from `LidAngleSource`). Both
-    /// sources subscribe to the `AppleSPUDevice` broker, whose
-    /// HID-callback handler runs off the main actor — they cannot
-    /// conform to the `@MainActor`-isolated `StimulusSource` protocol.
-    /// The exhaustiveness test in `SourceRegistryTests` unions this
-    /// with the contract emissions when checking that every non-impact
-    /// kind has a producer.
-    static let nonContractKinds: Set<ReactionKind> = [.gyroSpike, .lidOpened, .lidClosed, .lidSlammed]
+    /// `GyroscopeSource`), `.lidOpened` / `.lidClosed` / `.lidSlammed`
+    /// (direct-publish from `LidAngleSource`), and `.alsCovered` /
+    /// `.lightsOff` / `.lightsOn` (direct-publish from
+    /// `AmbientLightSource`). All three sources subscribe to the
+    /// `AppleSPUDevice` broker, whose HID-callback handler runs off the
+    /// main actor — they cannot conform to the `@MainActor`-isolated
+    /// `StimulusSource` protocol. The exhaustiveness test in
+    /// `SourceRegistryTests` unions this with the contract emissions
+    /// when checking that every non-impact kind has a producer.
+    static let nonContractKinds: Set<ReactionKind> = [
+        .gyroSpike,
+        .lidOpened, .lidClosed, .lidSlammed,
+        .alsCovered, .lightsOff, .lightsOn
+    ]
 
     /// Builds a fresh, unstarted source instance for the given SensorID.
     /// Returns nil if the ID is not a stimulus source.

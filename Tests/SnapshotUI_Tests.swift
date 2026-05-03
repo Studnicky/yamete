@@ -669,4 +669,69 @@ final class SnapshotUI_Tests: XCTestCase {
         .preferredColorScheme(.dark)
         assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 320))
     }
+
+    // MARK: - Cell 10: AmbientLightTuningSection collapsed / expanded
+    //
+    // Ambient light tuning is a universal (non-Direct) surface — the
+    // section ships in both AppStore and Direct builds. Cells live in
+    // BOTH SnapshotUI_Tests AND SnapshotUI_Direct_Tests so the
+    // AppStore and Direct PNG baselines stay in sync.
+    func test_cell_ambientLightTuningSection_collapsed() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_ambientLightTuningSection_collapsed.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_ambientLight_tuning", comment: "Ambient light tuning section header"),
+            isExpanded: .constant(false)
+        ) {
+            AmbientLightTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 60)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 60))
+    }
+
+    func test_cell_ambientLightTuningSection_expanded_lightScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_ambientLightTuningSection_expanded_lightScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_ambientLight_tuning", comment: "Ambient light tuning section header"),
+            contentRowCount: 11,
+            isExpanded: .constant(true)
+        ) {
+            AmbientLightTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 460)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 460))
+    }
+
+    func test_cell_ambientLightTuningSection_expanded_darkScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_ambientLightTuningSection_expanded_darkScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_ambientLight_tuning", comment: "Ambient light tuning section header"),
+            contentRowCount: 11,
+            isExpanded: .constant(true)
+        ) {
+            AmbientLightTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 460)
+        .preferredColorScheme(.dark)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 460))
+    }
 }

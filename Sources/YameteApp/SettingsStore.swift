@@ -30,6 +30,9 @@ public final class SettingsStore {
         case gyroSpikeThreshold, gyroCrestFactor, gyroRiseRate, gyroConfirmations, gyroWarmupSamples
         // Lid angle detection
         case lidOpenThresholdDeg, lidClosedThresholdDeg, lidSlamRateDegPerSec, lidSmoothingWindowMs
+        // Ambient light detection
+        case alsCoverDropThreshold, alsOffDropPercent, alsOffFloorLux
+        case alsOnRisePercent, alsOnCeilingLux, alsWindowSec
         // Microphone detection
         case micSpikeThreshold, micCrestFactor, micRiseRate, micConfirmations, micWarmupSamples
         // Headphone motion detection
@@ -107,6 +110,13 @@ public final class SettingsStore {
         Key.lidClosedThresholdDeg.rawValue:  Defaults.lidClosedThresholdDeg,
         Key.lidSlamRateDegPerSec.rawValue:   Defaults.lidSlamRateDegPerSec,
         Key.lidSmoothingWindowMs.rawValue:   Defaults.lidSmoothingWindowMs,
+        // Ambient light detection
+        Key.alsCoverDropThreshold.rawValue:  Defaults.alsCoverDropThreshold,
+        Key.alsOffDropPercent.rawValue:      Defaults.alsOffDropPercent,
+        Key.alsOffFloorLux.rawValue:         Defaults.alsOffFloorLux,
+        Key.alsOnRisePercent.rawValue:       Defaults.alsOnRisePercent,
+        Key.alsOnCeilingLux.rawValue:        Defaults.alsOnCeilingLux,
+        Key.alsWindowSec.rawValue:           Defaults.alsWindowSec,
         // Microphone detection
         Key.micSpikeThreshold.rawValue: Defaults.micSpikeThreshold,
         Key.micCrestFactor.rawValue:    Defaults.micCrestFactor,
@@ -490,6 +500,62 @@ public final class SettingsStore {
             let c = lidSmoothingWindowMs.clamped(to: Detection.Lid.smoothingWindowMsRange)
             if c != lidSmoothingWindowMs { lidSmoothingWindowMs = c; return }
             persist(lidSmoothingWindowMs, .lidSmoothingWindowMs)
+        }
+    }
+
+    // MARK: - Ambient light detection
+
+    var alsCoverDropThreshold: Double {
+        didSet {
+            guard alsCoverDropThreshold != oldValue else { return }
+            let c = alsCoverDropThreshold.clamped(to: Detection.AmbientLight.coverDropThresholdRange)
+            if c != alsCoverDropThreshold { alsCoverDropThreshold = c; return }
+            persist(alsCoverDropThreshold, .alsCoverDropThreshold)
+        }
+    }
+
+    var alsOffDropPercent: Double {
+        didSet {
+            guard alsOffDropPercent != oldValue else { return }
+            let c = alsOffDropPercent.clamped(to: Detection.AmbientLight.offDropPercentRange)
+            if c != alsOffDropPercent { alsOffDropPercent = c; return }
+            persist(alsOffDropPercent, .alsOffDropPercent)
+        }
+    }
+
+    var alsOffFloorLux: Double {
+        didSet {
+            guard alsOffFloorLux != oldValue else { return }
+            let c = alsOffFloorLux.clamped(to: Detection.AmbientLight.offFloorLuxRange)
+            if c != alsOffFloorLux { alsOffFloorLux = c; return }
+            persist(alsOffFloorLux, .alsOffFloorLux)
+        }
+    }
+
+    var alsOnRisePercent: Double {
+        didSet {
+            guard alsOnRisePercent != oldValue else { return }
+            let c = alsOnRisePercent.clamped(to: Detection.AmbientLight.onRisePercentRange)
+            if c != alsOnRisePercent { alsOnRisePercent = c; return }
+            persist(alsOnRisePercent, .alsOnRisePercent)
+        }
+    }
+
+    var alsOnCeilingLux: Double {
+        didSet {
+            guard alsOnCeilingLux != oldValue else { return }
+            let c = alsOnCeilingLux.clamped(to: Detection.AmbientLight.onCeilingLuxRange)
+            if c != alsOnCeilingLux { alsOnCeilingLux = c; return }
+            persist(alsOnCeilingLux, .alsOnCeilingLux)
+        }
+    }
+
+    var alsWindowSec: Double {
+        didSet {
+            guard alsWindowSec != oldValue else { return }
+            let c = alsWindowSec.clamped(to: Detection.AmbientLight.windowSecRange)
+            if c != alsWindowSec { alsWindowSec = c; return }
+            persist(alsWindowSec, .alsWindowSec)
         }
     }
 
@@ -1010,6 +1076,13 @@ public final class SettingsStore {
         lidClosedThresholdDeg = d.double(forKey: Key.lidClosedThresholdDeg.rawValue)
         lidSlamRateDegPerSec  = d.double(forKey: Key.lidSlamRateDegPerSec.rawValue)
         lidSmoothingWindowMs  = d.integer(forKey: Key.lidSmoothingWindowMs.rawValue)
+        // Ambient light
+        alsCoverDropThreshold = d.double(forKey: Key.alsCoverDropThreshold.rawValue)
+        alsOffDropPercent     = d.double(forKey: Key.alsOffDropPercent.rawValue)
+        alsOffFloorLux        = d.double(forKey: Key.alsOffFloorLux.rawValue)
+        alsOnRisePercent      = d.double(forKey: Key.alsOnRisePercent.rawValue)
+        alsOnCeilingLux       = d.double(forKey: Key.alsOnCeilingLux.rawValue)
+        alsWindowSec          = d.double(forKey: Key.alsWindowSec.rawValue)
         // Microphone
         micSpikeThreshold = d.double(forKey: Key.micSpikeThreshold.rawValue)
         micCrestFactor    = d.double(forKey: Key.micCrestFactor.rawValue)
@@ -1198,6 +1271,12 @@ public final class SettingsStore {
         if !store.lidOpenThresholdDeg.isFinite  { store.lidOpenThresholdDeg  = Defaults.lidOpenThresholdDeg }
         if !store.lidClosedThresholdDeg.isFinite { store.lidClosedThresholdDeg = Defaults.lidClosedThresholdDeg }
         if !store.lidSlamRateDegPerSec.isFinite { store.lidSlamRateDegPerSec = Defaults.lidSlamRateDegPerSec }
+        if !store.alsCoverDropThreshold.isFinite { store.alsCoverDropThreshold = Defaults.alsCoverDropThreshold }
+        if !store.alsOffDropPercent.isFinite     { store.alsOffDropPercent     = Defaults.alsOffDropPercent }
+        if !store.alsOffFloorLux.isFinite        { store.alsOffFloorLux        = Defaults.alsOffFloorLux }
+        if !store.alsOnRisePercent.isFinite      { store.alsOnRisePercent      = Defaults.alsOnRisePercent }
+        if !store.alsOnCeilingLux.isFinite       { store.alsOnCeilingLux       = Defaults.alsOnCeilingLux }
+        if !store.alsWindowSec.isFinite          { store.alsWindowSec          = Defaults.alsWindowSec }
         if !store.micSpikeThreshold.isFinite    { store.micSpikeThreshold    = Defaults.micSpikeThreshold }
         if !store.micCrestFactor.isFinite       { store.micCrestFactor       = Defaults.micCrestFactor }
         if !store.micRiseRate.isFinite          { store.micRiseRate          = Defaults.micRiseRate }
@@ -1253,6 +1332,12 @@ public final class SettingsStore {
         lidClosedThresholdDeg = Defaults.lidClosedThresholdDeg
         lidSlamRateDegPerSec  = Defaults.lidSlamRateDegPerSec
         lidSmoothingWindowMs  = Defaults.lidSmoothingWindowMs
+        alsCoverDropThreshold = Defaults.alsCoverDropThreshold
+        alsOffDropPercent     = Defaults.alsOffDropPercent
+        alsOffFloorLux        = Defaults.alsOffFloorLux
+        alsOnRisePercent      = Defaults.alsOnRisePercent
+        alsOnCeilingLux       = Defaults.alsOnCeilingLux
+        alsWindowSec          = Defaults.alsWindowSec
         micSpikeThreshold     = Defaults.micSpikeThreshold
         micCrestFactor        = Defaults.micCrestFactor
         micRiseRate           = Defaults.micRiseRate

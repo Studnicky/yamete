@@ -73,6 +73,9 @@ final class MatrixLocalization_Tests: XCTestCase {
         case .lidOpened:            return .lidOpened
         case .lidClosed:            return .lidClosed
         case .lidSlammed:           return .lidSlammed
+        case .alsCovered:           return .alsCovered
+        case .lightsOff:            return .lightsOff
+        case .lightsOn:             return .lightsOn
         }
     }
 

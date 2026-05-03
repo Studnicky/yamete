@@ -84,6 +84,9 @@ public enum Reaction: Sendable {
     case lidOpened      // hinge angle crossed the open threshold from below
     case lidClosed      // hinge angle dropped below the closed threshold gently
     case lidSlammed     // hinge angle dropped below the closed threshold at slam rate
+    case alsCovered     // ambient light sensor occluded — fast drop with floor near zero
+    case lightsOff      // ambient lux dropped sharply over the configured window
+    case lightsOn       // ambient lux rose sharply over the configured window
 
     /// Payload-less mirror used as a settings dictionary key.
     public var kind: ReactionKind {
@@ -114,6 +117,9 @@ public enum Reaction: Sendable {
         case .lidOpened:                .lidOpened
         case .lidClosed:                .lidClosed
         case .lidSlammed:               .lidSlammed
+        case .alsCovered:               .alsCovered
+        case .lightsOff:                .lightsOff
+        case .lightsOn:                 .lightsOn
         }
     }
 
@@ -176,4 +182,7 @@ public enum ReactionKind: String, CaseIterable, Sendable, Codable {
     case lidOpened
     case lidClosed
     case lidSlammed
+    case alsCovered
+    case lightsOff
+    case lightsOn
 }

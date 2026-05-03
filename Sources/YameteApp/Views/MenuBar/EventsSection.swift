@@ -108,6 +108,13 @@ internal struct StimuliSection: View {
                 help: NSLocalizedString("help_source_lid_angle", comment: "Lid angle source help"),
                 kinds: [.lidOpened, .lidClosed, .lidSlammed]
             ))
+            result.append(.init(
+                sourceID: SensorID.ambientLight.rawValue,
+                title: NSLocalizedString("event_ambient_light", comment: "Ambient light events"),
+                icon: "sun.max.circle",
+                help: NSLocalizedString("help_source_ambient_light", comment: "Ambient light source help"),
+                kinds: [.alsCovered, .lightsOff, .lightsOn]
+            ))
         }
         return result
     }
@@ -389,6 +396,9 @@ internal struct StimuliSection: View {
         case .lidOpened:                NSLocalizedString("kind_lid_opened",     comment: "Lid opened label")
         case .lidClosed:                NSLocalizedString("kind_lid_closed",     comment: "Lid closed label")
         case .lidSlammed:               NSLocalizedString("kind_lid_slammed",    comment: "Lid slammed label")
+        case .alsCovered:               NSLocalizedString("kind_als_covered",    comment: "Ambient light covered label")
+        case .lightsOff:                NSLocalizedString("kind_lights_off",     comment: "Lights off label")
+        case .lightsOn:                 NSLocalizedString("kind_lights_on",      comment: "Lights on label")
         case .impact:                   ""
         }
     }

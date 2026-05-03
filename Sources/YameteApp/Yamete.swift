@@ -55,6 +55,7 @@ public final class Yamete {
     // alongside trackpad / mouse / keyboard.
     public let gyroscopeSource = GyroscopeSource()
     public let lidAngleSource = LidAngleSource()
+    public let ambientLightSource = AmbientLightSource()
 
     // Event sources
     public let usbSource = USBSource()
@@ -372,6 +373,13 @@ public final class Yamete {
                 if AppleSPUDevice.isHardwarePresent() {
                     lidAngleSource.start(publishingTo: bus)
                 }
+            case SensorID.ambientLight.rawValue:
+                // Ambient light is direct-publish over a continuous lux
+                // stream. Same SPU-broker hardware-presence gate as
+                // gyroscope and lid.
+                if AppleSPUDevice.isHardwarePresent() {
+                    ambientLightSource.start(publishingTo: bus)
+                }
             default: break
             }
         }
@@ -389,6 +397,7 @@ public final class Yamete {
             case SensorID.keyboardActivity.rawValue: keyboardActivitySource.stop()
             case SensorID.gyroscope.rawValue:        gyroscopeSource.stop()
             case SensorID.lidAngle.rawValue:         lidAngleSource.stop()
+            case SensorID.ambientLight.rawValue:     ambientLightSource.stop()
             default: break
             }
         }

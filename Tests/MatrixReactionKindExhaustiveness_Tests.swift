@@ -148,6 +148,9 @@ final class MatrixReactionKindExhaustiveness_Tests: XCTestCase {
             (.lidOpened, "lidOpened"),
             (.lidClosed, "lidClosed"),
             (.lidSlammed, "lidSlammed"),
+            (.alsCovered, "alsCovered"),
+            (.lightsOff, "lightsOff"),
+            (.lightsOn, "lightsOn"),
         ]
         // Drift detection: every allCases must appear in the pinned list.
         let pinnedKinds = Set(expected.map { $0.0 })
