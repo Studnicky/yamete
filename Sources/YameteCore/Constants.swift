@@ -46,6 +46,15 @@ public enum Detection {
         public static let smoothingWindowMsRange: ClosedRange<Int> = 50...500
     }
 
+    // MARK: - Thermal pressure (no tunable thresholds)
+    //
+    // ThermalSource publishes discrete `ProcessInfo.thermalState`
+    // transitions (`.nominal` / `.fair` / `.serious` / `.critical`).
+    // The state set, transition gates, and emission cadence are all
+    // OS-defined — there are no user-tunable thresholds, so no
+    // `Detection.Thermal` enum is declared. This comment is the
+    // single canonical record of that absence.
+
     // MARK: - Ambient light (lux, BMI286 + Apple SPU broker)
 
     public enum AmbientLight {

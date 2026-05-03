@@ -76,6 +76,10 @@ final class MatrixLocalization_Tests: XCTestCase {
         case .alsCovered:           return .alsCovered
         case .lightsOff:            return .lightsOff
         case .lightsOn:             return .lightsOn
+        case .thermalNominal:       return .thermalNominal
+        case .thermalFair:          return .thermalFair
+        case .thermalSerious:       return .thermalSerious
+        case .thermalCritical:      return .thermalCritical
         }
     }
 

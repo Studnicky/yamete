@@ -56,6 +56,7 @@ public final class Yamete {
     public let gyroscopeSource = GyroscopeSource()
     public let lidAngleSource = LidAngleSource()
     public let ambientLightSource = AmbientLightSource()
+    public let thermalSource = ThermalSource()
 
     // Event sources
     public let usbSource = USBSource()
@@ -380,6 +381,12 @@ public final class Yamete {
                 if AppleSPUDevice.isHardwarePresent() {
                     ambientLightSource.start(publishingTo: bus)
                 }
+            case SensorID.thermal.rawValue:
+                // Thermal is direct-publish over OS-level
+                // `ProcessInfo.thermalState` transitions. Universal —
+                // every macOS host exposes thermal state, no hardware
+                // gate.
+                thermalSource.start(publishingTo: bus)
             default: break
             }
         }
@@ -398,6 +405,7 @@ public final class Yamete {
             case SensorID.gyroscope.rawValue:        gyroscopeSource.stop()
             case SensorID.lidAngle.rawValue:         lidAngleSource.stop()
             case SensorID.ambientLight.rawValue:     ambientLightSource.stop()
+            case SensorID.thermal.rawValue:          thermalSource.stop()
             default: break
             }
         }

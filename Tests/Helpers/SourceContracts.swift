@@ -67,7 +67,8 @@ struct SourceContract: Sendable {
     static let nonContractKinds: Set<ReactionKind> = [
         .gyroSpike,
         .lidOpened, .lidClosed, .lidSlammed,
-        .alsCovered, .lightsOff, .lightsOn
+        .alsCovered, .lightsOff, .lightsOn,
+        .thermalNominal, .thermalFair, .thermalSerious, .thermalCritical
     ]
 
     /// Builds a fresh, unstarted source instance for the given SensorID.

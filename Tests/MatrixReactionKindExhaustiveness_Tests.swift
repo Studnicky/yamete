@@ -151,6 +151,10 @@ final class MatrixReactionKindExhaustiveness_Tests: XCTestCase {
             (.alsCovered, "alsCovered"),
             (.lightsOff, "lightsOff"),
             (.lightsOn, "lightsOn"),
+            (.thermalNominal, "thermalNominal"),
+            (.thermalFair, "thermalFair"),
+            (.thermalSerious, "thermalSerious"),
+            (.thermalCritical, "thermalCritical"),
         ]
         // Drift detection: every allCases must appear in the pinned list.
         let pinnedKinds = Set(expected.map { $0.0 })

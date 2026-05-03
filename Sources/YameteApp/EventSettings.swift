@@ -70,5 +70,6 @@ public enum StimulusSourceDefaults {
         SensorID.gyroscope.rawValue,
         SensorID.lidAngle.rawValue,
         SensorID.ambientLight.rawValue,
+        SensorID.thermal.rawValue,
     ]
 }

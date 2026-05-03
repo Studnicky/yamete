@@ -87,6 +87,10 @@ public enum Reaction: Sendable {
     case alsCovered     // ambient light sensor occluded — fast drop with floor near zero
     case lightsOff      // ambient lux dropped sharply over the configured window
     case lightsOn       // ambient lux rose sharply over the configured window
+    case thermalNominal   // ProcessInfo.thermalState transitioned to .nominal
+    case thermalFair      // ProcessInfo.thermalState transitioned to .fair
+    case thermalSerious   // ProcessInfo.thermalState transitioned to .serious
+    case thermalCritical  // ProcessInfo.thermalState transitioned to .critical
 
     /// Payload-less mirror used as a settings dictionary key.
     public var kind: ReactionKind {
@@ -120,6 +124,10 @@ public enum Reaction: Sendable {
         case .alsCovered:               .alsCovered
         case .lightsOff:                .lightsOff
         case .lightsOn:                 .lightsOn
+        case .thermalNominal:           .thermalNominal
+        case .thermalFair:              .thermalFair
+        case .thermalSerious:           .thermalSerious
+        case .thermalCritical:          .thermalCritical
         }
     }
 
@@ -185,4 +193,8 @@ public enum ReactionKind: String, CaseIterable, Sendable, Codable {
     case alsCovered
     case lightsOff
     case lightsOn
+    case thermalNominal
+    case thermalFair
+    case thermalSerious
+    case thermalCritical
 }

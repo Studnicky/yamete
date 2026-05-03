@@ -441,6 +441,51 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
         assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 460))
     }
 
+    // MARK: - Cell 1e: ThermalSection collapsed / expanded
+    //
+    // Universal surface (not Direct-only) but cells live in BOTH
+    // SnapshotUI suites so the AppStore + Direct + HostApp PNG
+    // baselines seed. ThermalSection has no tunables — single
+    // light-only collapsed and expanded baselines.
+    func test_cell_thermalSection_collapsed() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_thermalSection_collapsed.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_thermal", comment: "Thermal section header"),
+            isExpanded: .constant(false)
+        ) {
+            ThermalSectionContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 60)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 60))
+    }
+
+    func test_cell_thermalSection_expanded() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_thermalSection_expanded.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_thermal", comment: "Thermal section header"),
+            contentRowCount: 1,
+            isExpanded: .constant(true)
+        ) {
+            ThermalSectionContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 120)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 120))
+    }
+
     // MARK: - Cell 2: MicTuningSection collapsed / expanded
 
     func test_cell_micTuningSection_collapsed() throws {

@@ -734,4 +734,49 @@ final class SnapshotUI_Tests: XCTestCase {
         .preferredColorScheme(.dark)
         assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 460))
     }
+
+    // MARK: - Cell 11: ThermalSection collapsed / expanded
+    //
+    // ThermalSection has no tunable thresholds — its expanded body is
+    // a single help-text row. Single light-only collapsed and expanded
+    // baselines suffice (no light/dark variants since the rendering
+    // is just a static text block).
+    func test_cell_thermalSection_collapsed() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_thermalSection_collapsed.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_thermal", comment: "Thermal section header"),
+            isExpanded: .constant(false)
+        ) {
+            ThermalSectionContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 60)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 60))
+    }
+
+    func test_cell_thermalSection_expanded() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_thermalSection_expanded.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_thermal", comment: "Thermal section header"),
+            contentRowCount: 1,
+            isExpanded: .constant(true)
+        ) {
+            ThermalSectionContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 120)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 120))
+    }
 }

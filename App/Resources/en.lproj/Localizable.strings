@@ -504,3 +504,17 @@
 "help_als_on_ceiling"           = "Lux ceiling above which a rise fires \"lights on\".";
 "setting_als_window"            = "Window (s)";
 "help_als_window"               = "Time window over which step-changes are measured.";
+
+/* Thermal pressure */
+"section_thermal"               = "Thermal";
+"sensor_thermal"                = "Thermal pressure";
+"event_thermal"                 = "Thermal pressure";
+"help_source_thermal"           = "Fires reactions when the OS reports a change in CPU thermal pressure (nominal / fair / serious / critical).";
+"reaction_thermalNominal"       = "Cooling down";
+"reaction_thermalFair"          = "Warm";
+"reaction_thermalSerious"       = "Hot";
+"reaction_thermalCritical"      = "Overheating";
+"kind_thermal_nominal"          = "Cooling down";
+"kind_thermal_fair"             = "Warm";
+"kind_thermal_serious"          = "Hot";
+"kind_thermal_critical"         = "Overheating";

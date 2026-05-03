@@ -40,6 +40,10 @@ public enum ReactionsConfig {
         .alsCovered:                0.7,
         .lightsOff:                 0.5,
         .lightsOn:                  0.4,
+        .thermalNominal:            0.2,
+        .thermalFair:               0.5,
+        .thermalSerious:            0.8,
+        .thermalCritical:           1.0,
     ]
 
     // MARK: - Per-source debounce windows

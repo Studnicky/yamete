@@ -1135,6 +1135,42 @@
       "replace": "return timestamp.timeIntervalSince(last) < 0",
       "search": "return timestamp.timeIntervalSince(last) < config.debounceSec",
       "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
+    },
+    {
+      "description": "ThermalSource.start — drop the cold-start baseline capture; the very first observation matching the cold-start state erroneously publishes a transition Reaction.",
+      "expectedFailingTest": "MatrixThermalSource_Tests/testThermal_initialSuppression_isCaught",
+      "expectedFailureSubstring": "[thermal-gate=initial-suppression]",
+      "id": "thermal-initial-suppression",
+      "replace": "s.lastState = nil",
+      "search": "s.lastState = initial",
+      "targetFile": "Sources/SensorKit/ThermalSource.swift"
+    },
+    {
+      "description": "ThermalSource.handleStateChange — drop the same-state dedup gate; identical state notifications republish the matching Reaction every time.",
+      "expectedFailingTest": "MatrixThermalSource_Tests/testThermal_stateDedup_isCaught",
+      "expectedFailureSubstring": "[thermal-gate=state-dedup]",
+      "id": "thermal-state-dedup",
+      "replace": "if s.lastState == nil { return nil }",
+      "search": "if s.lastState == current { return nil }",
+      "targetFile": "Sources/SensorKit/ThermalSource.swift"
+    },
+    {
+      "description": "ThermalSource.reaction(for:) — swap the .serious mapping so .serious erroneously surfaces as .thermalFair instead of .thermalSerious.",
+      "expectedFailingTest": "MatrixThermalSource_Tests/testThermal_stateMapping_isCaught",
+      "expectedFailureSubstring": "[thermal-gate=state-mapping]",
+      "id": "thermal-state-mapping",
+      "replace": "case .serious:  return .thermalFair",
+      "search": "case .serious:  return .thermalSerious",
+      "targetFile": "Sources/SensorKit/ThermalSource.swift"
+    },
+    {
+      "description": "ThermalSource.stop — drop the bus = nil clear; subsequent state-change observations republish even after stop() because the publish gate still sees a non-nil bus.",
+      "expectedFailingTest": "MatrixThermalSource_Tests/testThermal_observerRemoval_isCaught",
+      "expectedFailureSubstring": "[thermal-gate=observer-removal]",
+      "id": "thermal-observer-removal",
+      "replace": "s.bus = s.bus",
+      "search": "s.bus = nil",
+      "targetFile": "Sources/SensorKit/ThermalSource.swift"
     }
   ]
 }

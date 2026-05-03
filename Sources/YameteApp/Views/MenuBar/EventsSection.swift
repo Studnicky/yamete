@@ -62,6 +62,11 @@ internal struct StimuliSection: View {
               icon: "moon.zzz",
               help: NSLocalizedString("help_source_sleep_wake", comment: "Sleep/wake source help"),
               kinds: [.willSleep, .didWake]),
+        .init(sourceID: SensorID.thermal.rawValue,
+              title: NSLocalizedString("event_thermal", comment: "Thermal pressure events"),
+              icon: "thermometer.medium",
+              help: NSLocalizedString("help_source_thermal", comment: "Thermal source help"),
+              kinds: [.thermalNominal, .thermalFair, .thermalSerious, .thermalCritical]),
     ]
 
     private var activeRows: [StimulusRow] {
@@ -399,6 +404,10 @@ internal struct StimuliSection: View {
         case .alsCovered:               NSLocalizedString("kind_als_covered",    comment: "Ambient light covered label")
         case .lightsOff:                NSLocalizedString("kind_lights_off",     comment: "Lights off label")
         case .lightsOn:                 NSLocalizedString("kind_lights_on",      comment: "Lights on label")
+        case .thermalNominal:           NSLocalizedString("kind_thermal_nominal",  comment: "Thermal nominal label")
+        case .thermalFair:              NSLocalizedString("kind_thermal_fair",     comment: "Thermal fair label")
+        case .thermalSerious:           NSLocalizedString("kind_thermal_serious",  comment: "Thermal serious label")
+        case .thermalCritical:          NSLocalizedString("kind_thermal_critical", comment: "Thermal critical label")
         case .impact:                   ""
         }
     }
