@@ -281,8 +281,8 @@ test-host-app: hooks
 		-scheme YameteHostTest \
 		-destination 'platform=macOS,arch=arm64' \
 		-quiet
-	@mkdir -p build && touch build/.host-app-test-fresh
-	@printf "  ok        host-app sentinel touched (build/.host-app-test-fresh)\n"
+	@mkdir -p build && git rev-parse HEAD > build/.host-app-test-fresh
+	@printf "  ok        host-app sentinel recorded (build/.host-app-test-fresh = $$(cat build/.host-app-test-fresh))\n"
 
 # ── Local pre-push gate setup ────────────────────────────────
 # Installs the repo's checked-in git hooks under .githooks. Idempotent;
