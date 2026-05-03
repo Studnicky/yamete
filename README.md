@@ -11,7 +11,7 @@
 <p align="center">
 
 [![itai](https://img.shields.io/badge/%E3%81%84%E3%81%9F%E3%81%84-ouch-red)](https://knowyourmeme.com/memes/pain)
-[![mutations caught](https://img.shields.io/badge/mutations%20caught-112%2F112-success)](Tests/Mutation/mutation-catalog.json)
+[![mutations caught](https://img.shields.io/badge/mutations%20caught-111%2F111-success)](Tests/Mutation/mutation-catalog.json)
 [![USB detected](https://img.shields.io/badge/USB%20cable-detected-mediumpurple)](https://knowyourmeme.com/memes/surprised-pikachu)
 [![Zero onboarding](https://img.shields.io/badge/onboarding-skipped-lightgrey)](https://knowyourmeme.com/memes/yeet)
 [![ouch but tested](https://img.shields.io/badge/crash%20handling-this%20is%20fine-orange)](Tests/CrashHandling_Tests.swift)
@@ -180,7 +180,22 @@ Thank you to everyone shipping open tools for Apple Silicon. This app only exist
 
 ## Continuous integration
 
-Every PR and every push to `master` / `develop` runs four required correctness gates via GitHub Actions: `swift test` (default), `swift test -Xswiftc -DDIRECT_BUILD`, `make lint` (strict-concurrency type-check), and `make mutate` (109/109 mutation-catalog gates caught). The host-app xcodebuild scheme runs alongside as a recommended-but-not-yet-required check, and `make perf-baseline` runs weekly on cron for absolute-baseline drift detection. See [.github/RULESET.md](.github/RULESET.md) for the branch-protection ruleset.
+For a joke app where the value proposition is "your laptop yells when smacked," the CI surface is genuinely disproportionate. Every PR runs (in roughly ten minutes wall-clock):
+
+- `swift test` (default + `-Xswiftc -DDIRECT_BUILD`) — the SPM cells, ~750 each lane
+- `make lint` — Swift 6 strict-concurrency type-check
+- `make mutate` (PR slice) — 111 mutation-catalog gates, every one caught
+- `make check-versions` — `project.yml` ↔ docs version drift gate, the result of `release/2.0.0` shipping with `MARKETING_VERSION` still pinned at `1.3.2` because somebody (me) had four version surfaces and updated one
+- `make build` — both Direct and App Store bundle variants link cleanly
+- `actionlint` — the workflow YAML lint
+
+The two-hour `make test-host-app` xcodebuild lane (which validates that hardware-absence error paths don't crash on a runner with no haptic / mic / accelerometer / Force-Touch / UN-center / Accessibility-granted CGEvent) is **off the PR path**. It runs only on push to `master` and via `workflow_dispatch`. The local `.githooks/pre-push` gate refuses to push a `release/**` or `hotfix/**` branch unless `make test-host-app` has been run since the most recent change to any tracked source file (compares mtimes against `build/.host-app-test-fresh`). On Apple Silicon the local run takes 4 minutes vs 2 hours on CI, so the gate is the faster check anyway.
+
+`make perf-baseline` runs weekly via cron for absolute-baseline drift detection. Concurrency policy is "newer push always supersedes older runs on the same ref," master included — stale results don't get to masquerade as current state.
+
+If you came here looking for what the test apparatus actually proves, the answer is: it catches mutations to the bus routing, lifecycle ordering, coalesce window math, multiplier stacking, drop-not-cancel semantics, NaN/Inf admission in settings, locale plural rules across 40 locales, and snapshot pixel drift in 4 build variants. It does not prove that the laptop actually flinches when you hit it. That part you have to verify yourself.
+
+See [.github/RULESET.md](.github/RULESET.md) for the branch-protection ruleset.
 
 ## Contributing
 

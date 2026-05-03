@@ -4,3 +4,4 @@
 - **Swift 6 with complete strict concurrency.** The `@unchecked Sendable` surface is two narrow framework-handle wrappers. Everything else is genuine `Sendable` or actor-isolated.
 - **Four SPM modules** with a unidirectional graph: `YameteCore` ← `SensorKit`/`ResponseKit` ← `YameteApp`.
 - **Zero network.** No analytics. No telemetry. Local logs auto-rotate every 24 hours.
+- **A test apparatus that is wildly out of proportion to the artifact.** ~750 cells across 2 SPM variants, a 111-entry mutation catalog (every one caught), property-based and concurrent-interleaved fuzz, 4 build-variant snapshot trees, performance baselines with a 2× tolerance band, and a 2-hour xcodebuild host-app integration lane that runs in 4 minutes locally because CI is a haunted swamp. None of it proves the laptop actually flinches when you hit it; that part you verify yourself.
