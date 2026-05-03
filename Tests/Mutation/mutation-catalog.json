@@ -1000,6 +1000,51 @@
       "replace": "for s in subviews { h = min(h == 0 ? .infinity : h, s.sizeThatFits(.unspecified).height) }",
       "search": "for s in subviews { h = max(h, s.sizeThatFits(.unspecified).height) }",
       "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "GyroDetector.process \u2014 drop sample-count warmup gate; samples within warmup window must NOT publish .gyroSpike.",
+      "expectedFailingTest": "MatrixGyroscopeSource_Tests/testGyroSpike_warmup_isCaught",
+      "expectedFailureSubstring": "[gyro-gate=warmup]",
+      "id": "gyro-warmup-gate",
+      "replace": "guard s.sampleCount >= 0 else { return nil }",
+      "search": "guard s.sampleCount >= config.warmupSamples else { return nil }",
+      "targetFile": "Sources/SensorKit/GyroDetector.swift"
+    },
+    {
+      "description": "GyroDetector.process \u2014 drop spike-threshold magnitude floor; sub-threshold magnitudes must NOT publish .gyroSpike.",
+      "expectedFailingTest": "MatrixGyroscopeSource_Tests/testGyroSpike_magnitudeFloor_isCaught",
+      "expectedFailureSubstring": "[gyro-gate=magnitude-floor]",
+      "id": "gyro-magnitude-floor",
+      "replace": "guard magnitude > -1 else { return nil }",
+      "search": "guard magnitude > config.spikeThreshold else { return nil }",
+      "targetFile": "Sources/SensorKit/GyroDetector.swift"
+    },
+    {
+      "description": "GyroDetector.process \u2014 drop minConfirmations gate; under-confirmation single sample must NOT publish .gyroSpike.",
+      "expectedFailingTest": "MatrixGyroscopeSource_Tests/testGyroSpike_confirmations_isCaught",
+      "expectedFailureSubstring": "[gyro-gate=confirmations]",
+      "id": "gyro-confirmations-gate",
+      "replace": "guard confirmed >= 0 else {",
+      "search": "guard confirmed >= config.minConfirmations else {",
+      "targetFile": "Sources/SensorKit/GyroDetector.swift"
+    },
+    {
+      "description": "GyroscopeSource.handleReport \u2014 drop debounce window; tight burst of above-threshold reports must coalesce to one fire.",
+      "expectedFailingTest": "MatrixGyroscopeSource_Tests/testGyroSpike_debounceWindow_isCaught",
+      "expectedFailureSubstring": "[gyro-gate=debounce-window]",
+      "id": "gyro-debounce-window",
+      "replace": "if let last = s.lastFiredAt, timestamp.timeIntervalSince(last) < -1 {",
+      "search": "if let last = s.lastFiredAt, timestamp.timeIntervalSince(last) < ReactionsConfig.gyroDebounce {",
+      "targetFile": "Sources/SensorKit/GyroscopeSource.swift"
+    },
+    {
+      "description": "GyroscopeSource.handleReport \u2014 corrupt the X-axis byte offset (canonical 6 \u2192 0); decoded magnitude collapses to zero (the test payload has zero-bytes at offsets 0..5) and the cell-expected single fire never appears.",
+      "expectedFailingTest": "MatrixGyroscopeSource_Tests/testGyroSpike_decodeOffset_isCaught",
+      "expectedFailureSubstring": "[gyro-gate=decode-offset]",
+      "id": "gyro-decode-byte-offset",
+      "replace": "let rawX = raw.loadUnaligned(fromByteOffset: 0, as: Int32.self)",
+      "search": "let rawX = raw.loadUnaligned(fromByteOffset: 6, as: Int32.self)",
+      "targetFile": "Sources/SensorKit/GyroscopeSource.swift"
     }
   ]
 }

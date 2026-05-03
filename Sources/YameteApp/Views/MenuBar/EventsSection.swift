@@ -4,6 +4,9 @@ import YameteCore
 #if !RAW_SWIFTC_LUMP
 import ResponseKit
 #endif
+#if !RAW_SWIFTC_LUMP
+import SensorKit
+#endif
 import SwiftUI
 
 // MARK: - Stimuli section (cable / power / device / trackpad reactions)
@@ -88,6 +91,15 @@ internal struct StimuliSection: View {
                 icon: "keyboard",
                 help: NSLocalizedString("help_source_keyboard", comment: "Keyboard source help"),
                 kinds: [.keyboardTyped]
+            ))
+        }
+        if AppleSPUDevice.isHardwarePresent() {
+            result.append(.init(
+                sourceID: SensorID.gyroscope.rawValue,
+                title: NSLocalizedString("event_gyroscope", comment: "Gyroscope events"),
+                icon: "gyroscope",
+                help: NSLocalizedString("help_source_gyroscope", comment: "Gyroscope source help"),
+                kinds: [.gyroSpike]
             ))
         }
         return result
@@ -366,6 +378,7 @@ internal struct StimuliSection: View {
         case .mouseClicked:             NSLocalizedString("kind_mouse_clicked",  comment: "Mouse clicked label")
         case .mouseScrolled:            NSLocalizedString("kind_mouse_scrolled", comment: "Mouse scrolled label")
         case .keyboardTyped:            NSLocalizedString("kind_keyboard_typed", comment: "Keyboard typed label")
+        case .gyroSpike:                NSLocalizedString("kind_gyro_spike",     comment: "Gyroscope spike label")
         case .impact:                   ""
         }
     }

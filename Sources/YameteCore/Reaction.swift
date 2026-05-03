@@ -80,6 +80,7 @@ public enum Reaction: Sendable {
     case mouseClicked   // primary button click from a non-trackpad mouse
     case mouseScrolled  // sustained scroll-wheel activity from a mouse
     case keyboardTyped  // keyboard typing rate threshold crossed
+    case gyroSpike      // angular velocity spike from the BMI286 gyroscope
 
     /// Payload-less mirror used as a settings dictionary key.
     public var kind: ReactionKind {
@@ -106,6 +107,7 @@ public enum Reaction: Sendable {
         case .mouseClicked:             .mouseClicked
         case .mouseScrolled:            .mouseScrolled
         case .keyboardTyped:            .keyboardTyped
+        case .gyroSpike:                .gyroSpike
         }
     }
 
@@ -164,4 +166,5 @@ public enum ReactionKind: String, CaseIterable, Sendable, Codable {
     case mouseClicked
     case mouseScrolled
     case keyboardTyped
+    case gyroSpike
 }

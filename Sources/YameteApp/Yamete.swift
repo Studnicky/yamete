@@ -50,6 +50,11 @@ public final class Yamete {
     public let microphoneSource: MicrophoneSource
     public let headphoneMotionSource: HeadphoneMotionSource
 
+    // Gyroscope is a direct-publish reaction source (does NOT participate in
+    // fusion); declared here so its lifecycle hooks into `rebuildEventSources`
+    // alongside trackpad / mouse / keyboard.
+    public let gyroscopeSource = GyroscopeSource()
+
     // Event sources
     public let usbSource = USBSource()
     public let powerSource = PowerSource()
@@ -353,6 +358,13 @@ public final class Yamete {
                 mouseActivitySource.start(publishingTo: bus)
             case SensorID.keyboardActivity.rawValue:
                 keyboardActivitySource.start(publishingTo: bus)
+            case SensorID.gyroscope.rawValue:
+                // Gyroscope is direct-publish like trackpad/mouse/keyboard but
+                // gates on SPU HID hardware presence. Skip start when the host
+                // does not expose a BMI286.
+                if AppleSPUDevice.isHardwarePresent() {
+                    gyroscopeSource.start(publishingTo: bus)
+                }
             default: break
             }
         }
@@ -368,6 +380,7 @@ public final class Yamete {
             case SensorID.trackpadActivity.rawValue: trackpadActivitySource.stop()
             case SensorID.mouseActivity.rawValue:    mouseActivitySource.stop()
             case SensorID.keyboardActivity.rawValue: keyboardActivitySource.stop()
+            case SensorID.gyroscope.rawValue:        gyroscopeSource.stop()
             default: break
             }
         }

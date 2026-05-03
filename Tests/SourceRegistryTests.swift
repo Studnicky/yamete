@@ -20,22 +20,34 @@ final class SourceRegistryTests: XCTestCase {
     }
 
     func testStimulusSourceDefaultsMatchContractIDs() {
+        // `enabledStimulusSourceIDs` defaults are a SUPERSET of `SourceContract.all`
+        // because GyroscopeSource is direct-publish (off-MainActor) and cannot
+        // conform to the `@MainActor` StimulusSource protocol — but its enable
+        // toggle still flows through the same persisted ID list. The contract
+        // IDs must be a strict subset of the default ID set.
         let contractIDs = Set(SourceContract.all.map(\.id.rawValue))
         let defaults    = Set(StimulusSourceDefaults.allStimulusSourceIDs)
-        XCTAssertEqual(contractIDs, defaults,
-                       "StimulusSourceDefaults must match SourceContract.all exactly")
+        XCTAssertTrue(contractIDs.isSubset(of: defaults),
+                      "SourceContract.all IDs must be a subset of StimulusSourceDefaults — missing in defaults: \(contractIDs.subtracting(defaults))")
+        let extras = defaults.subtracting(contractIDs)
+        // The only legal extra is the gyroscope — see SourceContracts.swift
+        // file note for why it has no protocol conformance.
+        XCTAssertEqual(extras, [SensorID.gyroscope.rawValue],
+                       "StimulusSourceDefaults entries with no SourceContract must be exactly {gyroscope}, got \(extras)")
     }
 
     func testEveryEmittedKindIsAccountedForAcrossContracts() {
         // Aggregate every kind every stimulus source can produce. `.impact`
         // is the only kind not produced by a stimulus source (it comes from
-        // the impact-fusion pipeline) so we expect ReactionKind.allCases minus
-        // .impact to equal the union.
-        let union = SourceContract.all.flatMap { $0.emittedKinds }
-        let unionSet = Set(union)
+        // the impact-fusion pipeline). `SourceContract.nonContractKinds` adds
+        // kinds emitted by direct-publish off-MainActor sources (currently
+        // .gyroSpike from GyroscopeSource) that the @MainActor StimulusSource
+        // protocol cannot host.
+        let union = Set(SourceContract.all.flatMap(\.emittedKinds))
+            .union(SourceContract.nonContractKinds)
         let nonImpact = Set(ReactionKind.allCases).subtracting([.impact])
-        XCTAssertEqual(unionSet, nonImpact,
-                       "Every non-impact ReactionKind must be emitted by at least one stimulus source")
+        XCTAssertEqual(union, nonImpact,
+                       "Every non-impact ReactionKind must be emitted by at least one stimulus source (contract or non-contract)")
     }
 
     @MainActor

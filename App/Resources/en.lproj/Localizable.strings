@@ -450,3 +450,13 @@
 "kind_mouse_clicked"         = "Clicked";
 "kind_mouse_scrolled"        = "Scrolling";
 "kind_keyboard_typed"        = "Typing";
+
+/* Gyroscope detection */
+"section_gyro_tuning"           = "Gyroscope Tuning";
+"event_gyroscope"               = "Gyroscope";
+"kind_gyro_spike"               = "Lid yank / spin";
+"help_source_gyroscope"         = "Fires a reaction when the BMI286 gyroscope detects an angular-velocity spike — lid yanks, sudden rotations.";
+"setting_gyro_spike_threshold"  = "Spike threshold (deg/s)";
+"help_gyro_spike_threshold"     = "Angular velocity required to fire.";
+"setting_gyro_rise_rate"        = "Rise rate (deg/s²)";
+"help_gyro_rise_rate"           = "Minimum angular acceleration to fire.";

@@ -61,6 +61,7 @@ public struct SensorID: Hashable, Sendable, RawRepresentable, CustomStringConver
     public var description: String { rawValue }
 
     public static let accelerometer = SensorID("accelerometer")
+    public static let gyroscope = SensorID("gyroscope")
     public static let microphone = SensorID("microphone")
     public static let headphoneMotion = SensorID("headphone-motion")
 

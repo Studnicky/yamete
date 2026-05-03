@@ -352,6 +352,7 @@ final class MatrixRouting_Tests: XCTestCase {
         case .mouseClicked:             return .mouseClicked
         case .mouseScrolled:            return .mouseScrolled
         case .keyboardTyped:            return .keyboardTyped
+        case .gyroSpike:            return .gyroSpike
         }
     }
 }

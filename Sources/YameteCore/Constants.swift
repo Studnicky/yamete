@@ -20,6 +20,18 @@ public enum Detection {
         public static let intensityCeiling: Float = 0.060
     }
 
+    // MARK: - Gyroscope (deg/s angular velocity, BMI286 via SPU broker)
+
+    public enum Gyro {
+        public static let spikeThresholdRange: ClosedRange<Double> = 50.0...500.0
+        public static let crestFactorRange: ClosedRange<Double> = 1.5...5.0
+        public static let riseRateRange: ClosedRange<Double> = 10.0...200.0
+        public static let confirmationsRange: ClosedRange<Int> = 1...10
+        public static let warmupRange: ClosedRange<Int> = 0...200
+        public static let intensityFloor: Float = 50.0
+        public static let intensityCeiling: Float = 500.0
+    }
+
     // MARK: - Microphone (HP-filtered PCM amplitude, AVAudioEngine)
 
     public enum Mic {

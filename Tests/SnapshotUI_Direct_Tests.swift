@@ -241,6 +241,74 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
         assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 540))
     }
 
+    // MARK: - Cell 1b: GyroTuningSection collapsed / expanded
+
+    /// `GyroTuningSection` wraps `GyroTuningContent` in an `AccordionCard`.
+    /// Collapsed: only the header bar contributes pixels. Expanded variants
+    /// render the five-row tuning body (confirmations, crest factor, rise
+    /// rate, spike threshold, warmup). The view is gated on
+    /// `AppleSPUDevice.isHardwarePresent` at the StimuliSection insertion
+    /// point in production; the cell renders the section directly so the
+    /// snapshot does not depend on hardware presence.
+    func test_cell_gyroTuningSection_collapsed() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_gyroTuningSection_collapsed.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_gyro_tuning", comment: "Gyroscope tuning section header"),
+            isExpanded: .constant(false)
+        ) {
+            GyroTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 60)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 60))
+    }
+
+    func test_cell_gyroTuningSection_expanded_lightScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_gyroTuningSection_expanded_lightScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_gyro_tuning", comment: "Gyroscope tuning section header"),
+            contentRowCount: 9,
+            isExpanded: .constant(true)
+        ) {
+            GyroTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 360)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 360))
+    }
+
+    func test_cell_gyroTuningSection_expanded_darkScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_gyroTuningSection_expanded_darkScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_gyro_tuning", comment: "Gyroscope tuning section header"),
+            contentRowCount: 9,
+            isExpanded: .constant(true)
+        ) {
+            GyroTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 360)
+        .preferredColorScheme(.dark)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 360))
+    }
+
     // MARK: - Cell 2: MicTuningSection collapsed / expanded
 
     func test_cell_micTuningSection_collapsed() throws {

@@ -36,6 +36,14 @@ public enum Defaults {
     public static let accelBandpassLow: Double = 20.0
     public static let accelBandpassHigh: Double = 25.0
 
+    // MARK: - Gyroscope detection (deg/s)
+
+    public static let gyroSpikeThreshold: Double = 200.0
+    public static let gyroCrestFactor: Double = 2.5
+    public static let gyroRiseRate: Double = 50.0
+    public static let gyroConfirmations: Int = 3
+    public static let gyroWarmup: Int = 50
+
     // MARK: - Microphone detection
 
     public static let micSpikeThreshold: Double = 0.020

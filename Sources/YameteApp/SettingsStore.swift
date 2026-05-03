@@ -26,6 +26,8 @@ public final class SettingsStore {
         // Accelerometer detection
         case accelSpikeThreshold, accelCrestFactor, accelRiseRate, accelConfirmations
         case accelWarmupSamples, accelReportInterval, accelBandpassLowHz, accelBandpassHighHz
+        // Gyroscope detection
+        case gyroSpikeThreshold, gyroCrestFactor, gyroRiseRate, gyroConfirmations, gyroWarmupSamples
         // Microphone detection
         case micSpikeThreshold, micCrestFactor, micRiseRate, micConfirmations, micWarmupSamples
         // Headphone motion detection
@@ -92,6 +94,12 @@ public final class SettingsStore {
         Key.accelReportInterval.rawValue:  Defaults.accelReportInterval,
         Key.accelBandpassLowHz.rawValue:   Defaults.accelBandpassLow,
         Key.accelBandpassHighHz.rawValue:  Defaults.accelBandpassHigh,
+        // Gyroscope detection
+        Key.gyroSpikeThreshold.rawValue:   Defaults.gyroSpikeThreshold,
+        Key.gyroCrestFactor.rawValue:      Defaults.gyroCrestFactor,
+        Key.gyroRiseRate.rawValue:         Defaults.gyroRiseRate,
+        Key.gyroConfirmations.rawValue:    Defaults.gyroConfirmations,
+        Key.gyroWarmupSamples.rawValue:    Defaults.gyroWarmup,
         // Microphone detection
         Key.micSpikeThreshold.rawValue: Defaults.micSpikeThreshold,
         Key.micCrestFactor.rawValue:    Defaults.micCrestFactor,
@@ -390,6 +398,53 @@ public final class SettingsStore {
             let c = accelWarmupSamples.clamped(to: Detection.Accel.warmupRange)
             if c != accelWarmupSamples { accelWarmupSamples = c; return }
             persist(accelWarmupSamples, .accelWarmupSamples)
+        }
+    }
+
+    // MARK: - Gyroscope detection
+
+    var gyroSpikeThreshold: Double {
+        didSet {
+            guard gyroSpikeThreshold != oldValue else { return }
+            let c = gyroSpikeThreshold.clamped(to: Detection.Gyro.spikeThresholdRange)
+            if c != gyroSpikeThreshold { gyroSpikeThreshold = c; return }
+            persist(gyroSpikeThreshold, .gyroSpikeThreshold)
+        }
+    }
+
+    var gyroCrestFactor: Double {
+        didSet {
+            guard gyroCrestFactor != oldValue else { return }
+            let c = gyroCrestFactor.clamped(to: Detection.Gyro.crestFactorRange)
+            if c != gyroCrestFactor { gyroCrestFactor = c; return }
+            persist(gyroCrestFactor, .gyroCrestFactor)
+        }
+    }
+
+    var gyroRiseRate: Double {
+        didSet {
+            guard gyroRiseRate != oldValue else { return }
+            let c = gyroRiseRate.clamped(to: Detection.Gyro.riseRateRange)
+            if c != gyroRiseRate { gyroRiseRate = c; return }
+            persist(gyroRiseRate, .gyroRiseRate)
+        }
+    }
+
+    var gyroConfirmations: Int {
+        didSet {
+            guard gyroConfirmations != oldValue else { return }
+            let c = gyroConfirmations.clamped(to: Detection.Gyro.confirmationsRange)
+            if c != gyroConfirmations { gyroConfirmations = c; return }
+            persist(gyroConfirmations, .gyroConfirmations)
+        }
+    }
+
+    var gyroWarmupSamples: Int {
+        didSet {
+            guard gyroWarmupSamples != oldValue else { return }
+            let c = gyroWarmupSamples.clamped(to: Detection.Gyro.warmupRange)
+            if c != gyroWarmupSamples { gyroWarmupSamples = c; return }
+            persist(gyroWarmupSamples, .gyroWarmupSamples)
         }
     }
 
@@ -899,6 +954,12 @@ public final class SettingsStore {
         accelReportInterval   = d.double(forKey: Key.accelReportInterval.rawValue)
         accelBandpassLowHz    = d.double(forKey: Key.accelBandpassLowHz.rawValue)
         accelBandpassHighHz   = d.double(forKey: Key.accelBandpassHighHz.rawValue)
+        // Gyroscope
+        gyroSpikeThreshold    = d.double(forKey: Key.gyroSpikeThreshold.rawValue)
+        gyroCrestFactor       = d.double(forKey: Key.gyroCrestFactor.rawValue)
+        gyroRiseRate          = d.double(forKey: Key.gyroRiseRate.rawValue)
+        gyroConfirmations     = d.integer(forKey: Key.gyroConfirmations.rawValue)
+        gyroWarmupSamples     = d.integer(forKey: Key.gyroWarmupSamples.rawValue)
         // Microphone
         micSpikeThreshold = d.double(forKey: Key.micSpikeThreshold.rawValue)
         micCrestFactor    = d.double(forKey: Key.micCrestFactor.rawValue)
@@ -1081,6 +1142,9 @@ public final class SettingsStore {
         if !store.accelReportInterval.isFinite  { store.accelReportInterval  = Defaults.accelReportInterval }
         if !store.accelBandpassLowHz.isFinite   { store.accelBandpassLowHz   = Defaults.accelBandpassLow }
         if !store.accelBandpassHighHz.isFinite  { store.accelBandpassHighHz  = Defaults.accelBandpassHigh }
+        if !store.gyroSpikeThreshold.isFinite   { store.gyroSpikeThreshold   = Defaults.gyroSpikeThreshold }
+        if !store.gyroCrestFactor.isFinite      { store.gyroCrestFactor      = Defaults.gyroCrestFactor }
+        if !store.gyroRiseRate.isFinite         { store.gyroRiseRate         = Defaults.gyroRiseRate }
         if !store.micSpikeThreshold.isFinite    { store.micSpikeThreshold    = Defaults.micSpikeThreshold }
         if !store.micCrestFactor.isFinite       { store.micCrestFactor       = Defaults.micCrestFactor }
         if !store.micRiseRate.isFinite          { store.micRiseRate          = Defaults.micRiseRate }
@@ -1127,6 +1191,11 @@ public final class SettingsStore {
         accelConfirmations    = Defaults.accelConfirmations
         accelWarmupSamples    = Defaults.accelWarmup
         accelReportInterval   = Defaults.accelReportInterval
+        gyroSpikeThreshold    = Defaults.gyroSpikeThreshold
+        gyroCrestFactor       = Defaults.gyroCrestFactor
+        gyroRiseRate          = Defaults.gyroRiseRate
+        gyroConfirmations     = Defaults.gyroConfirmations
+        gyroWarmupSamples     = Defaults.gyroWarmup
         micSpikeThreshold     = Defaults.micSpikeThreshold
         micCrestFactor        = Defaults.micCrestFactor
         micRiseRate           = Defaults.micRiseRate
