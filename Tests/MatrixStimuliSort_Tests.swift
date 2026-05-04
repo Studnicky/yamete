@@ -122,3 +122,60 @@ final class MatrixStimuliSort_Tests: XCTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 }
+
+/// Same active-above-inactive + alpha-within-group invariant for the
+/// impact-detection master accordion in `SensorSection`. Mirrors the
+/// `StimuliSection.orderedRows(...)` cells but operates on the
+/// impact-only sensor list (accel / mic / headphones).
+@MainActor
+final class MatrixImpactSensorSort_Tests: XCTestCase {
+
+    private static let accelID  = SensorID.accelerometer.rawValue
+    private static let micID    = SensorID.microphone.rawValue
+    private static let hpID     = SensorID.headphoneMotion.rawValue
+
+    /// Active-above-inactive: enabled accel beats disabled mic+headphones.
+    func testActiveAboveInactive_impactGroup() {
+        let result = SensorSection.orderedSensorIDs(
+            [Self.accelID, Self.micID, Self.hpID],
+            enabledIDs: [Self.accelID],
+            collationLocale: Locale(identifier: "en")
+        )
+        XCTAssertEqual(result.first, Self.accelID,
+                       "Active accelerometer must precede inactive sensors regardless of alpha")
+    }
+
+    /// All three available, all active → alpha-sorted by localised title.
+    /// Accelerometer / Headphone Motion / Microphone.
+    func testAllActive_alphaSort() {
+        let result = SensorSection.orderedSensorIDs(
+            [Self.accelID, Self.micID, Self.hpID],
+            enabledIDs: [Self.accelID, Self.micID, Self.hpID],
+            collationLocale: Locale(identifier: "en")
+        )
+        XCTAssertEqual(result, [Self.accelID, Self.hpID, Self.micID])
+    }
+
+    /// All three available, none active → same alpha order in the inactive
+    /// group.
+    func testAllInactive_alphaSort() {
+        let result = SensorSection.orderedSensorIDs(
+            [Self.accelID, Self.micID, Self.hpID],
+            enabledIDs: [],
+            collationLocale: Locale(identifier: "en")
+        )
+        XCTAssertEqual(result, [Self.accelID, Self.hpID, Self.micID])
+    }
+
+    /// Hardware-availability filter: only sensors in `availableSensors` are
+    /// returned, regardless of `enabledIDs` containing a non-available
+    /// sensor (stale settings).
+    func testFilters_unavailableSensors() {
+        let result = SensorSection.orderedSensorIDs(
+            [Self.accelID, Self.micID],
+            enabledIDs: [Self.accelID, Self.micID, Self.hpID],
+            collationLocale: Locale(identifier: "en")
+        )
+        XCTAssertEqual(result, [Self.accelID, Self.micID])
+    }
+}
