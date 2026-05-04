@@ -96,11 +96,6 @@ public struct MenuBarView: View {
 
     @ViewBuilder private var leftColumn: some View {
         VStack(spacing: 0) {
-            // SensitivitySection used to live above SensorSection but it
-            // governs the impact-fusion intensityGate ONLY (see
-            // `Yamete.swift` `fusion.intensityGate`), so it now lives
-            // INSIDE the Impact Detection master accordion alongside
-            // cooldown + consensus.
             SensorSection(availableSensors: availableSensors)
             Divider()
             StimuliSection()
@@ -209,17 +204,15 @@ internal struct HeaderSection: View {
     @Environment(SettingsStore.self) var settings
     @State private var rotator = MenuHeaderRotator()
 
-    /// Cross-fade duration for the subtext rotation. ~3.5s ease-in-out
-    /// reads as a slow pulse rather than a flicker — deliberate enough
-    /// that the user notices the transition without it feeling busy.
+    /// Cross-fade duration between rotator pages. ~3.5s ease-in-out
+    /// reads as a slow pulse rather than a flicker.
     private static let crossfadeDuration: Double = 3.5
 
     public var body: some View {
-        // Application icon — the same image macOS shows in the Dock /
-        // Finder / status-item launch icon. NEVER substituted with a
-        // reaction face; the menu header stays calm even while an impact
-        // is in flight (the menu-bar status-item icon is the surface
-        // that reflects live reactions).
+        // Application icon, the same image AppKit shows in the Dock and
+        // Finder. The menu-bar status-item icon (managed elsewhere) is
+        // the surface that reflects live reactions; this header icon
+        // stays static.
         let icon = NSApp.applicationIconImage
         let body = rotator.current
 
@@ -232,15 +225,13 @@ internal struct HeaderSection: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                // Static title — never rotates.
                 Text(NSLocalizedString("app_title", comment: "Application name"))
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Theme.pink)
 
-                // Rotating subtext — notification body strings drawn from
-                // the user's enabled stimulus kinds. `.id(body)` triggers
-                // SwiftUI to dispose the old text and animate the new one
-                // in; the slow ease-in-out cross-fade reads as a pulse.
+                // `.id(body)` causes SwiftUI to dispose the prior text
+                // and cross-fade the new one in via the .opacity
+                // transition + animation tied to body.
                 Text(body)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
@@ -268,20 +259,14 @@ internal struct HeaderSection: View {
             rotator.start()
         }
         .onDisappear { rotator.stop() }
-        // Only the locale change should rebuild the pool — the moan
-        // strings are independent of which stimuli/sensors the user
-        // has enabled, so toggling those does not affect the rotation.
+        // The moan pool depends only on the resolved locale — stimulus
+        // and sensor toggles do not affect it.
         .onChange(of: settings.resolvedNotificationLocale) { _, _ in rebuildPages() }
     }
 
-    /// Recompute the rotator's body pool from the user's currently-enabled
-    /// reaction kinds and selected locale. Called on launch and whenever
-    /// either input changes.
+    /// Recompute the rotator's body pool for the resolved locale.
     private func rebuildPages() {
         let appTagline = NSLocalizedString("app_tagline", comment: "Application tagline")
-        // Pool: tagline + every impact-tier moan in the user's locale.
-        // Event-body strings are not included — the rotator surfaces
-        // spicy reaction copy only.
         let pages = MenuHeaderRotator.buildBodies(
             appTagline: appTagline,
             locale: settings.resolvedNotificationLocale

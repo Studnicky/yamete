@@ -224,12 +224,11 @@ final class MatrixBusInteractionTests: IntegrationTestCase {
 
         await harness.bus.publish(reactionFor(kind: kindA))
         // Wait until A's `.action` phase is observably in flight, then
-        // cancelAndReset before the 200 ms action sleep completes. The
-        // prior `Task.sleep(80 ms)` raced the action duration: under
-        // slow CI the 80 ms sleep dilated past 200 ms and A's
-        // `.post` fired before cancelAndReset arrived (caught on round
-        // 9, run 25254849962). Polling for the `.action` phase ties
-        // the cancel to a deterministic event mid-action.
+        // call cancelAndReset before the 200 ms action sleep completes.
+        // Polling for the `.action` phase ties the cancel to a
+        // deterministic event mid-action — a fixed sleep can dilate
+        // past the action window on slow schedulers and fire `.post`
+        // before cancelAndReset arrives.
         _ = await awaitUntil(timeout: 1.0) {
             spy.calls.contains { $0.phase == .action && $0.kind == kindA }
         }

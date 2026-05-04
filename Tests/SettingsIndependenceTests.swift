@@ -4,16 +4,14 @@ import XCTest
 @testable import ResponseKit
 @testable import YameteApp
 
-/// Locks down the per-trackpad-kind threshold pairs so they are written to
-/// distinct UserDefaults keys and never cross-contaminate.
-///
-/// Bug previously caught in the wild: `trackpadScrollMin/Max`,
-/// `trackpadTouchingMin/Max`, `trackpadSlidingMin/Max` were bound to the same
-/// UI slider — moving one slider would write to all three pairs at once,
-/// which then persisted on next launch and silently destroyed the user's
-/// per-kind tuning. This file pins (a) every pair has a distinct rawValue and
-/// (b) writing one pair does not perturb any other pair across a fresh
-/// SettingsStore round-trip.
+/// Locks down the per-trackpad-kind threshold pairs so each writes to
+/// a distinct UserDefaults key and the pairs never cross-contaminate.
+/// `trackpadScrollMin/Max`, `trackpadTouchingMin/Max`, and
+/// `trackpadSlidingMin/Max` each persist independently — pins (a)
+/// every pair has a distinct rawValue and (b) writing one pair does
+/// not perturb any other pair across a fresh SettingsStore round-trip.
+/// A regression that bound multiple pairs to the same slider would
+/// silently destroy per-kind tuning on next launch.
 @MainActor
 final class SettingsIndependenceTests: XCTestCase {
 

@@ -440,11 +440,11 @@ final class DriverParity_Tests: XCTestCase {
         // normally. This mirrors the documented skip in
         // `NotificationAuthRealDriverTests`.
         let bundleURL = Bundle.main.bundleURL.path
-        // Phase 1: under xcodebuild with the YameteHostTest scheme,
+        // Under xcodebuild with the YameteHostTest scheme,
         // Bundle.main resolves to the bundled `Yamete.app` (or
         // `Yamete Direct.app`) under DerivedData, which exposes a real
         // bundle proxy and lets `UNUserNotificationCenter.current()`
-        // succeed. Detect that case and DO NOT skip — the Real half of
+        // succeed. Detect that case and do NOT skip — the Real half of
         // the parity test runs there.
         let isHostAppBundle = bundleURL.hasSuffix("/Yamete.app")
             || bundleURL.hasSuffix("/Yamete Direct.app")

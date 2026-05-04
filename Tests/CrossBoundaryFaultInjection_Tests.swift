@@ -3,7 +3,7 @@ import IOKit
 @testable import YameteCore
 @testable import SensorKit
 
-/// Phase 8 — cross-boundary simultaneous fault injection.
+/// Cross-boundary simultaneous fault injection.
 ///
 /// Existing `_force*` seams (USB / Bluetooth / Thunderbolt
 /// `_forceKernelFailureKr`, AudioPeripheral `_forceListenerStatus`,

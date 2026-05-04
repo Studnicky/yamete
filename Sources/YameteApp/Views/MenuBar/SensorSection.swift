@@ -5,15 +5,13 @@ import SwiftUI
 
 // MARK: - Sensors & Detection
 
-/// Displays the Impact Detection group: a master accordion containing one
-/// SensorAccordionCard per available impact sensor (accelerometer, microphone,
-/// AirPods motion). Per-sensor cards sort active-above-inactive (alpha-sort
-/// within each group, locale-aware collation). The master accordion exposes
-/// a single toggle that flips the whole group on/off, and is visually
-/// framed by the same accordion-card chrome as the discrete-event stimuli
-/// in `StimuliSection` so the impact group reads as a peer of those cards.
-/// Cooldown + consensus controls appear BELOW the per-sensor cards so the
-/// auto-sort doesn't reshuffle them away from the data they govern.
+/// Impact Detection group. A master `SensorAccordionCard` wraps one
+/// inner `SensorAccordionCard` per available impact sensor
+/// (accelerometer, microphone, AirPods motion). Per-sensor cards sort
+/// active-above-inactive with locale-aware alpha-sort within each group.
+/// Reactivity, cooldown, and consensus controls render after the
+/// per-sensor cards so the auto-sort cannot reshuffle them away from
+/// the impact-fusion data they govern.
 internal struct SensorSection: View {
     @Environment(SettingsStore.self) var settings
     @Environment(Yamete.self) var yamete
@@ -78,13 +76,13 @@ internal struct SensorSection: View {
                     sensorCard(for: sensorID)
                 }
 
-                // Reactivity / cooldown / consensus all govern the
-                // impact-fusion pipeline ONLY (verified at
-                // `Yamete.swift:101-108` — `sensitivityMin/Max` are wired
-                // into `fusion.intensityGate` and nowhere else). They
-                // belong inside the Impact Detection group, not at the
-                // top of the menu where they used to misleadingly appear
-                // global.
+                // Reactivity, cooldown, and consensus all govern the
+                // impact-fusion pipeline only — `sensitivityMin/Max`
+                // feed `fusion.intensityGate`; `debounce` is the rearm
+                // interval; `consensusRequired` clamps to the count of
+                // enabled impact sensors. None of them affect the
+                // discrete-event stimulus sources or the per-output
+                // dispatch matrix.
                 VStack(spacing: 10) {
                     Divider()
                     SettingHeader(icon: "gauge.with.needle",
@@ -112,21 +110,15 @@ internal struct SensorSection: View {
                 }
                 .padding(Theme.accordionInner)
             }
-            // When the impact master kill switch is OFF, dim every per-
-            // sensor card AND the cooldown/consensus rows; user can still
-            // see what was configured (so they know what resumes when
-            // they flip the master back on) but cannot interact until
-            // the override is released.
             .dimmedWhenMasterOff(s.impactMasterEnabled)
         }
         .onAppear { clampConsensus() }
         .onChange(of: settings.enabledSensorIDs) { _, _ in clampConsensus() }
     }
 
-    /// Pure-functional sort exposed for unit tests. Mirrors the
-    /// `StimuliSection.orderedRows(...)` shape: active group above inactive
-    /// group, each alphabetised by localised title using the user-selected
-    /// locale's collation rules.
+    /// Pure-functional sort exposed for unit tests. Active sensors above
+    /// inactive, each alphabetised by localised title under the
+    /// `collationLocale`'s case- and diacritic-insensitive rules.
     @MainActor
     internal static func orderedSensorIDs(_ availableSensors: [String],
                                           enabledIDs: Set<String>,
@@ -193,13 +185,12 @@ internal struct SensorSection: View {
         return arrayToggleBinding($s.enabledSensorIDs, element: id)
     }
 
-    /// Override-disable kill switch for the impact group. Reads/writes
-    /// `settings.impactMasterEnabled` only — does NOT mutate
-    /// `enabledSensorIDs`. When `false`, dispatch is gated to disabled
-    /// regardless of per-sensor state; per-sensor toggles are preserved
-    /// verbatim so flipping the master back ON restores the prior
-    /// selection unchanged. The dispatch gate lives in the impact-fusion
-    /// consumption path (see `Yamete.swift`).
+    /// Override-disable kill switch for the impact group. Reads and
+    /// writes `settings.impactMasterEnabled` only; never mutates
+    /// `enabledSensorIDs`. When `false`, `Yamete.rebuildSensorPipeline`
+    /// computes an empty enabled-sensor set so the fusion pipeline does
+    /// not run. When `true`, the per-sensor selection in
+    /// `enabledSensorIDs` flows through unchanged.
     private func masterImpactBinding() -> Binding<Bool> {
         @Bindable var s = settings
         return Binding(

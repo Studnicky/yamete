@@ -113,12 +113,13 @@ public final class MenuHeaderRotator {
         return shuffled
     }
 
-    /// Pure helper — exposed `internal static` so tests can build pages
-    /// without instantiating the rotator. The pool is `[appTagline]`
-    /// followed by every impact-tier moan in the user's locale (deduped
-    /// across tiers). Event-body strings are deliberately NOT included
-    /// because the user wants the rotator to surface spicy reaction
-    /// copy, not bland system-event descriptions.
+    /// Builds the rotator's body pool: `[appTagline]` followed by every
+    /// impact-tier moan in the given locale (deduped across tiers,
+    /// empty entries skipped, en fallback per tier). Event-body
+    /// strings are intentionally not included — the rotator surfaces
+    /// reaction copy, not system-event descriptions. Exposed
+    /// `internal static` so tests can build the pool without
+    /// instantiating the rotator.
     @MainActor
     internal static func buildBodies(appTagline: String, locale: String) -> [String] {
         var bodies: [String] = [appTagline]

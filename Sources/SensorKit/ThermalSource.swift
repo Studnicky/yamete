@@ -15,11 +15,10 @@ import os
 // Reaction (`.thermalNominal`, `.thermalFair`, `.thermalSerious`,
 // `.thermalCritical`).
 //
-// Unlike Phase 2/3 sources, this source does NOT touch the AppleSPU
-// HID broker — thermal state is OS-defined and surfaces through Cocoa
-// notifications. The semantic shape closest to this in the existing
-// codebase is `SleepWakeSource` / `PowerSource` — both edge-trigger
-// against a captured baseline. We follow the same pattern:
+// Does not touch the `AppleSPUDevice` HID broker — thermal state is
+// OS-defined and surfaces through Cocoa notifications. The semantic
+// shape mirrors `SleepWakeSource` / `PowerSource`: edge-trigger
+// against a captured baseline.
 //   • At `start()`, capture the current state silently (no publish).
 //   • On every notification, read the new state via the injected
 //     provider, dedup against the last-seen state, and publish the

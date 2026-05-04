@@ -136,13 +136,9 @@ final class ReactiveOutputLifecycleTests: XCTestCase {
     // MARK: - Normal completion sequence
 
     /// A single stimulus produces pre → action → post in order, multiplier = 1.0.
-    ///
-    /// Round 6 hardening: the fixed `Task.sleep(100ms)` tail wait was too
-    /// tight under CI — coalesce (16ms) + action (10ms) + post hook can
-    /// stretch past 100ms when the scheduler is loaded, leaving postAction
-    /// not yet fired when the assertion runs. Replace with `awaitUntil` on
-    /// `postActions.count >= 1` so the test waits until the lifecycle
-    /// actually completes regardless of scheduler load.
+    /// Uses `awaitUntil` on `postActions.count >= 1` rather than a fixed
+    /// tail sleep — coalesce + action + post can stretch past a fixed
+    /// 100ms window under loaded schedulers.
     func testNormalSequenceFiresAllHooksInOrder() async throws {
         let bus = await makeBus()
         let spy = SpyOutput()
@@ -303,12 +299,9 @@ final class ReactiveOutputLifecycleTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(10))
         await bus.publish(.acConnected)
         await bus.publish(.acConnected)
-        // Poll until postAction has fired — round 6 applied this same
-        // fix to `testNormalSequenceFiresAllHooksInOrder`; the fixed
-        // 100 ms tail sleep dilated past the action+post lifecycle on
-        // the slow CI runner (round 9b run 25255791274 caught
-        // postAction not yet recorded), leaving `postActions.first`
-        // nil and the multiplier defaulted to `?? 0`.
+        // Poll until postAction lands — a fixed tail sleep dilates past
+        // the action+post lifecycle on slow schedulers, leaving
+        // `postActions.first` nil and the multiplier defaulting to `?? 0`.
         let finished = await awaitUntil(timeout: 1.0) {
             spy.postActions.count >= 1
         }

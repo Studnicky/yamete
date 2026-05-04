@@ -124,18 +124,11 @@ internal struct StimuliSection: View {
         return result
     }
 
-    /// Active (enabled) stimuli render above inactive (disabled) ones; each
-    /// group is alphabetised by its localised title using the collation rules
-    /// of the user-selected language (`settings.resolvedNotificationLocale`)
-    /// rather than the system default — so a German user sees German
-    /// umlaut ordering even on a French-system host. Toggling a stimulus's
-    /// enabled state moves it across the group boundary on the next render.
-    /// The impact-sensor consensus group lives in `SensorSection` and is
-    /// always pinned above this section by the parent layout — it never
-    /// participates in this sort.
-    ///
-    /// Pure-functional sort — extracted as `internal static` so unit tests
-    /// can assert ordering without instantiating SwiftUI.
+    /// Active (enabled) stimuli render above inactive (disabled) ones;
+    /// each group is alphabetised by its localised title using the
+    /// `collationLocale`'s collation rules (case- and diacritic-
+    /// insensitive). Pure-functional, exposed `internal static` so unit
+    /// tests can assert ordering without instantiating SwiftUI.
     internal static func orderedRows(_ rows: [StimulusRow],
                                      enabledIDs: Set<String>,
                                      collationLocale: Locale) -> [StimulusRow] {
@@ -192,13 +185,12 @@ internal struct StimuliSection: View {
         }
     }
 
-    /// Override-disable kill switch for the Stimuli group. Reads/writes
-    /// `settings.stimuliMasterEnabled` only — does NOT mutate
-    /// `enabledStimulusSourceIDs`. When `false`, dispatch is gated so no
-    /// stimulus reaction fires regardless of the per-stimulus toggles;
-    /// per-stimulus toggles are preserved verbatim so flipping the master
-    /// back ON restores the prior selection unchanged. The dispatch gate
-    /// lives in the per-source start/stop wiring in `Yamete.swift`.
+    /// Override-disable kill switch for the Stimuli group. Reads and
+    /// writes `settings.stimuliMasterEnabled` only; never mutates
+    /// `enabledStimulusSourceIDs`. When `false`, `Yamete.rebuildEventSources`
+    /// computes a desired set of `[]` so every stimulus source is
+    /// stopped. When `true`, the per-source selection in
+    /// `enabledStimulusSourceIDs` flows through unchanged.
     private func masterStimuliBinding() -> Binding<Bool> {
         @Bindable var s = settings
         return Binding(

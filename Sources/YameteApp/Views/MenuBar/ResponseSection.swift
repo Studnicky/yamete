@@ -226,17 +226,13 @@ internal struct ResponseSection: View {
         }
     }
 
-    /// Override-disable kill switch for the Reactions group. Reads/writes
-    /// `settings.reactionsMasterEnabled` only — does NOT mutate any
-    /// per-output toggle (`soundEnabled`, `flashEnabled`,
-    /// `notificationsEnabled`, `ledEnabled`, `keyboardBrightnessEnabled`,
-    /// `hapticEnabled`, `displayBrightnessEnabled`, `displayTintEnabled`).
-    /// When `false`, every output's dispatch is gated to disabled
-    /// regardless of its per-output toggle and per-reaction matrix entry;
-    /// flipping the master back ON releases the override and the user's
-    /// individual settings flow through unchanged. The dispatch gate
-    /// lives in each output's `shouldFire` (or equivalent) — see the
-    /// downstream wiring.
+    /// Override-disable kill switch for the Reactions group. Reads and
+    /// writes `settings.reactionsMasterEnabled` only; never mutates any
+    /// per-output toggle. When `false`, `ReactiveOutput.consume` skips
+    /// dispatch via `OutputConfigProvider.reactionsMasterIsOn()` so no
+    /// output fires regardless of its per-output toggle or per-reaction
+    /// matrix entry. When `true`, individual settings flow through
+    /// unchanged.
     private func masterReactionsBinding() -> Binding<Bool> {
         @Bindable var s = settings
         return Binding(
