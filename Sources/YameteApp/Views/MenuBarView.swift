@@ -223,22 +223,35 @@ internal struct HeaderSection: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                // Top row: title at the leading edge, impacts-today
-                // counter trailing-aligned. Both share a baseline.
+                // Top row, three columns: title (leading), paused-pill
+                // (centred — only rendered when the fusion engine is
+                // stopped, so the centre column collapses to zero
+                // width otherwise and the impacts counter occupies its
+                // own trailing slot via a `Spacer` either way),
+                // impacts-today counter (trailing).
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(NSLocalizedString("app_title", comment: "Application name"))
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(Theme.stateActive)
                     Spacer(minLength: 4)
+                    if !yamete.fusion.isRunning {
+                        Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
+                            .font(.caption2)
+                            .foregroundStyle(Theme.stateWarning)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Theme.stateWarning.opacity(0.15))
+                            .clipShape(Capsule())
+                        Spacer(minLength: 4)
+                    }
                     Text(impactsLine)
                         .font(.caption)
                         .foregroundStyle(Theme.stateInert)
                         .lineLimit(1)
                 }
 
-                // Second row: rotating subtext at the leading edge,
-                // last-impact tier trailing-aligned. The cross-fade is
-                // anchored to the body string changing.
+                // Second row: rotating subtext (leading) + last-impact
+                // tier (trailing). The cross-fade is anchored to the
+                // body string changing.
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(body)
                         .font(.system(size: 10))
@@ -256,14 +269,6 @@ internal struct HeaderSection: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
-                    }
-                    if !yamete.fusion.isRunning {
-                        Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
-                            .font(.caption2)
-                            .foregroundStyle(Theme.stateWarning)
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(Theme.stateWarning.opacity(0.15))
-                            .clipShape(Capsule())
                     }
                 }
             }
