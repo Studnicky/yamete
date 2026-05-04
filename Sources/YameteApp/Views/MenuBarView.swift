@@ -54,8 +54,6 @@ public struct MenuBarView: View {
             .frame(maxHeight: maxScrollHeight)
 
             Divider()
-            ImpactCounterStrip()
-            Divider()
             FooterSection()
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -201,6 +199,7 @@ internal let tuningLabelWidth: CGFloat = 50
 
 internal struct HeaderSection: View {
     @Environment(Yamete.self) var yamete
+    @Environment(MenuBarFace.self) var menuBarFace
     @Environment(SettingsStore.self) var settings
     @State private var rotator = MenuHeaderRotator()
 
@@ -209,12 +208,11 @@ internal struct HeaderSection: View {
     private static let crossfadeDuration: Double = 3.5
 
     public var body: some View {
-        // Application icon, the same image AppKit shows in the Dock and
-        // Finder. The menu-bar status-item icon (managed elsewhere) is
-        // the surface that reflects live reactions; this header icon
-        // stays static.
         let icon = NSApp.applicationIconImage
         let body = rotator.current
+        let impactsLine = String(format: NSLocalizedString("impacts_today",
+                                                           comment: "Daily impact counter"),
+                                 menuBarFace.impactCount)
 
         HStack(alignment: .center, spacing: 12) {
             if let icon {
@@ -225,32 +223,49 @@ internal struct HeaderSection: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(NSLocalizedString("app_title", comment: "Application name"))
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Theme.pink)
+                // Top row: title at the leading edge, impacts-today
+                // counter trailing-aligned. Both share a baseline.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(NSLocalizedString("app_title", comment: "Application name"))
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Theme.stateActive)
+                    Spacer(minLength: 4)
+                    Text(impactsLine)
+                        .font(.caption)
+                        .foregroundStyle(Theme.stateInert)
+                        .lineLimit(1)
+                }
 
-                // `.id(body)` causes SwiftUI to dispose the prior text
-                // and cross-fade the new one in via the .opacity
-                // transition + animation tied to body.
-                Text(body)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .id(body)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: Self.crossfadeDuration), value: body)
-            }
-
-            Spacer(minLength: 0)
-
-            if !yamete.fusion.isRunning {
-                Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
-                    .font(.caption)
-                    .foregroundStyle(Theme.mauve)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Theme.mauve.opacity(0.15))
-                    .clipShape(Capsule())
+                // Second row: rotating subtext at the leading edge,
+                // last-impact tier trailing-aligned. The cross-fade is
+                // anchored to the body string changing.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(body)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.stateInert)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .id(body)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: Self.crossfadeDuration), value: body)
+                    Spacer(minLength: 4)
+                    if let tier = menuBarFace.lastImpactTier {
+                        Text(verbatim: String(format: NSLocalizedString("last_impact",
+                                                                        comment: "Last impact tier label"),
+                                              String(describing: tier)))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                    if !yamete.fusion.isRunning {
+                        Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
+                            .font(.caption2)
+                            .foregroundStyle(Theme.stateWarning)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Theme.stateWarning.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
             }
         }
         .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 8)
@@ -274,36 +289,6 @@ internal struct HeaderSection: View {
         rotator.setPages(pages)
     }
 
-}
-
-// MARK: - Impact counter strip (between content and footer)
-
-internal struct ImpactCounterStrip: View {
-    @Environment(Yamete.self) var yamete
-    @Environment(MenuBarFace.self) var menuBarFace
-
-    public var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "waveform.path.ecg")
-                .font(.system(size: 9))
-                .foregroundStyle(Theme.pink.opacity(0.7))
-            Text(String(format: NSLocalizedString("impacts_today", comment: "Daily impact counter"), menuBarFace.impactCount))
-            Spacer()
-            if let tier = menuBarFace.lastImpactTier {
-                Text(verbatim: String(format: NSLocalizedString("last_impact", comment: "Last impact tier label"), String(describing: tier)))
-                    .foregroundStyle(.tertiary)
-            }
-            if !yamete.fusion.isRunning {
-                Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
-                    .foregroundStyle(Theme.mauve)
-                    .padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(Theme.mauve.opacity(0.12))
-                    .clipShape(Capsule())
-            }
-        }
-        .font(.caption).foregroundStyle(.secondary)
-        .padding(.horizontal, 14).padding(.vertical, 5)
-    }
 }
 
 // MARK: - Shared detection gate parameter rows
