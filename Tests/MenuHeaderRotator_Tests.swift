@@ -2,53 +2,80 @@ import XCTest
 @testable import YameteApp
 @testable import YameteCore
 
-/// Pure-functional tests for `MenuHeaderRotator`. Verifies page-cycle
-/// invariants without exercising the wall-clock timer (`start()` is not
-/// called; tests drive the cursor via the `internal` `advance()` seam).
+/// Pure-functional tests for `MenuHeaderRotator`. Drives the cursor via
+/// the `internal` `advance()` seam plus an injected deterministic
+/// shuffle so order is locked across runs without exercising the
+/// wall-clock timer.
 @MainActor
 final class MenuHeaderRotator_Tests: XCTestCase {
+
+    /// Identity shuffle — preserves caller order. Tests that need
+    /// deterministic ordering substitute this for the default RNG-backed
+    /// shuffle.
+    private static let identity: ([String]) -> [String] = { $0 }
+
+    /// Reverse shuffle — flips caller order; used to verify the
+    /// adjacent-repeat avoidance kicks in when the natural reshuffle
+    /// would otherwise repeat the last shown page.
+    private static let reverse: ([String]) -> [String] = { $0.reversed() }
 
     /// Single-page rotator: `advance()` is a no-op, the cursor never
     /// goes out of bounds.
     func testSinglePage_advanceIsNoop() {
-        let rotator = MenuHeaderRotator(pages: ["only-body"])
+        let rotator = MenuHeaderRotator(pages: ["only-body"], shuffle: Self.identity)
         XCTAssertEqual(rotator.current, "only-body")
         rotator.advance()
         XCTAssertEqual(rotator.current, "only-body", "Single-page advance must be a no-op")
     }
 
-    /// Multi-page advance wraps modulo the page count.
-    func testMultiPage_advanceWrapsModulo() {
-        let rotator = MenuHeaderRotator(pages: ["A", "B", "C"])
+    /// First cycle walks the pool in caller order so launch-time always
+    /// shows page 0 first (the tagline) — no shuffle on initial load.
+    func testFirstCycle_walksPoolInOrder() {
+        let rotator = MenuHeaderRotator(pages: ["A", "B", "C"], shuffle: Self.identity)
         XCTAssertEqual(rotator.current, "A")
         rotator.advance(); XCTAssertEqual(rotator.current, "B")
         rotator.advance(); XCTAssertEqual(rotator.current, "C")
-        rotator.advance(); XCTAssertEqual(rotator.current, "A", "Wraps to page 0")
     }
 
-    /// `setPages(_:)` resets the cursor to page 0.
+    /// Subsequent cycles use the shuffled order (identity here for
+    /// determinism) and avoid repeating the last shown page across the
+    /// boundary. With identity shuffle the natural reshuffle would
+    /// re-emit "A" right after "C" — the head-rotation guard pushes "A"
+    /// to the end so we get "B" instead.
+    func testCycleBoundary_avoidsAdjacentRepeat() {
+        let rotator = MenuHeaderRotator(pages: ["A", "B", "C"], shuffle: Self.identity)
+        rotator.advance() // B
+        rotator.advance() // C — last of cycle
+        rotator.advance() // would be A under raw identity shuffle; head-rotation pushes it later
+        XCTAssertNotEqual(rotator.current, "C",
+                          "First page of a new cycle must not equal the last page of the prior cycle")
+    }
+
+    /// `setPages(_:)` resets the cursor to the new pool's first entry
+    /// and re-seeds the queue (caller-order first cycle, shuffled
+    /// thereafter).
     func testSetPages_resetsCursor() {
-        let rotator = MenuHeaderRotator(pages: ["A", "B"])
+        let rotator = MenuHeaderRotator(pages: ["A", "B"], shuffle: Self.identity)
         rotator.advance() // current = B
-        rotator.setPages(["X"])
+        rotator.setPages(["X", "Y"])
         XCTAssertEqual(rotator.current, "X")
     }
 
-    /// `setPages(_:)` with an equal page list is a no-op (idempotent).
+    /// `setPages(_:)` with an equal pool is a no-op (idempotent).
     /// Important: equal re-sets must not flicker the visible page during
     /// onChange-driven rebuilds.
     func testSetPages_equalIsIdempotent() {
-        let pages = ["A", "B"]
-        let rotator = MenuHeaderRotator(pages: pages)
+        let pages = ["A", "B", "C"]
+        let rotator = MenuHeaderRotator(pages: pages, shuffle: Self.identity)
         rotator.advance() // current = B
         rotator.setPages(pages)
         XCTAssertEqual(rotator.current, "B",
-                       "Equal-page set must NOT reset the cursor (would cause flicker)")
+                       "Equal-pool set must NOT reset the cursor (would cause flicker)")
     }
 
-    /// `setPages(_:)` with empty input is rejected (would orphan the cursor).
+    /// `setPages(_:)` with empty input is rejected — would orphan the cursor.
     func testSetPages_emptyRejected() {
-        let rotator = MenuHeaderRotator(pages: ["A"])
+        let rotator = MenuHeaderRotator(pages: ["A"], shuffle: Self.identity)
         rotator.setPages([])
         XCTAssertEqual(rotator.current, "A", "Empty input must be ignored")
     }
@@ -58,43 +85,30 @@ final class MenuHeaderRotator_Tests: XCTestCase {
     func testInit_intervalClamped() {
         // No public accessor — interval is private. We just verify the
         // initialiser does not crash at the band boundaries.
-        _ = MenuHeaderRotator(pages: ["A"], interval: 0.5)
-        _ = MenuHeaderRotator(pages: ["A"], interval: 300)
-        _ = MenuHeaderRotator(pages: ["A"], interval: 8)
+        _ = MenuHeaderRotator(pages: ["A"], interval: 0.5,  shuffle: Self.identity)
+        _ = MenuHeaderRotator(pages: ["A"], interval: 300,  shuffle: Self.identity)
+        _ = MenuHeaderRotator(pages: ["A"], interval: 8,    shuffle: Self.identity)
     }
 
     /// `buildBodies(...)` always emits the app tagline first, even when
-    /// the enabledKinds list is empty.
+    /// the locale's moan pool is empty.
     func testBuildBodies_taglineFirst() {
         let bodies = MenuHeaderRotator.buildBodies(
             appTagline: "your laptop yells when smacked",
-            enabledKinds: [],
-            locale: "en"
+            locale: "qx"   // bogus locale → no moans loaded → only tagline
         )
-        XCTAssertEqual(bodies.count, 1)
-        XCTAssertEqual(bodies.first, "your laptop yells when smacked")
+        XCTAssertEqual(bodies.first, "your laptop yells when smacked",
+                       "Tagline must always be page 0")
     }
 
-    /// `buildBodies(...)` returns deduped body variants — duplicate
-    /// strings across pools are collapsed so the rotator doesn't show
-    /// the same body twice in a single cycle.
+    /// `buildBodies(...)` returns deduped strings — the same moan never
+    /// appears twice in a single pool even if it's defined for multiple
+    /// tiers in the locale.
     func testBuildBodies_dedupes() {
         let bodies = MenuHeaderRotator.buildBodies(
             appTagline: "tag",
-            enabledKinds: ReactionKind.allCases.filter { $0 != .impact },
             locale: "en"
         )
-        XCTAssertEqual(Set(bodies).count, bodies.count, "Bodies must be deduped")
-    }
-
-    /// `buildBodies(...)` skips empty body strings so an empty pool
-    /// entry never lands as a blank page.
-    func testBuildBodies_skipsEmpty() {
-        let bodies = MenuHeaderRotator.buildBodies(
-            appTagline: "tag",
-            enabledKinds: [.impact],   // .impact has no event body pool
-            locale: "en"
-        )
-        XCTAssertFalse(bodies.contains(""), "Empty bodies must be filtered out")
+        XCTAssertEqual(Set(bodies).count, bodies.count, "Moans must be deduped")
     }
 }

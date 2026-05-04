@@ -265,11 +265,10 @@ internal struct HeaderSection: View {
             rotator.start()
         }
         .onDisappear { rotator.stop() }
+        // Only the locale change should rebuild the pool — the moan
+        // strings are independent of which stimuli/sensors the user
+        // has enabled, so toggling those does not affect the rotation.
         .onChange(of: settings.resolvedNotificationLocale) { _, _ in rebuildPages() }
-        .onChange(of: settings.enabledStimulusSourceIDs) { _, _ in rebuildPages() }
-        .onChange(of: settings.enabledSensorIDs) { _, _ in rebuildPages() }
-        .onChange(of: settings.impactMasterEnabled) { _, _ in rebuildPages() }
-        .onChange(of: settings.stimuliMasterEnabled) { _, _ in rebuildPages() }
     }
 
     /// Recompute the rotator's body pool from the user's currently-enabled
@@ -277,59 +276,16 @@ internal struct HeaderSection: View {
     /// either input changes.
     private func rebuildPages() {
         let appTagline = NSLocalizedString("app_tagline", comment: "Application tagline")
+        // Pool: tagline + every impact-tier moan in the user's locale.
+        // Event-body strings are not included — the rotator surfaces
+        // spicy reaction copy only.
         let pages = MenuHeaderRotator.buildBodies(
             appTagline: appTagline,
-            enabledKinds: enabledReactionKinds(),
             locale: settings.resolvedNotificationLocale
         )
         rotator.setPages(pages)
     }
 
-    /// All reaction kinds whose source is currently enabled AND whose
-    /// group's master kill-switch is on. Mirrors the gating logic the bus
-    /// uses when deciding whether to publish a kind, so the rotator never
-    /// shows a body the user has silenced.
-    private func enabledReactionKinds() -> [ReactionKind] {
-        // The Stimuli kill-switch overrides the entire stimulus group;
-        // when it's off we surface no rotating body strings (only the
-        // tagline rotates, since `.impact` itself is excluded below).
-        guard settings.stimuliMasterEnabled else { return [] }
-        var kinds: [ReactionKind] = []
-        let stimulusIDs = Set(settings.enabledStimulusSourceIDs)
-        for kind in ReactionKind.allCases where kind != .impact {
-            // Map kind → owning source ID via the ReactionKind doc-comment
-            // convention (rawValue prefix). Cheaper than wiring a full
-            // SourceContracts table at this UI layer; if a kind's source
-            // can't be resolved, keep the kind so it still appears.
-            if let sourceID = ownerStimulusSourceID(for: kind),
-               !stimulusIDs.contains(sourceID) {
-                continue
-            }
-            kinds.append(kind)
-        }
-        return kinds
-    }
-
-    /// Kinds map to one of a small set of stimulus source IDs by prefix.
-    /// Returning `nil` means "no gating — always include this kind".
-    private func ownerStimulusSourceID(for kind: ReactionKind) -> String? {
-        let raw = kind.rawValue
-        if raw.hasPrefix("usb")              { return SensorID.usb.rawValue }
-        if raw.hasPrefix("ac")               { return SensorID.power.rawValue }
-        if raw.hasPrefix("audioPeripheral")  { return SensorID.audioPeripheral.rawValue }
-        if raw.hasPrefix("bluetooth")        { return SensorID.bluetooth.rawValue }
-        if raw.hasPrefix("thunderbolt")      { return SensorID.thunderbolt.rawValue }
-        if raw.hasPrefix("display")          { return SensorID.displayHotplug.rawValue }
-        if raw == "willSleep" || raw == "didWake" { return SensorID.sleepWake.rawValue }
-        if raw.hasPrefix("trackpad")         { return SensorID.trackpadActivity.rawValue }
-        if raw.hasPrefix("mouse")            { return SensorID.mouseActivity.rawValue }
-        if raw.hasPrefix("keyboard")         { return SensorID.keyboardActivity.rawValue }
-        if raw.hasPrefix("gyro")             { return SensorID.gyroscope.rawValue }
-        if raw.hasPrefix("lid")              { return SensorID.lidAngle.rawValue }
-        if raw.hasPrefix("lights") || raw == "alsCovered" { return SensorID.ambientLight.rawValue }
-        if raw.hasPrefix("thermal")          { return SensorID.thermal.rawValue }
-        return nil
-    }
 }
 
 // MARK: - Impact counter strip (between content and footer)

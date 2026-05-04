@@ -266,6 +266,27 @@ public enum NotificationPhrase {
         pick(prefix: "moan", tier: tier, localeID: localeID)
     }
 
+    /// Returns the full deduped moan pool — every variant across every
+    /// `ImpactTier` — in the user's preferred locale, falling back to en
+    /// when a tier is missing in that locale. Used by `MenuHeaderRotator`
+    /// to source its rotating subtext from the spicy reaction copy
+    /// rather than the bland system-event bodies.
+    public static func allMoans(preferredLocale: String) -> [String] {
+        let preferredCache = pools(for: preferredLocale)
+        let fallbackCache  = pools(for: fallbackLocaleID)
+        var seen = Set<String>()
+        var out: [String] = []
+        for tier in ImpactTier.allCases {
+            let groupKey = "moan_\(slug(for: tier))"
+            for moan in (preferredCache[groupKey] ?? []) + (fallbackCache[groupKey] ?? [])
+            where !moan.isEmpty && !seen.contains(moan) {
+                seen.insert(moan)
+                out.append(moan)
+            }
+        }
+        return out
+    }
+
     private static func pick(prefix: String, tier: ImpactTier, localeID: String) -> String {
         let groupKey = "\(prefix)_\(slug(for: tier))"
         return pools(for: localeID)[groupKey]?.randomElement() ?? ""
