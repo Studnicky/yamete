@@ -80,6 +80,17 @@ public enum Reaction: Sendable {
     case mouseClicked   // primary button click from a non-trackpad mouse
     case mouseScrolled  // sustained scroll-wheel activity from a mouse
     case keyboardTyped  // keyboard typing rate threshold crossed
+    case gyroSpike      // angular velocity spike from the BMI286 gyroscope
+    case lidOpened      // hinge angle crossed the open threshold from below
+    case lidClosed      // hinge angle dropped below the closed threshold gently
+    case lidSlammed     // hinge angle dropped below the closed threshold at slam rate
+    case alsCovered     // ambient light sensor occluded — fast drop with floor near zero
+    case lightsOff      // ambient lux dropped sharply over the configured window
+    case lightsOn       // ambient lux rose sharply over the configured window
+    case thermalNominal   // ProcessInfo.thermalState transitioned to .nominal
+    case thermalFair      // ProcessInfo.thermalState transitioned to .fair
+    case thermalSerious   // ProcessInfo.thermalState transitioned to .serious
+    case thermalCritical  // ProcessInfo.thermalState transitioned to .critical
 
     /// Payload-less mirror used as a settings dictionary key.
     public var kind: ReactionKind {
@@ -106,6 +117,17 @@ public enum Reaction: Sendable {
         case .mouseClicked:             .mouseClicked
         case .mouseScrolled:            .mouseScrolled
         case .keyboardTyped:            .keyboardTyped
+        case .gyroSpike:                .gyroSpike
+        case .lidOpened:                .lidOpened
+        case .lidClosed:                .lidClosed
+        case .lidSlammed:               .lidSlammed
+        case .alsCovered:               .alsCovered
+        case .lightsOff:                .lightsOff
+        case .lightsOn:                 .lightsOn
+        case .thermalNominal:           .thermalNominal
+        case .thermalFair:              .thermalFair
+        case .thermalSerious:           .thermalSerious
+        case .thermalCritical:          .thermalCritical
         }
     }
 
@@ -164,4 +186,15 @@ public enum ReactionKind: String, CaseIterable, Sendable, Codable {
     case mouseClicked
     case mouseScrolled
     case keyboardTyped
+    case gyroSpike
+    case lidOpened
+    case lidClosed
+    case lidSlammed
+    case alsCovered
+    case lightsOff
+    case lightsOn
+    case thermalNominal
+    case thermalFair
+    case thermalSerious
+    case thermalCritical
 }

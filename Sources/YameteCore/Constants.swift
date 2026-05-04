@@ -20,6 +20,52 @@ public enum Detection {
         public static let intensityCeiling: Float = 0.060
     }
 
+    // MARK: - Gyroscope (deg/s angular velocity, BMI286 via SPU broker)
+
+    public enum Gyro {
+        public static let spikeThresholdRange: ClosedRange<Double> = 50.0...500.0
+        public static let crestFactorRange: ClosedRange<Double> = 1.5...5.0
+        public static let riseRateRange: ClosedRange<Double> = 10.0...200.0
+        public static let confirmationsRange: ClosedRange<Int> = 1...10
+        public static let warmupRange: ClosedRange<Int> = 0...200
+        public static let intensityFloor: Float = 50.0
+        public static let intensityCeiling: Float = 500.0
+    }
+
+    // MARK: - Lid angle (hinge angle in degrees, BMI286 + Apple SPU broker)
+
+    public enum Lid {
+        /// Angle past which the lid is considered open (deg).
+        public static let openThresholdDegRange: ClosedRange<Double> = 5.0...30.0
+        /// Angle below which the lid is considered closed (deg).
+        public static let closedThresholdDegRange: ClosedRange<Double> = 1.0...10.0
+        /// Closing rate (deg/s) below which a transition counts as a slam.
+        /// Negative — slam rate is signed (closing reduces angle).
+        public static let slamRateRange: ClosedRange<Double> = -500.0 ... -50.0
+        /// EMA window over Δangle/Δt for jitter suppression (ms).
+        public static let smoothingWindowMsRange: ClosedRange<Int> = 50...500
+    }
+
+    // MARK: - Thermal pressure (no tunable thresholds)
+    //
+    // ThermalSource publishes discrete `ProcessInfo.thermalState`
+    // transitions (`.nominal` / `.fair` / `.serious` / `.critical`).
+    // The state set, transition gates, and emission cadence are all
+    // OS-defined — there are no user-tunable thresholds, so no
+    // `Detection.Thermal` enum is declared. This comment is the
+    // single canonical record of that absence.
+
+    // MARK: - Ambient light (lux, BMI286 + Apple SPU broker)
+
+    public enum AmbientLight {
+        public static let coverDropThresholdRange: ClosedRange<Double> = 0.5...0.99
+        public static let offDropPercentRange: ClosedRange<Double> = 0.5...0.99
+        public static let offFloorLuxRange: ClosedRange<Double> = 1.0...300.0
+        public static let onRisePercentRange: ClosedRange<Double> = 0.5...5.0
+        public static let onCeilingLuxRange: ClosedRange<Double> = 50.0...1000.0
+        public static let windowSecRange: ClosedRange<Double> = 0.5...10.0
+    }
+
     // MARK: - Microphone (HP-filtered PCM amplitude, AVAudioEngine)
 
     public enum Mic {

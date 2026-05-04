@@ -26,6 +26,13 @@ public final class SettingsStore {
         // Accelerometer detection
         case accelSpikeThreshold, accelCrestFactor, accelRiseRate, accelConfirmations
         case accelWarmupSamples, accelReportInterval, accelBandpassLowHz, accelBandpassHighHz
+        // Gyroscope detection
+        case gyroSpikeThreshold, gyroCrestFactor, gyroRiseRate, gyroConfirmations, gyroWarmupSamples
+        // Lid angle detection
+        case lidOpenThresholdDeg, lidClosedThresholdDeg, lidSlamRateDegPerSec, lidSmoothingWindowMs
+        // Ambient light detection
+        case alsCoverDropThreshold, alsOffDropPercent, alsOffFloorLux
+        case alsOnRisePercent, alsOnCeilingLux, alsWindowSec
         // Microphone detection
         case micSpikeThreshold, micCrestFactor, micRiseRate, micConfirmations, micWarmupSamples
         // Headphone motion detection
@@ -92,6 +99,24 @@ public final class SettingsStore {
         Key.accelReportInterval.rawValue:  Defaults.accelReportInterval,
         Key.accelBandpassLowHz.rawValue:   Defaults.accelBandpassLow,
         Key.accelBandpassHighHz.rawValue:  Defaults.accelBandpassHigh,
+        // Gyroscope detection
+        Key.gyroSpikeThreshold.rawValue:   Defaults.gyroSpikeThreshold,
+        Key.gyroCrestFactor.rawValue:      Defaults.gyroCrestFactor,
+        Key.gyroRiseRate.rawValue:         Defaults.gyroRiseRate,
+        Key.gyroConfirmations.rawValue:    Defaults.gyroConfirmations,
+        Key.gyroWarmupSamples.rawValue:    Defaults.gyroWarmup,
+        // Lid angle detection
+        Key.lidOpenThresholdDeg.rawValue:    Defaults.lidOpenThresholdDeg,
+        Key.lidClosedThresholdDeg.rawValue:  Defaults.lidClosedThresholdDeg,
+        Key.lidSlamRateDegPerSec.rawValue:   Defaults.lidSlamRateDegPerSec,
+        Key.lidSmoothingWindowMs.rawValue:   Defaults.lidSmoothingWindowMs,
+        // Ambient light detection
+        Key.alsCoverDropThreshold.rawValue:  Defaults.alsCoverDropThreshold,
+        Key.alsOffDropPercent.rawValue:      Defaults.alsOffDropPercent,
+        Key.alsOffFloorLux.rawValue:         Defaults.alsOffFloorLux,
+        Key.alsOnRisePercent.rawValue:       Defaults.alsOnRisePercent,
+        Key.alsOnCeilingLux.rawValue:        Defaults.alsOnCeilingLux,
+        Key.alsWindowSec.rawValue:           Defaults.alsWindowSec,
         // Microphone detection
         Key.micSpikeThreshold.rawValue: Defaults.micSpikeThreshold,
         Key.micCrestFactor.rawValue:    Defaults.micCrestFactor,
@@ -390,6 +415,147 @@ public final class SettingsStore {
             let c = accelWarmupSamples.clamped(to: Detection.Accel.warmupRange)
             if c != accelWarmupSamples { accelWarmupSamples = c; return }
             persist(accelWarmupSamples, .accelWarmupSamples)
+        }
+    }
+
+    // MARK: - Gyroscope detection
+
+    var gyroSpikeThreshold: Double {
+        didSet {
+            guard gyroSpikeThreshold != oldValue else { return }
+            let c = gyroSpikeThreshold.clamped(to: Detection.Gyro.spikeThresholdRange)
+            if c != gyroSpikeThreshold { gyroSpikeThreshold = c; return }
+            persist(gyroSpikeThreshold, .gyroSpikeThreshold)
+        }
+    }
+
+    var gyroCrestFactor: Double {
+        didSet {
+            guard gyroCrestFactor != oldValue else { return }
+            let c = gyroCrestFactor.clamped(to: Detection.Gyro.crestFactorRange)
+            if c != gyroCrestFactor { gyroCrestFactor = c; return }
+            persist(gyroCrestFactor, .gyroCrestFactor)
+        }
+    }
+
+    var gyroRiseRate: Double {
+        didSet {
+            guard gyroRiseRate != oldValue else { return }
+            let c = gyroRiseRate.clamped(to: Detection.Gyro.riseRateRange)
+            if c != gyroRiseRate { gyroRiseRate = c; return }
+            persist(gyroRiseRate, .gyroRiseRate)
+        }
+    }
+
+    var gyroConfirmations: Int {
+        didSet {
+            guard gyroConfirmations != oldValue else { return }
+            let c = gyroConfirmations.clamped(to: Detection.Gyro.confirmationsRange)
+            if c != gyroConfirmations { gyroConfirmations = c; return }
+            persist(gyroConfirmations, .gyroConfirmations)
+        }
+    }
+
+    var gyroWarmupSamples: Int {
+        didSet {
+            guard gyroWarmupSamples != oldValue else { return }
+            let c = gyroWarmupSamples.clamped(to: Detection.Gyro.warmupRange)
+            if c != gyroWarmupSamples { gyroWarmupSamples = c; return }
+            persist(gyroWarmupSamples, .gyroWarmupSamples)
+        }
+    }
+
+    // MARK: - Lid angle detection
+
+    var lidOpenThresholdDeg: Double {
+        didSet {
+            guard lidOpenThresholdDeg != oldValue else { return }
+            let c = lidOpenThresholdDeg.clamped(to: Detection.Lid.openThresholdDegRange)
+            if c != lidOpenThresholdDeg { lidOpenThresholdDeg = c; return }
+            persist(lidOpenThresholdDeg, .lidOpenThresholdDeg)
+        }
+    }
+
+    var lidClosedThresholdDeg: Double {
+        didSet {
+            guard lidClosedThresholdDeg != oldValue else { return }
+            let c = lidClosedThresholdDeg.clamped(to: Detection.Lid.closedThresholdDegRange)
+            if c != lidClosedThresholdDeg { lidClosedThresholdDeg = c; return }
+            persist(lidClosedThresholdDeg, .lidClosedThresholdDeg)
+        }
+    }
+
+    var lidSlamRateDegPerSec: Double {
+        didSet {
+            guard lidSlamRateDegPerSec != oldValue else { return }
+            let c = lidSlamRateDegPerSec.clamped(to: Detection.Lid.slamRateRange)
+            if c != lidSlamRateDegPerSec { lidSlamRateDegPerSec = c; return }
+            persist(lidSlamRateDegPerSec, .lidSlamRateDegPerSec)
+        }
+    }
+
+    var lidSmoothingWindowMs: Int {
+        didSet {
+            guard lidSmoothingWindowMs != oldValue else { return }
+            let c = lidSmoothingWindowMs.clamped(to: Detection.Lid.smoothingWindowMsRange)
+            if c != lidSmoothingWindowMs { lidSmoothingWindowMs = c; return }
+            persist(lidSmoothingWindowMs, .lidSmoothingWindowMs)
+        }
+    }
+
+    // MARK: - Ambient light detection
+
+    var alsCoverDropThreshold: Double {
+        didSet {
+            guard alsCoverDropThreshold != oldValue else { return }
+            let c = alsCoverDropThreshold.clamped(to: Detection.AmbientLight.coverDropThresholdRange)
+            if c != alsCoverDropThreshold { alsCoverDropThreshold = c; return }
+            persist(alsCoverDropThreshold, .alsCoverDropThreshold)
+        }
+    }
+
+    var alsOffDropPercent: Double {
+        didSet {
+            guard alsOffDropPercent != oldValue else { return }
+            let c = alsOffDropPercent.clamped(to: Detection.AmbientLight.offDropPercentRange)
+            if c != alsOffDropPercent { alsOffDropPercent = c; return }
+            persist(alsOffDropPercent, .alsOffDropPercent)
+        }
+    }
+
+    var alsOffFloorLux: Double {
+        didSet {
+            guard alsOffFloorLux != oldValue else { return }
+            let c = alsOffFloorLux.clamped(to: Detection.AmbientLight.offFloorLuxRange)
+            if c != alsOffFloorLux { alsOffFloorLux = c; return }
+            persist(alsOffFloorLux, .alsOffFloorLux)
+        }
+    }
+
+    var alsOnRisePercent: Double {
+        didSet {
+            guard alsOnRisePercent != oldValue else { return }
+            let c = alsOnRisePercent.clamped(to: Detection.AmbientLight.onRisePercentRange)
+            if c != alsOnRisePercent { alsOnRisePercent = c; return }
+            persist(alsOnRisePercent, .alsOnRisePercent)
+        }
+    }
+
+    var alsOnCeilingLux: Double {
+        didSet {
+            guard alsOnCeilingLux != oldValue else { return }
+            let c = alsOnCeilingLux.clamped(to: Detection.AmbientLight.onCeilingLuxRange)
+            if c != alsOnCeilingLux { alsOnCeilingLux = c; return }
+            persist(alsOnCeilingLux, .alsOnCeilingLux)
+        }
+    }
+
+    var alsWindowSec: Double {
+        didSet {
+            guard alsWindowSec != oldValue else { return }
+            let c = alsWindowSec.clamped(to: Detection.AmbientLight.windowSecRange)
+            if c != alsWindowSec { alsWindowSec = c; return }
+            persist(alsWindowSec, .alsWindowSec)
         }
     }
 
@@ -899,6 +1065,24 @@ public final class SettingsStore {
         accelReportInterval   = d.double(forKey: Key.accelReportInterval.rawValue)
         accelBandpassLowHz    = d.double(forKey: Key.accelBandpassLowHz.rawValue)
         accelBandpassHighHz   = d.double(forKey: Key.accelBandpassHighHz.rawValue)
+        // Gyroscope
+        gyroSpikeThreshold    = d.double(forKey: Key.gyroSpikeThreshold.rawValue)
+        gyroCrestFactor       = d.double(forKey: Key.gyroCrestFactor.rawValue)
+        gyroRiseRate          = d.double(forKey: Key.gyroRiseRate.rawValue)
+        gyroConfirmations     = d.integer(forKey: Key.gyroConfirmations.rawValue)
+        gyroWarmupSamples     = d.integer(forKey: Key.gyroWarmupSamples.rawValue)
+        // Lid angle
+        lidOpenThresholdDeg   = d.double(forKey: Key.lidOpenThresholdDeg.rawValue)
+        lidClosedThresholdDeg = d.double(forKey: Key.lidClosedThresholdDeg.rawValue)
+        lidSlamRateDegPerSec  = d.double(forKey: Key.lidSlamRateDegPerSec.rawValue)
+        lidSmoothingWindowMs  = d.integer(forKey: Key.lidSmoothingWindowMs.rawValue)
+        // Ambient light
+        alsCoverDropThreshold = d.double(forKey: Key.alsCoverDropThreshold.rawValue)
+        alsOffDropPercent     = d.double(forKey: Key.alsOffDropPercent.rawValue)
+        alsOffFloorLux        = d.double(forKey: Key.alsOffFloorLux.rawValue)
+        alsOnRisePercent      = d.double(forKey: Key.alsOnRisePercent.rawValue)
+        alsOnCeilingLux       = d.double(forKey: Key.alsOnCeilingLux.rawValue)
+        alsWindowSec          = d.double(forKey: Key.alsWindowSec.rawValue)
         // Microphone
         micSpikeThreshold = d.double(forKey: Key.micSpikeThreshold.rawValue)
         micCrestFactor    = d.double(forKey: Key.micCrestFactor.rawValue)
@@ -1081,6 +1265,18 @@ public final class SettingsStore {
         if !store.accelReportInterval.isFinite  { store.accelReportInterval  = Defaults.accelReportInterval }
         if !store.accelBandpassLowHz.isFinite   { store.accelBandpassLowHz   = Defaults.accelBandpassLow }
         if !store.accelBandpassHighHz.isFinite  { store.accelBandpassHighHz  = Defaults.accelBandpassHigh }
+        if !store.gyroSpikeThreshold.isFinite   { store.gyroSpikeThreshold   = Defaults.gyroSpikeThreshold }
+        if !store.gyroCrestFactor.isFinite      { store.gyroCrestFactor      = Defaults.gyroCrestFactor }
+        if !store.gyroRiseRate.isFinite         { store.gyroRiseRate         = Defaults.gyroRiseRate }
+        if !store.lidOpenThresholdDeg.isFinite  { store.lidOpenThresholdDeg  = Defaults.lidOpenThresholdDeg }
+        if !store.lidClosedThresholdDeg.isFinite { store.lidClosedThresholdDeg = Defaults.lidClosedThresholdDeg }
+        if !store.lidSlamRateDegPerSec.isFinite { store.lidSlamRateDegPerSec = Defaults.lidSlamRateDegPerSec }
+        if !store.alsCoverDropThreshold.isFinite { store.alsCoverDropThreshold = Defaults.alsCoverDropThreshold }
+        if !store.alsOffDropPercent.isFinite     { store.alsOffDropPercent     = Defaults.alsOffDropPercent }
+        if !store.alsOffFloorLux.isFinite        { store.alsOffFloorLux        = Defaults.alsOffFloorLux }
+        if !store.alsOnRisePercent.isFinite      { store.alsOnRisePercent      = Defaults.alsOnRisePercent }
+        if !store.alsOnCeilingLux.isFinite       { store.alsOnCeilingLux       = Defaults.alsOnCeilingLux }
+        if !store.alsWindowSec.isFinite          { store.alsWindowSec          = Defaults.alsWindowSec }
         if !store.micSpikeThreshold.isFinite    { store.micSpikeThreshold    = Defaults.micSpikeThreshold }
         if !store.micCrestFactor.isFinite       { store.micCrestFactor       = Defaults.micCrestFactor }
         if !store.micRiseRate.isFinite          { store.micRiseRate          = Defaults.micRiseRate }
@@ -1127,6 +1323,21 @@ public final class SettingsStore {
         accelConfirmations    = Defaults.accelConfirmations
         accelWarmupSamples    = Defaults.accelWarmup
         accelReportInterval   = Defaults.accelReportInterval
+        gyroSpikeThreshold    = Defaults.gyroSpikeThreshold
+        gyroCrestFactor       = Defaults.gyroCrestFactor
+        gyroRiseRate          = Defaults.gyroRiseRate
+        gyroConfirmations     = Defaults.gyroConfirmations
+        gyroWarmupSamples     = Defaults.gyroWarmup
+        lidOpenThresholdDeg   = Defaults.lidOpenThresholdDeg
+        lidClosedThresholdDeg = Defaults.lidClosedThresholdDeg
+        lidSlamRateDegPerSec  = Defaults.lidSlamRateDegPerSec
+        lidSmoothingWindowMs  = Defaults.lidSmoothingWindowMs
+        alsCoverDropThreshold = Defaults.alsCoverDropThreshold
+        alsOffDropPercent     = Defaults.alsOffDropPercent
+        alsOffFloorLux        = Defaults.alsOffFloorLux
+        alsOnRisePercent      = Defaults.alsOnRisePercent
+        alsOnCeilingLux       = Defaults.alsOnCeilingLux
+        alsWindowSec          = Defaults.alsWindowSec
         micSpikeThreshold     = Defaults.micSpikeThreshold
         micCrestFactor        = Defaults.micCrestFactor
         micRiseRate           = Defaults.micRiseRate

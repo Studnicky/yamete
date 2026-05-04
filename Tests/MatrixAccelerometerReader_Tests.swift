@@ -7,7 +7,7 @@ import XCTest
 /// the assertion and makes `make mutate` report the entry CAUGHT.
 ///
 /// Architectural note: AccelerometerReader has no protocol-shaped DI seam
-/// over IOKit (no `AccelerometerKernelDriver`-style abstraction). The
+/// over IOKit (no `SPUKernelDriver`-style abstraction). The
 /// gates exercised here are reachable because:
 ///
 ///  1. `ReportContext` is `internal`, so cells construct one directly and

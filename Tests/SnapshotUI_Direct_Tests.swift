@@ -241,6 +241,251 @@ final class SnapshotUI_Direct_Tests: XCTestCase {
         assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 540))
     }
 
+    // MARK: - Cell 1b: GyroTuningSection collapsed / expanded
+
+    /// `GyroTuningSection` wraps `GyroTuningContent` in an `AccordionCard`.
+    /// Collapsed: only the header bar contributes pixels. Expanded variants
+    /// render the five-row tuning body (confirmations, crest factor, rise
+    /// rate, spike threshold, warmup). The view is gated on
+    /// `AppleSPUDevice.isHardwarePresent` at the StimuliSection insertion
+    /// point in production; the cell renders the section directly so the
+    /// snapshot does not depend on hardware presence.
+    func test_cell_gyroTuningSection_collapsed() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_gyroTuningSection_collapsed.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_gyro_tuning", comment: "Gyroscope tuning section header"),
+            isExpanded: .constant(false)
+        ) {
+            GyroTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 60)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 60))
+    }
+
+    func test_cell_gyroTuningSection_expanded_lightScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_gyroTuningSection_expanded_lightScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_gyro_tuning", comment: "Gyroscope tuning section header"),
+            contentRowCount: 9,
+            isExpanded: .constant(true)
+        ) {
+            GyroTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 360)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 360))
+    }
+
+    func test_cell_gyroTuningSection_expanded_darkScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_gyroTuningSection_expanded_darkScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_gyro_tuning", comment: "Gyroscope tuning section header"),
+            contentRowCount: 9,
+            isExpanded: .constant(true)
+        ) {
+            GyroTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 360)
+        .preferredColorScheme(.dark)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 360))
+    }
+
+    // MARK: - Cell 1c: LidTuningSection collapsed / expanded
+
+    /// `LidTuningSection` wraps `LidTuningContent` in an `AccordionCard`.
+    /// Collapsed: only the header bar contributes pixels. Expanded
+    /// variants render the four-row tuning body (open threshold,
+    /// closed threshold, slam rate, smoothing window). Universal
+    /// surface (not Direct-only) but cells live in BOTH SnapshotUI
+    /// suites so the AppStore + Direct + HostApp variants seed PNGs.
+    func test_cell_lidTuningSection_collapsed() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_lidTuningSection_collapsed.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_lid_tuning", comment: "Lid tuning section header"),
+            isExpanded: .constant(false)
+        ) {
+            LidTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 60)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 60))
+    }
+
+    func test_cell_lidTuningSection_expanded_lightScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_lidTuningSection_expanded_lightScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_lid_tuning", comment: "Lid tuning section header"),
+            contentRowCount: 7,
+            isExpanded: .constant(true)
+        ) {
+            LidTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 320)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 320))
+    }
+
+    func test_cell_lidTuningSection_expanded_darkScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_lidTuningSection_expanded_darkScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_lid_tuning", comment: "Lid tuning section header"),
+            contentRowCount: 7,
+            isExpanded: .constant(true)
+        ) {
+            LidTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 320)
+        .preferredColorScheme(.dark)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 320))
+    }
+
+    // MARK: - Cell 1d: AmbientLightTuningSection collapsed / expanded
+    //
+    // `AmbientLightTuningSection` wraps `AmbientLightTuningContent` in
+    // an `AccordionCard`. Universal surface (not Direct-only) but
+    // cells live in BOTH SnapshotUI suites so the AppStore + Direct
+    // + HostApp PNG baselines seed.
+    func test_cell_ambientLightTuningSection_collapsed() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_ambientLightTuningSection_collapsed.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_ambientLight_tuning", comment: "Ambient light tuning section header"),
+            isExpanded: .constant(false)
+        ) {
+            AmbientLightTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 60)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 60))
+    }
+
+    func test_cell_ambientLightTuningSection_expanded_lightScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_ambientLightTuningSection_expanded_lightScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_ambientLight_tuning", comment: "Ambient light tuning section header"),
+            contentRowCount: 11,
+            isExpanded: .constant(true)
+        ) {
+            AmbientLightTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 460)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 460))
+    }
+
+    func test_cell_ambientLightTuningSection_expanded_darkScheme() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_ambientLightTuningSection_expanded_darkScheme.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_ambientLight_tuning", comment: "Ambient light tuning section header"),
+            contentRowCount: 11,
+            isExpanded: .constant(true)
+        ) {
+            AmbientLightTuningContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 460)
+        .preferredColorScheme(.dark)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 460))
+    }
+
+    // MARK: - Cell 1e: ThermalSection collapsed / expanded
+    //
+    // Universal surface (not Direct-only) but cells live in BOTH
+    // SnapshotUI suites so the AppStore + Direct + HostApp PNG
+    // baselines seed. ThermalSection has no tunables — single
+    // light-only collapsed and expanded baselines.
+    func test_cell_thermalSection_collapsed() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_thermalSection_collapsed.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_thermal", comment: "Thermal section header"),
+            isExpanded: .constant(false)
+        ) {
+            ThermalSectionContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 60)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 60))
+    }
+
+    func test_cell_thermalSection_expanded() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_thermalSection_expanded.1.png"]
+        )
+        let settings = SettingsStore()
+        let view = AccordionCard(
+            title: NSLocalizedString("section_thermal", comment: "Thermal section header"),
+            contentRowCount: 1,
+            isExpanded: .constant(true)
+        ) {
+            ThermalSectionContent()
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 120)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 120))
+    }
+
     // MARK: - Cell 2: MicTuningSection collapsed / expanded
 
     func test_cell_micTuningSection_collapsed() throws {

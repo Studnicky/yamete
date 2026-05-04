@@ -8,7 +8,7 @@ import IOKit
 /// real production entry point (`SensorActivation.activate`,
 /// `SensorActivation.deactivate`, `AccelHardware.isSPUDevicePresent`,
 /// `AccelHardware.isSensorActivelyReporting`, `AccelHardware.openStream`)
-/// with `MockAccelerometerKernelDriver` configured to force a kernel
+/// with `MockSPUKernelDriver` configured to force a kernel
 /// failure code on a single call. The cell then asserts:
 ///   • the production function returned the failure-path value, OR
 ///   • the loop body downstream of the gate did NOT execute (counter on
@@ -30,7 +30,7 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
     /// Removing the gate runs the loop body anyway, which the counter
     /// catches.
     func testActivate_matchingFailure_shortCircuitsBeforeRegistryWrites() {
-        let mock = MockAccelerometerKernelDriver()
+        let mock = MockSPUKernelDriver()
         mock.setForceMatchingFailureKr(KERN_FAILURE)
 
         let result = SensorActivation.activate(reportIntervalUS: 10000, driver: mock)
@@ -54,7 +54,7 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
     /// processing the synthetic service, so the registry-write counter
     /// stays at 0.
     func testActivate_iteratorYieldsOneService_loopBodyExecutesThreeWrites() {
-        let mock = MockAccelerometerKernelDriver()
+        let mock = MockSPUKernelDriver()
 
         _ = SensorActivation.activate(reportIntervalUS: 10000, driver: mock)
 
@@ -78,7 +78,7 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
     /// `SensorActivation.deactivate`. Forced kernel failure must
     /// short-circuit; loop body's registry writes must be zero.
     func testDeactivate_matchingFailure_shortCircuitsBeforeRegistryWrites() {
-        let mock = MockAccelerometerKernelDriver()
+        let mock = MockSPUKernelDriver()
         mock.setForceMatchingFailureKr(KERN_FAILURE)
 
         SensorActivation.deactivate(driver: mock)
@@ -95,7 +95,7 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
     /// One iteration writes 3 properties; mutated gate that flips the
     /// comparison breaks immediately and the writes are zero.
     func testDeactivate_iteratorYieldsOneService_loopBodyExecutesThreeWrites() {
-        let mock = MockAccelerometerKernelDriver()
+        let mock = MockSPUKernelDriver()
 
         SensorActivation.deactivate(driver: mock)
 
@@ -111,7 +111,7 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
     /// Forced manager-open failure must yield false and short-circuit
     /// before `hidManagerCopyDevices` is called.
     func testIsSPUDevicePresent_managerOpenFailure_returnsFalseShortCircuit() {
-        let mock = MockAccelerometerKernelDriver()
+        let mock = MockSPUKernelDriver()
         mock.setForceManagerOpenFailure(kIOReturnNotPermitted)
 
         let present = AccelHardware.isSPUDevicePresent(driver: mock)
@@ -132,7 +132,7 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
     /// at the head of `isSensorActivelyReporting`. Forced failure must
     /// yield false and short-circuit before the iterator is polled.
     func testIsSensorActivelyReporting_matchingFailure_returnsFalseShortCircuit() {
-        let mock = MockAccelerometerKernelDriver()
+        let mock = MockSPUKernelDriver()
         mock.setForceMatchingFailureKr(KERN_FAILURE)
 
         let reporting = AccelHardware.isSensorActivelyReporting(driver: mock)
@@ -155,7 +155,7 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
     /// execute its two `registryCreateCFProperty` calls. Mutated gate
     /// that breaks early skips the body and the counter is 0.
     func testIsSensorActivelyReporting_iteratorYieldsOneService_loopBodyProbesTwoProperties() {
-        let mock = MockAccelerometerKernelDriver()
+        let mock = MockSPUKernelDriver()
 
         _ = AccelHardware.isSensorActivelyReporting(driver: mock)
 
@@ -172,7 +172,7 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
     /// `SensorError.ioKitError` on the consumer stream and short-circuit
     /// before any device-side work.
     func testOpenStream_managerOpenFailure_surfacesIoKitErrorShortCircuit() async {
-        let mock = MockAccelerometerKernelDriver()
+        let mock = MockSPUKernelDriver()
         mock.setForceManagerOpenFailure(kIOReturnNotPermitted)
 
         let stream = AccelHardware.openStream(
@@ -212,7 +212,7 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
     /// `SensorError.ioKitError` and short-circuit before
     /// `hidDeviceMaxReportSize` is called.
     func testOpenStream_deviceOpenFailure_surfacesIoKitErrorShortCircuit() async {
-        let mock = MockAccelerometerKernelDriver()
+        let mock = MockSPUKernelDriver()
         mock.setForceDeviceOpenFailure(kIOReturnNotPermitted)
 
         let stream = AccelHardware.openStream(
@@ -255,7 +255,7 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
     /// to slip through to the watchdog stall after 5s) does not get
     /// mis-counted as caught.
     func testOpenStream_maxSizeZero_surfacesIoKitError() async {
-        let mock = MockAccelerometerKernelDriver()
+        let mock = MockSPUKernelDriver()
         mock.setForceMaxReportSizeZero(true)
 
         let stream = AccelHardware.openStream(

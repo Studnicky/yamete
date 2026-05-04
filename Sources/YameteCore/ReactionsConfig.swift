@@ -33,6 +33,17 @@ public enum ReactionsConfig {
         .mouseClicked:              0.50,
         .mouseScrolled:             0.40,
         .keyboardTyped:             0.35,
+        .gyroSpike:                 0.7,
+        .lidOpened:                 0.4,
+        .lidClosed:                 0.3,
+        .lidSlammed:                0.95,
+        .alsCovered:                0.7,
+        .lightsOff:                 0.5,
+        .lightsOn:                  0.4,
+        .thermalNominal:            0.2,
+        .thermalFair:               0.5,
+        .thermalSerious:            0.8,
+        .thermalCritical:           1.0,
     ]
 
     // MARK: - Per-source debounce windows
@@ -43,6 +54,16 @@ public enum ReactionsConfig {
     /// Display reconfiguration: macOS emits 3-4 callbacks per real change.
     /// Consumed by `DisplayHotplugSource.dispatchDebounced`.
     public static let displayDebounce: TimeInterval = 0.20
+    /// Gyroscope spike: BMI286 reports at 100Hz; cap publish rate so a
+    /// sustained-rotation event does not flood the bus. 0.5s aligns with
+    /// the user's intuition of distinct spikes.
+    /// Consumed by `GyroscopeSource.dispatchHandler`.
+    public static let gyroDebounce: TimeInterval = 0.5
+    /// Ambient light sensor: cap publish rate so a flickering lamp or
+    /// hand-pass-through does not flood the bus. 1.0s aligns with the
+    /// human "distinct lighting change" interval.
+    /// Consumed by `AmbientLightDetector.process`.
+    public static let alsDebounce: TimeInterval = 1.0
     // Note: AudioPeripheralSource (Set-diff dedup), PowerSource (edge-state
     // dedup via `lastWasOnAC`), BluetoothSource and ThunderboltSource (IOKit
     // emits one event per device match/terminate — no rapid-fire pattern in

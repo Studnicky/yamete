@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Four new sensor surfaces, each with full menu controls and per-reaction
+  matrix integration.** Following gap analysis against four reference repos
+  (`olvvier/apple-silicon-accelerometer`, `pirate/mac-hardware-toys`,
+  `harttle/macbook-lighter`, `vlasvlasvlas/spank`), Yamete now publishes:
+  - **Gyroscope spikes** (`.gyroSpike`) — lid yank, laptop spin, rotation
+    transients. Same Apple Silicon SPU HID device as the BMI286 accelerometer,
+    different HID usage (9 vs 3). Six-gate consensus pipeline (`GyroDetector`)
+    tuned for deg/s magnitude with separate spike threshold, rise rate,
+    crest factor, confirmation count, warmup, and cooldown.
+  - **Lid angle state transitions** (`.lidOpened`, `.lidClosed`, `.lidSlammed`)
+    via SPU HID usage 8. State machine (closed/opening/open/closing) with
+    EMA smoothing on Δangle/Δt to suppress jitter. The slam gate fires when
+    rate-of-change crosses a configurable negative threshold while the angle
+    approaches zero.
+  - **Ambient light step changes** (`.lightsOff`, `.lightsOn`, `.alsCovered`)
+    via SPU HID usage 7. Two-second ring buffer + step detector with separate
+    percent and floor/ceiling gates per direction. The `.alsCovered` path
+    has its own faster rate constraint so a hand over the sensor reads
+    distinctly from gradual room dimming.
+  - **Thermal pressure transitions** (`.thermalNominal`, `.thermalFair`,
+    `.thermalSerious`, `.thermalCritical`) via `NSProcessInfo
+    .thermalStateDidChangeNotification`. Cold-start suppression: the initial
+    state captured at start does not publish. Per-state dedup. No tunable
+    thresholds — the levels are OS-defined.
+- **AppleSPUDevice broker.** Refactored the previously-direct accelerometer
+  IOHID handle into a ref-counted multiplexer with a single input-report
+  callback that fans out to every subscriber regardless of `(usagePage,
+  usage)` — gyroscope, lid, and ambient-light sources subscribe alongside
+  the accelerometer and decode their own byte offsets from the shared
+  report. Phase 0 of the v2.1.0 plan. The activation/deactivation
+  three-phase teardown invariant is preserved verbatim from the previous
+  implementation; only the LAST subscriber's release closes the device.
+- **Two emission patterns documented.** Continuous-stream sources (accel,
+  microphone, gyroscope, ambient light) run a detector pipeline over a
+  high-frequency sample stream and emit one Reaction on threshold cross;
+  discrete state-transition sources (USB, power, audio, BT, Thunderbolt,
+  display, sleep/wake, lid, thermal) observe an OS notification surface
+  and emit one Reaction per user-meaningful state change. Both feed the
+  same bus.
+
+### Changed
+- Event source count documented as **eleven** (was: seven).
+- Mutation catalog grew from 111 → 130 entries (5 gyro, 5 lid, 5 ALS, 4
+  thermal). All caught.
+
 ## [2.0.0] - 2026-05-02
 
 ### Added

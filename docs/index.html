@@ -63,8 +63,12 @@
             <p>Built-in accelerometer, microphone transient detection, and AirPods IMU. A consensus engine fuses them before firing, so a passing truck doesn't make your laptop cry in public.</p>
           </div>
           <div class="feature">
-            <h3>Seven Event Sources</h3>
-            <p>USB attach/detach, power adapter plug/unplug, audio peripheral add/remove, Bluetooth connect/disconnect, Thunderbolt attach/detach, display hotplug, and sleep/wake. Each fires its own reaction with independent output toggles.</p>
+            <h3>Eleven Event Sources</h3>
+            <p>USB attach/detach, power adapter plug/unplug, audio peripheral add/remove, Bluetooth connect/disconnect, Thunderbolt attach/detach, display hotplug, sleep/wake — plus lid open/closed/slammed (hinge angle from the Apple Silicon SPU), thermal pressure transitions (nominal/fair/serious/critical), gyroscope spikes (lid yank, laptop spin), and ambient-light step changes (lights flipped, sensor covered). Each fires its own reaction with independent output toggles.</p>
+          </div>
+          <div class="feature">
+            <h3>SPU Sensor Multiplexer</h3>
+            <p>Apple Silicon's SPU HID device exposes accelerometer, gyroscope, lid-angle, and ambient-light data through a single in-kernel handle. Yamete refactored that handle into a ref-counted broker (<code>AppleSPUDevice</code>) so all four sensors share one open device, decode their own bytes from the same report, and release the handle when nobody's listening.</p>
           </div>
           <div class="feature">
             <h3>Sound Clips With Taste</h3>
@@ -106,8 +110,10 @@
 
       <section id="how-it-works">
         <h2>How it works</h2>
-        <p>All events — impacts and system notifications alike — flow through a single <code>ReactionBus</code>. Impact sensors each run their own detection pipeline: raw samples pass through bandpass filtering and a six-gate analysis (spike threshold, rise rate, crest factor, confirmation count, warmup, cooldown). When enough sensors agree within a time window, the fused impact publishes onto the bus.</p>
-        <p>Seven IOKit and CoreAudio event sources subscribe to system notifications for USB, power, audio, Bluetooth, Thunderbolt, display, and sleep/wake and publish onto the same bus. Before any output sees a reaction, the bus stamps it once with a clip duration and face selection — so sound, screen flash, LED, and notification all see the same pre-selected face and audio clip, keeping every response in sync regardless of how many outputs are active.</p>
+        <p>All events — impacts and system notifications alike — flow through a single <code>ReactionBus</code>. Two emission patterns feed the bus.</p>
+        <p><strong>Continuous-stream sources</strong> (accelerometer, microphone, gyroscope, ambient light) run their own detection pipeline over a high-frequency stream: raw samples pass through bandpass filtering and a six-gate analysis (spike threshold, rise rate, crest factor, confirmation count, warmup, cooldown), and the source emits exactly one Reaction when the pipeline crosses threshold. Raw samples never leave the source. The accelerometer, gyroscope, and ambient-light sensor share a single Apple Silicon SPU HID device through a ref-counted multiplexer; each one decodes its own byte offsets from the same in-kernel report.</p>
+        <p><strong>Discrete state-transition sources</strong> (USB, power, audio, Bluetooth, Thunderbolt, display, sleep/wake, lid angle, thermal pressure) observe an OS notification, an IOKit callback, or a KVO surface and emit one Reaction per user-meaningful state change — lid opens past 10°, lid slams, lights flip off, thermal pressure crosses to <code>.serious</code>, USB attaches. Same bus.</p>
+        <p>When enough impact sensors agree within a fusion window, the fused impact publishes onto the bus. Before any output sees a reaction, the bus stamps it once with a clip duration and face selection — so sound, screen flash, LED, and notification all see the same pre-selected face and audio clip, keeping every response in sync regardless of how many outputs are active.</p>
         <p>Outputs subscribe independently and filter by their per-reaction toggle matrix. A reaction that has LED and sound enabled but flash disabled produces a pulse and a clip, and nothing on screen.</p>
         <p>It's a menu bar app (<code>LSUIElement</code>). No Dock icon, no app windows, no onboarding wizard asking how you heard about it. All controls live in the menu bar dropdown, because some of us have standards.</p>
       </section>
@@ -116,8 +122,8 @@
         <h2>How seriously is this tested <span style="font-weight: 400; color: var(--muted); font-size: 0.9rem;">(too)</span></h2>
         <p>For a joke app whose entire value proposition is "your laptop yells when you smack it," the test apparatus is genuinely disproportionate. It includes:</p>
         <ul>
-          <li>~750 unit and integration cells across two SPM build variants (default and <code>DIRECT_BUILD</code>).</li>
-          <li>A 111-entry <strong>mutation catalog</strong> — every entry is a deliberate code change to a production gate that must cause a named test to fail. Every gate is caught.</li>
+          <li>~795 unit and integration cells across two SPM build variants (default and <code>DIRECT_BUILD</code>).</li>
+          <li>A 130-entry <strong>mutation catalog</strong> — every entry is a deliberate code change to a production gate that must cause a named test to fail. Every gate is caught.</li>
           <li>Property-based fuzz over the bus invariants (1600 random cases per cell). Concurrent-interleaved fuzz that spawns multiple producers on overlapping timelines and asserts no missed drop, no double-action, no leaked task. Settings-corruption fuzz against the <code>SettingsStore</code>. Locale × plural fuzz across 40 locales.</li>
           <li>~28 SwiftUI snapshot baselines per build variant across 4 variants (<code>AppStore</code>, <code>Direct</code>, <code>HostApp</code>, <code>CI</code>) so that a regression in accordion row-height geometry shows up as pixel diff before it ships.</li>
           <li>Performance baselines with a 2× tolerance band. Crash-handling boundary audit. Driver Real-vs-Mock parity. Cross-boundary fault injection at every Source / Bus / Output seam.</li>
