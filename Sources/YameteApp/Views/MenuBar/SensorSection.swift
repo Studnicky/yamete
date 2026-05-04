@@ -17,7 +17,7 @@ internal struct SensorSection: View {
     @Environment(Yamete.self) var yamete
     let availableSensors: [String]
 
-    @State private var impactGroupExpanded = true
+    @State private var impactGroupExpanded = false
     @State private var accelExpanded = false
     @State private var micExpanded   = false
     @State private var hpExpanded    = false

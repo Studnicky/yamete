@@ -149,7 +149,7 @@ internal struct StimuliSection: View {
                          collationLocale: Locale(identifier: settings.resolvedNotificationLocale))
     }
 
-    @State private var stimuliGroupExpanded: Bool = true
+    @State private var stimuliGroupExpanded: Bool = false
 
     public var body: some View {
         SensorAccordionCard(

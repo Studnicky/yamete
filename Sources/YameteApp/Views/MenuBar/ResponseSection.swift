@@ -52,7 +52,7 @@ internal struct ResponseSection: View {
         }
     }
 
-    @State private var reactionsGroupExpanded: Bool = true
+    @State private var reactionsGroupExpanded: Bool = false
 
     public var body: some View {
         @Bindable var s = settings

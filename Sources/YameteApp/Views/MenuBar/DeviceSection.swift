@@ -14,7 +14,7 @@ internal struct DeviceSection: View {
     let audioDevices: [AudioOutputDevice]
     let displays: [NSScreen]
 
-    @State private var devicesGroupExpanded: Bool = true
+    @State private var devicesGroupExpanded: Bool = false
 
     /// Identifier for each device collection bound by this section. Tests
     /// use these to assert toggling a single display does not mutate the
