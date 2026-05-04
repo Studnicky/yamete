@@ -34,3 +34,16 @@ DerivedData/
 
 # Enginseer agent topology cache (local-only, never committed)
 .enginseer/
+
+# Local scratch — face-rig design exploration, MCP logs, vendor handoff (never committed)
+.playwright-mcp/
+Assets/faces-svg/
+Assets/faces-svg-review/
+docs/art/
+scripts/generate-face-svg-assets.py
+scripts/render-face-svg-review.py
+scripts/validate-face-svg.py
+yamete_vector_art_plans/
+yamete_vector_art_plans.zip
+yamete-browser-review-*.png
+AGENTS.md
