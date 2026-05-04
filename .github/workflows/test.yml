@@ -50,7 +50,7 @@ jobs:
         run: swift test
       - name: Upload test artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: swift-test-default-results
           path: |
@@ -76,7 +76,7 @@ jobs:
         run: swift test -Xswiftc -DDIRECT_BUILD
       - name: Upload test artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: swift-test-direct-build-results
           path: |

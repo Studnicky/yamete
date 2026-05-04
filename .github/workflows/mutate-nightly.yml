@@ -53,7 +53,7 @@ jobs:
         run: make mutate 2>&1 | tee mutate.log
       - name: Upload mutate log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mutate-nightly-log
           path: mutate.log
