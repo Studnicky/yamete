@@ -71,6 +71,12 @@
 
 /* Sensitivity & Sensors accordion title */
 
+/* Impact detection master group title */
+"section_impact_detection" = "Impact Detection";
+
+/* Impact detection master toggle help text */
+"help_impact_detection" = "Master toggle for the three impact-detection sensors (accelerometer, microphone, AirPods motion). Turning this off disables all impact reactions; individual sensors can be re-enabled below.";
+
 /* Impact consensus setting title */
 "setting_consensus" = "Impact Consensus";
 
