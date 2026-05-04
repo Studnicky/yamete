@@ -31,3 +31,6 @@ build/
 DerivedData/
 .build/
 .build-stage/
+
+# Enginseer agent topology cache (local-only, never committed)
+.enginseer/
