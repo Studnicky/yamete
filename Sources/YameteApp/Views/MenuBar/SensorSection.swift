@@ -73,7 +73,7 @@ internal struct SensorSection: View {
             help: NSLocalizedString("help_impact_detection", comment: "Impact detection master toggle help")
         ) {
             VStack(spacing: 0) {
-                // Per-sensor cards: active above inactive, alpha-sorted within
+                // Per-sensor cards: active above inactive, alpha-sorted within.
                 ForEach(ordered, id: \.self) { sensorID in
                     sensorCard(for: sensorID)
                 }
@@ -102,6 +102,12 @@ internal struct SensorSection: View {
                 }
                 .padding(Theme.accordionInner)
             }
+            // When the impact master kill switch is OFF, dim every per-
+            // sensor card AND the cooldown/consensus rows; user can still
+            // see what was configured (so they know what resumes when
+            // they flip the master back on) but cannot interact until
+            // the override is released.
+            .dimmedWhenMasterOff(s.impactMasterEnabled)
         }
         .onAppear { clampConsensus() }
         .onChange(of: settings.enabledSensorIDs) { _, _ in clampConsensus() }

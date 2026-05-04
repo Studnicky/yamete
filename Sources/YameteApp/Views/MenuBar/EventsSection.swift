@@ -186,6 +186,9 @@ internal struct StimuliSection: View {
                     }
                 }
             }
+            // Stimuli master OFF → dim every row AND its expanded content
+            // so the user sees what was configured but can't interact.
+            .dimmedWhenMasterOff(settings.stimuliMasterEnabled)
         }
     }
 

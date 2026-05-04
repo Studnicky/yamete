@@ -219,6 +219,10 @@ internal struct ResponseSection: View {
             }
 
             }
+            // Reactions master OFF → dim every output card AND its
+            // expanded content so the user sees what was configured
+            // but cannot interact until the override is released.
+            .dimmedWhenMasterOff(settings.reactionsMasterEnabled)
         }
     }
 
