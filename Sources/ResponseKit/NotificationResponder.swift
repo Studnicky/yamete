@@ -182,6 +182,23 @@ public enum NotificationPhrase {
         return eventPhrasing(kind: reaction.kind, preferredLocale: preferredLocale)
     }
 
+    /// Returns every body variant defined for `kind` in the user's
+    /// preferred locale, deduped, falling back to the en pool when the
+    /// preferred locale has no entries. Used by `MenuHeaderRotator` to
+    /// build its rotation pages from the canonical Events.strings copy.
+    public static func eventBodies(kind: ReactionKind, preferredLocale: String) -> [String] {
+        let key = "body_\(kind.rawValue)"
+        let preferred = eventPools(for: preferredLocale)[key] ?? []
+        let fallback  = eventPools(for: fallbackLocaleID)[key] ?? []
+        var seen = Set<String>()
+        var out: [String] = []
+        for body in preferred + fallback where !body.isEmpty && !seen.contains(body) {
+            seen.insert(body)
+            out.append(body)
+        }
+        return out
+    }
+
     public static func eventPhrasing(kind: ReactionKind, preferredLocale: String) -> (title: String, body: String) {
         let key = kind.rawValue
         let preferredPools = eventPools(for: preferredLocale)

@@ -203,54 +203,53 @@ internal let tuningLabelWidth: CGFloat = 50
 
 internal struct HeaderSection: View {
     @Environment(Yamete.self) var yamete
-    @Environment(MenuBarFace.self) var menuBarFace
     @Environment(SettingsStore.self) var settings
     @State private var rotator = MenuHeaderRotator()
 
-    /// Cross-fade duration between rotator pages. Tuned so the swap reads
-    /// as a deliberate transition, not a flicker — matches the
-    /// AccordionCard expand/collapse curve.
-    private static let crossfadeDuration: Double = 0.45
+    /// Cross-fade duration for the subtext rotation. ~3.5s ease-in-out
+    /// reads as a slow pulse rather than a flicker — deliberate enough
+    /// that the user notices the transition without it feeling busy.
+    private static let crossfadeDuration: Double = 3.5
 
     public var body: some View {
-        let face = menuBarFace.reactionFace ?? FaceLibrary.shared.image(at: 0)
-        let page = rotator.current
+        // Application icon — the same image macOS shows in the Dock /
+        // Finder / status-item launch icon. NEVER substituted with a
+        // reaction face; the menu header stays calm even while an impact
+        // is in flight (the menu-bar status-item icon is the surface
+        // that reflects live reactions).
+        let icon = NSApp.applicationIconImage
+        let body = rotator.current
 
-        VStack(spacing: 6) {
-            // Centred app icon face. Falls back to FaceLibrary index 0 when
-            // no impact is in flight; swaps to the live reaction face when
-            // an impact lands (matching the menu-bar status item behaviour).
-            if let face {
-                Image(nsImage: face)
+        HStack(alignment: .center, spacing: 12) {
+            if let icon {
+                Image(nsImage: icon)
                     .resizable()
                     .interpolation(.high)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 40, height: 40)
             }
 
-            // Centred rotating title + body. Cross-fade triggered by the
-            // page identity changing (`.id(page.id)` forces SwiftUI to
-            // dispose the old subview and animate the replacement in).
-            VStack(spacing: 2) {
-                Text(page.title)
-                    .font(.system(size: 14, weight: .bold))
+            VStack(alignment: .leading, spacing: 2) {
+                // Static title — never rotates.
+                Text(NSLocalizedString("app_title", comment: "Application name"))
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Theme.pink)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                if !page.body.isEmpty {
-                    Text(page.body)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .lineLimit(3)
-                }
-            }
-            .id(page.id)
-            .transition(.opacity)
-            .animation(.easeInOut(duration: Self.crossfadeDuration), value: page.id)
 
-            // Paused indicator stays visible alongside the rotator so the
-            // user always knows when detection is suspended.
+                // Rotating subtext — notification body strings drawn from
+                // the user's enabled stimulus kinds. `.id(body)` triggers
+                // SwiftUI to dispose the old text and animate the new one
+                // in; the slow ease-in-out cross-fade reads as a pulse.
+                Text(body)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .id(body)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: Self.crossfadeDuration), value: body)
+            }
+
+            Spacer(minLength: 0)
+
             if !yamete.fusion.isRunning {
                 Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
                     .font(.caption)
@@ -260,7 +259,6 @@ internal struct HeaderSection: View {
                     .clipShape(Capsule())
             }
         }
-        .frame(maxWidth: .infinity)
         .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 8)
         .onAppear {
             rebuildPages()
@@ -270,16 +268,16 @@ internal struct HeaderSection: View {
         .onChange(of: settings.resolvedNotificationLocale) { _, _ in rebuildPages() }
         .onChange(of: settings.enabledStimulusSourceIDs) { _, _ in rebuildPages() }
         .onChange(of: settings.enabledSensorIDs) { _, _ in rebuildPages() }
+        .onChange(of: settings.impactMasterEnabled) { _, _ in rebuildPages() }
+        .onChange(of: settings.stimuliMasterEnabled) { _, _ in rebuildPages() }
     }
 
-    /// Recompute the rotator pages from the user's currently-enabled
+    /// Recompute the rotator's body pool from the user's currently-enabled
     /// reaction kinds and selected locale. Called on launch and whenever
     /// either input changes.
     private func rebuildPages() {
-        let appTitle   = NSLocalizedString("app_title",   comment: "Application name")
         let appTagline = NSLocalizedString("app_tagline", comment: "Application tagline")
-        let pages = MenuHeaderRotator.buildPages(
-            appTitle: appTitle,
+        let pages = MenuHeaderRotator.buildBodies(
             appTagline: appTagline,
             enabledKinds: enabledReactionKinds(),
             locale: settings.resolvedNotificationLocale
@@ -287,14 +285,16 @@ internal struct HeaderSection: View {
         rotator.setPages(pages)
     }
 
-    /// All reaction kinds whose source is currently enabled. Mirrors the
-    /// gating logic the bus uses when deciding whether to publish a kind:
-    /// impact kinds gate on `enabledSensorIDs`; event/stimulus kinds gate
-    /// on `enabledStimulusSourceIDs` membership.
+    /// All reaction kinds whose source is currently enabled AND whose
+    /// group's master kill-switch is on. Mirrors the gating logic the bus
+    /// uses when deciding whether to publish a kind, so the rotator never
+    /// shows a body the user has silenced.
     private func enabledReactionKinds() -> [ReactionKind] {
+        // The Stimuli kill-switch overrides the entire stimulus group;
+        // when it's off we surface no rotating body strings (only the
+        // tagline rotates, since `.impact` itself is excluded below).
+        guard settings.stimuliMasterEnabled else { return [] }
         var kinds: [ReactionKind] = []
-        // Impact reactions always carry the same kind (.impact); skip and
-        // let the rotator surface event phrasings only.
         let stimulusIDs = Set(settings.enabledStimulusSourceIDs)
         for kind in ReactionKind.allCases where kind != .impact {
             // Map kind → owning source ID via the ReactionKind doc-comment

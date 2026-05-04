@@ -7,48 +7,43 @@ import ResponseKit
 import Foundation
 import Observation
 
-/// Drives the rotating title/body pair shown at the top of the menu bar
-/// dropdown. Pages cycle on a fixed interval; the current page is observed
-/// by the SwiftUI HeaderSection which cross-fades between pages on change.
+/// Drives the rotating subtext shown beneath the static "Yamete" title in
+/// the menu bar dropdown header. Pages cycle on a fixed interval; each
+/// page is a localised notification body string. The current page is
+/// observed by `HeaderSection`, which slow-pulses between pages with a
+/// ~3.5s ease-in-out cross-fade.
 ///
-/// Page #0 is always the app identity (`app_title` / `app_tagline`) so the
-/// header reads "Yamete — your MacBook reacts when you smack it" before
-/// any rotation happens. Subsequent pages are sample notification phrasings
-/// for every enabled reaction kind, drawn from `NotificationPhrase` in the
-/// user's selected locale.
+/// Page 0 is always the app tagline (`app_tagline`) so the header reads
+/// the brand descriptor first; subsequent pages are body strings drawn
+/// from the enabled reaction kinds' Events.strings body pools in the
+/// user's selected locale. Titles do NOT rotate — the static "Yamete"
+/// stays put above the rotating body line.
 ///
-/// The rotator is `@MainActor`-isolated and `Sendable` because every
-/// observer is on the main actor — no cross-actor send is needed.
+/// `@MainActor`-isolated; every observer lives on the main actor.
 @MainActor
 @Observable
 public final class MenuHeaderRotator {
-    public struct Page: Identifiable, Equatable, Sendable {
-        public var id: String { title + "|" + body }
-        public let title: String
-        public let body: String
-    }
-
-    public private(set) var current: Page
-    private var pages: [Page]
+    public private(set) var current: String
+    private var pages: [String]
     private var index: Int = 0
     private var task: Task<Void, Never>?
     private let interval: TimeInterval
 
-    /// `interval` clamped to `[1.5s, 30s]` so a misconfigured caller can't
-    /// thrash the UI or stall the rotation entirely.
-    public init(pages: [Page] = [], interval: TimeInterval = 5.0) {
-        let safeInterval = max(1.5, min(30.0, interval))
+    /// `interval` clamped to `[3.5s, 30s]` — a value below the cross-fade
+    /// duration would queue transitions before the previous one finished.
+    public init(pages: [String] = [], interval: TimeInterval = 8.0) {
+        let safeInterval = max(3.5, min(30.0, interval))
         self.interval = safeInterval
-        let safePages = pages.isEmpty
-            ? [Page(title: "", body: "")]
-            : pages
+        let safePages = pages.isEmpty ? [""] : pages
         self.pages = safePages
         self.current = safePages[0]
     }
 
     /// Replace the page set. Resets the cursor to page 0 and the visible
-    /// page to the new first entry. Idempotent on equal pages.
-    public func setPages(_ newPages: [Page]) {
+    /// page to the new first entry. Idempotent on equal pages — equal
+    /// re-sets are a no-op so the cross-fade doesn't restart whenever the
+    /// caller re-emits the same list.
+    public func setPages(_ newPages: [String]) {
         guard !newPages.isEmpty else { return }
         if newPages == pages { return }
         pages = newPages
@@ -83,22 +78,27 @@ public final class MenuHeaderRotator {
     }
 
     /// Pure helper — exposed `internal static` so tests can build pages
-    /// without instantiating the rotator. Mirrors what HeaderSection.onAppear
-    /// computes at runtime: the app-identity page first, then one sample
-    /// phrasing per enabled reaction kind.
+    /// without instantiating the rotator. Mirrors what
+    /// `HeaderSection.onAppear` computes at runtime: the tagline first,
+    /// then every body variant for each enabled reaction kind in the
+    /// user's locale, deduped, sorted for stable ordering.
     @MainActor
-    internal static func buildPages(appTitle: String,
-                                    appTagline: String,
-                                    enabledKinds: [ReactionKind],
-                                    locale: String) -> [Page] {
-        var pages: [Page] = [Page(title: appTitle, body: appTagline)]
+    internal static func buildBodies(appTagline: String,
+                                     enabledKinds: [ReactionKind],
+                                     locale: String) -> [String] {
+        var bodies: [String] = [appTagline]
         for kind in enabledKinds {
-            let pair = NotificationPhrase.eventPhrasing(kind: kind, preferredLocale: locale)
-            // Skip kinds whose phrasing is missing (key fallback returns
-            // the raw rawValue) so the rotator never lands on a broken page.
-            guard !pair.title.isEmpty, pair.title != kind.rawValue else { continue }
-            pages.append(Page(title: pair.title, body: pair.body))
+            let pool = NotificationPhrase.eventBodies(kind: kind, preferredLocale: locale)
+            bodies.append(contentsOf: pool)
         }
-        return pages
+        // Dedup while preserving the tagline's lead position so the header
+        // always reads the brand descriptor first on launch.
+        var seen = Set<String>()
+        var deduped: [String] = []
+        for body in bodies where !body.isEmpty && !seen.contains(body) {
+            seen.insert(body)
+            deduped.append(body)
+        }
+        return deduped
     }
 }
