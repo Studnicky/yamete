@@ -53,13 +53,13 @@
 /* Sensitivity & Sensors accordion title */
 
 /* Sensor consensus setting title */
-"setting_consensus" = "传感器共识";
+"setting_consensus" = "Impact Consensus";
 
 /* Sensor consensus setting help text */
-"help_consensus" = "触发前必须独立检测到冲击的传感器数量。上限为提供数据的传感器数量。";
+"help_consensus" = "Number of impact sensors (accelerometer, microphone, AirPods motion) that must independently detect an impact before triggering. Clamped to the number of impact sensors delivering data. Does not apply to discrete-event sources (USB, lid, thermal, etc.).";
 
 /* Sensor consensus count */
-"consensus_format" = "%lld个传感器";
+"consensus_format" = "%lld impact sensors";
 
 /* Cooldown setting title */
 "setting_cooldown" = "冷却时间";

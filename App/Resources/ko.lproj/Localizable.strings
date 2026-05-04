@@ -53,13 +53,13 @@
 /* Sensitivity & Sensors accordion title */
 
 /* Sensor consensus setting title */
-"setting_consensus" = "센서 합의";
+"setting_consensus" = "Impact Consensus";
 
 /* Sensor consensus setting help text */
-"help_consensus" = "트리거하기 전에 독립적으로 충격을 감지해야 하는 센서 수. 데이터를 제공하는 센서 수로 제한됩니다.";
+"help_consensus" = "Number of impact sensors (accelerometer, microphone, AirPods motion) that must independently detect an impact before triggering. Clamped to the number of impact sensors delivering data. Does not apply to discrete-event sources (USB, lid, thermal, etc.).";
 
 /* Sensor consensus count */
-"consensus_format" = "%lld개 센서";
+"consensus_format" = "%lld impact sensors";
 
 /* Cooldown setting title */
 "setting_cooldown" = "쿨다운";

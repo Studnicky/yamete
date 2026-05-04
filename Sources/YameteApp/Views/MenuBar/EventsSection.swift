@@ -18,7 +18,7 @@ internal struct StimuliSection: View {
     // Per-source expanded state
     @State private var expandedSources: Set<String> = []
 
-    private struct StimulusRow {
+    internal struct StimulusRow {
         let sourceID: String
         let title: String
         let icon: String
@@ -124,9 +124,41 @@ internal struct StimuliSection: View {
         return result
     }
 
+    /// Active (enabled) stimuli render above inactive (disabled) ones; each
+    /// group is alphabetised by its localised title using the collation rules
+    /// of the user-selected language (`settings.resolvedNotificationLocale`)
+    /// rather than the system default — so a German user sees German
+    /// umlaut ordering even on a French-system host. Toggling a stimulus's
+    /// enabled state moves it across the group boundary on the next render.
+    /// The impact-sensor consensus group lives in `SensorSection` and is
+    /// always pinned above this section by the parent layout — it never
+    /// participates in this sort.
+    ///
+    /// Pure-functional sort — extracted as `internal static` so unit tests
+    /// can assert ordering without instantiating SwiftUI.
+    internal static func orderedRows(_ rows: [StimulusRow],
+                                     enabledIDs: Set<String>,
+                                     collationLocale: Locale) -> [StimulusRow] {
+        let compare: (StimulusRow, StimulusRow) -> Bool = { lhs, rhs in
+            lhs.title.compare(rhs.title,
+                              options: [.caseInsensitive, .diacriticInsensitive],
+                              range: nil,
+                              locale: collationLocale) == .orderedAscending
+        }
+        let active   = rows.filter {  enabledIDs.contains($0.sourceID) }.sorted(by: compare)
+        let inactive = rows.filter { !enabledIDs.contains($0.sourceID) }.sorted(by: compare)
+        return active + inactive
+    }
+
+    private var orderedRows: [StimulusRow] {
+        Self.orderedRows(activeRows,
+                         enabledIDs: Set(settings.enabledStimulusSourceIDs),
+                         collationLocale: Locale(identifier: settings.resolvedNotificationLocale))
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
-            ForEach(activeRows, id: \.sourceID) { row in
+            ForEach(orderedRows, id: \.sourceID) { row in
                 let isExpanded = Binding(
                     get: { expandedSources.contains(row.sourceID) },
                     set: { expanded in

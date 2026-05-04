@@ -53,13 +53,13 @@
 /* Sensitivity & Sensors accordion title */
 
 /* Sensor consensus setting title */
-"setting_consensus" = "Sensör Mutabakatı";
+"setting_consensus" = "Impact Consensus";
 
 /* Sensor consensus setting help text */
-"help_consensus" = "Tetiklemeden önce bir darbeyi bağımsız olarak algılaması gereken sensör sayısı. Veri sağlayan sensör sayısıyla sınırlandırılmıştır.";
+"help_consensus" = "Number of impact sensors (accelerometer, microphone, AirPods motion) that must independently detect an impact before triggering. Clamped to the number of impact sensors delivering data. Does not apply to discrete-event sources (USB, lid, thermal, etc.).";
 
 /* Sensor consensus count */
-"consensus_format" = "%lld sensör";
+"consensus_format" = "%lld impact sensors";
 
 /* Cooldown setting title */
 "setting_cooldown" = "Bekleme Süresi";

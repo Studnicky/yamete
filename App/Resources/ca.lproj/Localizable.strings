@@ -53,13 +53,13 @@
 /* Sensitivity & Sensors accordion title */
 
 /* Sensor consensus setting title */
-"setting_consensus" = "Consens de sensors";
+"setting_consensus" = "Impact Consensus";
 
 /* Sensor consensus setting help text */
-"help_consensus" = "Nombre de sensors que han de detectar un impacte de manera independent abans d'activar-se. Limitat al nombre de sensors que proporcionen dades.";
+"help_consensus" = "Number of impact sensors (accelerometer, microphone, AirPods motion) that must independently detect an impact before triggering. Clamped to the number of impact sensors delivering data. Does not apply to discrete-event sources (USB, lid, thermal, etc.).";
 
 /* Sensor consensus count */
-"consensus_format" = "%lld sensors";
+"consensus_format" = "%lld impact sensors";
 
 /* Cooldown setting title */
 "setting_cooldown" = "Temps de recuperació";

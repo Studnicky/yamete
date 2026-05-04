@@ -68,8 +68,8 @@ internal struct SensorSection: View {
                 if enabledCount >= 2 {
                     Divider()
                     SettingRow(icon: "person.3",
-                               title: NSLocalizedString("setting_consensus", comment: "Sensor consensus setting title"),
-                               help: NSLocalizedString("help_consensus", comment: "Sensor consensus setting help text")) {
+                               title: NSLocalizedString("setting_consensus", comment: "Impact consensus setting title"),
+                               help: NSLocalizedString("help_consensus", comment: "Impact consensus setting help text")) {
                         SingleSliderInt(value: $s.consensusRequired, bounds: 1...enabledCount,
                                         labelWidth: lw, format: Fmt.consensus)
                     }
