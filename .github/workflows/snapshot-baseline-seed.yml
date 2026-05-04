@@ -50,7 +50,7 @@ jobs:
         id: xcode
         run: echo "version=$(xcodebuild -version | head -1 | awk '{print $2}')" >> "$GITHUB_OUTPUT"
       - name: Cache Swift build artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .build
           key: spm-snapshot-seed-${{ runner.os }}-xcode${{ steps.xcode.outputs.version }}-${{ hashFiles('Package.resolved', 'Package.swift') }}
