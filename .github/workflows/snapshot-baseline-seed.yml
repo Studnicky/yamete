@@ -80,7 +80,7 @@ jobs:
           echo "Recorded baselines:"
           find Tests/__Snapshots__/CI -name '*.png' | sort
       - name: Create seed PR
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: chore/snapshot-baseline-seed${{ inputs.branch_suffix && format('-{0}', inputs.branch_suffix) || '' }}
           base: develop
