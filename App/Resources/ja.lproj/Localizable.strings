@@ -53,13 +53,13 @@
 /* Sensitivity & Sensors accordion title */
 
 /* Sensor consensus setting title */
-"setting_consensus" = "センサーコンセンサス";
+"setting_consensus" = "Impact Consensus";
 
 /* Sensor consensus setting help text */
-"help_consensus" = "トリガーする前に独立して衝撃を検出する必要があるセンサーの数。データを提供しているセンサーの数にクランプされます。";
+"help_consensus" = "Number of impact sensors (accelerometer, microphone, AirPods motion) that must independently detect an impact before triggering. Clamped to the number of impact sensors delivering data. Does not apply to discrete-event sources (USB, lid, thermal, etc.).";
 
 /* Sensor consensus count */
-"consensus_format" = "%lld個のセンサー";
+"consensus_format" = "%lld impact sensors";
 
 /* Cooldown setting title */
 "setting_cooldown" = "クールダウン";
@@ -412,3 +412,21 @@
 "kind_thermal_fair"             = "Warm";
 "kind_thermal_serious"          = "Hot";
 "kind_thermal_critical"         = "Overheating";
+
+/* Impact detection master group title */
+"section_impact_detection" = "Impact Detection";
+
+/* Impact detection master toggle help text */
+"help_impact_detection" = "Override switch for the impact-detection group (accelerometer, microphone, AirPods motion). Turning this off silences every impact reaction without changing the per-sensor toggles below; turning it back on releases the override.";
+
+/* Stimuli master group title */
+"section_stimuli" = "Stimuli";
+
+/* Stimuli master toggle help text */
+"help_stimuli" = "Override switch for the entire Stimuli group. Turning this off silences every stimulus reaction (USB, power, audio, Bluetooth, Thunderbolt, display, sleep/wake, lid, thermal, gyroscope, ambient light, trackpad, mouse, keyboard) without changing the per-stimulus toggles below; turning it back on releases the override.";
+
+/* Reactions master group title */
+"section_reactions" = "Reactions";
+
+/* Reactions master toggle help text */
+"help_reactions" = "Override switch for the entire Reactions group. Turning this off silences every output (sound, screen flash, notification, LED, haptic, brightness, tint) without changing the per-output toggles below; turning it back on releases the override.";

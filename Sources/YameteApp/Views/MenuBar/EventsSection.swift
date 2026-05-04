@@ -18,7 +18,7 @@ internal struct StimuliSection: View {
     // Per-source expanded state
     @State private var expandedSources: Set<String> = []
 
-    private struct StimulusRow {
+    internal struct StimulusRow {
         let sourceID: String
         let title: String
         let icon: String
@@ -124,27 +124,84 @@ internal struct StimuliSection: View {
         return result
     }
 
+    /// Active (enabled) stimuli render above inactive (disabled) ones; each
+    /// group is alphabetised by its localised title using the collation rules
+    /// of the user-selected language (`settings.resolvedNotificationLocale`)
+    /// rather than the system default — so a German user sees German
+    /// umlaut ordering even on a French-system host. Toggling a stimulus's
+    /// enabled state moves it across the group boundary on the next render.
+    /// The impact-sensor consensus group lives in `SensorSection` and is
+    /// always pinned above this section by the parent layout — it never
+    /// participates in this sort.
+    ///
+    /// Pure-functional sort — extracted as `internal static` so unit tests
+    /// can assert ordering without instantiating SwiftUI.
+    internal static func orderedRows(_ rows: [StimulusRow],
+                                     enabledIDs: Set<String>,
+                                     collationLocale: Locale) -> [StimulusRow] {
+        let compare: (StimulusRow, StimulusRow) -> Bool = { lhs, rhs in
+            lhs.title.compare(rhs.title,
+                              options: [.caseInsensitive, .diacriticInsensitive],
+                              range: nil,
+                              locale: collationLocale) == .orderedAscending
+        }
+        let active   = rows.filter {  enabledIDs.contains($0.sourceID) }.sorted(by: compare)
+        let inactive = rows.filter { !enabledIDs.contains($0.sourceID) }.sorted(by: compare)
+        return active + inactive
+    }
+
+    private var orderedRows: [StimulusRow] {
+        Self.orderedRows(activeRows,
+                         enabledIDs: Set(settings.enabledStimulusSourceIDs),
+                         collationLocale: Locale(identifier: settings.resolvedNotificationLocale))
+    }
+
+    @State private var stimuliGroupExpanded: Bool = true
+
     public var body: some View {
-        VStack(spacing: 0) {
-            ForEach(activeRows, id: \.sourceID) { row in
-                let isExpanded = Binding(
-                    get: { expandedSources.contains(row.sourceID) },
-                    set: { expanded in
-                        if expanded { expandedSources.insert(row.sourceID) }
-                        else { expandedSources.remove(row.sourceID) }
+        SensorAccordionCard(
+            title: NSLocalizedString("section_stimuli", comment: "Stimuli master group title"),
+            icon: "dot.radiowaves.left.and.right",
+            isEnabled: masterStimuliBinding(),
+            isExpanded: $stimuliGroupExpanded,
+            help: NSLocalizedString("help_stimuli", comment: "Stimuli master toggle help")
+        ) {
+            VStack(spacing: 0) {
+                ForEach(orderedRows, id: \.sourceID) { row in
+                    let isExpanded = Binding(
+                        get: { expandedSources.contains(row.sourceID) },
+                        set: { expanded in
+                            if expanded { expandedSources.insert(row.sourceID) }
+                            else { expandedSources.remove(row.sourceID) }
+                        }
+                    )
+                    SensorAccordionCard(
+                        title: row.title,
+                        icon: row.icon,
+                        isEnabled: sourceBinding(id: row.sourceID),
+                        isExpanded: isExpanded,
+                        help: row.help
+                    ) {
+                        sourceContent(row: row)
                     }
-                )
-                SensorAccordionCard(
-                    title: row.title,
-                    icon: row.icon,
-                    isEnabled: sourceBinding(id: row.sourceID),
-                    isExpanded: isExpanded,
-                    help: row.help
-                ) {
-                    sourceContent(row: row)
                 }
             }
         }
+    }
+
+    /// Override-disable kill switch for the Stimuli group. Reads/writes
+    /// `settings.stimuliMasterEnabled` only — does NOT mutate
+    /// `enabledStimulusSourceIDs`. When `false`, dispatch is gated so no
+    /// stimulus reaction fires regardless of the per-stimulus toggles;
+    /// per-stimulus toggles are preserved verbatim so flipping the master
+    /// back ON restores the prior selection unchanged. The dispatch gate
+    /// lives in the per-source start/stop wiring in `Yamete.swift`.
+    private func masterStimuliBinding() -> Binding<Bool> {
+        @Bindable var s = settings
+        return Binding(
+            get: { s.stimuliMasterEnabled },
+            set: { newValue in s.stimuliMasterEnabled = newValue }
+        )
     }
 
     // MARK: - Source accordion content

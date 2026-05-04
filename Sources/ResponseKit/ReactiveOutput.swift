@@ -69,6 +69,11 @@ open class ReactiveOutput {
     public final func consume(from bus: ReactionBus, configProvider: OutputConfigProvider) async {
         let stream = await bus.subscribe()
         for await fired in stream {
+            // Reactions master kill switch overrides every per-output gate
+            // when the user has flipped it off in the menu. The override is
+            // checked here (not in each subclass's `shouldFire`) so every
+            // output respects it without per-class wiring.
+            guard configProvider.reactionsMasterIsOn() else { continue }
             guard shouldFire(fired, provider: configProvider) else { continue }
 
             // Drop-not-cancel: if a lifecycle is already running (preAction/action
