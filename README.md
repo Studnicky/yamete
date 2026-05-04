@@ -11,7 +11,7 @@
 <p align="center">
 
 [![itai](https://img.shields.io/badge/%E3%81%84%E3%81%9F%E3%81%84-ouch-red)](https://knowyourmeme.com/memes/pain)
-[![mutations caught](https://img.shields.io/badge/mutations%20caught-111%2F111-success)](Tests/Mutation/mutation-catalog.json)
+[![mutations caught](https://img.shields.io/badge/mutations%20caught-130%2F130-success)](Tests/Mutation/mutation-catalog.json)
 [![USB detected](https://img.shields.io/badge/USB%20cable-detected-mediumpurple)](https://knowyourmeme.com/memes/surprised-pikachu)
 [![Zero onboarding](https://img.shields.io/badge/onboarding-skipped-lightgrey)](https://knowyourmeme.com/memes/yeet)
 [![ouch but tested](https://img.shields.io/badge/crash%20handling-this%20is%20fine-orange)](Tests/CrashHandling_Tests.swift)
@@ -76,7 +76,10 @@
 [![outputs](https://img.shields.io/badge/outputs-4-mediumseagreen)](https://studnicky.github.io/yamete/architecture.html)
 [![Strict Concurrency](https://img.shields.io/badge/strict%20concurrency-complete-blue)](Sources/)
 [![race condition](https://img.shields.io/badge/race%20condition-zero-limegreen)](https://knowyourmeme.com/memes/lightning-mcqueen)
-[![Event sources](https://img.shields.io/badge/event%20sources-7-hotpink)](Sources/SensorKit/EventSources.swift)
+[![Event sources](https://img.shields.io/badge/event%20sources-11-hotpink)](Sources/SensorKit/EventSources.swift)
+[![SPU multiplexer](https://img.shields.io/badge/SPU%20HID-ref--counted%20broker-mediumvioletred)](Sources/SensorKit/AppleSPUDevice.swift)
+[![lid angle](https://img.shields.io/badge/lid%20angle-slammed-darkred)](Sources/SensorKit/LidAngleSource.swift)
+[![thermal pressure](https://img.shields.io/badge/thermal%20pressure-tracked-orangered)](Sources/SensorKit/ThermalSource.swift)
 [![Zero network](https://img.shields.io/badge/network-zero-black)](https://studnicky.github.io/yamete/privacy.html)
 [![Built on a Friday](https://img.shields.io/badge/built-on%20a%20Friday-cyan)](https://www.youtube.com/watch?v=kfVsfOSbJY0)
 [![keyboard backlight](https://img.shields.io/badge/keyboard%20backlight-oscillating-cornflowerblue)](Sources/ResponseKit/LEDFlash.swift)
@@ -152,7 +155,8 @@ Other make targets: `make build`, `make appstore`, `make dmg`, `make test`, `mak
 ## What's under the hood
 
 - **Three impact sensors** fused by a consensus engine with rearm. [Full pipeline on the architecture page](https://studnicky.github.io/yamete/architecture.html#pipeline).
-- **Seven system event sources** — USB attach/detach, power adapter plug/unplug, audio peripheral add/remove, Bluetooth connect/disconnect, Thunderbolt attach/detach, display hotplug, and sleep/wake — each publishing onto the same Reaction Bus as impacts.
+- **Eleven system event sources** — USB attach/detach, power adapter plug/unplug, audio peripheral add/remove, Bluetooth connect/disconnect, Thunderbolt attach/detach, display hotplug, sleep/wake, lid open/closed/slammed (Apple Silicon SPU hinge angle), thermal pressure (`.nominal` → `.fair` → `.serious` → `.critical` transitions via `NSProcessInfo`), gyroscope spikes (lid yank, laptop spin — same SPU HID device as the accelerometer), and ambient-light step changes (lights flipped, sensor covered) — each publishing onto the same Reaction Bus as impacts.
+- **Shared SPU HID broker.** Apple Silicon's SPU HID device exposes accelerometer, gyroscope, lid-angle, and ambient-light data through a single in-kernel handle that does not multiplex naturally. Yamete wraps it in a ref-counted multiplexer (`AppleSPUDevice`) so all four sensors share one open device, decode their own byte offsets from the same report, and release the handle when nobody's listening.
 - **Reaction Bus** — a single `ReactionBus` actor that all sources publish onto and all outputs subscribe from independently. Audio clip and face are pre-selected once on the bus before any output sees the event, keeping every response in sync.
 - **LED flash output** — Caps Lock LED PWM flicker and keyboard backlight spring animation on every reaction. Toggleable per-output, configurable brightness range.
 - **Per-reaction output matrix** — every output (sound, screen flash, notification, LED) has an independent enable/disable toggle per event type, so you can have sound on USB attach and LED on AC unplug with nothing else.
@@ -184,7 +188,7 @@ For a joke app where the value proposition is "your laptop yells when smacked," 
 
 - `swift test` (default + `-Xswiftc -DDIRECT_BUILD`) — the SPM cells, ~750 each lane
 - `make lint` — Swift 6 strict-concurrency type-check
-- `make mutate` (PR slice) — 111 mutation-catalog gates, every one caught
+- `make mutate` (PR slice) — 130 mutation-catalog gates, every one caught
 - `make check-versions` — `project.yml` ↔ docs version drift gate, the result of `release/2.0.0` shipping with `MARKETING_VERSION` still pinned at `1.3.2` because somebody (me) had four version surfaces and updated one
 - `make build` — both Direct and App Store bundle variants link cleanly
 - `actionlint` — the workflow YAML lint

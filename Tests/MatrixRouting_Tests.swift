@@ -352,6 +352,17 @@ final class MatrixRouting_Tests: XCTestCase {
         case .mouseClicked:             return .mouseClicked
         case .mouseScrolled:            return .mouseScrolled
         case .keyboardTyped:            return .keyboardTyped
+        case .gyroSpike:            return .gyroSpike
+        case .lidOpened:            return .lidOpened
+        case .lidClosed:            return .lidClosed
+        case .lidSlammed:           return .lidSlammed
+        case .alsCovered:           return .alsCovered
+        case .lightsOff:            return .lightsOff
+        case .lightsOn:             return .lightsOn
+        case .thermalNominal:       return .thermalNominal
+        case .thermalFair:          return .thermalFair
+        case .thermalSerious:       return .thermalSerious
+        case .thermalCritical:      return .thermalCritical
         }
     }
 }

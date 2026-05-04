@@ -1000,6 +1000,177 @@
       "replace": "for s in subviews { h = min(h == 0 ? .infinity : h, s.sizeThatFits(.unspecified).height) }",
       "search": "for s in subviews { h = max(h, s.sizeThatFits(.unspecified).height) }",
       "targetFile": "Sources/YameteApp/Views/FlowLayout.swift"
+    },
+    {
+      "description": "GyroDetector.process \u2014 drop sample-count warmup gate; samples within warmup window must NOT publish .gyroSpike.",
+      "expectedFailingTest": "MatrixGyroscopeSource_Tests/testGyroSpike_warmup_isCaught",
+      "expectedFailureSubstring": "[gyro-gate=warmup]",
+      "id": "gyro-warmup-gate",
+      "replace": "guard s.sampleCount >= 0 else { return nil }",
+      "search": "guard s.sampleCount >= config.warmupSamples else { return nil }",
+      "targetFile": "Sources/SensorKit/GyroDetector.swift"
+    },
+    {
+      "description": "GyroDetector.process \u2014 drop spike-threshold magnitude floor; sub-threshold magnitudes must NOT publish .gyroSpike.",
+      "expectedFailingTest": "MatrixGyroscopeSource_Tests/testGyroSpike_magnitudeFloor_isCaught",
+      "expectedFailureSubstring": "[gyro-gate=magnitude-floor]",
+      "id": "gyro-magnitude-floor",
+      "replace": "guard magnitude > -1 else { return nil }",
+      "search": "guard magnitude > config.spikeThreshold else { return nil }",
+      "targetFile": "Sources/SensorKit/GyroDetector.swift"
+    },
+    {
+      "description": "GyroDetector.process \u2014 drop minConfirmations gate; under-confirmation single sample must NOT publish .gyroSpike.",
+      "expectedFailingTest": "MatrixGyroscopeSource_Tests/testGyroSpike_confirmations_isCaught",
+      "expectedFailureSubstring": "[gyro-gate=confirmations]",
+      "id": "gyro-confirmations-gate",
+      "replace": "guard confirmed >= 0 else {",
+      "search": "guard confirmed >= config.minConfirmations else {",
+      "targetFile": "Sources/SensorKit/GyroDetector.swift"
+    },
+    {
+      "description": "GyroscopeSource.handleReport \u2014 drop debounce window; tight burst of above-threshold reports must coalesce to one fire.",
+      "expectedFailingTest": "MatrixGyroscopeSource_Tests/testGyroSpike_debounceWindow_isCaught",
+      "expectedFailureSubstring": "[gyro-gate=debounce-window]",
+      "id": "gyro-debounce-window",
+      "replace": "if let last = s.lastFiredAt, timestamp.timeIntervalSince(last) < -1 {",
+      "search": "if let last = s.lastFiredAt, timestamp.timeIntervalSince(last) < ReactionsConfig.gyroDebounce {",
+      "targetFile": "Sources/SensorKit/GyroscopeSource.swift"
+    },
+    {
+      "description": "GyroscopeSource.handleReport \u2014 corrupt the X-axis byte offset (canonical 6 \u2192 0); decoded magnitude collapses to zero (the test payload has zero-bytes at offsets 0..5) and the cell-expected single fire never appears.",
+      "expectedFailingTest": "MatrixGyroscopeSource_Tests/testGyroSpike_decodeOffset_isCaught",
+      "expectedFailureSubstring": "[gyro-gate=decode-offset]",
+      "id": "gyro-decode-byte-offset",
+      "replace": "let rawX = raw.loadUnaligned(fromByteOffset: 0, as: Int32.self)",
+      "search": "let rawX = raw.loadUnaligned(fromByteOffset: 6, as: Int32.self)",
+      "targetFile": "Sources/SensorKit/GyroscopeSource.swift"
+    },
+    {
+      "description": "LidAngleStateMachine.process \u2014 drop the slam-rate gate; gentle close traces erroneously fire .lidSlammed.",
+      "expectedFailingTest": "MatrixLidAngleSource_Tests/testLidAngle_slamRateGate_isCaught",
+      "expectedFailureSubstring": "[lid-gate=slam-rate]",
+      "id": "lid-slam-rate-gate",
+      "replace": "if s.smoothedRate < 0\n                && angleDeg < config.closedThresholdDeg {",
+      "search": "if s.smoothedRate < config.slamRateDegPerSec\n                && angleDeg < config.closedThresholdDeg {",
+      "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
+    },
+    {
+      "description": "LidAngleStateMachine.process \u2014 drop the open-threshold guard inside .opening; .lidOpened fires for sub-threshold angles.",
+      "expectedFailingTest": "MatrixLidAngleSource_Tests/testLidAngle_openThreshold_isCaught",
+      "expectedFailureSubstring": "[lid-gate=open-threshold]",
+      "id": "lid-open-threshold",
+      "replace": "case .opening:\n                if angleDeg >= 0 {",
+      "search": "case .opening:\n                if angleDeg >= config.openThresholdDeg {",
+      "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
+    },
+    {
+      "description": "LidAngleStateMachine.process \u2014 widen the closed-threshold guard inside .closing to always trip; a closing trace that never reaches the canonical 5\u00b0 threshold (descends only to 8\u00b0) erroneously fires .lidClosed under the loosened gate.",
+      "expectedFailingTest": "MatrixLidAngleSource_Tests/testLidAngle_closedThreshold_isCaught",
+      "expectedFailureSubstring": "[lid-gate=closed-threshold]",
+      "id": "lid-closed-threshold",
+      "replace": "case .closing:\n                if angleDeg <= 360 {",
+      "search": "case .closing:\n                if angleDeg <= config.closedThresholdDeg {",
+      "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
+    },
+    {
+      "description": "LidAngleStateMachine.process \u2014 invert the dt-sign guard; non-monotonic timestamps (or any positive dt) take the wrong branch and the slam path never sees a positive-dt rate computation.",
+      "expectedFailingTest": "MatrixLidAngleSource_Tests/testLidAngle_timeDeltaSign_isCaught",
+      "expectedFailureSubstring": "[lid-gate=time-delta-sign]",
+      "id": "lid-time-delta-sign",
+      "replace": "guard dt < 0 else {",
+      "search": "guard dt > 0 else {",
+      "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
+    },
+    {
+      "description": "LidAngleStateMachine.process \u2014 drop EMA smoothing; the smoothedRate becomes the raw instantaneous rate and a single 90\u21920\u00b0 jump immediately trips the slam path even on noisy single samples.",
+      "expectedFailingTest": "MatrixLidAngleSource_Tests/testLidAngle_emaSmoothing_isCaught",
+      "expectedFailureSubstring": "[lid-gate=ema-smoothing]",
+      "id": "lid-ema-smoothing",
+      "replace": "s.smoothedRate = instantaneousRate",
+      "search": "s.smoothedRate = alpha * instantaneousRate + (1 - alpha) * s.smoothedRate",
+      "targetFile": "Sources/SensorKit/LidAngleStateMachine.swift"
+    },
+    {
+      "description": "AmbientLightDetector.process \u2014 drop the windowSec * 0.5 elapsed gate; sub-window drops erroneously fire .lightsOff before the buffer has accumulated a full window.",
+      "expectedFailingTest": "MatrixAmbientLightSource_Tests/testAmbientLight_windowRateGate_isCaught",
+      "expectedFailureSubstring": "[als-gate=window-rate]",
+      "id": "als-window-rate-gate",
+      "replace": "if elapsed >= 0 {",
+      "search": "if elapsed >= config.windowSec * 0.5 {",
+      "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
+    },
+    {
+      "description": "AmbientLightDetector.process \u2014 widen the off-floor gate to always trip; a small percent drop with high absolute lux erroneously fires .lightsOff under the loosened gate.",
+      "expectedFailingTest": "MatrixAmbientLightSource_Tests/testAmbientLight_floorGate_isCaught",
+      "expectedFailureSubstring": "[als-gate=off-floor]",
+      "id": "als-floor-gate",
+      "replace": "if drop >= config.offDropPercent && lux < 100000 {",
+      "search": "if drop >= config.offDropPercent && lux < config.offFloorLux {",
+      "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
+    },
+    {
+      "description": "AmbientLightDetector.process \u2014 invert the rise-percent comparison; .lightsOn never fires under any rise.",
+      "expectedFailingTest": "MatrixAmbientLightSource_Tests/testAmbientLight_risePercentComparison_isCaught",
+      "expectedFailureSubstring": "[als-gate=rise-percent-comparison]",
+      "id": "als-rise-percent-comparison",
+      "replace": "if rise < config.onRisePercent && lux > config.onCeilingLux {",
+      "search": "if rise >= config.onRisePercent && lux > config.onCeilingLux {",
+      "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
+    },
+    {
+      "description": "AmbientLightDetector.process \u2014 drop the cover rate gate; gradual dims erroneously fire .alsCovered when the rate constraint is removed.",
+      "expectedFailingTest": "MatrixAmbientLightSource_Tests/testAmbientLight_coverRateGate_isCaught",
+      "expectedFailureSubstring": "[als-gate=cover-rate]",
+      "id": "als-cover-rate-gate",
+      "replace": "timestamp.timeIntervalSince(recent.timestamp) <= 86400,",
+      "search": "timestamp.timeIntervalSince(recent.timestamp) <= 0.2,",
+      "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
+    },
+    {
+      "description": "AmbientLightDetector.process \u2014 drop the cooldown gate; back-to-back rapid covers bypass debounce and surface multiple emissions.",
+      "expectedFailingTest": "MatrixAmbientLightSource_Tests/testAmbientLight_cooldownGate_isCaught",
+      "expectedFailureSubstring": "[als-gate=cooldown]",
+      "id": "als-cooldown-gate",
+      "replace": "return timestamp.timeIntervalSince(last) < 0",
+      "search": "return timestamp.timeIntervalSince(last) < config.debounceSec",
+      "targetFile": "Sources/SensorKit/AmbientLightDetector.swift"
+    },
+    {
+      "description": "ThermalSource.start — drop the cold-start baseline capture; the very first observation matching the cold-start state erroneously publishes a transition Reaction.",
+      "expectedFailingTest": "MatrixThermalSource_Tests/testThermal_initialSuppression_isCaught",
+      "expectedFailureSubstring": "[thermal-gate=initial-suppression]",
+      "id": "thermal-initial-suppression",
+      "replace": "s.lastState = nil",
+      "search": "s.lastState = initial",
+      "targetFile": "Sources/SensorKit/ThermalSource.swift"
+    },
+    {
+      "description": "ThermalSource.handleStateChange — drop the same-state dedup gate; identical state notifications republish the matching Reaction every time.",
+      "expectedFailingTest": "MatrixThermalSource_Tests/testThermal_stateDedup_isCaught",
+      "expectedFailureSubstring": "[thermal-gate=state-dedup]",
+      "id": "thermal-state-dedup",
+      "replace": "if s.lastState == nil { return nil }",
+      "search": "if s.lastState == current { return nil }",
+      "targetFile": "Sources/SensorKit/ThermalSource.swift"
+    },
+    {
+      "description": "ThermalSource.reaction(for:) — swap the .serious mapping so .serious erroneously surfaces as .thermalFair instead of .thermalSerious.",
+      "expectedFailingTest": "MatrixThermalSource_Tests/testThermal_stateMapping_isCaught",
+      "expectedFailureSubstring": "[thermal-gate=state-mapping]",
+      "id": "thermal-state-mapping",
+      "replace": "case .serious:  return .thermalFair",
+      "search": "case .serious:  return .thermalSerious",
+      "targetFile": "Sources/SensorKit/ThermalSource.swift"
+    },
+    {
+      "description": "ThermalSource.stop — drop the bus = nil clear; subsequent state-change observations republish even after stop() because the publish gate still sees a non-nil bus.",
+      "expectedFailingTest": "MatrixThermalSource_Tests/testThermal_observerRemoval_isCaught",
+      "expectedFailureSubstring": "[thermal-gate=observer-removal]",
+      "id": "thermal-observer-removal",
+      "replace": "s.bus = s.bus",
+      "search": "s.bus = nil",
+      "targetFile": "Sources/SensorKit/ThermalSource.swift"
     }
   ]
 }

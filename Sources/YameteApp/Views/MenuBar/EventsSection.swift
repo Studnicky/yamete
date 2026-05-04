@@ -4,6 +4,9 @@ import YameteCore
 #if !RAW_SWIFTC_LUMP
 import ResponseKit
 #endif
+#if !RAW_SWIFTC_LUMP
+import SensorKit
+#endif
 import SwiftUI
 
 // MARK: - Stimuli section (cable / power / device / trackpad reactions)
@@ -59,6 +62,11 @@ internal struct StimuliSection: View {
               icon: "moon.zzz",
               help: NSLocalizedString("help_source_sleep_wake", comment: "Sleep/wake source help"),
               kinds: [.willSleep, .didWake]),
+        .init(sourceID: SensorID.thermal.rawValue,
+              title: NSLocalizedString("event_thermal", comment: "Thermal pressure events"),
+              icon: "thermometer.medium",
+              help: NSLocalizedString("help_source_thermal", comment: "Thermal source help"),
+              kinds: [.thermalNominal, .thermalFair, .thermalSerious, .thermalCritical]),
     ]
 
     private var activeRows: [StimulusRow] {
@@ -88,6 +96,29 @@ internal struct StimuliSection: View {
                 icon: "keyboard",
                 help: NSLocalizedString("help_source_keyboard", comment: "Keyboard source help"),
                 kinds: [.keyboardTyped]
+            ))
+        }
+        if AppleSPUDevice.isHardwarePresent() {
+            result.append(.init(
+                sourceID: SensorID.gyroscope.rawValue,
+                title: NSLocalizedString("event_gyroscope", comment: "Gyroscope events"),
+                icon: "gyroscope",
+                help: NSLocalizedString("help_source_gyroscope", comment: "Gyroscope source help"),
+                kinds: [.gyroSpike]
+            ))
+            result.append(.init(
+                sourceID: SensorID.lidAngle.rawValue,
+                title: NSLocalizedString("event_lid_angle", comment: "Lid angle events"),
+                icon: "laptopcomputer",
+                help: NSLocalizedString("help_source_lid_angle", comment: "Lid angle source help"),
+                kinds: [.lidOpened, .lidClosed, .lidSlammed]
+            ))
+            result.append(.init(
+                sourceID: SensorID.ambientLight.rawValue,
+                title: NSLocalizedString("event_ambient_light", comment: "Ambient light events"),
+                icon: "sun.max.circle",
+                help: NSLocalizedString("help_source_ambient_light", comment: "Ambient light source help"),
+                kinds: [.alsCovered, .lightsOff, .lightsOn]
             ))
         }
         return result
@@ -366,6 +397,17 @@ internal struct StimuliSection: View {
         case .mouseClicked:             NSLocalizedString("kind_mouse_clicked",  comment: "Mouse clicked label")
         case .mouseScrolled:            NSLocalizedString("kind_mouse_scrolled", comment: "Mouse scrolled label")
         case .keyboardTyped:            NSLocalizedString("kind_keyboard_typed", comment: "Keyboard typed label")
+        case .gyroSpike:                NSLocalizedString("kind_gyro_spike",     comment: "Gyroscope spike label")
+        case .lidOpened:                NSLocalizedString("kind_lid_opened",     comment: "Lid opened label")
+        case .lidClosed:                NSLocalizedString("kind_lid_closed",     comment: "Lid closed label")
+        case .lidSlammed:               NSLocalizedString("kind_lid_slammed",    comment: "Lid slammed label")
+        case .alsCovered:               NSLocalizedString("kind_als_covered",    comment: "Ambient light covered label")
+        case .lightsOff:                NSLocalizedString("kind_lights_off",     comment: "Lights off label")
+        case .lightsOn:                 NSLocalizedString("kind_lights_on",      comment: "Lights on label")
+        case .thermalNominal:           NSLocalizedString("kind_thermal_nominal",  comment: "Thermal nominal label")
+        case .thermalFair:              NSLocalizedString("kind_thermal_fair",     comment: "Thermal fair label")
+        case .thermalSerious:           NSLocalizedString("kind_thermal_serious",  comment: "Thermal serious label")
+        case .thermalCritical:          NSLocalizedString("kind_thermal_critical", comment: "Thermal critical label")
         case .impact:                   ""
         }
     }

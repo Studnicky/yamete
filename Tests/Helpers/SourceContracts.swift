@@ -45,6 +45,30 @@ struct SourceContract: Sendable {
                        isStateful: true),
         SourceContract(id: .mouseActivity, emittedKinds: [.mouseClicked, .mouseScrolled], isStateful: true),
         SourceContract(id: .keyboardActivity, emittedKinds: [.keyboardTyped], isStateful: true),
+        // GyroscopeSource is intentionally NOT a StimulusSource conformer:
+        // its handler runs on the broker's HID worker thread (non-MainActor),
+        // and the protocol is `@MainActor`. The bus-routing contract tests
+        // therefore exclude it; its kind (.gyroSpike) is enumerated via the
+        // `nonContractKinds` accessor below and accounted for by the
+        // dedicated `MatrixGyroscopeSource_Tests` matrix cells instead.
+    ]
+
+    /// `ReactionKind`s that are emitted by sources NOT covered by
+    /// `SourceContract.all`. Includes `.gyroSpike` (direct-publish from
+    /// `GyroscopeSource`), `.lidOpened` / `.lidClosed` / `.lidSlammed`
+    /// (direct-publish from `LidAngleSource`), and `.alsCovered` /
+    /// `.lightsOff` / `.lightsOn` (direct-publish from
+    /// `AmbientLightSource`). All three sources subscribe to the
+    /// `AppleSPUDevice` broker, whose HID-callback handler runs off the
+    /// main actor — they cannot conform to the `@MainActor`-isolated
+    /// `StimulusSource` protocol. The exhaustiveness test in
+    /// `SourceRegistryTests` unions this with the contract emissions
+    /// when checking that every non-impact kind has a producer.
+    static let nonContractKinds: Set<ReactionKind> = [
+        .gyroSpike,
+        .lidOpened, .lidClosed, .lidSlammed,
+        .alsCovered, .lightsOff, .lightsOn,
+        .thermalNominal, .thermalFair, .thermalSerious, .thermalCritical
     ]
 
     /// Builds a fresh, unstarted source instance for the given SensorID.

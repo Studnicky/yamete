@@ -67,5 +67,9 @@ public enum StimulusSourceDefaults {
         SensorID.trackpadActivity.rawValue,
         SensorID.mouseActivity.rawValue,
         SensorID.keyboardActivity.rawValue,
+        SensorID.gyroscope.rawValue,
+        SensorID.lidAngle.rawValue,
+        SensorID.ambientLight.rawValue,
+        SensorID.thermal.rawValue,
     ]
 }

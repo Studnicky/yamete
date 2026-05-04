@@ -36,6 +36,30 @@ public enum Defaults {
     public static let accelBandpassLow: Double = 20.0
     public static let accelBandpassHigh: Double = 25.0
 
+    // MARK: - Gyroscope detection (deg/s)
+
+    public static let gyroSpikeThreshold: Double = 200.0
+    public static let gyroCrestFactor: Double = 2.5
+    public static let gyroRiseRate: Double = 50.0
+    public static let gyroConfirmations: Int = 3
+    public static let gyroWarmup: Int = 50
+
+    // MARK: - Lid angle detection (degrees / deg-per-second)
+
+    public static let lidOpenThresholdDeg: Double = 10.0
+    public static let lidClosedThresholdDeg: Double = 5.0
+    public static let lidSlamRateDegPerSec: Double = -180.0
+    public static let lidSmoothingWindowMs: Int = 100
+
+    // MARK: - Ambient light detection (lux)
+
+    public static let alsCoverDropThreshold: Double = 0.95
+    public static let alsOffDropPercent: Double = 0.80
+    public static let alsOffFloorLux: Double = 30.0
+    public static let alsOnRisePercent: Double = 1.50
+    public static let alsOnCeilingLux: Double = 100.0
+    public static let alsWindowSec: Double = 2.0
+
     // MARK: - Microphone detection
 
     public static let micSpikeThreshold: Double = 0.020

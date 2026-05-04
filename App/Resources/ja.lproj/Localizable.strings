@@ -344,3 +344,71 @@
 
 /* English fallback (translation pending) */
 "setting_flash_active_display" = "Active display only";
+
+/* Gyroscope detection */
+"section_gyro_tuning"           = "Gyroscope Tuning";
+"event_gyroscope"               = "Gyroscope";
+"kind_gyro_spike"               = "Lid yank / spin";
+"help_source_gyroscope"         = "Fires a reaction when the BMI286 gyroscope detects an angular-velocity spike — lid yanks, sudden rotations.";
+"setting_gyro_spike_threshold"  = "Spike threshold (deg/s)";
+"help_gyro_spike_threshold"     = "Angular velocity required to fire.";
+"setting_gyro_rise_rate"        = "Rise rate (deg/s²)";
+"help_gyro_rise_rate"           = "Minimum angular acceleration to fire.";
+
+/* Lid angle detection */
+"section_lid_tuning"            = "Lid Tuning";
+"sensor_lid_angle"              = "Lid angle";
+"event_lid_angle"               = "Lid angle";
+"help_source_lid_angle"         = "Fires reactions when the BMI286 hinge sensor detects the lid opening, closing, or slamming shut.";
+"reaction_lidOpened"            = "Lid opened";
+"reaction_lidClosed"            = "Lid closed";
+"reaction_lidSlammed"           = "Lid slammed";
+"kind_lid_opened"               = "Lid opened";
+"kind_lid_closed"               = "Lid closed";
+"kind_lid_slammed"              = "Lid slammed";
+"setting_lid_open_threshold"    = "Open threshold (°)";
+"help_lid_open_threshold"       = "Angle past which the lid is considered open.";
+"setting_lid_closed_threshold"  = "Closed threshold (°)";
+"help_lid_closed_threshold"     = "Angle below which the lid is considered closed.";
+"setting_lid_slam_rate"         = "Slam rate (°/s)";
+"help_lid_slam_rate"            = "Closing rate that qualifies as a slam (negative).";
+"setting_lid_smoothing"         = "Smoothing window (ms)";
+"help_lid_smoothing"            = "EMA window over Δangle to suppress jitter.";
+
+/* Ambient light detection */
+"section_ambientLight_tuning"   = "Ambient Light Tuning";
+"sensor_ambientLight"           = "Ambient light";
+"event_ambient_light"           = "Ambient light";
+"help_source_ambient_light"     = "Fires reactions when the BMI286 ambient-light sensor detects step-changes in lux — lights toggled, sensor occluded.";
+"reaction_alsCovered"           = "Sensor covered";
+"reaction_lightsOff"            = "Lights off";
+"reaction_lightsOn"             = "Lights on";
+"kind_als_covered"              = "Sensor covered";
+"kind_lights_off"               = "Lights off";
+"kind_lights_on"                = "Lights on";
+"setting_als_cover_drop"        = "Cover drop ratio";
+"help_als_cover_drop"           = "Fraction below baseline that counts as a covered sensor.";
+"setting_als_off_percent"       = "Off drop %";
+"help_als_off_percent"          = "Fraction drop over the window required to fire \"lights off\".";
+"setting_als_off_floor"         = "Off floor (lux)";
+"help_als_off_floor"            = "Lux floor below which a drop fires \"lights off\".";
+"setting_als_on_percent"        = "On rise %";
+"help_als_on_percent"           = "Fraction rise over the window required to fire \"lights on\".";
+"setting_als_on_ceiling"        = "On ceiling (lux)";
+"help_als_on_ceiling"           = "Lux ceiling above which a rise fires \"lights on\".";
+"setting_als_window"            = "Window (s)";
+"help_als_window"               = "Time window over which step-changes are measured.";
+
+/* Thermal pressure */
+"section_thermal"               = "Thermal";
+"sensor_thermal"                = "Thermal pressure";
+"event_thermal"                 = "Thermal pressure";
+"help_source_thermal"           = "Fires reactions when the OS reports a change in CPU thermal pressure (nominal / fair / serious / critical).";
+"reaction_thermalNominal"       = "Cooling down";
+"reaction_thermalFair"          = "Warm";
+"reaction_thermalSerious"       = "Hot";
+"reaction_thermalCritical"      = "Overheating";
+"kind_thermal_nominal"          = "Cooling down";
+"kind_thermal_fair"             = "Warm";
+"kind_thermal_serious"          = "Hot";
+"kind_thermal_critical"         = "Overheating";
