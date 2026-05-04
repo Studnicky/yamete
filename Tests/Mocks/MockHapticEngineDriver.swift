@@ -6,8 +6,7 @@ import os
 /// Test double for `HapticEngineDriver`. Default state reports
 /// hardware available and accepts all engine + pattern operations.
 /// Tests flip `isHardwareAvailable` to exercise the
-/// "no Force Touch trackpad" path that the production code
-/// previously skipped.
+/// "no Force Touch trackpad" path the production code skips.
 final class MockHapticEngineDriver: HapticEngineDriver, @unchecked Sendable {
     private struct State: Sendable {
         var hardwareAvailable: Bool = true

@@ -141,7 +141,7 @@ final class PanelLayoutTests: IntegrationTestCase {
                        "0 rows clamps to row=1 → 0.125s floor")
     }
 
-    // MARK: - UI-gate mutation anchors (Phase 7)
+    // MARK: - UI-gate mutation anchors
     //
     // These cells exist to give the mutation catalog stable bracketed
     // substrings for individual animation-duration formula gates. Each

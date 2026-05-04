@@ -6,54 +6,38 @@ import SwiftUI
 import XCTest
 @testable import YameteApp
 
-/// Phase 7b — closes the four UI gates that Phase 7 deferred: `RangeSlider`,
-/// `FlowLayout`, `SensitivityRuler`, `Updater`. Cells render the affected
-/// views into `NSHostingView` and pin observable invariants
-/// (intrinsicContentSize, version-fallback string) so the mutation catalog
-/// can drive each gate.
+/// Mutation-catalog gates for the four UI types that resist direct
+/// invocation from a unit test: `RangeSlider`, `FlowLayout`,
+/// `SensitivityRuler`, `Updater`. Cells render the affected views into
+/// `NSHostingView` and pin observable invariants
+/// (intrinsicContentSize, version-fallback string) so the mutation
+/// catalog can drive each gate without instantiating the live UI.
 ///
-/// Why intrinsic-size pinning?
-///   `Layout` protocol gates fire during `sizeThatFits` and `placeSubviews`,
-///   neither of which is invokable from a unit test in isolation (the
-///   `Subviews` collection is opaque, only constructible via a SwiftUI
-///   render). Driving the layout through `NSHostingView.intrinsicContentSize`
-///   exposes wrap / spacing / row-height decisions as a single observable
-///   number — robust against font drift, host-locale shifts, and SwiftUI
-///   internal layout quirks.
+/// Intrinsic-size pinning is used because `Layout` protocol gates
+/// fire during `sizeThatFits` and `placeSubviews`, neither of which
+/// is invokable from a unit test in isolation (the `Subviews`
+/// collection is opaque, only constructible via a SwiftUI render).
+/// Driving the layout through `NSHostingView.intrinsicContentSize`
+/// exposes wrap / spacing / row-height decisions as a single
+/// observable number, robust against font drift and host-locale
+/// shifts.
 ///
-/// Why not gesture injection for `RangeSlider`?
-///   The clamp / swap branches inside `DragGesture.onChanged` cannot be
-///   invoked from a unit test without either pumping a synthetic `NSEvent`
-///   stream or extracting the math into a static helper. Both options
-///   require production refactoring; this phase is additive-only on the
-///   test side. The single accessible RangeSlider gate is the public
-///   default-parameter `labelWidth` — a defaulted struct field whose value
-///   is observable through the rendered HStack's intrinsic width when no
-///   caller overrides it.
+/// `RangeSlider` clamp / swap branches inside `DragGesture.onChanged`
+/// require either synthetic `NSEvent` pumping or a static-helper
+/// extraction to be reachable from a test; the gestural math is
+/// exposed via the helper extraction (`RangeSlider.clampedSwap(...)`,
+/// `internal static`).
 ///
-/// Why no `Updater` cells?
-///   Two distinct gates surveyed; both unreachable from this harness
-///   without production refactor:
-///     1. `Updater.isNewer(remote:local:)` is `private static` and
-///        defined inside the `#if DIRECT_BUILD` branch. Testing the
-///        semver compare requires either widening visibility (e.g.
-///        `internal`) or extracting it as a stand-alone helper that
-///        compiles under both build configurations.
-///     2. The App-Store-stub init's `?? "1.0.0"` fallback is non-
-///        observable under SPM `swift test`: `Bundle.main` resolves to
-///        the `xctest` runner, whose Info.plist already supplies a
-///        `CFBundleShortVersionString` (e.g. "16.0" on macOS 16). The
-///        left-hand side of the `??` always wins, so a mutation flipping
-///        the fallback string never reaches the observable
-///        `currentVersion`. Closing this gap requires a production seam
-///        that injects `Bundle` (or a static helper resolving the
-///        version from a passed-in dictionary).
-///
-///   Both gaps are documented in `Tests/Mutation/README.md` under the
-///   Phase 7b section; no catalog entry is filed for `Updater` until a
-///   testable seam exists.
+/// `Updater.isNewer(remote:local:)` is exposed `internal static` so
+/// the SemVer-2.0 ordering cells can drive it directly. The
+/// App-Store-stub init's `?? "1.0.0"` fallback is non-observable
+/// under SPM `swift test` because `Bundle.main` resolves to the
+/// `xctest` runner whose Info.plist always supplies a
+/// `CFBundleShortVersionString`; the production path uses a static
+/// helper that accepts an injected version dictionary so the
+/// fallback can be exercised explicitly.
 @MainActor
-final class UIGatesPhase7B_Tests: XCTestCase {
+final class UIGatesIntegrationTests: XCTestCase {
 
     // MARK: - Helpers
 
@@ -255,12 +239,12 @@ final class UIGatesPhase7B_Tests: XCTestCase {
             "Spacer().frame(width: 50) likely collapsed to 0")
     }
 
-    // MARK: - Phase 7c — production seam closures
+    // MARK: - Pure-helper gates
     //
-    // These cells drive the helpers extracted in Phase 7c directly,
-    // bypassing the SwiftUI gesture / render path. Each pins one of the
-    // gates that Phase 7b documented as un-pinnable without a production
-    // refactor.
+    // These cells drive the static helpers extracted from
+    // gesture-resident UI math directly, bypassing the SwiftUI
+    // gesture / render path. Each pins one gate that the rendered
+    // intrinsicContentSize cells above cannot reach.
 
     // MARK: RangeSlider clamp / pair-swap
 
@@ -511,11 +495,11 @@ private final class NilInfoBundle: Bundle, @unchecked Sendable {
 }
 
 #if DIRECT_BUILD
-/// Phase 7c Direct-only cells — exercise `Updater.isNewer(remote:local:)`,
-/// which is `internal static` inside the `#if DIRECT_BUILD` branch.
-/// Compiled only when SPM is invoked with `-Xswiftc -DDIRECT_BUILD`.
+/// Direct-only `Updater.isNewer(remote:local:)` cells. Compiled only
+/// when SPM is invoked with `-Xswiftc -DDIRECT_BUILD` because the
+/// helper is `internal static` inside an `#if DIRECT_BUILD` branch.
 @MainActor
-final class UIGatesPhase7C_DirectOnly_Tests: XCTestCase {
+final class UpdaterIsNewerDirectOnly_Tests: XCTestCase {
 
     /// Cell Q — equal versions are NOT newer. `isNewer` returns false
     /// when remote and local are identical.
@@ -587,11 +571,11 @@ final class UIGatesPhase7C_DirectOnly_Tests: XCTestCase {
 }
 #endif
 
-/// Phase 7c — SemVer 2.0 ordering cells. Compiled under BOTH build
-/// variants (the `Updater.isNewer(...)` extension lives outside the
-/// `#if DIRECT_BUILD` block so the comparator is always available).
-/// These cells are catalog-able under bare `swift test` because they
-/// don't depend on the Direct-only `performCheck` plumbing.
+/// SemVer 2.0 ordering cells. Compiled under both build variants —
+/// the `Updater.isNewer(...)` extension lives outside the
+/// `#if DIRECT_BUILD` block so the comparator is always available.
+/// These cells exercise the comparator via `swift test` without
+/// depending on the Direct-only `performCheck` plumbing.
 @MainActor
 final class UpdaterSemVerOrdering_Tests: XCTestCase {
 

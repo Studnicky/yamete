@@ -310,9 +310,10 @@ public final class SettingsStore {
         }
     }
 
-    /// Computed proxy: true iff the user wants any visual response.
-    /// Backed entirely by `visualResponseMode` — no separate storage. Exists
-    /// so existing call sites (and tests) can keep reading/writing a Bool.
+    /// Computed Bool proxy over `visualResponseMode`: `true` iff the
+    /// mode is anything other than `.none`. No separate storage; call
+    /// sites that prefer a Bool surface read and write through this
+    /// proxy and the underlying mode field stays canonical.
     var screenFlash: Bool {
         get { visualResponseMode != .off }
         set {
