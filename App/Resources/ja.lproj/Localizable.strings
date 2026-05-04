@@ -430,3 +430,9 @@
 
 /* Reactions master toggle help text */
 "help_reactions" = "Override switch for the entire Reactions group. Turning this off silences every output (sound, screen flash, notification, LED, haptic, brightness, tint) without changing the per-output toggles below; turning it back on releases the override.";
+
+/* Devices master group title */
+"section_devices" = "Devices";
+
+/* Devices master toggle help text */
+"help_devices" = "Override switch for the Devices group. Turning this off un-routes flashes from your selected displays and sounds from your selected audio devices, falling back to system defaults; per-device selections are preserved verbatim and resume when the override is released.";

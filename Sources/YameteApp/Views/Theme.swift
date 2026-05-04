@@ -82,10 +82,10 @@ enum Theme {
 
     /// Opacity multiplier applied to a group's content when its master
     /// kill switch is OFF. Tuned to read as clearly muted while leaving
-    /// enough contrast that the user can still see their per-item
+    /// enough contrast that the user can still read their per-item
     /// settings (so they know what will resume when the master flips
     /// back on).
-    static let disabledByMasterOpacity: Double = 0.35
+    static let disabledByMasterOpacity: Double = 0.60
 
     // MARK: - Layout constants
 

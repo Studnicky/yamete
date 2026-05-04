@@ -445,6 +445,7 @@ public final class Yamete {
                         _ = self.settings.impactMasterEnabled
                         _ = self.settings.stimuliMasterEnabled
                         _ = self.settings.reactionsMasterEnabled
+                        _ = self.settings.devicesMasterEnabled
                     } onChange: {
                         continuation.resume(returning: true)
                     }

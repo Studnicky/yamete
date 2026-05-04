@@ -78,11 +78,21 @@ internal struct SensorSection: View {
                     sensorCard(for: sensorID)
                 }
 
-                // Cooldown + consensus appear AFTER the sensor cards so
-                // auto-sort never reshuffles them away from the impact group.
-                // Consensus only renders when 2+ impact sensors are enabled
-                // (a 1-sensor consensus is always 1).
+                // Reactivity / cooldown / consensus all govern the
+                // impact-fusion pipeline ONLY (verified at
+                // `Yamete.swift:101-108` — `sensitivityMin/Max` are wired
+                // into `fusion.intensityGate` and nowhere else). They
+                // belong inside the Impact Detection group, not at the
+                // top of the menu where they used to misleadingly appear
+                // global.
                 VStack(spacing: 10) {
+                    Divider()
+                    SettingHeader(icon: "gauge.with.needle",
+                                  title: NSLocalizedString("setting_reactivity", comment: "Reactivity setting title"),
+                                  help: NSLocalizedString("help_reactivity", comment: "Reactivity setting help text"))
+                    SensitivityRuler()
+                    RangeSlider(low: $s.sensitivityMin, high: $s.sensitivityMax,
+                                bounds: Detection.unitRange, labelWidth: lw, format: Fmt.percent)
                     Divider()
                     SettingRow(icon: "timer",
                                title: NSLocalizedString("setting_cooldown", comment: "Cooldown setting title"),

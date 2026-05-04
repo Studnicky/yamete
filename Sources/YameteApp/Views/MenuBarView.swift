@@ -96,8 +96,11 @@ public struct MenuBarView: View {
 
     @ViewBuilder private var leftColumn: some View {
         VStack(spacing: 0) {
-            SensitivitySection()
-            Divider()
+            // SensitivitySection used to live above SensorSection but it
+            // governs the impact-fusion intensityGate ONLY (see
+            // `Yamete.swift` `fusion.intensityGate`), so it now lives
+            // INSIDE the Impact Detection master accordion alongside
+            // cooldown + consensus.
             SensorSection(availableSensors: availableSensors)
             Divider()
             StimuliSection()

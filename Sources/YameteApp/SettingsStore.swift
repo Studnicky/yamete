@@ -46,7 +46,7 @@ public final class SettingsStore {
         // back to true releases the override — individual settings flow
         // through unchanged. Order: impact (accel/mic/headphones), stimuli
         // (every discrete-event source), reactions (every output).
-        case impactMasterEnabled, stimuliMasterEnabled, reactionsMasterEnabled
+        case impactMasterEnabled, stimuliMasterEnabled, reactionsMasterEnabled, devicesMasterEnabled
         // Per-output × per-reaction toggle matrix (JSON-encoded Data)
         case soundReactionMatrix, flashReactionMatrix, notificationReactionMatrix, ledReactionMatrix
         // Independent output master toggles (replaces 3-way visualResponseMode gate)
@@ -146,6 +146,7 @@ public final class SettingsStore {
         Key.impactMasterEnabled.rawValue:    true,
         Key.stimuliMasterEnabled.rawValue:   true,
         Key.reactionsMasterEnabled.rawValue: true,
+        Key.devicesMasterEnabled.rawValue:   true,
         // Per-output toggle matrices empty → defaults to "enabled"
         Key.soundReactionMatrix.rawValue:        Data(),
         Key.flashReactionMatrix.rawValue:        Data(),
@@ -279,6 +280,13 @@ public final class SettingsStore {
         didSet {
             guard reactionsMasterEnabled != oldValue else { return }
             persist(reactionsMasterEnabled, .reactionsMasterEnabled)
+        }
+    }
+
+    var devicesMasterEnabled: Bool {
+        didSet {
+            guard devicesMasterEnabled != oldValue else { return }
+            persist(devicesMasterEnabled, .devicesMasterEnabled)
         }
     }
 
@@ -1088,6 +1096,7 @@ public final class SettingsStore {
         impactMasterEnabled    = d.bool(forKey: Key.impactMasterEnabled.rawValue)
         stimuliMasterEnabled   = d.bool(forKey: Key.stimuliMasterEnabled.rawValue)
         reactionsMasterEnabled = d.bool(forKey: Key.reactionsMasterEnabled.rawValue)
+        devicesMasterEnabled   = d.bool(forKey: Key.devicesMasterEnabled.rawValue)
         debugLogging    = d.bool(forKey:   Key.debugLogging.rawValue)
         notificationLocale = d.string(forKey: Key.notificationLocale.rawValue) ?? ""
         flashOpacityMin = d.double(forKey: Key.flashOpacityMin.rawValue)
@@ -1347,9 +1356,10 @@ public final class SettingsStore {
         accelBandpassLowHz    = Defaults.accelBandpassLow
         accelBandpassHighHz   = Defaults.accelBandpassHigh
         debounce              = Defaults.debounce
-        impactMasterEnabled   = true
-        stimuliMasterEnabled  = true
+        impactMasterEnabled    = true
+        stimuliMasterEnabled   = true
         reactionsMasterEnabled = true
+        devicesMasterEnabled   = true
         soundEnabled          = Defaults.soundEnabled
         debugLogging          = AppLog.supportsDebugLogging ? Defaults.debugLogging : false
         visualResponseMode    = Defaults.visualResponseMode
@@ -1452,21 +1462,30 @@ extension SettingsStore: OutputConfigProvider {
     public func reactionsMasterIsOn() -> Bool { reactionsMasterEnabled }
 
     public func audioConfig() -> AudioOutputConfig {
+        // Devices master kill switch: when off, no audio device is
+        // selected for routing — outputs fall back to whatever sane
+        // default the audio responder picks (typically the system
+        // default), which preserves audibility of UI sounds while
+        // disengaging the user's per-device routing.
         AudioOutputConfig(
             enabled: soundEnabled,
             volumeMin: Float(volumeMin),
             volumeMax: Float(volumeMax),
-            deviceUIDs: enabledAudioDevices,
+            deviceUIDs: devicesMasterEnabled ? enabledAudioDevices : [],
             perReaction: soundReactionMatrix.asDictionary()
         )
     }
 
     public func flashConfig() -> FlashOutputConfig {
+        // Devices master kill switch: when off, the flash routes to no
+        // displays. The activeDisplayOnly toggle still applies once the
+        // master is restored; per-display selection is preserved
+        // verbatim for that resume.
         FlashOutputConfig(
             enabled: flashEnabled,
             opacityMin: Float(flashOpacityMin),
             opacityMax: Float(flashOpacityMax),
-            enabledDisplayIDs: enabledDisplays,
+            enabledDisplayIDs: devicesMasterEnabled ? enabledDisplays : [],
             perReaction: flashReactionMatrix.asDictionary(),
             dismissAfter: debounce,
             activeDisplayOnly: flashActiveDisplayOnly
