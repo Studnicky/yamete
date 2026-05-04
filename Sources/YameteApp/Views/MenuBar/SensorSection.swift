@@ -177,26 +177,18 @@ internal struct SensorSection: View {
         return arrayToggleBinding($s.enabledSensorIDs, element: id)
     }
 
-    /// Master toggle for the entire impact group. Reads "any impact sensor
-    /// enabled?". Writing `true` enables every available impact sensor;
-    /// writing `false` disables every impact sensor while leaving non-impact
-    /// stimuli (lid, thermal, USB, ...) in `enabledStimulusSourceIDs`
-    /// untouched (those live in a different settings array).
+    /// Override-disable kill switch for the impact group. Reads/writes
+    /// `settings.impactMasterEnabled` only — does NOT mutate
+    /// `enabledSensorIDs`. When `false`, dispatch is gated to disabled
+    /// regardless of per-sensor state; per-sensor toggles are preserved
+    /// verbatim so flipping the master back ON restores the prior
+    /// selection unchanged. The dispatch gate lives in the impact-fusion
+    /// consumption path (see `Yamete.swift`).
     private func masterImpactBinding() -> Binding<Bool> {
         @Bindable var s = settings
         return Binding(
-            get: { availableSensors.contains { s.enabledSensorIDs.contains($0) } },
-            set: { newValue in
-                if newValue {
-                    var ids = s.enabledSensorIDs
-                    for sensor in availableSensors where !ids.contains(sensor) {
-                        ids.append(sensor)
-                    }
-                    s.enabledSensorIDs = ids
-                } else {
-                    s.enabledSensorIDs.removeAll { availableSensors.contains($0) }
-                }
-            }
+            get: { s.impactMasterEnabled },
+            set: { newValue in s.impactMasterEnabled = newValue }
         )
     }
 

@@ -41,6 +41,12 @@ public final class SettingsStore {
         case ledEnabled, ledBrightnessMin, ledBrightnessMax, keyboardBrightnessEnabled
         // Cable / power / device event sources
         case enabledStimulusSourceIDs = "enabledEventSourceIDs"
+        // Group-level kill switches. Each defaults to true; flipping false
+        // overrides every per-item toggle in the group to disable. Flipping
+        // back to true releases the override — individual settings flow
+        // through unchanged. Order: impact (accel/mic/headphones), stimuli
+        // (every discrete-event source), reactions (every output).
+        case impactMasterEnabled, stimuliMasterEnabled, reactionsMasterEnabled
         // Per-output × per-reaction toggle matrix (JSON-encoded Data)
         case soundReactionMatrix, flashReactionMatrix, notificationReactionMatrix, ledReactionMatrix
         // Independent output master toggles (replaces 3-way visualResponseMode gate)
@@ -136,6 +142,10 @@ public final class SettingsStore {
         Key.keyboardBrightnessEnabled.rawValue: false,
         // Event sources default on across the board
         Key.enabledStimulusSourceIDs.rawValue: StimulusSourceDefaults.allStimulusSourceIDs,
+        // Group-level kill switches default ON (no override engaged).
+        Key.impactMasterEnabled.rawValue:    true,
+        Key.stimuliMasterEnabled.rawValue:   true,
+        Key.reactionsMasterEnabled.rawValue: true,
         // Per-output toggle matrices empty → defaults to "enabled"
         Key.soundReactionMatrix.rawValue:        Data(),
         Key.flashReactionMatrix.rawValue:        Data(),
@@ -240,6 +250,35 @@ public final class SettingsStore {
             let c = debounce.clamped(to: Detection.debounceRange)
             if c != debounce { debounce = c; return }
             persist(debounce, .debounce)
+        }
+    }
+
+    // MARK: - Group kill switches (override-disable; default ON)
+    //
+    // Each is an "off-only" override. When ON (the default) the group's
+    // per-item toggles flow through unchanged. When OFF, dispatch is
+    // gated to disabled regardless of the per-item state — but the
+    // per-item state is preserved verbatim so flipping the master back
+    // ON restores the user's prior selection without any reconstruction.
+
+    var impactMasterEnabled: Bool {
+        didSet {
+            guard impactMasterEnabled != oldValue else { return }
+            persist(impactMasterEnabled, .impactMasterEnabled)
+        }
+    }
+
+    var stimuliMasterEnabled: Bool {
+        didSet {
+            guard stimuliMasterEnabled != oldValue else { return }
+            persist(stimuliMasterEnabled, .stimuliMasterEnabled)
+        }
+    }
+
+    var reactionsMasterEnabled: Bool {
+        didSet {
+            guard reactionsMasterEnabled != oldValue else { return }
+            persist(reactionsMasterEnabled, .reactionsMasterEnabled)
         }
     }
 
@@ -1046,6 +1085,9 @@ public final class SettingsStore {
         accelBandpassHighHz  = d.double(forKey: Key.accelBandpassHighHz.rawValue)
         debounce        = d.double(forKey: Key.debounce.rawValue)
         soundEnabled    = d.bool(forKey:   Key.soundEnabled.rawValue)
+        impactMasterEnabled    = d.bool(forKey: Key.impactMasterEnabled.rawValue)
+        stimuliMasterEnabled   = d.bool(forKey: Key.stimuliMasterEnabled.rawValue)
+        reactionsMasterEnabled = d.bool(forKey: Key.reactionsMasterEnabled.rawValue)
         debugLogging    = d.bool(forKey:   Key.debugLogging.rawValue)
         notificationLocale = d.string(forKey: Key.notificationLocale.rawValue) ?? ""
         flashOpacityMin = d.double(forKey: Key.flashOpacityMin.rawValue)
@@ -1305,6 +1347,9 @@ public final class SettingsStore {
         accelBandpassLowHz    = Defaults.accelBandpassLow
         accelBandpassHighHz   = Defaults.accelBandpassHigh
         debounce              = Defaults.debounce
+        impactMasterEnabled   = true
+        stimuliMasterEnabled  = true
+        reactionsMasterEnabled = true
         soundEnabled          = Defaults.soundEnabled
         debugLogging          = AppLog.supportsDebugLogging ? Defaults.debugLogging : false
         visualResponseMode    = Defaults.visualResponseMode
@@ -1404,6 +1449,8 @@ public final class SettingsStore {
 // MARK: - Output config snapshots (consumed by ResponseKit outputs)
 
 extension SettingsStore: OutputConfigProvider {
+    public func reactionsMasterIsOn() -> Bool { reactionsMasterEnabled }
+
     public func audioConfig() -> AudioOutputConfig {
         AudioOutputConfig(
             enabled: soundEnabled,
