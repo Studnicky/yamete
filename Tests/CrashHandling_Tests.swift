@@ -289,10 +289,10 @@ final class CrashHandling_Tests: XCTestCase {
     // swaps either to `-` / `*` would trap. Drive the wraparound
     // boundary directly via the static helper.
     //
-    // Note: there is no UInt64-typed Settings field — the originally
-    // proposed "Settings UInt64 overflow" cell is degenerate (see
-    // bottom). This cell repurposes the slot to pin the wraparound
-    // arithmetic that does exist in `evaluateActivity`.
+    // No Settings field is UInt64-typed, so a "Settings UInt64
+    // overflow" cell would be degenerate. This cell pins the
+    // wraparound arithmetic that does exist in `evaluateActivity`
+    // instead.
 
     func test_evaluateActivity_uint64WraparoundBoundary_noTrap() {
         let decision = AccelHardware.evaluateActivity(

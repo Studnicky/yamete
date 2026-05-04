@@ -141,8 +141,9 @@ public final class NotificationResponder: ReactiveOutput {
 /// Variant counts can vary per locale; no hardcoded `variantsPerTier`.
 /// Falls back to `en` arrays when a locale has no entries for a given pool.
 ///
-/// Internal (not private) so `@testable import ResponseKit` can cover it.
-enum NotificationPhrase {
+/// `public` because `MenuHeaderRotator` in YameteApp consumes
+/// `eventPhrasing(...)` to build its rotation pages from sample phrasings.
+public enum NotificationPhrase {
     /// Cache: localeID → "title_tap" → ["Mm, again?", "Tease~", ...]
     private static let cache = OSAllocatedUnfairLock<[String: [String: [String]]]>(initialState: [:])
     /// Separate cache for `Events.strings` so impact-pool clears don't blow
@@ -181,7 +182,24 @@ enum NotificationPhrase {
         return eventPhrasing(kind: reaction.kind, preferredLocale: preferredLocale)
     }
 
-    static func eventPhrasing(kind: ReactionKind, preferredLocale: String) -> (title: String, body: String) {
+    /// Returns every body variant defined for `kind` in the user's
+    /// preferred locale, deduped, falling back to the en pool when the
+    /// preferred locale has no entries. Used by `MenuHeaderRotator` to
+    /// build its rotation pages from the canonical Events.strings copy.
+    public static func eventBodies(kind: ReactionKind, preferredLocale: String) -> [String] {
+        let key = "body_\(kind.rawValue)"
+        let preferred = eventPools(for: preferredLocale)[key] ?? []
+        let fallback  = eventPools(for: fallbackLocaleID)[key] ?? []
+        var seen = Set<String>()
+        var out: [String] = []
+        for body in preferred + fallback where !body.isEmpty && !seen.contains(body) {
+            seen.insert(body)
+            out.append(body)
+        }
+        return out
+    }
+
+    public static func eventPhrasing(kind: ReactionKind, preferredLocale: String) -> (title: String, body: String) {
         let key = kind.rawValue
         let preferredPools = eventPools(for: preferredLocale)
         let preferredTitle = preferredPools["title_\(key)"]?.randomElement()
@@ -246,6 +264,27 @@ enum NotificationPhrase {
 
     static func moan(for tier: ImpactTier, localeID: String) -> String {
         pick(prefix: "moan", tier: tier, localeID: localeID)
+    }
+
+    /// Returns the full deduped moan pool — every variant across every
+    /// `ImpactTier` — in the user's preferred locale, falling back to en
+    /// when a tier is missing in that locale. Used by `MenuHeaderRotator`
+    /// to source its rotating subtext from the spicy reaction copy
+    /// rather than the bland system-event bodies.
+    public static func allMoans(preferredLocale: String) -> [String] {
+        let preferredCache = pools(for: preferredLocale)
+        let fallbackCache  = pools(for: fallbackLocaleID)
+        var seen = Set<String>()
+        var out: [String] = []
+        for tier in ImpactTier.allCases {
+            let groupKey = "moan_\(slug(for: tier))"
+            for moan in (preferredCache[groupKey] ?? []) + (fallbackCache[groupKey] ?? [])
+            where !moan.isEmpty && !seen.contains(moan) {
+                seen.insert(moan)
+                out.append(moan)
+            }
+        }
+        return out
     }
 
     private static func pick(prefix: String, tier: ImpactTier, localeID: String) -> String {

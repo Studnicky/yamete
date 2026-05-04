@@ -110,14 +110,11 @@ final class MatrixDisplayHotplugSourceTests: XCTestCase {
     /// Confirms the debounce is a sliding window — once it fires, subsequent
     /// rapid callbacks are gated until the window closes again.
     ///
-    /// Round 5 nuance: on slow CI hardware the round-3 fix (a CI-scaled 300 ms
-    /// gap before the third inject) can stretch wide enough that the gap
-    /// itself spans more than one debounce window. When that happens the
-    /// pacing yields THREE legitimate emissions instead of two — every emit
-    /// is correct under sliding-debounce semantics, the test just witnessed
-    /// a third window opening because the scaled wait widened past it.
-    /// We assert the upper bound (`<= 3`) here — the lower-bound guarantee
-    /// (`>= 2`) lives in `testTwoWithinWindowThenOnePast_publishesAtLeastTwice`
+    /// Asserts the upper bound (`<= 3`) only. On slow schedulers the
+    /// CI-scaled gap before the third inject can span more than one
+    /// debounce window and yield three legitimate emissions — sliding-
+    /// debounce semantics permit it. The lower-bound guarantee (`>= 2`)
+    /// lives in `testTwoWithinWindowThenOnePast_publishesAtLeastTwice`
     /// below, which uses a tighter gap so it cannot accidentally span an
     /// extra window.
     func testTwoWithinWindowThenOnePast_publishesTwice() async {

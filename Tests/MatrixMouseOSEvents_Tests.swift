@@ -5,13 +5,14 @@ import AppKit
 
 /// Mouse OS-event-surface matrix.
 ///
-/// Bug class: mouse scroll detection (NSEvent `.scrollWheel` with empty
-/// phase, RMS over 2.0s window, threshold compare, 1.0s debounce) was
-/// previously only exercised via `_testEmit(.mouseScrolled)`, which
-/// publishes directly to the bus and bypasses the entire OS event
-/// routing pipeline. A regression that confused trackpad scrolls
-/// (non-empty phase) with mouse-wheel scrolls (empty phase) would slip
-/// through.
+/// Drives synthetic NSEvent `.scrollWheel` events with empty phase
+/// (mouse wheel) and non-empty phase (trackpad fling) through the OS
+/// event-routing pipeline so the production detector — RMS over the
+/// 2.0s window, threshold compare, 1.0s debounce, phase-vs-wheel
+/// attribution — runs end-to-end. `_testEmit(.mouseScrolled)`
+/// shortcuts the bus directly and bypasses the detector, which would
+/// let a regression confusing trackpad scrolls with mouse-wheel
+/// scrolls slip through.
 ///
 /// Click attribution: mouse clicks reach the bus via an IOHIDManager
 /// input-value callback inside `MouseActivitySource`. That callback

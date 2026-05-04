@@ -145,10 +145,9 @@ final class SourceLifecycleTests: XCTestCase {
     /// threshold so a single press is enough to clear the gate; a
     /// second `start()` must not produce a second publish.
     ///
-    /// Hardening notes (Phase 8 transient signal-11 follow-up): the
-    /// flake did not reproduce on this host (30 / 30 isolated, 5 / 5
-    /// full-suite — see `Tests/Mutation/README.md`), so this cell adds
-    /// surface-area reductions rather than a targeted fix:
+    /// Hardening notes for this cell — surface-area reductions that
+    /// keep a transient signal-11 from leaking across runs even though
+    /// the flake does not reproduce locally:
     /// 1. `defer { source.stop() }` — runs even if `XCTAssertEqual`
     ///    records a failure or any `try` throws, so the source's bus
     ///    reference and `keyWindow` are always cleared on test exit

@@ -50,13 +50,13 @@ final class MatrixSourceDebounce_Tests: XCTestCase {
     /// 4 cells × {0ms, 1ms, debounce-well-under (10ms), debounce-well-over (200ms)}.
     /// First emit always passes. Second passes only when delay ≥ debounce.
     ///
-    /// CI calibration: under the GitHub macos runner a 40ms `Task.sleep`
-    /// can stretch past the 50ms USB debounce constant, so the
-    /// previously-used "debounce-10ms" cell flipped to "second emit
-    /// passes" non-deterministically. The strict-block cells are now
-    /// well under 50ms (10ms + 30ms scheduler slack still ≤ 50ms) and
-    /// the strict-pass cell is well past (200ms + slack still > 50ms),
-    /// so the test stays deterministic regardless of scheduler load.
+    /// CI calibration: a `Task.sleep` near the 50ms USB debounce
+    /// constant can stretch past the boundary on the GitHub macos
+    /// runner and flip "second emit blocked" into "second emit passes"
+    /// non-deterministically. The strict-block cells stay well under
+    /// 50ms (10ms + 30ms scheduler slack still ≤ 50ms) and the
+    /// strict-pass cell is well past (200ms + slack still > 50ms), so
+    /// the test stays deterministic regardless of scheduler load.
     func testUSBDebounceRapidFire() async throws {
         struct Cell { let delayMs: Int; let expectedPassed: Int }
         let cells: [Cell] = [

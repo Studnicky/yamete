@@ -4,19 +4,17 @@ import XCTest
 
 /// Ring 2 onion-skin for `SleepWakeSource` — DOCUMENTED RING 3 GAP.
 ///
-/// CORRECTION TO PLAN: this source was originally classified as Ring
-/// 2-testable on the assumption it observed
-/// `NSWorkspace.shared.notificationCenter.willSleepNotification` /
-/// `.didWakeNotification`. Verified against `Sources/SensorKit/EventSources.swift`
-/// (the `SleepWakeSource` class): the production source actually
-/// subscribes via `IORegisterForSystemPower(context, &port, callback,
-/// &notifier)` and dispatches on `kIOMessageSystemWillSleep` /
-/// `kIOMessageSystemHasPoweredOn` from the IOKit power-management
-/// callback. There is no `NSWorkspace.didChangeNotification` /
-/// `NSWorkspace.willSleepNotification` observer registered in the source.
+/// `SleepWakeSource` subscribes via `IORegisterForSystemPower(context,
+/// &port, callback, &notifier)` and dispatches on
+/// `kIOMessageSystemWillSleep` / `kIOMessageSystemHasPoweredOn` from
+/// the IOKit power-management callback. It does NOT observe
+/// `NSWorkspace.willSleepNotification` /
+/// `NSWorkspace.didWakeNotification`, so posting those notifications
+/// from a test does not exercise the production handler.
 ///
-/// Therefore SleepWakeSource is a Ring 3 transport-layer gap, identical
-/// in shape to PowerSource: the kernel pmRootDomain emits power-state
+/// SleepWakeSource is therefore a Ring 3 transport-layer gap,
+/// identical in shape to PowerSource: the kernel pmRootDomain emits
+/// power-state
 /// messages to registered ports, and userspace cannot synthesize them
 /// without root + a real `pmset sleep` (which would actually sleep the
 /// host machine and lose every other test in the suite).

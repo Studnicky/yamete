@@ -54,8 +54,6 @@ public struct MenuBarView: View {
             .frame(maxHeight: maxScrollHeight)
 
             Divider()
-            ImpactCounterStrip()
-            Divider()
             FooterSection()
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -96,8 +94,6 @@ public struct MenuBarView: View {
 
     @ViewBuilder private var leftColumn: some View {
         VStack(spacing: 0) {
-            SensitivitySection()
-            Divider()
             SensorSection(availableSensors: availableSensors)
             Divider()
             StimuliSection()
@@ -175,7 +171,7 @@ internal enum Fmt {
     static let warmup: @Sendable (Double) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), $0 / 50.0) }
     static let warmupInt: @Sendable (Int) -> String = { String(format: NSLocalizedString("unit_seconds", comment: "Seconds format"), Double($0) / 50.0) }
     static let confirmations: @Sendable (Int) -> String = { String(format: NSLocalizedString("confirmations_format", comment: "Confirmation hit count"), $0) }
-    static let consensus: @Sendable (Int) -> String = { String(format: NSLocalizedString("consensus_format", comment: "Sensor consensus count"), $0) }
+    static let consensus: @Sendable (Int) -> String = { String(format: NSLocalizedString("consensus_format", comment: "Impact sensor count format"), $0) }
 }
 
 // MARK: - Generic toggle binding for array-backed selections
@@ -204,64 +200,100 @@ internal let tuningLabelWidth: CGFloat = 50
 internal struct HeaderSection: View {
     @Environment(Yamete.self) var yamete
     @Environment(MenuBarFace.self) var menuBarFace
+    @Environment(SettingsStore.self) var settings
+    @State private var rotator = MenuHeaderRotator()
+
+    /// Cross-fade duration between rotator pages. ~3.5s ease-in-out
+    /// reads as a slow pulse rather than a flicker.
+    private static let crossfadeDuration: Double = 3.5
 
     public var body: some View {
-        VStack(spacing: 0) {
-            // App identity
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
+        let icon = NSApp.applicationIconImage
+        let body = rotator.current
+        let impactsLine = String(format: NSLocalizedString("impacts_today",
+                                                           comment: "Daily impact counter"),
+                                 menuBarFace.impactCount)
+
+        HStack(alignment: .center, spacing: 12) {
+            if let icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 40, height: 40)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                // Top row, three columns: title (leading), paused-pill
+                // (centred — only rendered when the fusion engine is
+                // stopped, so the centre column collapses to zero
+                // width otherwise and the impacts counter occupies its
+                // own trailing slot via a `Spacer` either way),
+                // impacts-today counter (trailing).
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(NSLocalizedString("app_title", comment: "Application name"))
                         .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(Theme.pink)
-                    Text(NSLocalizedString("app_tagline", comment: "Application tagline"))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
-                if !yamete.fusion.isRunning {
-                    Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
+                        .foregroundStyle(Theme.stateActive)
+                    Spacer(minLength: 4)
+                    if !yamete.fusion.isRunning {
+                        Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
+                            .font(.caption2)
+                            .foregroundStyle(Theme.stateWarning)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Theme.stateWarning.opacity(0.15))
+                            .clipShape(Capsule())
+                        Spacer(minLength: 4)
+                    }
+                    Text(impactsLine)
                         .font(.caption)
-                        .foregroundStyle(Theme.mauve)
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Theme.mauve.opacity(0.15))
-                        .clipShape(Capsule())
+                        .foregroundStyle(Theme.stateInert)
+                        .lineLimit(1)
+                }
+
+                // Second row: rotating subtext (leading) + last-impact
+                // tier (trailing). The cross-fade is anchored to the
+                // body string changing.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(body)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.stateInert)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .id(body)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: Self.crossfadeDuration), value: body)
+                    Spacer(minLength: 4)
+                    if let tier = menuBarFace.lastImpactTier {
+                        Text(verbatim: String(format: NSLocalizedString("last_impact",
+                                                                        comment: "Last impact tier label"),
+                                              String(describing: tier)))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
                 }
             }
-            .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 6)
-
         }
-    }
-}
-
-// MARK: - Impact counter strip (between content and footer)
-
-internal struct ImpactCounterStrip: View {
-    @Environment(Yamete.self) var yamete
-    @Environment(MenuBarFace.self) var menuBarFace
-
-    public var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "waveform.path.ecg")
-                .font(.system(size: 9))
-                .foregroundStyle(Theme.pink.opacity(0.7))
-            Text(String(format: NSLocalizedString("impacts_today", comment: "Daily impact counter"), menuBarFace.impactCount))
-            Spacer()
-            if let tier = menuBarFace.lastImpactTier {
-                Text(verbatim: String(format: NSLocalizedString("last_impact", comment: "Last impact tier label"), String(describing: tier)))
-                    .foregroundStyle(.tertiary)
-            }
-            if !yamete.fusion.isRunning {
-                Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
-                    .foregroundStyle(Theme.mauve)
-                    .padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(Theme.mauve.opacity(0.12))
-                    .clipShape(Capsule())
-            }
+        .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 8)
+        .onAppear {
+            rebuildPages()
+            rotator.start()
         }
-        .font(.caption).foregroundStyle(.secondary)
-        .padding(.horizontal, 14).padding(.vertical, 5)
+        .onDisappear { rotator.stop() }
+        // The moan pool depends only on the resolved locale — stimulus
+        // and sensor toggles do not affect it.
+        .onChange(of: settings.resolvedNotificationLocale) { _, _ in rebuildPages() }
     }
+
+    /// Recompute the rotator's body pool for the resolved locale.
+    private func rebuildPages() {
+        let appTagline = NSLocalizedString("app_tagline", comment: "Application tagline")
+        let pages = MenuHeaderRotator.buildBodies(
+            appTagline: appTagline,
+            locale: settings.resolvedNotificationLocale
+        )
+        rotator.setPages(pages)
+    }
+
 }
 
 // MARK: - Shared detection gate parameter rows

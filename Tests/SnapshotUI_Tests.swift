@@ -76,22 +76,20 @@ final class SnapshotUI_Tests: XCTestCase {
 
     /// Per-build-variant snapshot directory.
     ///
-    /// Phase 3 split: shared cells render subtly differently under
-    /// `DIRECT_BUILD` (e.g. `FooterSection`'s right column composes a
-    /// version + chevron pill instead of skipping, `ResponseSection`'s
-    /// audio card surfaces a Direct-only `EnableToggleRow`). To keep
-    /// both builds covered by pixel-baselines without one variant
-    /// overwriting the other's, baselines live in build-variant
-    /// subdirectories under `__Snapshots__/`.
+    /// Shared cells render subtly differently under `DIRECT_BUILD`
+    /// (e.g. `FooterSection`'s right column composes a version +
+    /// chevron pill instead of skipping, `ResponseSection`'s audio
+    /// card surfaces a Direct-only `EnableToggleRow`). Baselines live
+    /// in build-variant subdirectories under `__Snapshots__/` so one
+    /// variant does not overwrite the other.
     ///
-    /// Phase 1 host-app extension: a third dimension also affects pixel
-    /// output — whether tests run under the SPM `xctest` runner (where
-    /// `Bundle.main` is the runner and SwiftUI bundle assets fall back to
-    /// defaults) versus inside `Yamete.app` / `Yamete Direct.app` host
-    /// (where the real bundle assets render in). Detect the host bundle
-    /// via `Bundle.main.bundleURL` and route to a `HostApp` variant
-    /// directory in either case so the SPM and host-app baselines do
-    /// not overwrite each other.
+    /// A third dimension also affects pixel output: whether the cell
+    /// runs under the SPM `xctest` runner (where `Bundle.main` is the
+    /// runner and SwiftUI bundle assets fall back to defaults) or
+    /// inside `Yamete.app` / `Yamete Direct.app` (where the real
+    /// bundle assets render). The host bundle is detected via
+    /// `Bundle.main.bundleURL` and routed to a `HostApp` variant
+    /// directory in either case.
     ///
     /// `#filePath` resolves to the absolute path of this test file at
     /// compile time. We strip the file basename and append the variant
@@ -206,12 +204,11 @@ final class SnapshotUI_Tests: XCTestCase {
     static func snapshotVariant() -> String {
         let bundlePath = Bundle.main.bundleURL.path
         let isHostApp = bundlePath.contains("Yamete.app") || bundlePath.contains("Yamete Direct.app")
-        // Use the centralised CITiming.isCI so the path-based fallback
-        // applies here too — `xcodebuild test` on the host-app target
-        // does not always propagate the runner's `CI` env var into the
-        // test bundle process, so an inline env-only check resolved to
-        // `HostApp` instead of `HostApp_CI` on round 8 and the cells
-        // ran against developer-host baselines.
+        // `CITiming.isCI` carries a path-based fallback: `xcodebuild
+        // test` on the host-app scheme does not always propagate the
+        // runner's `CI` env var into the test-bundle process, so an
+        // env-only check would resolve to `HostApp` on CI and run
+        // against developer-host baselines.
         let isCI = CITiming.isCI
         // The host-app lane has its OWN runner-vs-developer-host pixel
         // drift, distinct from the SPM AppStore/Direct lanes. Carve it

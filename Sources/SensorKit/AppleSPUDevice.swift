@@ -36,10 +36,10 @@ import os
 //   FULL raw byte buffer + length + capture timestamp. The handler
 //   decodes its own bytes from its own offsets and is a no-op if the
 //   data it cares about isn't present in this report.
-// • The `dispatch` enum is used for diagnostic logging only in Phase 0.
-//   Future phases may use it to pick the right service node when
-//   activating a specific sensor (e.g., `dispatchGyro = Yes` for gyro
-//   activation, mirroring `dispatchAccel = Yes` for accel).
+// • The `dispatch` enum is currently used for diagnostic logging only.
+//   Activation of a specific sensor service node (e.g.
+//   `dispatchGyro = Yes`) is the obvious next consumer if a sensor
+//   ever needs per-usage activation toggles.
 //
 // Refcount lifecycle
 // ------------------

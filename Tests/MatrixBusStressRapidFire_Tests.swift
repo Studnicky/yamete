@@ -31,12 +31,10 @@ final class MatrixBusStressRapidFire_Tests: XCTestCase {
     /// window must produce exactly one action whose multiplier is capped at
     /// 2.0 by `min(2.0, pendingMultiplier + intensity * 0.5)`.
     ///
-    /// Round 6 hardening: the fixed `Task.sleep(10ms)` lead before the
-    /// burst raced subscriber registration on the slow CI runner — when
-    /// `consume()` had not yet subscribed, the entire 100-publish burst
-    /// was dropped (0 actions instead of 1). Replace with a poll on
-    /// `_testSubscriberCount() > 0` and replace the tail wait with
-    /// `awaitUntil` on `spy.actions().count >= 1`.
+    /// CI-tolerant: polls `_testSubscriberCount() > 0` before publishing
+    /// (a fixed sleep races subscriber registration on slow CI hardware
+    /// and drops the burst silently) and uses `awaitUntil` for the tail
+    /// wait instead of a fixed `Task.sleep`.
     func testHundredSameKindCoalescesToOneActionMultiplierCapped() async throws {
         let bus = await makeBus()
         let spy = MatrixSpyOutput()
