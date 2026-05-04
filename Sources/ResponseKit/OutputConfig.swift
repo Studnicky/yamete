@@ -198,6 +198,21 @@ public protocol OutputConfigProvider: AnyObject {
     func displayTintConfig() -> DisplayTintOutputConfig
     func volumeSpikeConfig() -> VolumeSpikeOutputConfig
     func trackpadSourceConfig() -> TrackpadSourceConfig
+
+    /// Override-disable kill switch read by every output's `shouldFire`.
+    /// When `false`, every output declines to fire regardless of its own
+    /// per-output toggle and per-reaction matrix entry. The user's
+    /// individual settings are not mutated; flipping this back to `true`
+    /// releases the override and dispatch resumes normally. Defaulted in
+    /// the protocol extension below so existing test/mock implementors
+    /// don't need to add it.
+    func reactionsMasterIsOn() -> Bool
+}
+
+public extension OutputConfigProvider {
+    /// Default to `true` (no override) so existing implementors that
+    /// haven't been updated still dispatch normally.
+    func reactionsMasterIsOn() -> Bool { true }
 }
 
 /// Default clip duration used by outputs when reacting to events (which have

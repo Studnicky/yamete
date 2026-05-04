@@ -204,33 +204,131 @@ internal let tuningLabelWidth: CGFloat = 50
 internal struct HeaderSection: View {
     @Environment(Yamete.self) var yamete
     @Environment(MenuBarFace.self) var menuBarFace
+    @Environment(SettingsStore.self) var settings
+    @State private var rotator = MenuHeaderRotator()
+
+    /// Cross-fade duration between rotator pages. Tuned so the swap reads
+    /// as a deliberate transition, not a flicker — matches the
+    /// AccordionCard expand/collapse curve.
+    private static let crossfadeDuration: Double = 0.45
 
     public var body: some View {
-        VStack(spacing: 0) {
-            // App identity
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(NSLocalizedString("app_title", comment: "Application name"))
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(Theme.pink)
-                    Text(NSLocalizedString("app_tagline", comment: "Application tagline"))
+        let face = menuBarFace.reactionFace ?? FaceLibrary.shared.image(at: 0)
+        let page = rotator.current
+
+        VStack(spacing: 6) {
+            // Centred app icon face. Falls back to FaceLibrary index 0 when
+            // no impact is in flight; swaps to the live reaction face when
+            // an impact lands (matching the menu-bar status item behaviour).
+            if let face {
+                Image(nsImage: face)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 36, height: 36)
+            }
+
+            // Centred rotating title + body. Cross-fade triggered by the
+            // page identity changing (`.id(page.id)` forces SwiftUI to
+            // dispose the old subview and animate the replacement in).
+            VStack(spacing: 2) {
+                Text(page.title)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.pink)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                if !page.body.isEmpty {
+                    Text(page.body)
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
-                if !yamete.fusion.isRunning {
-                    Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
-                        .font(.caption)
-                        .foregroundStyle(Theme.mauve)
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Theme.mauve.opacity(0.15))
-                        .clipShape(Capsule())
+                        .lineLimit(3)
                 }
             }
-            .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 6)
+            .id(page.id)
+            .transition(.opacity)
+            .animation(.easeInOut(duration: Self.crossfadeDuration), value: page.id)
 
+            // Paused indicator stays visible alongside the rotator so the
+            // user always knows when detection is suspended.
+            if !yamete.fusion.isRunning {
+                Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
+                    .font(.caption)
+                    .foregroundStyle(Theme.mauve)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Theme.mauve.opacity(0.15))
+                    .clipShape(Capsule())
+            }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 8)
+        .onAppear {
+            rebuildPages()
+            rotator.start()
+        }
+        .onDisappear { rotator.stop() }
+        .onChange(of: settings.resolvedNotificationLocale) { _, _ in rebuildPages() }
+        .onChange(of: settings.enabledStimulusSourceIDs) { _, _ in rebuildPages() }
+        .onChange(of: settings.enabledSensorIDs) { _, _ in rebuildPages() }
+    }
+
+    /// Recompute the rotator pages from the user's currently-enabled
+    /// reaction kinds and selected locale. Called on launch and whenever
+    /// either input changes.
+    private func rebuildPages() {
+        let appTitle   = NSLocalizedString("app_title",   comment: "Application name")
+        let appTagline = NSLocalizedString("app_tagline", comment: "Application tagline")
+        let pages = MenuHeaderRotator.buildPages(
+            appTitle: appTitle,
+            appTagline: appTagline,
+            enabledKinds: enabledReactionKinds(),
+            locale: settings.resolvedNotificationLocale
+        )
+        rotator.setPages(pages)
+    }
+
+    /// All reaction kinds whose source is currently enabled. Mirrors the
+    /// gating logic the bus uses when deciding whether to publish a kind:
+    /// impact kinds gate on `enabledSensorIDs`; event/stimulus kinds gate
+    /// on `enabledStimulusSourceIDs` membership.
+    private func enabledReactionKinds() -> [ReactionKind] {
+        var kinds: [ReactionKind] = []
+        // Impact reactions always carry the same kind (.impact); skip and
+        // let the rotator surface event phrasings only.
+        let stimulusIDs = Set(settings.enabledStimulusSourceIDs)
+        for kind in ReactionKind.allCases where kind != .impact {
+            // Map kind → owning source ID via the ReactionKind doc-comment
+            // convention (rawValue prefix). Cheaper than wiring a full
+            // SourceContracts table at this UI layer; if a kind's source
+            // can't be resolved, keep the kind so it still appears.
+            if let sourceID = ownerStimulusSourceID(for: kind),
+               !stimulusIDs.contains(sourceID) {
+                continue
+            }
+            kinds.append(kind)
+        }
+        return kinds
+    }
+
+    /// Kinds map to one of a small set of stimulus source IDs by prefix.
+    /// Returning `nil` means "no gating — always include this kind".
+    private func ownerStimulusSourceID(for kind: ReactionKind) -> String? {
+        let raw = kind.rawValue
+        if raw.hasPrefix("usb")              { return SensorID.usb.rawValue }
+        if raw.hasPrefix("ac")               { return SensorID.power.rawValue }
+        if raw.hasPrefix("audioPeripheral")  { return SensorID.audioPeripheral.rawValue }
+        if raw.hasPrefix("bluetooth")        { return SensorID.bluetooth.rawValue }
+        if raw.hasPrefix("thunderbolt")      { return SensorID.thunderbolt.rawValue }
+        if raw.hasPrefix("display")          { return SensorID.displayHotplug.rawValue }
+        if raw == "willSleep" || raw == "didWake" { return SensorID.sleepWake.rawValue }
+        if raw.hasPrefix("trackpad")         { return SensorID.trackpadActivity.rawValue }
+        if raw.hasPrefix("mouse")            { return SensorID.mouseActivity.rawValue }
+        if raw.hasPrefix("keyboard")         { return SensorID.keyboardActivity.rawValue }
+        if raw.hasPrefix("gyro")             { return SensorID.gyroscope.rawValue }
+        if raw.hasPrefix("lid")              { return SensorID.lidAngle.rawValue }
+        if raw.hasPrefix("lights") || raw == "alsCovered" { return SensorID.ambientLight.rawValue }
+        if raw.hasPrefix("thermal")          { return SensorID.thermal.rawValue }
+        return nil
     }
 }
 

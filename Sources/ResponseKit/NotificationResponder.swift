@@ -141,8 +141,9 @@ public final class NotificationResponder: ReactiveOutput {
 /// Variant counts can vary per locale; no hardcoded `variantsPerTier`.
 /// Falls back to `en` arrays when a locale has no entries for a given pool.
 ///
-/// Internal (not private) so `@testable import ResponseKit` can cover it.
-enum NotificationPhrase {
+/// `public` because `MenuHeaderRotator` in YameteApp consumes
+/// `eventPhrasing(...)` to build its rotation pages from sample phrasings.
+public enum NotificationPhrase {
     /// Cache: localeID → "title_tap" → ["Mm, again?", "Tease~", ...]
     private static let cache = OSAllocatedUnfairLock<[String: [String: [String]]]>(initialState: [:])
     /// Separate cache for `Events.strings` so impact-pool clears don't blow
@@ -181,7 +182,7 @@ enum NotificationPhrase {
         return eventPhrasing(kind: reaction.kind, preferredLocale: preferredLocale)
     }
 
-    static func eventPhrasing(kind: ReactionKind, preferredLocale: String) -> (title: String, body: String) {
+    public static func eventPhrasing(kind: ReactionKind, preferredLocale: String) -> (title: String, body: String) {
         let key = kind.rawValue
         let preferredPools = eventPools(for: preferredLocale)
         let preferredTitle = preferredPools["title_\(key)"]?.randomElement()

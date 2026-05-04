@@ -156,27 +156,52 @@ internal struct StimuliSection: View {
                          collationLocale: Locale(identifier: settings.resolvedNotificationLocale))
     }
 
+    @State private var stimuliGroupExpanded: Bool = true
+
     public var body: some View {
-        VStack(spacing: 0) {
-            ForEach(orderedRows, id: \.sourceID) { row in
-                let isExpanded = Binding(
-                    get: { expandedSources.contains(row.sourceID) },
-                    set: { expanded in
-                        if expanded { expandedSources.insert(row.sourceID) }
-                        else { expandedSources.remove(row.sourceID) }
+        SensorAccordionCard(
+            title: NSLocalizedString("section_stimuli", comment: "Stimuli master group title"),
+            icon: "dot.radiowaves.left.and.right",
+            isEnabled: masterStimuliBinding(),
+            isExpanded: $stimuliGroupExpanded,
+            help: NSLocalizedString("help_stimuli", comment: "Stimuli master toggle help")
+        ) {
+            VStack(spacing: 0) {
+                ForEach(orderedRows, id: \.sourceID) { row in
+                    let isExpanded = Binding(
+                        get: { expandedSources.contains(row.sourceID) },
+                        set: { expanded in
+                            if expanded { expandedSources.insert(row.sourceID) }
+                            else { expandedSources.remove(row.sourceID) }
+                        }
+                    )
+                    SensorAccordionCard(
+                        title: row.title,
+                        icon: row.icon,
+                        isEnabled: sourceBinding(id: row.sourceID),
+                        isExpanded: isExpanded,
+                        help: row.help
+                    ) {
+                        sourceContent(row: row)
                     }
-                )
-                SensorAccordionCard(
-                    title: row.title,
-                    icon: row.icon,
-                    isEnabled: sourceBinding(id: row.sourceID),
-                    isExpanded: isExpanded,
-                    help: row.help
-                ) {
-                    sourceContent(row: row)
                 }
             }
         }
+    }
+
+    /// Override-disable kill switch for the Stimuli group. Reads/writes
+    /// `settings.stimuliMasterEnabled` only — does NOT mutate
+    /// `enabledStimulusSourceIDs`. When `false`, dispatch is gated so no
+    /// stimulus reaction fires regardless of the per-stimulus toggles;
+    /// per-stimulus toggles are preserved verbatim so flipping the master
+    /// back ON restores the prior selection unchanged. The dispatch gate
+    /// lives in the per-source start/stop wiring in `Yamete.swift`.
+    private func masterStimuliBinding() -> Binding<Bool> {
+        @Bindable var s = settings
+        return Binding(
+            get: { s.stimuliMasterEnabled },
+            set: { newValue in s.stimuliMasterEnabled = newValue }
+        )
     }
 
     // MARK: - Source accordion content

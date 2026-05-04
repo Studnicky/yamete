@@ -300,7 +300,12 @@ public final class Yamete {
     }
 
     private func rebuildSensorPipeline() {
-        let enabled = Set(settings.enabledSensorIDs)
+        // Impact master kill switch: when off, the impact pipeline does not
+        // run regardless of `enabledSensorIDs`. Per-sensor selection is
+        // preserved verbatim — flipping the master back on resumes.
+        let enabled = settings.impactMasterEnabled
+            ? Set(settings.enabledSensorIDs)
+            : Set<String>()
         let sources: [any SensorSource] = allSensorSources.filter { enabled.contains($0.id.rawValue) }
 
         let config = FusionConfig(
@@ -312,14 +317,18 @@ public final class Yamete {
             lastPushedFusionConfig = config
         }
 
-        let shouldRun = settings.soundEnabled
-            || settings.flashEnabled
-            || settings.notificationsEnabled
-            || settings.ledEnabled
-            || settings.hapticEnabled
-            || settings.displayBrightnessEnabled
-            || settings.displayTintEnabled
-            || settings.volumeSpikeEnabled
+        // Reactions master kill switch shorts out the per-output OR test:
+        // if every output is muted globally, there is no reason to run the
+        // detection pipeline either.
+        let shouldRun = settings.reactionsMasterEnabled
+            && (settings.soundEnabled
+                || settings.flashEnabled
+                || settings.notificationsEnabled
+                || settings.ledEnabled
+                || settings.hapticEnabled
+                || settings.displayBrightnessEnabled
+                || settings.displayTintEnabled
+                || settings.volumeSpikeEnabled)
         if shouldRun && !sources.isEmpty {
             fusion.start(sources: sources, bus: bus)
         } else {
@@ -328,7 +337,13 @@ public final class Yamete {
     }
 
     private func rebuildEventSources() {
-        let desired = Set(settings.enabledStimulusSourceIDs)
+        // Stimuli master kill switch: when off, every stimulus source is
+        // stopped regardless of per-source selection. Per-source selection
+        // is preserved verbatim so flipping the master back on restores
+        // exactly the prior set without any reconstruction.
+        let desired = settings.stimuliMasterEnabled
+            ? Set(settings.enabledStimulusSourceIDs)
+            : Set<String>()
         guard desired != enabledStimulusSources else { return }
 
         for sourceID in desired.subtracting(enabledStimulusSources) {
@@ -427,6 +442,9 @@ public final class Yamete {
                         _ = self.settings.enabledStimulusSourceIDs
                         _ = self.settings.consensusRequired
                         _ = self.settings.debounce
+                        _ = self.settings.impactMasterEnabled
+                        _ = self.settings.stimuliMasterEnabled
+                        _ = self.settings.reactionsMasterEnabled
                     } onChange: {
                         continuation.resume(returning: true)
                     }
