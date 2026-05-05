@@ -147,8 +147,8 @@ body { background: var(--vp-c-bg); color: var(--vp-c-text-1); }
 
 /* ===== Yamete sidebar icon block — FULL WIDTH, entire face visible ===== */
 
-.VPSidebar::before {
-  content: "";
+/* Sidebar icon: rendered via a Vue layout-top slot in theme/index.ts */
+.VPSidebar .yamete-sidebar-icon {
   display: block;
   width: 208px;
   height: 208px;
