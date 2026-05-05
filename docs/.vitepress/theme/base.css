@@ -1,6 +1,7 @@
 /**
  * base.css — shared visual rules.
- * Copy this file verbatim into other projects. Only palette.css changes per project.
+ * Squashage-derived; Yamete adds dark-only flourishes plus a full-width
+ * sidebar-icon block and a brand-coloured headings/links pass.
  */
 
 :root {
@@ -8,103 +9,162 @@
   --vp-font-family-mono: "SF Mono", Menlo, Consolas, ui-monospace, monospace;
 }
 
-.vp-doc a { color: var(--vp-c-brand-1); text-decoration: none; }
-.vp-doc a:hover { color: var(--vp-c-brand-2); text-decoration: underline; }
+/* ===== Body / typography ===== */
 
+body { background: var(--vp-c-bg); color: var(--vp-c-text-1); }
+
+.vp-doc a {
+  color: var(--vp-c-brand-1);
+  text-decoration: none;
+  font-weight: 500;
+}
+.vp-doc a:hover { color: var(--yamete-accent-soft); text-decoration: underline; }
+
+.vp-doc h1 {
+  color: var(--yamete-accent-soft);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
 .vp-doc h2 {
   border-bottom: 1px solid var(--vp-c-divider);
   padding-bottom: 0.4rem;
   margin-top: 2.4rem;
   font-weight: 600;
   letter-spacing: -0.01em;
+  color: var(--yamete-accent-soft);
 }
-.vp-doc h3 { font-weight: 600; margin-top: 1.75rem; }
+.vp-doc h3 {
+  font-weight: 600;
+  margin-top: 1.75rem;
+  color: var(--vp-c-brand-1);
+}
+.vp-doc h4 { color: var(--vp-c-brand-1); font-weight: 600; }
+
+.vp-doc strong { color: var(--yamete-accent-soft); font-weight: 600; }
+.vp-doc em { color: var(--vp-c-text-1); }
 
 .vp-doc :not(pre) > code {
-  background: #f5f5f5;
+  background: var(--vp-code-bg);
   border: 1px solid var(--vp-c-divider);
   border-radius: 4px;
-  color: var(--vp-c-text-1);
+  color: var(--vp-code-color);
   font-size: 0.875em;
   padding: 0.1em 0.35em;
 }
-.dark .vp-doc :not(pre) > code { background: #1a1a1a; }
 
 .vp-doc div[class*="language-"] { border: 1px solid var(--vp-c-divider); border-radius: 4px; }
 
 .vp-doc table { border-collapse: collapse; width: 100%; }
-.vp-doc th { background: var(--vp-c-bg-alt); border-bottom: 1px solid var(--vp-c-divider); font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; }
-.vp-doc td, .vp-doc th { border-bottom: 1px solid var(--vp-c-divider); padding: 0.5rem 0.75rem; }
+.vp-doc th {
+  background: var(--vp-c-bg-alt);
+  border-bottom: 1px solid var(--vp-c-divider);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--vp-c-brand-1);
+  text-align: left;
+}
+.vp-doc td, .vp-doc th { border-bottom: 1px solid var(--vp-c-divider); padding: 0.55rem 0.85rem; }
+.vp-doc tr:hover td { background: var(--vp-c-bg-alt); }
+
+.vp-doc blockquote {
+  border-left: 3px solid var(--vp-c-brand-1);
+  background: var(--vp-c-bg-alt);
+  border-radius: 0 4px 4px 0;
+  color: var(--vp-c-text-1);
+  padding: 0.65rem 1rem;
+  font-style: italic;
+}
+.vp-doc blockquote p { color: var(--vp-c-text-1); }
+
+/* ===== Sidebar ===== */
+
+.VPSidebar { background: var(--vp-c-bg) !important; }
+
+.VPSidebar .group { border-top: 1px solid var(--vp-c-divider); padding-top: 0.75rem; }
+.VPSidebar .group:first-of-type { border-top: 0; }
 
 .VPSidebarItem.level-0 > .item > .text {
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--vp-c-text-3);
+  color: var(--yamete-accent-soft);
 }
-.VPSidebarItem.is-active > .item > .link > .text { color: var(--vp-c-brand-1); font-weight: 600; }
 
-.vp-doc blockquote {
-  border-left: 3px solid var(--vp-c-brand-1);
-  background: var(--vp-c-bg-alt);
-  border-radius: 0 4px 4px 0;
-  color: var(--vp-c-text-2);
-  padding: 0.65rem 1rem;
+.VPSidebarItem.level-1 .link .text {
+  color: var(--vp-c-text-1);
+  font-weight: 400;
 }
+.VPSidebarItem.level-1:hover .link .text { color: var(--yamete-accent-soft); }
+.VPSidebarItem.is-active > .item > .link > .text {
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+
+/* ===== Top nav ===== */
+
+.VPNavBar .VPNavBarTitle .title {
+  color: var(--yamete-accent-soft);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.VPNavBarMenuLink {
+  color: var(--vp-c-text-2) !important;
+  font-weight: 500;
+}
+.VPNavBarMenuLink:hover, .VPNavBarMenuLink.active {
+  color: var(--vp-c-brand-1) !important;
+}
+
+/* ===== Right outline (On this page) ===== */
+
+.VPDocAsideOutline .outline-title {
+  color: var(--yamete-accent-soft) !important;
+  font-size: 0.78rem !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.VPDocAsideOutlineItem a { color: var(--vp-c-text-2) !important; }
+.VPDocAsideOutlineItem a:hover,
+.VPDocAsideOutlineItem.active a { color: var(--vp-c-brand-1) !important; }
+.VPDocAside .outline-marker { background: var(--vp-c-brand-1) !important; }
+
+/* ===== Last updated ===== */
+
+.VPLastUpdated { color: var(--vp-c-text-3); }
+
+/* ===== Feature cards (home grids) ===== */
 
 .VPFeature {
   border: 1px solid var(--vp-c-divider) !important;
-  border-radius: 4px !important;
+  background: var(--vp-c-bg-alt) !important;
+  border-radius: 6px !important;
   box-shadow: none !important;
 }
+.VPFeature .title { color: var(--yamete-accent-soft) !important; }
 
-/* Yamete-specific: oversized logo in sidebar so the icon is prominent on
-   every page (matches the hero size on the home page). */
-.VPSidebar .VPNavBarTitle .title {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 1rem 0 1.5rem;
-}
+/* ===== Yamete sidebar icon block — FULL WIDTH, entire face visible ===== */
 
-.VPSidebar .VPImage,
-.VPSidebar .image-src,
-.VPSidebar .image,
-.VPSidebar a img {
-  width: 96px;
-  height: 96px;
-  object-fit: contain;
-  display: block;
-  margin: 0 auto;
-}
-
-/* Sidebar app-icon hero — render at top of every sidebar */
 .VPSidebar::before {
   content: "";
   display: block;
-  width: 128px;
-  height: 128px;
-  margin: 1.25rem auto 0.5rem;
-  background: url('/yamete/icon.png') center/contain no-repeat;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  margin: 1.25rem 0 1.5rem;
+  background-image: url('/yamete/icon.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
 }
 
-/* The hero on the home page should use the SAME icon size as the sidebar
-   for visual consistency — and the home page also gets the sidebar
-   because we use `layout: doc` with custom hero markup, not `layout: home`. */
+/* ===== Custom hero on the home page (no icon — just text + actions) ===== */
+
 .yamete-hero {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
   padding: 1.5rem 0 2rem;
   border-bottom: 1px solid var(--vp-c-divider);
   margin-bottom: 2rem;
-}
-.yamete-hero img {
-  width: 128px;
-  height: 128px;
-  flex-shrink: 0;
 }
 .yamete-hero h1 {
   font-size: 2.4rem;
@@ -113,11 +173,13 @@
   margin: 0 0 0.4rem;
   border: 0;
   padding: 0;
+  color: var(--yamete-accent-soft);
 }
 .yamete-hero .tagline {
   font-size: 1rem;
   color: var(--vp-c-text-2);
   margin: 0 0 0.9rem;
+  max-width: 60ch;
 }
 .yamete-hero .actions a {
   display: inline-block;
@@ -130,12 +192,14 @@
   margin-right: 0.5rem;
   text-decoration: none;
 }
+.yamete-hero .actions a:hover { background: var(--vp-c-brand-2); }
 .yamete-hero .actions a.alt {
-  background: var(--vp-c-bg-alt);
+  background: transparent;
   color: var(--vp-c-text-1);
   border: 1px solid var(--vp-c-divider);
 }
-
-@media (max-width: 600px) {
-  .yamete-hero { flex-direction: column; text-align: center; }
+.yamete-hero .actions a.alt:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
 }
