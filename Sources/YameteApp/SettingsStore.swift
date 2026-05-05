@@ -33,6 +33,8 @@ public final class SettingsStore {
         // Ambient light detection
         case alsCoverDropThreshold, alsOffDropPercent, alsOffFloorLux
         case alsOnRisePercent, alsOnCeilingLux, alsWindowSec
+        // Thermal sensitivity ratchet (gates which thermal states fire reactions)
+        case thermalReactivityFloor
         // Microphone detection
         case micSpikeThreshold, micCrestFactor, micRiseRate, micConfirmations, micWarmupSamples
         // Headphone motion detection
@@ -123,6 +125,7 @@ public final class SettingsStore {
         Key.alsOnRisePercent.rawValue:       Defaults.alsOnRisePercent,
         Key.alsOnCeilingLux.rawValue:        Defaults.alsOnCeilingLux,
         Key.alsWindowSec.rawValue:           Defaults.alsWindowSec,
+        Key.thermalReactivityFloor.rawValue: Defaults.thermalReactivityFloor,
         // Microphone detection
         Key.micSpikeThreshold.rawValue: Defaults.micSpikeThreshold,
         Key.micCrestFactor.rawValue:    Defaults.micCrestFactor,
@@ -627,6 +630,17 @@ public final class SettingsStore {
         }
     }
 
+    /// Thermal sensitivity ratchet (0...4). Gates which thermal states
+    /// publish a reaction. Default 2 (.serious + .critical).
+    var thermalReactivityFloor: Int {
+        didSet {
+            guard thermalReactivityFloor != oldValue else { return }
+            let c = thermalReactivityFloor.clamped(to: Detection.Thermal.reactivityFloorRange)
+            if c != thermalReactivityFloor { thermalReactivityFloor = c; return }
+            persist(thermalReactivityFloor, .thermalReactivityFloor)
+        }
+    }
+
     // MARK: - Microphone detection
 
     var micSpikeThreshold: Double {
@@ -1108,6 +1122,7 @@ public final class SettingsStore {
         enabledAudioDevices = d.array(forKey: Key.enabledAudioDevices.rawValue) as? [String] ?? []
         enabledSensorIDs = d.array(forKey: Key.enabledSensorIDs.rawValue) as? [String] ?? []
         consensusRequired     = d.integer(forKey: Key.consensusRequired.rawValue)
+        thermalReactivityFloor = d.integer(forKey: Key.thermalReactivityFloor.rawValue)
         // Accelerometer
         accelSpikeThreshold   = d.double(forKey: Key.accelSpikeThreshold.rawValue)
         accelCrestFactor      = d.double(forKey: Key.accelCrestFactor.rawValue)

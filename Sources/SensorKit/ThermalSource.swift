@@ -69,6 +69,10 @@ public final class ThermalSource: Sendable {
     public var isAvailable: Bool { true }
 
     private let provider: ThermalStateProvider
+    /// Closure returning the current `thermalReactivityFloor` (0...4).
+    /// Consulted at publish time so live changes to the SettingsStore
+    /// take effect immediately. Default: full reactivity (4).
+    private let floorProvider: @MainActor () -> Int
 
     /// Lock-protected lifecycle / state. The observer token is
     /// captured at `start()` and removed at `stop()`. `lastState`
@@ -82,8 +86,14 @@ public final class ThermalSource: Sendable {
 
     /// Public init. Default provider reads `ProcessInfo.processInfo`.
     /// Tests inject a `MockThermalStateProvider`.
-    public init(provider: ThermalStateProvider = RealThermalStateProvider()) {
+    /// `floorProvider` returns the current thermal-reactivity floor (0...4).
+    /// Default returns 4 (everything fires) for the no-arg test path.
+    public init(
+        provider: ThermalStateProvider = RealThermalStateProvider(),
+        floorProvider: @MainActor @escaping () -> Int = { 4 }
+    ) {
         self.provider = provider
+        self.floorProvider = floorProvider
         self.state = OSAllocatedUnfairLock(initialState: State())
     }
 
@@ -159,15 +169,39 @@ public final class ThermalSource: Sendable {
         }
         let pending: Pending? = state.withLock { s in
             guard let bus = s.bus else { return nil }
-            // Dedup: identical state → no emission.
+            // Dedup: identical state, no emission.
             if s.lastState == current { return nil }
             s.lastState = current
+            // Reactivity-floor gate: rank-based ratchet from SettingsStore.
+            // Update lastState anyway (so a subsequent floor-bump does not
+            // immediately re-publish a stale reaction); then suppress this
+            // emission if the current state is below the floor.
+            let stateRaw = Self.rawValue(of: current)
+            // Observer queue is .main; safe to assume isolation here.
+            let floor = MainActor.assumeIsolated { floorProvider() }
+            guard Detection.Thermal.shouldFire(stateRaw: stateRaw, floor: floor) else {
+                return nil
+            }
             return Pending(bus: bus, reaction: Self.reaction(for: current))
         }
 
         if let pending {
             log.info("activity:Publish wasGeneratedBy entity:ThermalSource state=\(Self.describe(current))")
             Task { await pending.bus.publish(pending.reaction) }
+        }
+    }
+
+
+    /// Stable raw-value mapping for ProcessInfo.ThermalState.
+    /// Defined locally so the `Detection.Thermal.shouldFire` ratchet
+    /// has a single source of truth that mirrors Apple's enum order.
+    private static func rawValue(of state: ProcessInfo.ThermalState) -> Int {
+        switch state {
+        case .nominal:  return 0
+        case .fair:     return 1
+        case .serious:  return 2
+        case .critical: return 3
+        @unknown default: return 0
         }
     }
 

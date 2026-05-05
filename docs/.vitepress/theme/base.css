@@ -250,8 +250,16 @@ body { background: var(--vp-c-bg); color: var(--vp-c-text-1); }
   background: var(--vp-c-bg-alt);
   border: 1px solid var(--vp-c-divider);
   border-radius: 6px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   cursor: zoom-in;
+}
+.vp-doc div[class*="mermaid"] svg,
+.vp-doc .yamete-mermaid-frame svg {
+  /* Let the SVG render at its natural width when it would otherwise clip
+     text — the frame scrolls horizontally instead. The expand modal handles
+     the wide case via pan/zoom. */
+  min-width: 100%;
 }
 .vp-doc div[class*="mermaid"] svg,
 .vp-doc .yamete-mermaid-frame svg {

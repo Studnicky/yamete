@@ -7,7 +7,7 @@ description: Six gates between a raw sample and a published reaction. Why each o
 
 *Every continuous sensor runs the same six-gate pipeline (`ImpactDetector`): warmup, spike threshold, rise rate, crest factor, confirmation count, intensity remap. Each gate kills a specific class of false positive that the gate before it cannot. Walking the gates in order is walking the design conversation about what counts as an impact.*
 
-Every impact sensor runs an `ImpactDetector` independently. Each sample passes through six gates in order. All six must pass to produce an intensity value. Any gate failure returns nil for that sample — no event emitted, no noise downstream.
+Every impact sensor runs an `ImpactDetector` independently. Each sample passes through six gates in order. All six must pass to produce an intensity value. Any gate failure returns nil for that sample. no event emitted, no noise downstream.
 
         
           ImpactDetector.process() -- per-sample gate chain
