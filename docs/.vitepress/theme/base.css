@@ -151,12 +151,14 @@ body { background: var(--vp-c-bg); color: var(--vp-c-text-1); }
   content: "";
   display: block;
   width: 100%;
-  aspect-ratio: 1 / 1;
+  height: 0;
+  padding-bottom: 100%;          /* forces a real square at sidebar-content width */
   margin: 0.5rem 0 1rem;
   background-image: url('/yamete/icon.png');
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
+  flex-shrink: 0;                /* parent might be flex; do not let it squish */
 }
 
 /* ===== Custom hero on the home page (no icon — just text + actions) ===== */
