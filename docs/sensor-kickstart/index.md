@@ -1,3 +1,8 @@
+---
+title: Sensor Kickstart
+description: Tiny LaunchDaemon that wakes the BMI286 accelerometer at boot and on every wake event.
+---
+
 # yamete-sensor-kickstart
 
 **What it is**: a tiny open-source helper that kickstarts the built-in
