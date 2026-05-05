@@ -31,6 +31,12 @@ const sidebar = [
       { link: '/privacy',          text: 'Privacy' },
     ],
   },
+  {
+    text: 'Credit',
+    items: [
+      { link: '/acknowledgments',  text: 'Acknowledgments' },
+    ],
+  },
 ]
 
 export default withMermaid(defineConfig({
