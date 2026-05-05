@@ -1,7 +1,7 @@
 <p align="center">
-  <a href="https://studnicky.github.io/yamete">
-    <img src="App/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256@1x.png" alt="Yamete" width="160" height="160">
-  </a>
+ <a href="https://studnicky.github.io/yamete">
+ <img src="App/Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256@1x.png" alt="Yamete" width="160" height="160">
+ </a>
 </p>
 
 <h1 align="center">Yamete</h1>
@@ -130,17 +130,17 @@ Lives in your menu bar. Watches the accelerometer, the microphone, and your AirP
 
 ## The full tour is on Pages
 
-Everything past these badges — features, the architecture, the privacy receipts, the install walkthrough, the moans — lives on the project site so this README can stay short.
+Past the badges: features, architecture, privacy receipts, install, the moans. All on the project site so this README stays short.
 
 → **[studnicky.github.io/yamete](https://studnicky.github.io/yamete)**
 
 | | |
 |---|---|
 | **[What it does](https://studnicky.github.io/yamete)** | Features, screenshots, two-builds rationale. |
-| **[Architecture](https://studnicky.github.io/yamete/architecture.html)** | Module graph, detection gates, the IOKit-to-speaker signal path. |
-| **[How seriously tested](https://studnicky.github.io/yamete/#how-seriously-tested)** | The mutation catalog, fuzz layers, host-app lane, pre-push gate. None of it proves the laptop flinches when you hit it. That part you verify yourself. |
+| **[Architecture](https://studnicky.github.io/yamete/architecture.html)** | Module graph, detection gates, the path from IOKit to speakers. |
+| **[How seriously tested](https://studnicky.github.io/yamete/#how-seriously-tested)** | Mutation catalog, fuzz layers, host-app lane, pre-push gate. None of it proves the laptop flinches when you smack it. That part you verify yourself. |
 | **[Support / FAQ](https://studnicky.github.io/yamete/support.html)** | "How do I tune it." "Why won't the accelerometer wake up on App Store." Answers. |
-| **[Privacy](https://studnicky.github.io/yamete/privacy.html)** | Nothing leaves your Mac. Nothing. The page elaborates anyway. |
+| **[Privacy](https://studnicky.github.io/yamete/privacy.html)** | Nothing leaves your Mac. Nothing. The page says it again with feeling. |
 | **[Install](https://studnicky.github.io/yamete/INSTALLATION.html)** | Download the DMG, drag the app over, done. App Store sandbox needs the sensor-kickstart helper once per machine. |
 | **[CHANGELOG](docs/CHANGELOG.md)** | Every release, what changed, why. |
 
@@ -157,24 +157,24 @@ cd yamete && make install
 
 ## Why does this exist
 
-Apple Silicon MacBooks ship with a real BMI286 accelerometer — the same class of part that's in phones — and Apple exposes exactly zero public API for it on macOS. The entire `CMMotionManager` surface is `API_UNAVAILABLE(macos)`. I read that as an invitation. [Full context on the project site.](https://studnicky.github.io/yamete/#why)
+Apple Silicon MacBooks ship with a real BMI286 accelerometer (same chip class as the one in your phone) and Apple flags every line of `CMMotionManager` as `API_UNAVAILABLE(macos)`. That sounded bratty to me. I touched it anyway. [Full context on the project site.](https://studnicky.github.io/yamete/#why)
 
-> If you use this daily, I genuinely want to know why. If you install it, laugh once, and delete it, that's a completely valid outcome and I'm glad you stopped by.
+> If you use this daily I want to know what's wrong with you. If you install it, laugh once, and delete it, that's the right outcome and I'm glad you stopped by.
 
 ## Acknowledgments
 
-Stands on the work of researchers who've reverse-engineered Apple Silicon hardware:
+Stands on people who already did the reverse-engineering Apple wouldn't:
 
-- **[KBPulse](https://github.com/EthanRDoesMC/KBPulse/)** — Keyboard brightness via CoreBrightness on M1+.
-- **[spank](https://github.com/vlasvlasvlas/spank)** — IOKit patterns and hardware-interaction approaches.
-- **[apple-silicon-accelerometer](https://github.com/olvvier/apple-silicon-accelerometer)** — Proved the BMI286 was accessible.
-- **[mac-hardware-toys](https://github.com/pirate/mac-hardware-toys)** — Keyboard-brightness wrapping, system-level integration patterns.
-- **[macbook-lighter](https://github.com/harttle/macbook-lighter)** — Brightness-daemon design, light-sensing approaches.
+- **[KBPulse](https://github.com/EthanRDoesMC/KBPulse/)**. Keyboard brightness via CoreBrightness on M1+.
+- **[spank](https://github.com/vlasvlasvlas/spank)**. IOKit patterns and hardware-interaction approaches.
+- **[apple-silicon-accelerometer](https://github.com/olvvier/apple-silicon-accelerometer)**. Proved the BMI286 was accessible.
+- **[mac-hardware-toys](https://github.com/pirate/mac-hardware-toys)**. Keyboard-brightness wrapping, system-level integration patterns.
+- **[macbook-lighter](https://github.com/harttle/macbook-lighter)**. Brightness-daemon design, light-sensing approaches.
 
-This app only exists because others did the reverse-engineering Apple won't.
+This app only exists because they did the work first. Pay them attention.
 
 ## License
 
-MIT — [LICENSE](LICENSE). Bundled sound and face assets carry their own provenance: [docs/LICENSES-CONTENT.md](docs/LICENSES-CONTENT.md).
+MIT. See [LICENSE](LICENSE). Bundled sound and face assets carry their own provenance: [docs/LICENSES-CONTENT.md](docs/LICENSES-CONTENT.md).
 
 Issues and PRs at [github.com/Studnicky/yamete](https://github.com/Studnicky/yamete). Support: GitHub Issues only. No email.

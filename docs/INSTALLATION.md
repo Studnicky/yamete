@@ -25,9 +25,9 @@ Compatible headphones for motion detection: AirPods Pro, AirPods Max, AirPods (3
 Download the latest direct-distribution `.dmg` from [Releases](https://github.com/Studnicky/yamete/releases), open it, and drag **Yamete Direct.app** to `/Applications`.
 
 On first launch:
-1. macOS may prompt "Yamete Direct is from an identified developer". click **Open**
+1. MacOS may prompt "Yamete Direct is from an identified developer". Click **Open**
 2. The app appears in the menu bar (no Dock icon)
-3. Grant microphone permission when prompted (optional. accelerometer works without it)
+3. Grant microphone permission when prompted (optional. Accelerometer works without it)
 
 ## Build from source
 
@@ -93,7 +93,7 @@ Each main control is a **range slider** with two thumbs defining a response wind
 
 **Reactivity**. Impact force response window. The low thumb sets the weakest force that triggers a response. The high thumb sets the force for maximum response. Higher values respond to lighter impacts. Five tiers (Tap / Light / Med / Firm / Hard) are marked on the ruler.
 
-**Volume**. Audio playback level window. Impact intensity maps linearly between the low and high thumb values. Clip selection also follows intensity. lighter impacts play shorter clips.
+**Volume**. Audio playback level window. Impact intensity maps linearly between the low and high thumb values. Clip selection also follows intensity. Lighter impacts play shorter clips.
 
 **Flash Opacity**. Screen flash brightness window. The flash envelope (attack/hold/decay timing) is shaped by impact intensity and gated inside the sound clip duration.
 
