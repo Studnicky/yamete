@@ -57,7 +57,7 @@ function initSidebar(tocItems, activePage) {
     <a href="index.html"><img src="assets/icon.png" alt="Yamete icon" class="app-icon"></a>
     <h1><a href="index.html" style="color:inherit;text-decoration:none">Yamete</a></h1>
     <p class="tagline">Your MacBook reacts when you smack it.</p>
-    <span class="badge">macOS 14+ · v2.0.0</span>
+    <span class="badge">macOS 14+ · v2.1.0</span>
 
     <a class="dl-btn" href="${RELEASES_URL}">Download Yamete Direct</a>
     <span class="dl-sub">App Store coming soon</span>
