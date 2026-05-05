@@ -228,3 +228,121 @@ body { background: var(--vp-c-bg); color: var(--vp-c-text-1); }
 .yamete-fade-leave-active { transition: opacity 1.6s ease-in-out; }
 .yamete-fade-enter-from,
 .yamete-fade-leave-to { opacity: 0; }
+
+/* ===== Code wrapping (long inline code shouldn't break the layout) ===== */
+.vp-doc :not(pre) > code {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.vp-doc pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ===== Mermaid diagrams: full-width, click-to-expand ===== */
+.vp-doc div[class*="mermaid"],
+.vp-doc .yamete-mermaid-frame {
+  position: relative;
+  max-width: 100%;
+  margin: 1.5rem 0;
+  padding: 0.5rem;
+  background: var(--vp-c-bg-alt);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.vp-doc div[class*="mermaid"] svg,
+.vp-doc .yamete-mermaid-frame svg {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+  margin: 0 auto;
+}
+.yamete-mermaid-expand {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 9px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--vp-c-text-2);
+  background: var(--vp-c-bg);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 4px;
+  cursor: zoom-in;
+  z-index: 1;
+  user-select: none;
+}
+.yamete-mermaid-expand:hover {
+  color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+/* Modal overlay for the expanded diagram */
+.yamete-mermaid-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+  cursor: grab;
+}
+.yamete-mermaid-modal.dragging { cursor: grabbing; }
+.yamete-mermaid-modal-toolbar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+}
+.yamete-mermaid-modal-toolbar button {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: var(--vp-c-bg);
+  border: 1px solid var(--vp-c-divider);
+  color: var(--vp-c-text-1);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.yamete-mermaid-modal-toolbar button:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+}
+.yamete-mermaid-modal-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.yamete-mermaid-modal-stage svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: 0 0;
+  max-width: none !important;
+  height: auto !important;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.yamete-mermaid-modal-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  color: var(--vp-c-text-3);
+  background: var(--vp-c-bg);
+  padding: 4px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  z-index: 2;
+}

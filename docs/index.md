@@ -19,13 +19,18 @@ layout: doc
 <div class="feature-grid">
 
 <div>
-<h3>Three Sensors, One Opinion</h3>
-<p>Built-in accelerometer, microphone transient detection, and AirPods IMU. A consensus engine fuses them before firing so a passing truck doesn't make your laptop cry in public.</p>
+<h3>Three Impact Sensors, One Opinion</h3>
+<p>Built-in accelerometer (BMI286 via the SPU HID broker), microphone transient detection, and AirPods IMU. A consensus engine fuses them before firing so a passing truck doesn't make your laptop cry in public. Per-sensor six-gate pipeline (warmup, spike, rise rate, crest factor, confirmations, intensity). Detail in <a href="/yamete/architecture/detection-gates">Detection gates</a>.</p>
 </div>
 
 <div>
-<h3>Eleven Event Sources</h3>
-<p>USB attach/detach, power adapter plug/unplug, audio peripheral add/remove, Bluetooth connect/disconnect, Thunderbolt attach/detach, display hotplug, sleep/wake. Plus lid open/closed/slammed (hinge angle from the Apple Silicon SPU), thermal pressure transitions (nominal/fair/serious/critical), gyroscope spikes (lid yank, laptop spin), and ambient-light step changes (lights flipped, sensor covered). Each fires its own reaction with its own output toggles.</p>
+<h3>Eleven System Event Sources</h3>
+<p>USB attach/detach, power adapter plug/unplug, audio peripheral add/remove, Bluetooth connect/disconnect, Thunderbolt attach/detach, display hotplug, sleep/wake. Plus lid open/closed/slammed (hinge angle from the Apple Silicon SPU), thermal pressure transitions (nominal / fair / serious / critical), gyroscope spikes (lid yank, laptop spin), and ambient-light step changes (lights flipped, sensor covered). Each fires its own reaction with its own output toggles.</p>
+</div>
+
+<div>
+<h3>Three Input-Activity Sources</h3>
+<p>Trackpad (touching / sliding / contact / tapping / circling — the circling gate integrates Δangle and fires on a full revolution), mouse (click + sustained scroll, with device-attribution to filter trackpad-originated events), keyboard (rate-windowed key-press tap). Independent enable per source. Per-event toggles still apply.</p>
 </div>
 
 <div>
