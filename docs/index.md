@@ -5,15 +5,12 @@ layout: doc
 ---
 
 <div class="yamete-hero">
-  <img src="/icon.png" alt="Yamete app icon">
-  <div>
-    <h1>Yamete</h1>
-    <p class="tagline">Lives in your menu bar. Watches the accelerometer, the microphone, your AirPods. Reacts when you touch it. The face has range, the sounds have opinions, and the Direct build has no shame whatsoever.</p>
-    <div class="actions">
-      <a href="https://github.com/Studnicky/yamete/releases/latest">Download (Direct)</a>
-      <a class="alt" href="./architecture">How it works</a>
-      <a class="alt" href="https://github.com/Studnicky/yamete">Source</a>
-    </div>
+  <h1>Yamete</h1>
+  <p class="tagline">Lives in your menu bar. Watches the accelerometer, the microphone, your AirPods. Reacts when you touch it. The face has range, the sounds have opinions, and the Direct build has no shame whatsoever.</p>
+  <div class="actions">
+    <a href="https://github.com/Studnicky/yamete/releases/latest">Download (Direct)</a>
+    <a class="alt" href="./architecture">How it works</a>
+    <a class="alt" href="https://github.com/Studnicky/yamete">Source</a>
   </div>
 </div>
 
