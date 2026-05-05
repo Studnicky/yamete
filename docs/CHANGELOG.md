@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-05-04
+
 ### Added
 - **Four new sensor surfaces, each with full menu controls and per-reaction
   matrix integration.** Following gap analysis against four reference repos
@@ -48,10 +50,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and emit one Reaction per user-meaningful state change. Both feed the
   same bus.
 
+- **Menubar redesign.** Header now puts the static "Yamete" title and face
+  art on the left with a body-only rotator strip; impact counter folded
+  into the header rows; paused indicator centred between title and counter
+  and re-renders on fusion-state change. Master kill-switch row per group
+  drives a 35→60% dim of the group's contents via semantic color roles.
+  Four group accordions (impact / device / response / sensor) default to
+  collapsed. Header rotator pulls spicy moans from the Direct overlay
+  with non-repeating shuffle. Impact-detection promoted to its own master
+  accordion with Impact Consensus rendered below the threshold row.
+- **Impact Consensus relabel.** "Sensor Consensus" → "Impact Consensus"
+  across all 40 lprojs; help text and unit copy follow. The consensus
+  slider only governs impact-sensor fusion (accelerometer, microphone,
+  AirPods motion); with eleven event sources in v2.1.0 — most discrete
+  state-transition — the original label was misleading.
+- **Active-above-inactive stimuli sort.** `StimuliSection` partitions
+  enabled stimuli above disabled, alphabetised within each group by
+  localised title. Toggling a stimulus relocates it on the next render.
+  Impact-sensor consensus group is composed in `SensorSection` above
+  `StimuliSection` and is pinned by composition, not by sort.
+- **App icon regenerated.** New 10-resolution `AppIcon.appiconset`
+  rendered from the canonical face SVG: pink rounded bezel + white
+  face. Replaces the inherited template icon.
+- **Observation contract tests.** New `Tests/ObservationContractTests.swift`
+  asserts that view-consumed Observable types stay coupled to SwiftUI
+  re-render — caught at test time instead of "the menu didn't update."
+
 ### Changed
 - Event source count documented as **eleven** (was: seven).
 - Mutation catalog grew from 111 → 130 entries (5 gyro, 5 lid, 5 ALS, 4
   thermal). All caught.
+- README slimmed; ARCHITECTURE / CHANGELOG / LICENSES-CONTENT / PRIVACY
+  moved into `docs/`.
+- Two passes of historical/temporal comment scrubbing across SensorKit,
+  YameteApp views, and Tests.
+
+### Fixed
+- Paused indicator now re-renders on fusion-state change (was static
+  after first paint).
 
 ## [2.0.0] - 2026-05-02
 

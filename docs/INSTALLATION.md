@@ -4,7 +4,7 @@
 
 - macOS 14.0+ (Sonoma)
 - Built with Swift 6 (complete strict concurrency)
-- Latest release: 2.0.0
+- Latest release: 2.1.0
 
 ### Sensor compatibility by Mac model
 
