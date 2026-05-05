@@ -58,3 +58,84 @@
   border-radius: 4px !important;
   box-shadow: none !important;
 }
+
+/* Yamete-specific: oversized logo in sidebar so the icon is prominent on
+   every page (matches the hero size on the home page). */
+.VPSidebar .VPNavBarTitle .title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1rem 0 1.5rem;
+}
+
+.VPSidebar .VPImage,
+.VPSidebar .image-src,
+.VPSidebar .image,
+.VPSidebar a img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Sidebar app-icon hero — render at top of every sidebar */
+.VPSidebar::before {
+  content: "";
+  display: block;
+  width: 128px;
+  height: 128px;
+  margin: 1.25rem auto 0.5rem;
+  background: url('/yamete/icon.png') center/contain no-repeat;
+}
+
+/* The hero on the home page should use the SAME icon size as the sidebar
+   for visual consistency — and the home page also gets the sidebar
+   because we use `layout: doc` with custom hero markup, not `layout: home`. */
+.yamete-hero {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem 0 2rem;
+  border-bottom: 1px solid var(--vp-c-divider);
+  margin-bottom: 2rem;
+}
+.yamete-hero img {
+  width: 128px;
+  height: 128px;
+  flex-shrink: 0;
+}
+.yamete-hero h1 {
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.4rem;
+  border: 0;
+  padding: 0;
+}
+.yamete-hero .tagline {
+  font-size: 1rem;
+  color: var(--vp-c-text-2);
+  margin: 0 0 0.9rem;
+}
+.yamete-hero .actions a {
+  display: inline-block;
+  background: var(--vp-c-brand-1);
+  color: var(--vp-button-brand-text);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.55rem 1rem;
+  border-radius: 6px;
+  margin-right: 0.5rem;
+  text-decoration: none;
+}
+.yamete-hero .actions a.alt {
+  background: var(--vp-c-bg-alt);
+  color: var(--vp-c-text-1);
+  border: 1px solid var(--vp-c-divider);
+}
+
+@media (max-width: 600px) {
+  .yamete-hero { flex-direction: column; text-align: center; }
+}
