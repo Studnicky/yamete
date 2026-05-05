@@ -10,7 +10,11 @@
 # Canonical source: project.yml MARKETING_VERSION
 # Derived surfaces (asserted to match):
 #   - docs/INSTALLATION.md   line "- Latest release: X.Y.Z"
-#   - docs/assets/sidebar.js line macOS 14+ . vX.Y.Z inside <span class="badge">
+#
+# Note: docs/assets/sidebar.js was the previous additional surface; it
+# was removed in the VitePress site migration (the version is no longer
+# rendered in the new sidebar). If we re-introduce a version display in
+# the VitePress hero or badge, add a check for that surface here.
 #
 # Surfaces deliberately NOT asserted:
 #   - CHANGELOG.md headings -- historical entries reference past versions,
@@ -41,11 +45,6 @@ report() {
 inst="$(awk -F': ' '/^- Latest release:/{print $2; exit}' docs/INSTALLATION.md)"
 if [[ "$inst" != "$CANONICAL" ]]; then
   report "docs/INSTALLATION.md" "$inst"
-fi
-
-sidebar="$(grep -oE 'macOS 14\+ . v[0-9]+\.[0-9]+\.[0-9]+' docs/assets/sidebar.js | head -1 | sed 's/.* v//')"
-if [[ "$sidebar" != "$CANONICAL" ]]; then
-  report "docs/assets/sidebar.js" "$sidebar"
 fi
 
 if [[ $fail -ne 0 ]]; then

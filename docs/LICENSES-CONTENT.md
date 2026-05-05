@@ -1,3 +1,7 @@
+---
+title: Content licenses
+---
+
 # Content Licenses
 
 All media assets bundled with Yamete are original works by Studnicky.
@@ -21,4 +25,4 @@ All media assets bundled with Yamete are original works by Studnicky.
 
 ## Source Code
 
-The source code is licensed under the MIT License. See [LICENSE](LICENSE).
+The source code is licensed under the MIT License. See [LICENSE](https://github.com/Studnicky/yamete/blob/master/LICENSE).

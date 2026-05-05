@@ -1,3 +1,7 @@
+---
+title: Changelog
+---
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
@@ -6,6 +10,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [2.1.1] - 2026-05-04
+
+### Fixed
+- **Release workflow** now reads `docs/CHANGELOG.md` instead of the
+  pre-reorg root `CHANGELOG.md` path. The v2.1.0 tag's release run
+  failed at the changelog-extract step (`awk: can't open file
+  CHANGELOG.md`) and never published the GitHub Release with the DMG
+  attached. CI-only fix; no app behaviour changes between v2.1.0 and
+  v2.1.1. v2.1.1 is the version that actually ships a published release.
 
 ## [2.1.0] - 2026-05-04
 

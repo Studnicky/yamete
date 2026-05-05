@@ -1,3 +1,7 @@
+---
+title: Remediation
+---
+
 # Yamete — Remediation Plan
 
 Generated from multi-agent audit covering all four SPM modules.  
