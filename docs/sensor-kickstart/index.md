@@ -20,7 +20,7 @@ falls back to microphone + headphone-motion only.
 MacBook Pro who want the tactile detection channel (desk slaps and taps
 picked up through the laptop chassis) in addition to the microphone. On
 Macs without the BMI286 (iMac, Mac Mini, Mac Studio, Mac Pro, Intel Macs),
-this helper does nothing useful. there is no sensor to kickstart.
+this helper does nothing useful. There is no sensor to kickstart.
 
 **Who should NOT install it**: anyone who is not comfortable compiling a
 ~250-line Swift source file and installing a LaunchDaemon as root. The
@@ -41,76 +41,76 @@ the community.
 Please include:
 
 - **Your Mac model**: e.g., "MacBook Pro 14-inch, M2 Pro, 2023". The
-  "About This Mac" dialog has all of this.
+ "About This Mac" dialog has all of this.
 - **Your macOS version**: full string including the point release, e.g.
-  `14.5 (23F79)`.
-- **What you were expecting vs. what happened**: one line each is fine.
+ `14.5 (23F79)`.
+- **What you were expecting vs. What happened**: one line each is fine.
 - **Output of the probe command, before and after running `kickstart`**:
-  ```bash
-  /usr/local/libexec/yamete-sensor-kickstart probe
-  /usr/local/libexec/yamete-sensor-kickstart kickstart
-  /usr/local/libexec/yamete-sensor-kickstart probe
-  ```
+ ```bash
+ /usr/local/libexec/yamete-sensor-kickstart probe
+ /usr/local/libexec/yamete-sensor-kickstart kickstart
+ /usr/local/libexec/yamete-sensor-kickstart probe
+ ```
 - **The last 20 lines of the LaunchDaemon log** (after a reboot if you
-  can reproduce the issue at boot):
-  ```bash
-  tail -20 /var/log/yamete-sensor-kickstart.log
-  ```
+ can reproduce the issue at boot):
+ ```bash
+ tail -20 /var/log/yamete-sensor-kickstart.log
+ ```
 - **The last 20 lines of the Yamete app log** (helpful for cross-
-  referencing the probe result with what Yamete actually saw):
-  ```bash
-  tail -20 "$HOME/Library/Containers/com.studnicky.yamete/Data/Library/Application Support/Yamete/logs/yamete-$(date +%Y-%m-%d).log"
-  ```
+ referencing the probe result with what Yamete actually saw):
+ ```bash
+ tail -20 "$HOME/Library/Containers/com.studnicky.yamete/Data/Library/Application Support/Yamete/logs/yamete-$(date +%Y-%m-%d).log"
+ ```
 
 Reports on Macs where this **does** work are just as valuable as reports
-where it doesn't. we are building a known-working matrix and every data
+where it doesn't. We are building a known-working matrix and every data
 point helps.
 
 ## Safety notes
 
 1. **This is an open-source helper, not an Apple-sanctioned
-   interface.** The three property writes it issues (`ReportInterval`,
-   `SensorPropertyReportingState`, `SensorPropertyPowerState` on the
-   `AppleSPUHIDDriver` service) are Apple-internal driver commands. They
-   are invoked via public IOKit functions with no private API imports,
-   but the property keys themselves are undocumented. A future macOS
-   update can change or remove this surface without warning.
+ interface.** The three property writes it issues (`ReportInterval`,
+ `SensorPropertyReportingState`, `SensorPropertyPowerState` on the
+ `AppleSPUHIDDriver` service) are Apple-internal driver commands. They
+ are invoked via public IOKit functions with no private API imports,
+ but the property keys themselves are undocumented. A future macOS
+ update can change or remove this surface without warning.
 2. **It runs as root via a LaunchDaemon.** That is necessary because
-   LaunchDaemons execute outside of any user's App Sandbox. Review the
-   source (`yamete-sensor-kickstart.swift`) before running the installer
-   if you want to audit exactly what it does. it is short enough to
-   read in a few minutes.
+ LaunchDaemons execute outside of any user's App Sandbox. Review the
+ source (`yamete-sensor-kickstart.swift`) before running the installer
+ if you want to audit exactly what it does. It is short enough to
+ read in a few minutes.
 3. **It does not touch the network, write to user data, load kexts,
-   install launch agents as other users, or persist anything other
-   than the LaunchDaemon plist + the compiled binary.** The install
-   paths are `/usr/local/libexec/yamete-sensor-kickstart` and
-   `/Library/LaunchDaemons/com.studnicky.yamete.sensor-kickstart.plist`.
-   The uninstall script removes both.
+ install launch agents as other users, or persist anything other
+ than the LaunchDaemon plist + the compiled binary.** The install
+ paths are `/usr/local/libexec/yamete-sensor-kickstart` and
+ `/Library/LaunchDaemons/com.studnicky.yamete.sensor-kickstart.plist`.
+ The uninstall script removes both.
 4. **`sudo` is required** for the install and uninstall scripts. You
-   will be prompted for your admin password.
+ will be prompted for your admin password.
 
 ## Files in this directory
 
-- **`yamete-sensor-kickstart.swift`**. the helper source (single file,
-  uses only `Foundation` and `IOKit`). Implements four subcommands:
-  - `probe`. report whether the sensor is currently streaming
-  - `kickstart`. one-shot: write the activation properties and exit
-  - `deactivate`. one-shot: stop streaming (for testing)
-  - `daemon`. long-lived: run `kickstart` on startup, then subscribe to
-    IOKit system power notifications via `IORegisterForSystemPower` and
-    re-run `kickstart` on every wake event. **This is how the shipping
-    LaunchDaemon invokes the helper.**
-- **`com.studnicky.yamete.sensor-kickstart.plist`**. the LaunchDaemon
-  plist. `RunAtLoad = true`, `KeepAlive = true`, `ProcessType = Background`.
-  the helper starts at boot in `daemon` mode, kickstarts the sensor once,
-  then parks itself in `CFRunLoopRun` waiting for wake notifications.
-  Idle CPU cost is effectively zero (it is asleep on a run loop).
-  Logs to `/var/log/yamete-sensor-kickstart.log`.
-- **`install.sh`**. compiles the Swift file with `swiftc`, copies the
-  binary to `/usr/local/libexec/`, copies the plist to
-  `/Library/LaunchDaemons/`, and loads it with `launchctl bootstrap`.
-- **`uninstall.sh`**. unloads the LaunchDaemon and removes both files
-  plus the log.
+- **`yamete-sensor-kickstart.swift`**. The helper source (single file,
+ uses only `Foundation` and `IOKit`). Implements four subcommands:
+ - `probe`. Report whether the sensor is currently streaming
+ - `kickstart`. One-shot: write the activation properties and exit
+ - `deactivate`. One-shot: stop streaming (for testing)
+ - `daemon`. Long-lived: run `kickstart` on startup, then subscribe to
+ IOKit system power notifications via `IORegisterForSystemPower` and
+ re-run `kickstart` on every wake event. **This is how the shipping
+ LaunchDaemon invokes the helper.**
+- **`com.studnicky.yamete.sensor-kickstart.plist`**. The LaunchDaemon
+ plist. `RunAtLoad = true`, `KeepAlive = true`, `ProcessType = Background`.
+ the helper starts at boot in `daemon` mode, kickstarts the sensor once,
+ then parks itself in `CFRunLoopRun` waiting for wake notifications.
+ Idle CPU cost is zero (it is asleep on a run loop).
+ Logs to `/var/log/yamete-sensor-kickstart.log`.
+- **`install.sh`**. Compiles the Swift file with `swiftc`, copies the
+ binary to `/usr/local/libexec/`, copies the plist to
+ `/Library/LaunchDaemons/`, and loads it with `launchctl bootstrap`.
+- **`uninstall.sh`**. Unloads the LaunchDaemon and removes both files
+ plus the log.
 
 ## Installation
 
@@ -128,8 +128,8 @@ The installer will:
 4. Unload any previously-installed version of the LaunchDaemon.
 5. Copy the binary and plist to their system locations (sudo prompt).
 6. Load the LaunchDaemon with `launchctl bootstrap` (triggers `RunAtLoad`
-  . the daemon starts, kickstarts the sensor immediately, and registers
-   its wake watcher).
+ . The daemon starts, kickstarts the sensor immediately, and registers
+ its wake watcher).
 7. Probe the sensor again to confirm the kickstart succeeded.
 
 If the final probe succeeds, launch or relaunch Yamete. Open the menu
@@ -139,7 +139,7 @@ microphone.
 
 From the next reboot onward, the LaunchDaemon starts automatically at
 boot and Yamete picks up the live sensor without any further action.
-The daemon runs for the whole session. it re-runs the kickstart on
+The daemon runs for the whole session. It re-runs the kickstart on
 every wake event so sleep / lid close / display sleep cannot cool it
 out from under the app.
 
@@ -155,7 +155,7 @@ and Yamete silently falls back to microphone + headphone-motion.
 
 ## Troubleshooting
 
-**`probe: active=false` after installing**  
+**`probe: active=false` after installing** 
 The LaunchDaemon may have run before the IOKit service matching became
 ready. Try forcing it to run again:
 
@@ -164,36 +164,36 @@ sudo launchctl kickstart -k system/com.studnicky.yamete.sensor-kickstart
 /usr/local/libexec/yamete-sensor-kickstart probe
 ```
 
-**`probe: no AppleSPUHIDDriver dispatchAccel=Yes service found`**  
+**`probe: no AppleSPUHIDDriver dispatchAccel=Yes service found`** 
 Your Mac doesn't have the BMI286 accelerometer (iMac, Mac Mini, Mac
 Studio, Mac Pro, or Intel Mac). The helper won't help on this hardware;
 Yamete will run on microphone + headphone-motion only.
 
-**`error: this helper is only useful on Apple Silicon Macs`**  
+**`error: this helper is only useful on Apple Silicon Macs`** 
 The installer detected an Intel architecture. Even if you're running
 the Intel build of macOS on Apple Silicon via Rosetta (you shouldn't
 be), the IOKit calls need native arm64. Nothing to do here.
 
-**Yamete still doesn't show the Accelerometer in the Sensors list**  
+**Yamete still doesn't show the Accelerometer in the Sensors list** 
 Open the Yamete menu bar dropdown once after the helper has run. The
 sensor availability is probed when the dropdown opens. Also make sure
-you toggled the Accelerometer row on. the helper kickstarts the
+you toggled the Accelerometer row on. The helper kickstarts the
 hardware but doesn't change Yamete's settings.
 
-**Does the sensor survive sleep/wake?**  
+**Does the sensor survive sleep/wake?** 
 Yes, two ways:
 
 1. **On the hardware we have tested**, the BMI286 sits in Apple
-   Silicon's always-on power domain and streams continuously at 100Hz
-   across lid close / open cycles with no intervention. Verified
-   empirically: a 35-second sleep period showed `_num_events`
-   incrementing at the full 100 events/sec rate throughout sleep.
+ Silicon's always-on power domain and streams continuously at 100Hz
+ across lid close / open cycles with no intervention. Verified
+ empirically: a 35-second sleep period showed `_num_events`
+ incrementing at the full 100 events/sec rate throughout sleep.
 2. **Defense in depth**: the daemon subscribes to IOKit system power
-   notifications via `IORegisterForSystemPower` and re-runs
-   `kickstart()` on every `kIOMessageSystemHasPoweredOn` event. Even if
-   a future macOS revision or a specific hardware configuration starts
-   cooling the sensor during sleep, the daemon will re-run the
-   kickstart the moment the system finishes waking.
+ notifications via `IORegisterForSystemPower` and re-runs
+ `kickstart()` on every `kIOMessageSystemHasPoweredOn` event. Even if
+ a future macOS revision or a specific hardware configuration starts
+ cooling the sensor during sleep, the daemon will re-run the
+ kickstart the moment the system finishes waking.
 
 You can confirm the wake handler is firing by tailing the log across a
 sleep cycle:

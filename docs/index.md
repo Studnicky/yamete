@@ -5,18 +5,18 @@ layout: doc
 ---
 
 <div class="yamete-hero">
-  <h1>Yamete</h1>
-  <p class="tagline">Lives in your menu bar. Watches the accelerometer, the microphone, your AirPods. Reacts when you touch it. The face has range, the sounds have opinions, and the Direct build has no shame whatsoever.</p>
-  <div class="actions">
-    <a href="https://github.com/Studnicky/yamete/releases/latest">Download (Direct)</a>
-    <a class="alt" href="./architecture">How it works</a>
-    <a class="alt" href="https://github.com/Studnicky/yamete">Source</a>
-  </div>
+ <h1>Yamete</h1>
+ <p class="tagline">Lives in your menu bar. Watches the accelerometer, the microphone, your AirPods. Reacts when you touch it. The face has range. The sounds have opinions. The Direct build has no shame at all.</p>
+ <div class="actions">
+ <a href="https://github.com/Studnicky/yamete/releases/latest">Download (Direct)</a>
+ <a class="alt" href="./architecture">How it works</a>
+ <a class="alt" href="https://github.com/Studnicky/yamete">Source</a>
+ </div>
 </div>
 
-It also watches your USB ports, the power adapter, audio peripherals, Bluetooth, Thunderbolt, every display, sleep and wake, the lid hinge, the gyro, the ambient-light sensor, and the thermal pressure level. Why react to one event when you can react to all of them.
+It also watches your USB ports, power adapter, audio peripherals, Bluetooth, Thunderbolt, every display, sleep and wake, the lid hinge, the gyro, the ambient-light sensor, the thermal pressure level. Picking one would be rude.
 
-Built because I wanted to. Runs entirely offline. Stores nothing. Will not meaningfully improve your life. *That's the whole point.*
+Built because I felt like it. Runs offline. Stores nothing. Will not improve your life in any way I'd describe with a straight face. *That's the whole point.*
 
 ## What it does (the menu)
 
@@ -32,11 +32,11 @@ Built because I wanted to. Runs entirely offline. Stores nothing. Will not meani
 
 Apple Silicon MacBooks ship with a real BMI286 accelerometer. Same chip class as the one in your phone. Apple exposes zero public macOS API for it. The whole `CMMotionManager` surface is `API_UNAVAILABLE(macos)`.
 
-I read that as an invitation.
+That sounded bratty to me. I touched it anyway.
 
-The result is a fully functional reason to touch your laptop with intent. The engineering equivalent of a ship in a bottle. The hard part is invisible. The finished thing is not especially useful. Explaining why it exists at dinner parties is awkward, in a way I find personally fulfilling.
+The result is a fully functional excuse to touch your laptop too hard. Engineering equivalent of a ship in a bottle. Hard part invisible, finished thing useless, dinner-party explanation awkward in a way I personally enjoy.
 
-> If you use this daily I genuinely want to know why. If you install it, laugh once, and delete it, that's a perfectly valid outcome and I'm glad you stopped by.
+> If you use this daily I want to know what's wrong with you. If you install it, laugh once, and delete it, that's the right outcome and I'm glad you stopped by.
 
 ## How the bus works
 
@@ -56,7 +56,7 @@ It is a menu bar app (`LSUIElement`). No Dock icon. No app windows. No onboardin
 
 ## How seriously is this tested (way too)
 
-For a joke app whose entire premise is "your laptop yells when you smack it," the test apparatus is genuinely disproportionate.
+For a joke app whose pitch is "your laptop yells when you smack it," the test apparatus is oversexed.
 
 * ~795 unit and integration cells across two SPM build variants (default and `DIRECT_BUILD`)
 * A 130-entry **mutation catalog**. Every entry is a deliberate code change to a production gate that must cause a named test to fail. Every gate caught.
@@ -70,36 +70,36 @@ None of this proves the laptop actually flinches when you hit it. That part you 
 
 ## Privacy (nothing leaves, nothing)
 
-Zero network connections. All sensor data processed locally, in real time. Microphone audio is analysed for transient peaks and immediately discarded. Nothing recorded. Logs auto-delete after 24 hours. No accounts, no tracking, no ads, no telemetry, no analytics, no "just this once" exceptions to any of the above.
+Zero network connections. Everything happens locally. Microphone audio gets scanned for transient peaks and thrown away the same frame. Nothing recorded. Logs auto-delete after 24 hours. No accounts. No tracking. No ads. No telemetry. No analytics. No "just this once."
 
-If that sounds suspiciously clean, the source code is public and you are welcome to read every line. [Full Privacy Policy.](/privacy)
+If that sounds suspiciously clean, the source is public. Read every line. [Full Privacy Policy.](/privacy)
 
 ## Requirements
 
 * macOS 14.0 or later (Sonoma)
-* Apple Silicon MacBook (M1 through M4) for the tactile accelerometer channel
-* Any Mac with a microphone for the sound-based path, which works everywhere
-* AirPods Pro or Beats for headphone motion (optional, deeply silly, therefore recommended)
+* Apple Silicon MacBook (M1 through M4) so it can feel you smacking it
+* Any Mac with a microphone so it can hear you smacking it
+* AirPods Pro or Beats for headphone motion (optional, very silly, recommended)
 
-On an Intel Mac, an iMac, a Mac Mini, a Mac Studio, or a Mac Pro: microphone detection works fine. Every system event source above works on every Mac. You just cannot physically smack the laptop, on account of not having a laptop. Life finds a way.
+On an Intel Mac, iMac, Mac Mini, Mac Studio, or Mac Pro: microphone detection works fine. Every system event source above works on every Mac. You just cannot physically smack the laptop, on account of not having a laptop. Life finds a way.
 
 ## Two builds
 
 * **Yamete.** The Mac App Store build, rated 12+, with tame notification copy ("Mm, again?", "Show off~", "OUCH"). Plausibly deniable in most workplaces.
-* **Yamete Direct.** A notarised direct download with considerably less restrained notification copy. Not submitted to the App Store. For consenting adults who specifically wanted that.
+* **Yamete Direct.** A notarised direct download with notification copy that has fewer brakes on. Not submitted to the App Store. For consenting adults who knew what they were clicking.
 
-Same detection engine. Same event sources. Same sounds. Same face library. Same 40 locales in both. The only difference is what your Mac says about it.
+Same detection engine. Same event sources. Same sounds. Same face library. Same 40 locales. Only difference: what your Mac says about it.
 
 ## Accelerometer setup on App Store (optional)
 
-The App Store build runs under App Sandbox. Sandbox silently blocks the IORegistry writes needed to wake the BMI286, so out of the box that build uses microphone and headphone motion only. Honestly fine. The microphone path is good.
+The App Store build runs under App Sandbox. Sandbox quietly drops the IORegistry writes that would wake the BMI286, so out of the box that build runs on microphone and headphone motion only. Fine. The microphone path is good.
 
-If you want the full tactile channel on an Apple Silicon MacBook, there is a small open-source helper at [Sensor Kickstart.](/sensor-kickstart/) Compile one Swift file with `swiftc`, install it as a LaunchDaemon. It kickstarts the sensor at boot and re-warms it on every wake event. Yamete picks up the live stream automatically.
+Want the full tactile channel? Use the open-source [Sensor Kickstart](/sensor-kickstart/) helper. Compile one Swift file. Install it as a LaunchDaemon. It wakes the sensor at boot and re-warms it on every wake. Yamete picks up the live stream automatically.
 
-> Tried it? [File an issue](https://github.com/Studnicky/yamete/issues/new) either way. Building a known-working matrix across M1 through M4. Every data point helps.
+> Tried it? [File an issue](https://github.com/Studnicky/yamete/issues/new) either way. Putting together a known-working matrix across M1 through M4. Every data point counts.
 
 ## Support
 
 The [Support page](/support) covers setup, tuning, false positives, the whole accelerometer situation, and a handful of questions invented because they were funny.
 
-Something broken or weird on your M3 Air: [GitHub Issues.](https://github.com/Studnicky/yamete/issues) Only support channel. Please don't email the author.
+Something broken or weird on your M3 Air: [GitHub Issues.](https://github.com/Studnicky/yamete/issues) Only support channel. Don't email the author.

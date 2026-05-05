@@ -65,6 +65,6 @@ If this policy changes, the updated version will be posted at this URL. The effe
 
 ## Contact
 
-For privacy questions or corrections to this policy: [file an issue on GitHub.](https://github.com/Studnicky/yamete/issues/new) Because Yamete collects nothing and sends nothing, there is essentially nothing to ask about privately. Open issues are a better venue anyway. The answers become public documentation for everyone with the same question.
+For privacy questions or corrections to this policy: [file an issue on GitHub.](https://github.com/Studnicky/yamete/issues/new) Yamete collects nothing and sends nothing so there is nothing to ask about privately. Open issues are a better venue anyway. The answers become documentation for everyone with the same question.
 
 Source code is public at [github.com/Studnicky/yamete.](https://github.com/Studnicky/yamete) If you don't trust the policy, read the code. Every word of this is verifiable.
