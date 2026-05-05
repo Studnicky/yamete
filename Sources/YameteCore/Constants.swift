@@ -46,14 +46,38 @@ public enum Detection {
         public static let smoothingWindowMsRange: ClosedRange<Int> = 50...500
     }
 
-    // MARK: - Thermal pressure (no tunable thresholds)
+    // MARK: - Thermal pressure (ratchet sensitivity)
     //
     // ThermalSource publishes discrete `ProcessInfo.thermalState`
     // transitions (`.nominal` / `.fair` / `.serious` / `.critical`).
     // The state set, transition gates, and emission cadence are all
-    // OS-defined — there are no user-tunable thresholds, so no
-    // `Detection.Thermal` enum is declared. This comment is the
-    // single canonical record of that absence.
+    // OS-defined. The user-facing knob is a "ratchet crank" floor
+    // that gates WHICH transitions actually publish a reaction.
+    public enum Thermal {
+        public static let reactivityFloorRange: ClosedRange<Int> = 0...4
+        /// Severity rank used by the floor gate. Higher = more severe.
+        ///   .nominal  = 1, .fair = 2, .serious = 3, .critical = 4
+        /// A reaction fires when (5 - severityRank(state)) <= floor.
+        ///   floor=0 -> nothing fires
+        ///   floor=1 -> only .critical (rank 4) fires
+        ///   floor=2 -> .serious + .critical
+        ///   floor=3 -> .fair + .serious + .critical
+        ///   floor=4 -> everything
+        public static func severityRank(of state: Int /* 0..3 enum raw */) -> Int {
+            switch state {
+            case 0:  return 1
+            case 1:  return 2
+            case 2:  return 3
+            case 3:  return 4
+            default: return 1
+            }
+        }
+        /// True if the given state raw value should fire under the floor.
+        public static func shouldFire(stateRaw: Int, floor: Int) -> Bool {
+            guard floor >= 1, floor <= 4 else { return false }
+            return severityRank(of: stateRaw) >= (5 - floor)
+        }
+    }
 
     // MARK: - Ambient light (lux, BMI286 + Apple SPU broker)
 

@@ -30,7 +30,7 @@ layout: doc
 
 <div>
 <h3>Three Input-Activity Sources</h3>
-<p>Trackpad (touching / sliding / contact / tapping / circling — the circling gate integrates Δangle and fires on a full revolution), mouse (click + sustained scroll, with device-attribution to filter trackpad-originated events), keyboard (rate-windowed key-press tap). Independent enable per source. Per-event toggles still apply.</p>
+<p>Trackpad (touching / sliding / contact / tapping / circling. the circling gate integrates Δangle and fires on a full revolution), mouse (click + sustained scroll, with device-attribution to filter trackpad-originated events), keyboard (rate-windowed key-press tap). Independent enable per source. Per-event toggles still apply.</p>
 </div>
 
 <div>

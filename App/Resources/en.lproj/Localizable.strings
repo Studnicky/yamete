@@ -542,3 +542,12 @@
 "kind_thermal_fair"             = "Warm";
 "kind_thermal_serious"          = "Hot";
 "kind_thermal_critical"         = "Overheating";
+
+/* Thermal sensitivity ratchet (added v2.2.0) */
+"setting_thermal_floor"     = "Thermal sensitivity";
+"help_thermal_floor"        = "Ratchet that gates which thermal pressure transitions fire reactions. Off = no thermal reactions. Critical = only the highest tier. Serious + critical (default) = the levels that actually matter. Fair = include warm idle. All = every transition including back to nominal.";
+"thermal_floor_off"         = "off";
+"thermal_floor_critical"    = "critical";
+"thermal_floor_serious"     = "serious+";
+"thermal_floor_fair"        = "fair+";
+"thermal_floor_all"         = "all";

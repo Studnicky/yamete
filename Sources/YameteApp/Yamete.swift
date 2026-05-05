@@ -56,7 +56,7 @@ public final class Yamete {
     public let gyroscopeSource = GyroscopeSource()
     public let lidAngleSource = LidAngleSource()
     public let ambientLightSource = AmbientLightSource()
-    public let thermalSource = ThermalSource()
+    public let thermalSource: ThermalSource
 
     // Event sources
     public let usbSource = USBSource()
@@ -88,6 +88,13 @@ public final class Yamete {
         self.accelerometerSource = AccelerometerSource()
         self.microphoneSource = MicrophoneSource()
         self.headphoneMotionSource = HeadphoneMotionSource()
+        // Thermal source consults SettingsStore.thermalReactivityFloor at
+        // publish time so live ratchet changes take effect immediately.
+        self.thermalSource = ThermalSource(
+            floorProvider: { [weak settings] in
+                settings?.thermalReactivityFloor ?? Defaults.thermalReactivityFloor
+            }
+        )
 
         fusion.onActiveSourcesChanged = { [weak self] ids in
             self?.activeSensorIDs = ids

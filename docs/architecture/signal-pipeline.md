@@ -137,4 +137,4 @@ NSStatusItem icon"]:::menubar
         
 
         
-The bus enricher runs once per reaction before fan-out. All subscribers receive a `FiredReaction` with identical, pre-resolved values: the same `soundURL`, the same `clipDuration`, the same `faceIndices` array, and the same `publishedAt` timestamp. No output re-selects a clip or picks a face — they just consume what the enricher resolved.
+The bus enricher runs once per reaction before fan-out. All subscribers receive a `FiredReaction` with identical, pre-resolved values: the same `soundURL`, the same `clipDuration`, the same `faceIndices` array, and the same `publishedAt` timestamp. No output re-selects a clip or picks a face. they just consume what the enricher resolved.

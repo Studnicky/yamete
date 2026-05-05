@@ -204,11 +204,52 @@ internal struct StimuliSection: View {
     @ViewBuilder
     private func sourceContent(row: StimulusRow) -> some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Thermal source gets the reactivity-floor ratchet above its matrix rows.
+            // 0=off, 1=critical only, 2=serious+critical (default), 3=fair+, 4=all states.
+            // The slider gates which state transitions actually publish a Reaction;
+            // the per-output toggles below it then gate which outputs fire when one does.
+            if row.sourceID == SensorID.thermal.rawValue {
+                thermalReactivityRatchet
+            }
             ForEach(row.kinds, id: \.rawValue) { kind in
                 outputMatrixRow(kind: kind)
             }
         }
         .padding(.horizontal, 6).padding(.vertical, 6)
+    }
+
+    // MARK: - Thermal reactivity ratchet
+
+    /// 0...4 ratchet that gates which `ProcessInfo.thermalState` transitions
+    /// actually fire a reaction. Mirrors the model used by the impact-sensor
+    /// consensus row: a labelled int slider with a tier-name read-out.
+    @ViewBuilder
+    private var thermalReactivityRatchet: some View {
+        @Bindable var s = settings
+        SettingRow(icon: "thermometer.variable",
+                   title: NSLocalizedString("setting_thermal_floor",
+                                            comment: "Thermal sensitivity ratchet title"),
+                   help: NSLocalizedString("help_thermal_floor",
+                                           comment: "Thermal sensitivity ratchet help text")) {
+            HStack(spacing: 8) {
+                SingleSliderInt(value: $s.thermalReactivityFloor,
+                                bounds: Detection.Thermal.reactivityFloorRange,
+                                labelWidth: tuningLabelWidth,
+                                format: { Self.thermalFloorFormat($0) })
+            }
+        }
+    }
+
+    /// Renders the active floor as a short tier label.
+    static func thermalFloorFormat(_ floor: Int) -> String {
+        switch floor {
+        case 0:  return NSLocalizedString("thermal_floor_off",       comment: "Thermal ratchet off")
+        case 1:  return NSLocalizedString("thermal_floor_critical",  comment: "Critical only")
+        case 2:  return NSLocalizedString("thermal_floor_serious",   comment: "Serious + critical")
+        case 3:  return NSLocalizedString("thermal_floor_fair",      comment: "Fair + serious + critical")
+        case 4:  return NSLocalizedString("thermal_floor_all",       comment: "All thermal states")
+        default: return String(floor)
+        }
     }
 
     // MARK: - Output matrix row
