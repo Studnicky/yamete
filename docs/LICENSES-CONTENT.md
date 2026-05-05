@@ -1,28 +1,32 @@
 ---
 title: Content licenses
+description: Where the bundled sounds and faces come from. Honest version.
 ---
 
-# Content Licenses
+# Content licenses
 
-All media assets bundled with Yamete are original works by Studnicky.
+The honest version. None of the current sound and face assets bundled with Yamete are original work. They are all royalty-free assets pulled from public Google search results during prototyping. They ship in the app today because the app shipped today; they are placeholders for a real artist's pass at v3.
 
-## Sound Files
+::: warning Plan for v3
+Licensed assets from a real visual artist and a real voice actor are on the v3 roadmap. The faces will be drawn for Yamete specifically. The sound clips will be performed for Yamete specifically. The current set is the "while we ship the engineering" placeholder. If you are an illustrator or voice actor and this premise sounds like a project you would enjoy, [open an issue.](https://github.com/Studnicky/yamete/issues/new)
+:::
 
-| File | Description | License |
-|------|-------------|---------|
-| sound_00.mp3. sound_13.mp3 | Impact reaction audio clips | Original work, all rights reserved |
+## Sound files
 
-9 audio clips (sound_00, 01, 05, 08, 09, 10, 11, 12, 13) are included in the app bundle.
+`Sources/ResponseKit/Resources/Sounds/sound_*.mp3`
 
-## Face Images
+The current pool of impact reaction clips was sourced from public royalty-free libraries via Google search. They are reused under the assumption that the original sources permitted free non-commercial reuse, but the project does not assert ownership of any of these clips. If you are the original creator of a clip in the pool and would like attribution or removal, [open an issue.](https://github.com/Studnicky/yamete/issues/new)
 
-| File | Description | License |
-|------|-------------|---------|
-| face_01.svg. face_11.svg | Reaction face overlays (SVG) | Original work, all rights reserved |
-| face_01.png. face_11.png | Reaction face overlays (PNG) | Original work, all rights reserved |
+## Face images
 
-11 face images in SVG format are bundled in the app. PNG versions are available in Assets/faces-png/.
+`Sources/ResponseKit/Resources/Faces/face_*.svg` and `.png`
 
-## Source Code
+The current 11-expression face library was sourced from public royalty-free / fair-use anime line-art floating around Google image search during prototyping. The same caveat applies: the project does not assert ownership of any of these faces. Same path for attribution or removal: [open an issue.](https://github.com/Studnicky/yamete/issues/new)
+
+The menu bar icon (`menubar_icon.png`) and AppIcon were derived from one of these face source images. They will be replaced as part of the v3 art pass.
+
+## Source code
 
 The source code is licensed under the MIT License. See [LICENSE](https://github.com/Studnicky/yamete/blob/master/LICENSE).
+
+The project's [Acknowledgments](/acknowledgments) page credits the prior reverse-engineering work the engineering side of Yamete depends on. That is separate from this page; this page is about the bundled visual / audio media.
