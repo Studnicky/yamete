@@ -150,15 +150,14 @@ body { background: var(--vp-c-bg); color: var(--vp-c-text-1); }
 .VPSidebar::before {
   content: "";
   display: block;
-  width: 100%;
-  height: 0;
-  padding-bottom: 100%;          /* forces a real square at sidebar-content width */
-  margin: 0.5rem 0 1rem;
+  width: 208px;
+  height: 208px;
+  margin: 0.75rem auto 1rem;
   background-image: url('/yamete/icon.png');
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
-  flex-shrink: 0;                /* parent might be flex; do not let it squish */
+  flex-shrink: 0;
 }
 
 /* ===== Custom hero on the home page (no icon — just text + actions) ===== */
