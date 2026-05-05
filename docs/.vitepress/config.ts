@@ -43,7 +43,6 @@ export default defineConfig({
   srcDir: '.',
   themeConfig: {
     ...themeConfig,
-    logo: '/icon.png',
     siteTitle: 'Yamete',
     nav: [
       { text: 'Home',         link: '/' },

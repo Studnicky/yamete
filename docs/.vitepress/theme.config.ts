@@ -1,7 +1,7 @@
 import type { DefaultTheme } from 'vitepress'
 
 export const themeConfig = {
-  appearance: 'dark' as const,
+  appearance: 'force-dark' as const,
   outline: { label: 'On this page', level: [2, 3] as [number, number] },
   search: { provider: 'local' as const },
   footer: {
