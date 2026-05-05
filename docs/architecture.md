@@ -261,7 +261,7 @@ sequenceDiagram
 
 ### Audio clip selection
 
-`AudioPlayer` preloads all audio files from the bundle `sounds/` directory, sorted by duration (shortest first). Impact intensity selects a clip from the sorted list. lighter impacts play shorter clips, harder impacts play longer clips. A history of size 2 prevents immediate repeats.
+`AudioPlayer` preloads all audio files from the bundle `sounds/` directory, sorted by duration (shortest first). Impact intensity selects a clip from the sorted list. Lighter impacts play shorter clips, harder impacts play longer clips. A history of size 2 prevents immediate repeats.
 
 ### Screen flash rendering
 

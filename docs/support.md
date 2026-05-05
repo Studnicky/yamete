@@ -17,21 +17,21 @@ Everything you need to know about Yamete. Plus a few things you didn't ask for.
 
 ### What does Yamete actually do?
 
-Lives in your menu bar. When you smack your Mac, it reacts. A sound clip plays, a face shows, optionally the screen flashes or a notification banner fires. Gentle pat gets a small "mm~". Proper smack gets something more committed. The face has range.
+Lives in your menu bar. When you smack your Mac, it reacts. A sound clip plays, a face shows, optionally the screen flashes or a notification fires. Gentle pat: a small "mm~". Proper smack: something with more conviction. The face has range.
 
-Under the hood: three parallel detection pipelines (accelerometer, microphone, AirPods IMU), fused via a consensus engine, scaled to impact intensity. Significantly more engineered than the concept deserves. I'm at peace with that.
+Under the hood: three parallel detection pipelines (accelerometer, microphone, AirPods IMU), fused via a consensus engine, scaled to impact intensity. More engineered than the concept deserves. I'm at peace with that.
 
 ### What does "Yamete" mean?
 
-Japanese for "stop." The playful, flirty register, not the "I mean it" register. Closer to "stop it~" than "cease immediately." Perfect.
+Japanese for "stop." The playful, flirty register. Not the "I mean it" register. Closer to "stop it~" than "cease immediately." Perfect.
 
 ### Is this a joke?
 
-The concept is completely silly. The implementation is not. Swift 6 with full strict concurrency, multi-sensor signal processing with proper bandpass filters, a real consensus engine, thread-safe HID stream cleanup, a full test pyramid. Treat it as a serious engineering exercise in service of an extremely unserious idea.
+The concept is silly. The implementation is not. Swift 6 with full strict concurrency, multi-sensor signal processing with proper bandpass filters, a real consensus engine, thread-safe HID stream cleanup, a full test pyramid. Treat it as a serious engineering exercise in service of an extremely unserious idea.
 
 ### Why does this exist?
 
-Apple Silicon MacBooks ship with a real BMI286 accelerometer, and Apple marks all of `CMMotionManager` as `API_UNAVAILABLE(macos)`. That isn't a warning. That's a dare.
+Apple Silicon MacBooks ship with a real BMI286 accelerometer. Apple marks every line of `CMMotionManager` as `API_UNAVAILABLE(macos)`. That sounded bratty to me. I touched it anyway.
 
 Also I wanted to. Full stop.
 
@@ -41,7 +41,7 @@ No. That has never been the pitch.
 
 ## Event triggers
 
-Beyond physical impacts, Yamete reacts to a range of system events. Each toggles independently from the Events section in the menu bar dropdown.
+Beyond physical impacts, Yamete reacts to a row of system events. Each toggles independently in the Events section of the menu bar dropdown.
 
 * **USB.** Device attach and detach
 * **Power.** AC adapter plug and unplug
@@ -55,40 +55,40 @@ Beyond physical impacts, Yamete reacts to a range of system events. Each toggles
 * **Gyroscope.** Lid yank, laptop spin
 * **Ambient light.** Lights flipped, sensor covered
 
-All event sources ship enabled by default. Toggling one off stops Yamete from reacting to it. The impact detection pipeline is unaffected.
+All event sources ship on. Toggle one off and Yamete stops reacting to it. Impact detection is unaffected.
 
 ### How do I control which events fire which outputs?
 
-Each event type has its own row of per-output toggles in the Events section. The four outputs (Sound, Flash, LED, Notification) toggle independently for every event type. USB attach plays a sound and flashes the screen but stays silent on power events. Bluetooth connect notifications stay enabled while sound is muted for that event. Up to you.
+Each event type has its own row of per-output toggles in the Events section. The four outputs (Sound, Flash, LED, Notification) toggle independently for every event type. Sound on USB attach. LED on AC unplug. No flash on Bluetooth. Up to you, fully orthogonal.
 
-Impact detections from the accelerometer, microphone, and headphone motion channels have the same per-output toggles, controlled from the Outputs section. The matrix applies on top of each output's master toggle. An output must be enabled globally **and** enabled for the specific reaction kind before it fires.
+Impact detections (accelerometer, microphone, headphone motion) get the same per-output toggles, controlled from the Outputs section. The matrix applies on top of each output's master toggle. An output must be on globally **and** on for the specific reaction before it fires.
 
 ## Setup and usage
 
 ### How do I get it running?
 
-Download the DMG from the [latest release.](https://github.com/Studnicky/yamete/releases/latest) Drag `Yamete Direct.app` into Applications. Open it. A face appears in your menu bar. Click the face to open the dropdown. Tune whatever you like. On first launch it asks for microphone permission. Say yes unless you specifically don't want the microphone path.
+Grab the DMG from the [latest release.](https://github.com/Studnicky/yamete/releases/latest) Drag `Yamete Direct.app` into Applications. Open it. A face appears in your menu bar. Click the face. Tune whatever you like. First launch asks for microphone permission. Say yes unless you specifically don't want the microphone path.
 
-The App Store build installs normally once App Review finishes being coy about it.
+The App Store build installs normally once App Review stops blushing.
 
 ### What's the difference between Yamete and Yamete Direct?
 
-* **Yamete** is the Mac App Store build, rated 12+, with tame notification copy: "Mm, again?", "Show off~", "OUCH". Broadly safe for office use, probably.
-* **Yamete Direct** is a notarised direct download with considerably less restrained notification copy. Same everything else: engine, sounds, face, settings, 40 locales. Just has more to say about what you did.
+* **Yamete** is the Mac App Store build, rated 12+. Tame notification copy: "Mm, again?", "Show off~", "OUCH". Probably safe for office use.
+* **Yamete Direct** is the notarised direct download. Notification copy is much hornier. Same everything else: engine, sounds, face, settings, 40 locales. Just has more to say about what you did.
 
 ### Does it work on Intel Macs, iMacs, Mac Mini, Mac Studio, Mac Pro?
 
-Partially. None of those have the built-in BMI286 accelerometer, so the tactile channel is unavailable. Microphone-based detection works on any Mac with a mic. AirPods headphone motion works whenever AirPods Pro or Beats are connected. So yes, it runs. It is just a different kind of sensitive.
+Partially. None of those ship the BMI286 so there's no tactile channel. Microphone detection works on any Mac with a mic. AirPods headphone motion works whenever AirPods Pro or Beats are connected. So yes, it runs. It's just a different kind of sensitive.
 
 On Intel Macs the binary runs via Rosetta 2 (arm64 only).
 
 ### My MacBook's accelerometer isn't working in the App Store build
 
-Short version. App Sandbox silently blocks the IORegistry writes that would wake the accelerometer. The App Store build cannot do it on its own. Not a bug. That's sandboxing.
+Short version. App Sandbox silently blocks the IORegistry writes that would wake the accelerometer. The App Store build cannot do it on its own. Not a bug. That's sandbox doing its job.
 
-Long version. Apple provides no public macOS API for accelerometer access, so the app talks to the SPU HID driver directly via public IOKit functions. Those functions are callable from inside sandbox, but the kernel silently drops the property writes before they reach the driver. The sensor stays cold, the availability probe catches it at launch, and the accelerometer adapter is dropped from the pipeline. The app continues on microphone and headphone motion. Honestly fine.
+Long version. Apple provides no public macOS API for accelerometer access, so the app talks to the SPU HID driver directly via public IOKit functions. Those functions are callable from inside sandbox, but the kernel silently drops the property writes before they reach the driver. The sensor stays cold, the availability probe catches it at launch, and the accelerometer adapter is dropped from the pipeline. App keeps running on microphone and headphone motion. The microphone path is good.
 
-If you specifically want the tactile channel, there is a small open-source helper at [Sensor Kickstart.](/sensor-kickstart/) One Swift file, compiled with `swiftc`, installed as a LaunchDaemon. It wakes the sensor at boot and re-warms it on every wake event. Idle CPU cost is effectively zero.
+Want the tactile channel anyway? There's a small open-source helper at [Sensor Kickstart.](/sensor-kickstart/) One Swift file, compiled with `swiftc`, installed as a LaunchDaemon. Wakes the sensor at boot, re-warms it on every wake event. Idle CPU cost is zero.
 
 > Tried it? [File an issue](https://github.com/Studnicky/yamete/issues/new) either way.
 
@@ -96,7 +96,7 @@ If you specifically want the tactile channel, there is a small open-source helpe
 
 ### Nothing is being detected at all
 
-Walk through these in order.
+In order:
 
 1. Open the menu bar dropdown, expand Sensors, confirm at least one is enabled. If Accelerometer is the only one enabled and the sensor wasn't found at launch (common on App Store builds), it may have been auto-pruned. Enable Microphone too.
 2. Check Reactivity. Both thumbs above zero. Very low settings miss real impacts.
@@ -105,7 +105,7 @@ Walk through these in order.
 
 ### Way too many false positives (footsteps, typing, the neighbours, a truck)
 
-The consensus engine exists for this. Try:
+The consensus engine exists for this:
 
 * Raise Spike Threshold, Crest Factor, and Rise Rate.
 * Set Confirmations to 3 or higher. The signal has to stay above threshold across multiple samples before anything fires.
@@ -135,7 +135,7 @@ If the brightness does not restore on relaunch (sentinel lost, or the recovery p
 
 ### Notifications aren't appearing
 
-Flash Mode needs to be set to Notification. macOS prompts for notification permission the first time. If you denied it: System Settings → Notifications → Yamete → enable banners. Notification language is switchable independently (40 locales, under Flash Mode).
+Flash Mode needs to be set to Notification. MacOS prompts for notification permission the first time. If you denied it: System Settings → Notifications → Yamete → enable banners. Notification language is switchable independently (40 locales, under Flash Mode).
 
 ### The menu bar icon keeps showing a face instead of the normal icon
 
@@ -143,7 +143,7 @@ That is the normal icon. The face reacts on every detected impact for the durati
 
 ### CPU usage seems high
 
-Idle should be under 2 percent. If higher: raise the Report Interval (20ms instead of 10ms halves the polling rate), disable sensors you don't use. Still high: [file an issue](https://github.com/Studnicky/yamete/issues/new) with your Mac model, macOS version, and Activity Monitor numbers.
+Idle should be under 2 percent. If higher: raise the Report Interval (20ms instead of 10ms halves the polling rate). Disable sensors you don't use. Still high: [file an issue](https://github.com/Studnicky/yamete/issues/new) with your Mac model, macOS version, and Activity Monitor numbers.
 
 ### How do I uninstall?
 
@@ -164,24 +164,24 @@ Idle should be under 2 percent. If higher: raise the Report Interval (20ms inste
 
 ### Will you add more sound effects?
 
-Open an [issue](https://github.com/Studnicky/yamete/issues) with a royalty-free clip link and I will consider it. Custom sound pools are on the roadmap.
+Drop an [issue](https://github.com/Studnicky/yamete/issues) with a royalty-free clip link and I'll think about it. Custom sound pools are on the roadmap.
 
 ### Can I use this as a drum machine?
 
-You could map per-intensity tiers to drum hits and tap rhythms out on your laptop lid. I do not recommend it. I also find the idea delightful. If you actually do this, please tell me.
+Sure. Map per-intensity tiers to drum hits and tap rhythms out on your laptop lid. I do not recommend it. I find the idea delightful. If you do this, please tell me.
 
 ### Will typing trigger it?
 
-Normal typing doesn't produce a spike sharp enough to pass the detection gates at default settings. Very heavy typists on very light laptops might get the occasional false positive. Raise Spike Threshold a notch.
+Normal typing doesn't produce a spike sharp enough to pass the detection gates at default settings. Very heavy typists on very light laptops might get the occasional false hit. Raise Spike Threshold a notch.
 
 ### Can I choose which face appears on each screen?
 
-Not manually, but Yamete handles multiple displays automatically. When a reaction fires across more than one screen, each display gets a different face. The selection runs a deduplication pass so the same expression doesn't repeat across screens within a single reaction. The menu bar icon always shows the face assigned to the primary display.
+Not by hand. Yamete handles multiple displays automatically. When a reaction fires across more than one screen, each display gets a different face. The selection runs a deduplication pass so the same expression doesn't repeat across screens within a single reaction. The menu bar icon always shows the face assigned to the primary display.
 
 ### Is hitting my Mac bad for my Mac?
 
-The app isn't bad for your Mac. Hitting your Mac hard enough to trigger it repeatedly might be bad for your Mac. Please be gentle. It has feelings now.
+The app isn't. Hitting it hard enough to trigger it repeatedly might be. Please be gentle. It has feelings now.
 
 ## System requirements
 
-macOS 14.0+ (Sonoma), arm64 binary. BMI286 accelerometer channel requires an Apple Silicon MacBook. Everything else uses microphone and headphone motion. Microphone access is optional and requested at first launch. No Dock icon. No app windows. No noise you didn't ask for.
+macOS 14.0+ (Sonoma), arm64 binary. BMI286 accelerometer channel needs an Apple Silicon MacBook. Everything else uses microphone and headphone motion. Microphone access is optional, requested at first launch. No Dock icon. No app windows. No noise you didn't ask for.
