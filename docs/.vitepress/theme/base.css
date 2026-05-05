@@ -204,3 +204,27 @@ body { background: var(--vp-c-bg); color: var(--vp-c-text-1); }
   color: var(--vp-c-brand-1);
   background: var(--vp-c-brand-soft);
 }
+
+/* Sidebar spinner: rotating tagline + moans, ~3.5s cross-fade — mirrors
+   the app's MenuHeaderRotator. Sits directly under the sidebar icon. */
+.yamete-sidebar-spinner {
+  width: 208px;
+  margin: 0.25rem auto 1.25rem;
+  text-align: center;
+  min-height: 2.6em;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.yamete-sidebar-spinner .phrase {
+  margin: 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  line-height: 1.35;
+  color: var(--yamete-accent-soft);
+  letter-spacing: 0.01em;
+}
+.yamete-fade-enter-active,
+.yamete-fade-leave-active { transition: opacity 1.6s ease-in-out; }
+.yamete-fade-enter-from,
+.yamete-fade-leave-to { opacity: 0; }
