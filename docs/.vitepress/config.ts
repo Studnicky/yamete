@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitepress'
+import { withMermaid } from 'vitepress-plugin-mermaid'
 import { themeConfig } from './theme.config.js'
 
 const sidebar = [
@@ -32,11 +33,11 @@ const sidebar = [
   },
 ]
 
-export default defineConfig({
+export default withMermaid(defineConfig({
   appearance: themeConfig.appearance,
   base: '/yamete/',
   cleanUrls: true,
-  description: 'A macOS menu bar app that reacts when you smack your laptop. Three sensors, eleven event sources, forty languages, zero shame.',
+  description: 'A macOS menu bar app that reacts when you smack your laptop. Three sensors. Eleven event triggers. Forty languages. Zero shame.',
   ignoreDeadLinks: ['localhostLinks', /^\/privacy/],
   lang: 'en-US',
   lastUpdated: true,
@@ -64,4 +65,7 @@ export default defineConfig({
     ['meta', { property: 'og:title', content: 'Yamete: an app that reacts when you smack your MacBook' }],
     ['meta', { property: 'og:image', content: '/yamete/icon.png' }],
   ],
-})
+  // mermaid plugin options
+  mermaid: { theme: 'base' },
+  mermaidPlugin: { class: 'mermaid yamete-mermaid' },
+}))
