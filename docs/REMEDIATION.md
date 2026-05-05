@@ -2,14 +2,14 @@
 title: Remediation
 ---
 
-# Yamete — Remediation Plan
+# Yamete. Remediation Plan
 
 Generated from multi-agent audit covering all four SPM modules.  
 Execution is wave-ordered: each wave must build clean before the next starts.
 
 ---
 
-## Wave 1 — P0 Ship Blockers
+## Wave 1. P0 Ship Blockers
 
 Issues that cause immediate user-visible damage, memory corruption, use-after-free, or hardware left in a dirty state.
 
@@ -20,7 +20,7 @@ Issues that cause immediate user-visible damage, memory corruption, use-after-fr
 
 ### T1-B · NULL device pointer in `writeLED`
 **File:** `Sources/ResponseKit/LEDFlash.swift`  
-`IOHIDElementGetDevice` returns nil when the keyboard disconnects mid-animation. The nil pointer is passed unchecked to `IOHIDDeviceSetValue` — undefined behaviour.  
+`IOHIDElementGetDevice` returns nil when the keyboard disconnects mid-animation. The nil pointer is passed unchecked to `IOHIDDeviceSetValue`. undefined behaviour.  
 **Fix:** Guard `guard let device = IOHIDElementGetDevice(element) else { return }`.
 
 ### T1-C · Use-after-free ordering in `IOHIDDeviceRegisterInputReportCallback` teardown
@@ -64,7 +64,7 @@ The HID manager is opened in `init` but no `deinit` closes it.
 
 ---
 
-## Wave 2 — P1 Critical Correctness
+## Wave 2. P1 Critical Correctness
 
 ### T2-B · Keyboard brightness not restored on crash
 **File:** `Sources/ResponseKit/LEDFlash.swift`  
@@ -115,7 +115,7 @@ Strong self in `asyncAfter` keeps the adapter alive past deallocation; `stopDevi
 
 ### T7-A · `Reaction.timestamp` returns new `Date()` on every access
 **File:** `Sources/YameteCore/Reaction.swift`, `Sources/YameteCore/ReactionBus.swift`  
-Non-impact reactions compute `Date()` fresh each call — the same reaction reports different timestamps across accesses.  
+Non-impact reactions compute `Date()` fresh each call. the same reaction reports different timestamps across accesses.  
 **Fix:** Add `publishedAt: Date` to `FiredReaction`. Set it in `ReactionBus.publish()`. Remove the live-`Date()` from the `Reaction.timestamp` fallback for event reactions.
 
 ### T7-B · `faceIndices[i]` crashes when display count changes mid-reaction
@@ -133,7 +133,7 @@ Create: `LEDFlashTests.swift`, `FiredReactionTests.swift`, `BusEnricherTests.swi
 
 ---
 
-## Wave 3 — P1 Remainder
+## Wave 3. P1 Remainder
 
 ### Verify `Updater` under strict concurrency
 `make lint` confirms or surfaces violations. Add a comment confirming URLSession resumes on calling actor.
@@ -146,7 +146,7 @@ Log when consensus is clamped below user setting due to fewer active sensors.
 
 ---
 
-## Wave 4 — P2/P3 Housekeeping
+## Wave 4. P2/P3 Housekeeping
 
 | ID | File | Action |
 |---|---|---|

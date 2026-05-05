@@ -25,9 +25,9 @@ Compatible headphones for motion detection: AirPods Pro, AirPods Max, AirPods (3
 Download the latest direct-distribution `.dmg` from [Releases](https://github.com/Studnicky/yamete/releases), open it, and drag **Yamete Direct.app** to `/Applications`.
 
 On first launch:
-1. macOS may prompt "Yamete Direct is from an identified developer" — click **Open**
+1. macOS may prompt "Yamete Direct is from an identified developer". click **Open**
 2. The app appears in the menu bar (no Dock icon)
-3. Grant microphone permission when prompted (optional — accelerometer works without it)
+3. Grant microphone permission when prompted (optional. accelerometer works without it)
 
 ## Build from source
 
@@ -45,8 +45,8 @@ make install        # builds and copies to /Applications
 | `make release` | `dist/Yamete Direct.app` | Optimized direct build, Developer ID signed |
 | `make dmg` | `dist/Yamete Direct.dmg` | Direct-download disk image |
 | `make install` | `/Applications/Yamete Direct.app` | Build and install the direct product |
-| `make test` | — | Run the full test suite (unit, integration, E2E) |
-| `make clean` | — | Remove build artifacts |
+| `make test` |. | Run the full test suite (unit, integration, E2E) |
+| `make clean` |. | Remove build artifacts |
 
 ### App Store archive
 
@@ -91,11 +91,11 @@ All settings live in the menu bar dropdown. No config files. Settings persist in
 
 Each main control is a **range slider** with two thumbs defining a response window. Impact intensity maps linearly between the low and high thumbs.
 
-**Reactivity** — Impact force response window. The low thumb sets the weakest force that triggers a response. The high thumb sets the force for maximum response. Higher values respond to lighter impacts. Five tiers (Tap / Light / Med / Firm / Hard) are marked on the ruler.
+**Reactivity**. Impact force response window. The low thumb sets the weakest force that triggers a response. The high thumb sets the force for maximum response. Higher values respond to lighter impacts. Five tiers (Tap / Light / Med / Firm / Hard) are marked on the ruler.
 
-**Volume** — Audio playback level window. Impact intensity maps linearly between the low and high thumb values. Clip selection also follows intensity — lighter impacts play shorter clips.
+**Volume**. Audio playback level window. Impact intensity maps linearly between the low and high thumb values. Clip selection also follows intensity. lighter impacts play shorter clips.
 
-**Flash Opacity** — Screen flash brightness window. The flash envelope (attack/hold/decay timing) is shaped by impact intensity and gated inside the sound clip duration.
+**Flash Opacity**. Screen flash brightness window. The flash envelope (attack/hold/decay timing) is shaped by impact intensity and gated inside the sound clip duration.
 
 ### Sensitivity & Sensors panel
 
@@ -120,15 +120,15 @@ Expand the **Sensitivity & Sensors** accordion for advanced tuning:
 
 ### Devices panel
 
-- **Flash Displays** — Select which monitors show the flash overlay. None selected = all monitors.
-- **Audio Output** — Select which audio devices play impact sounds. None selected = no audio.
+- **Flash Displays**. Select which monitors show the flash overlay. None selected = all monitors.
+- **Audio Output**. Select which audio devices play impact sounds. None selected = no audio.
 
 ### Footer controls
 
-- **Pause / Resume** — Stop/start the detection pipeline
-- **Launch at Login** — Register with macOS for auto-start via ServiceManagement
-- **Debug Logging** — Direct builds only. Writes verbose sensor data to the direct app's log directory
-- **Impact counter** — Daily count and last impact tier + magnitude
+- **Pause / Resume**. Stop/start the detection pipeline
+- **Launch at Login**. Register with macOS for auto-start via ServiceManagement
+- **Debug Logging**. Direct builds only. Writes verbose sensor data to the direct app's log directory
+- **Impact counter**. Daily count and last impact tier + magnitude
 
 ## Troubleshooting
 
