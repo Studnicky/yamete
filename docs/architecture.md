@@ -24,15 +24,15 @@ The codebase is split into four Swift Package Manager targets with a strictly un
 %%{init: {
   "theme": "base",
   "themeVariables": {
-    "primaryColor": "#1a1a1a",
+    "primaryColor": "#141414",
     "primaryTextColor": "#e8e8e8",
     "primaryBorderColor": "#ff6b8a",
     "lineColor": "#ff6b8a",
     "secondaryColor": "#141414",
-    "tertiaryColor": "#0f0f0f",
-    "edgeLabelBackground": "#0d0d0d",
-    "clusterBkg": "#111111",
-    "clusterBorder": "#2a2a2a",
+    "tertiaryColor": "#0a0a0a",
+    "edgeLabelBackground": "#0a0a0a",
+    "clusterBkg": "#1a1a1a",
+    "clusterBorder": "#ff6b8a",
     "titleColor": "#ffb3c4",
     "nodeTextColor": "#e8e8e8",
     "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
@@ -68,11 +68,11 @@ SwiftUI shell"]:::app
   D --> E
   C --> E
 
-  classDef iokit fill:#1a0a0e,stroke:#ff6b8a,color:#ffb3c4
-  classDef sensor fill:#1a1220,stroke:#c084fc,color:#e8e8e8
-  classDef core fill:#0a1a15,stroke:#34d399,color:#e8e8e8
-  classDef response fill:#1a1500,stroke:#fbbf24,color:#e8e8e8
-  classDef app fill:#1a0a0e,stroke:#ff6b8a,color:#ffb3c4,stroke-width:2px
+  classDef iokit fill:#141414,stroke:#ff6b8a,color:#e8e8e8
+  classDef sensor fill:#141414,stroke:#ff6b8a,color:#e8e8e8
+  classDef core fill:#1a1a1a,stroke:#ffb3c4,color:#ffb3c4,stroke-width:2px
+  classDef response fill:#141414,stroke:#ff6b8a,color:#e8e8e8
+  classDef app fill:#1a1a1a,stroke:#ffb3c4,color:#ffb3c4,stroke-width:2px
 ```
 
         
@@ -103,12 +103,16 @@ Two categories of source publish onto the `ReactionBus`. Impact sources run thre
 %%{init: {
   "theme": "base",
   "themeVariables": {
-    "primaryColor": "#1a1a1a",
+    "primaryColor": "#141414",
     "primaryTextColor": "#e8e8e8",
     "primaryBorderColor": "#ff6b8a",
-    "lineColor": "#555",
+    "lineColor": "#ff6b8a",
     "secondaryColor": "#141414",
-    "edgeLabelBackground": "#0d0d0d",
+    "tertiaryColor": "#0a0a0a",
+    "edgeLabelBackground": "#0a0a0a",
+    "clusterBkg": "#1a1a1a",
+    "clusterBorder": "#ff6b8a",
+    "titleColor": "#ffb3c4",
     "nodeTextColor": "#e8e8e8",
     "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
   }
@@ -209,12 +213,12 @@ NSStatusItem icon"]:::menubar
   BUS -->|"AsyncStream<FiredReaction>"| NR
   BUS -->|"AsyncStream<FiredReaction>"| MBF
 
-  classDef sensor fill:#1a0a14,stroke:#ff6b8a,color:#e8e8e8
-  classDef evtsrc fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
-  classDef fusion fill:#1a1500,stroke:#fbbf24,color:#e8e8e8,stroke-width:2px
-  classDef bus fill:#0a1a15,stroke:#34d399,color:#e8e8e8,stroke-width:2px
-  classDef resp fill:#1a0a0e,stroke:#ff6b8a,color:#ffb3c4
-  classDef menubar fill:#1a1520,stroke:#c084fc,color:#e8e8e8
+  classDef sensor fill:#141414,stroke:#ff6b8a,color:#e8e8e8
+  classDef evtsrc fill:#141414,stroke:#ff6b8a,color:#e8e8e8
+  classDef fusion fill:#1a1a1a,stroke:#ffb3c4,color:#ffb3c4,stroke-width:2px
+  classDef bus fill:#1a1a1a,stroke:#ffb3c4,color:#ffb3c4,stroke-width:2px
+  classDef resp fill:#141414,stroke:#ff6b8a,color:#e8e8e8
+  classDef menubar fill:#141414,stroke:#ff6b8a,color:#e8e8e8
 ```
 
         
@@ -237,11 +241,16 @@ Every impact sensor runs an `ImpactDetector` independently. Each sample passes t
 %%{init: {
   "theme": "base",
   "themeVariables": {
-    "primaryColor": "#1a1a1a",
+    "primaryColor": "#141414",
     "primaryTextColor": "#e8e8e8",
     "primaryBorderColor": "#ff6b8a",
-    "lineColor": "#555",
-    "edgeLabelBackground": "#0d0d0d",
+    "lineColor": "#ff6b8a",
+    "secondaryColor": "#141414",
+    "tertiaryColor": "#0a0a0a",
+    "edgeLabelBackground": "#0a0a0a",
+    "clusterBkg": "#1a1a1a",
+    "clusterBorder": "#ff6b8a",
+    "titleColor": "#ffb3c4",
     "nodeTextColor": "#e8e8e8",
     "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
   }
@@ -300,10 +309,10 @@ source, timestamp, intensity"]):::io
   CONF -->|"yes"| INTENS
   INTENS --> OUT
 
-  classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
-  classDef gate fill:#141414,stroke:#fbbf24,color:#e8e8e8
-  classDef proc fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
-  classDef drop fill:#1a0a0a,stroke:#555,color:#888
+  classDef io fill:#141414,stroke:#ffb3c4,color:#ffb3c4,rx:20
+  classDef gate fill:#0a0a0a,stroke:#ff385f,color:#e8e8e8
+  classDef proc fill:#0a0a0a,stroke:#ff6b8a,color:#e8e8e8
+  classDef drop fill:#0a0a0a,stroke:#666,color:#666
 ```
 
         
@@ -336,11 +345,16 @@ Individual sensor impacts feed into `ImpactFusion`, which enforces two additiona
 %%{init: {
   "theme": "base",
   "themeVariables": {
-    "primaryColor": "#1a1a1a",
+    "primaryColor": "#141414",
     "primaryTextColor": "#e8e8e8",
     "primaryBorderColor": "#ff6b8a",
-    "lineColor": "#555",
-    "edgeLabelBackground": "#0d0d0d",
+    "lineColor": "#ff6b8a",
+    "secondaryColor": "#141414",
+    "tertiaryColor": "#0a0a0a",
+    "edgeLabelBackground": "#0a0a0a",
+    "clusterBkg": "#1a1a1a",
+    "clusterBorder": "#ff6b8a",
+    "titleColor": "#ffb3c4",
     "nodeTextColor": "#e8e8e8",
     "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
   }
@@ -393,10 +407,10 @@ remapped intensity, confidence, sources"]):::io
   SENS -->|"yes"| MARK
   MARK --> OUT
 
-  classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
-  classDef gate fill:#141414,stroke:#fbbf24,color:#e8e8e8
-  classDef proc fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
-  classDef drop fill:#1a0a0a,stroke:#555,color:#888
+  classDef io fill:#141414,stroke:#ffb3c4,color:#ffb3c4,rx:20
+  classDef gate fill:#0a0a0a,stroke:#ff385f,color:#e8e8e8
+  classDef proc fill:#0a0a0a,stroke:#ff6b8a,color:#e8e8e8
+  classDef drop fill:#0a0a0a,stroke:#666,color:#666
 ```
 
         
@@ -426,11 +440,16 @@ After fusion but before publishing to the bus, intensity passes through one more
 %%{init: {
   "theme": "base",
   "themeVariables": {
-    "primaryColor": "#1a1a1a",
+    "primaryColor": "#141414",
     "primaryTextColor": "#e8e8e8",
     "primaryBorderColor": "#ff6b8a",
-    "lineColor": "#555",
-    "edgeLabelBackground": "#0d0d0d",
+    "lineColor": "#ff6b8a",
+    "secondaryColor": "#141414",
+    "tertiaryColor": "#0a0a0a",
+    "edgeLabelBackground": "#0a0a0a",
+    "clusterBkg": "#1a1a1a",
+    "clusterBorder": "#ff6b8a",
+    "titleColor": "#ffb3c4",
     "nodeTextColor": "#e8e8e8",
     "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
   }
@@ -461,10 +480,10 @@ intensity: mappedIntensity"]):::io
   GATE -->|"yes"| MAP
   MAP --> OUT
 
-  classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
-  classDef gate fill:#141414,stroke:#fbbf24,color:#e8e8e8
-  classDef proc fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
-  classDef drop fill:#1a0a0a,stroke:#555,color:#888
+  classDef io fill:#141414,stroke:#ffb3c4,color:#ffb3c4,rx:20
+  classDef gate fill:#0a0a0a,stroke:#ff385f,color:#e8e8e8
+  classDef proc fill:#0a0a0a,stroke:#ff6b8a,color:#e8e8e8
+  classDef drop fill:#0a0a0a,stroke:#666,color:#666
 ```
 
         
@@ -501,11 +520,16 @@ Each output independently subscribes to the bus via `bus.subscribe()`, which ret
 %%{init: {
   "theme": "base",
   "themeVariables": {
-    "primaryColor": "#1a1a1a",
+    "primaryColor": "#141414",
     "primaryTextColor": "#e8e8e8",
     "primaryBorderColor": "#ff6b8a",
-    "lineColor": "#555",
-    "edgeLabelBackground": "#0d0d0d",
+    "lineColor": "#ff6b8a",
+    "secondaryColor": "#141414",
+    "tertiaryColor": "#0a0a0a",
+    "edgeLabelBackground": "#0a0a0a",
+    "clusterBkg": "#1a1a1a",
+    "clusterBorder": "#ff6b8a",
+    "titleColor": "#ffb3c4",
     "nodeTextColor": "#e8e8e8",
     "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
   }
@@ -541,10 +565,10 @@ read live settings snapshot"]:::proc
   GUARD -->|"yes"| ACT
   ACT --> REARM
 
-  classDef io fill:#1a0a14,stroke:#ff6b8a,color:#ffb3c4,rx:20
-  classDef gate fill:#141414,stroke:#fbbf24,color:#e8e8e8
-  classDef proc fill:#0f1520,stroke:#60a5fa,color:#e8e8e8
-  classDef drop fill:#1a0a0a,stroke:#555,color:#888
+  classDef io fill:#141414,stroke:#ffb3c4,color:#ffb3c4,rx:20
+  classDef gate fill:#0a0a0a,stroke:#ff385f,color:#e8e8e8
+  classDef proc fill:#0a0a0a,stroke:#ff6b8a,color:#e8e8e8
+  classDef drop fill:#0a0a0a,stroke:#666,color:#666
 ```
 
         
@@ -591,11 +615,16 @@ Three different thread contexts produce sensor data for the impact pipeline. Eac
 %%{init: {
   "theme": "base",
   "themeVariables": {
-    "primaryColor": "#1a1a1a",
+    "primaryColor": "#141414",
     "primaryTextColor": "#e8e8e8",
     "primaryBorderColor": "#ff6b8a",
-    "lineColor": "#555",
-    "edgeLabelBackground": "#0d0d0d",
+    "lineColor": "#ff6b8a",
+    "secondaryColor": "#141414",
+    "tertiaryColor": "#0a0a0a",
+    "edgeLabelBackground": "#0a0a0a",
+    "clusterBkg": "#1a1a1a",
+    "clusterBorder": "#ff6b8a",
+    "titleColor": "#ffb3c4",
     "nodeTextColor": "#e8e8e8",
     "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
   }
@@ -695,11 +724,16 @@ A subtle constraint: `continuation.finish()` and `continuation.yield()` must be 
 %%{init: {
   "theme": "base",
   "themeVariables": {
-    "primaryColor": "#1a1a1a",
+    "primaryColor": "#141414",
     "primaryTextColor": "#e8e8e8",
     "primaryBorderColor": "#ff6b8a",
-    "lineColor": "#555",
-    "edgeLabelBackground": "#0d0d0d",
+    "lineColor": "#ff6b8a",
+    "secondaryColor": "#141414",
+    "tertiaryColor": "#0a0a0a",
+    "edgeLabelBackground": "#0a0a0a",
+    "clusterBkg": "#1a1a1a",
+    "clusterBorder": "#ff6b8a",
+    "titleColor": "#ffb3c4",
     "nodeTextColor": "#e8e8e8",
     "fontFamily": "SF Mono, ui-monospace, Menlo, monospace"
   }

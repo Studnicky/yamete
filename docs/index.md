@@ -159,3 +159,16 @@ Want the full tactile channel? Use the open-source [Sensor Kickstart](/sensor-ki
 The [Support page](/support) covers setup, tuning, false positives, the whole accelerometer situation, and a handful of questions invented because they were funny.
 
 Something broken or weird on your M3 Air: [GitHub Issues.](https://github.com/Studnicky/yamete/issues) Only support channel. Don't email the author.
+
+## Acknowledgments
+
+Stands on people who already did the reverse-engineering Apple wouldn't:
+
+- **[KBPulse](https://github.com/EthanRDoesMC/KBPulse/).** Keyboard brightness via CoreBrightness on M1+.
+- **[spank](https://github.com/vlasvlasvlas/spank).** IOKit patterns and hardware-interaction approaches.
+- **[apple-silicon-accelerometer](https://github.com/olvvier/apple-silicon-accelerometer).** Proved the BMI286 was accessible.
+- **[mac-hardware-toys](https://github.com/pirate/mac-hardware-toys).** Keyboard-brightness wrapping, system-level integration patterns.
+- **[macbook-lighter](https://github.com/harttle/macbook-lighter).** Brightness-daemon design, light-sensing approaches.
+
+This app only exists because they did the work first. Pay them attention.
+
