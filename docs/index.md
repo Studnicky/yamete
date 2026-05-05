@@ -14,6 +14,62 @@ layout: doc
  </div>
 </div>
 
+## Features *(taken way too seriously, which is the problem)*
+
+<div class="feature-grid">
+
+<div>
+<h3>Three Sensors, One Opinion</h3>
+<p>Built-in accelerometer, microphone transient detection, and AirPods IMU. A consensus engine fuses them before firing so a passing truck doesn't make your laptop cry in public.</p>
+</div>
+
+<div>
+<h3>Eleven Event Sources</h3>
+<p>USB attach/detach, power adapter plug/unplug, audio peripheral add/remove, Bluetooth connect/disconnect, Thunderbolt attach/detach, display hotplug, sleep/wake. Plus lid open/closed/slammed (hinge angle from the Apple Silicon SPU), thermal pressure transitions (nominal/fair/serious/critical), gyroscope spikes (lid yank, laptop spin), and ambient-light step changes (lights flipped, sensor covered). Each fires its own reaction with its own output toggles.</p>
+</div>
+
+<div>
+<h3>SPU Sensor Multiplexer</h3>
+<p>Apple Silicon's SPU HID device exposes accelerometer, gyroscope, lid angle, and ambient-light data through a single in-kernel handle. Yamete wraps that handle in a ref-counted broker (<code>AppleSPUDevice</code>) so all four sensors share one open device, decode their own bytes from the same report, and release the handle when nobody's listening.</p>
+</div>
+
+<div>
+<h3>Sound Clips With Taste</h3>
+<p>Impact intensity picks the clip. A gentle pat gets a small "mm~". A full send gets something with conviction. Volume and clip pool tunable.</p>
+</div>
+
+<div>
+<h3>The Face</h3>
+<p>A live face in the menu bar. Eleven expressions, scaled to hit intensity. Reacts whether Flash Mode is on or off. It does not look away. It has seen things.</p>
+</div>
+
+<div>
+<h3>Flash Mode</h3>
+<p>Full-screen overlay with a radial-gradient reaction face. Exactly as dramatic as it sounds. Toggle off if your job depends on it. The face in the menu bar still reacts either way.</p>
+</div>
+
+<div>
+<h3>LED Flash</h3>
+<p>The Caps Lock LED flickers and the keyboard backlight springs through a damped animation on every reaction. Separate toggles for each, configurable brightness range. No extra entitlements required.</p>
+</div>
+
+<div>
+<h3>Per-Reaction Output Matrix</h3>
+<p>Every output (sound, screen flash, notification, LED) has an independent per-event toggle. Sound on USB attach, LED on AC unplug, no flash on Bluetooth. Fully orthogonal, fully yours.</p>
+</div>
+
+<div>
+<h3>40 Languages</h3>
+<p>Notification copy ships in 40 locales, switchable independently of your system language. Nothing says "I am a person of culture" like getting scolded by your MacBook in Portuguese.</p>
+</div>
+
+<div>
+<h3>Knobs For Days</h3>
+<p>Sensitivity, volume, flash opacity, LED brightness, per-sensor gate tuning (spike, crest, rise rate, confirmations), cooldown debounce. Dial it in until it knows you better than you know yourself.</p>
+</div>
+
+</div>
+
 It also watches your USB ports, power adapter, audio peripherals, Bluetooth, Thunderbolt, every display, sleep and wake, the lid hinge, the gyro, the ambient-light sensor, the thermal pressure level. Picking one would be rude.
 
 Built because I felt like it. Runs offline. Stores nothing. Will not improve your life in any way I'd describe with a straight face. *That's the whole point.*
