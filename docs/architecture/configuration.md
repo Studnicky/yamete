@@ -1,6 +1,6 @@
 ---
 title: Configuration
-description: Every tunable knob in Yamete, what it does, what it ranges over, and what the default is. Documentation as inventory.
+description: Every setting in Yamete, what it does, what it ranges over, what the default is. The user manual.
 ---
 
 # Configuration
@@ -40,7 +40,7 @@ Cross-sensor fusion lives in `ImpactFusion`. The values here are the contract be
 thresholdLow  = 1.0 - sensitivityMax
 thresholdHigh = 1.0 - sensitivityMin
 if rawIntensity < thresholdLow:
-    return nil   // reject — below the user's reactivity floor
+    return nil   // reject // below the user's reactivity floor
 remapped = (rawIntensity - thresholdLow) / max(0.001, thresholdHigh - thresholdLow)
 return clamp(remapped, 0…1)
 ```
@@ -85,7 +85,7 @@ Hinge angle in degrees via SPU HID usage 8. State-machine driven.
 |---|---|---|---|
 | Open threshold | 10° | 5°…30° | Angle above which the lid is considered open. Crossing from below fires `lidOpened`. |
 | Closed threshold | 5° | 1°…10° | Angle below which the lid is considered closed. Crossing from above fires `lidClosed`. |
-| Slam rate | -180 deg/s | -500…-50 | Closing rate (negative — closing reduces angle). If the lid crosses the closed threshold faster than this the event is `lidSlammed` instead of `lidClosed`. |
+| Slam rate | -180 deg/s | -500…-50 | Closing rate (negative. closing reduces angle). If the lid crosses the closed threshold faster than this the event is `lidSlammed` instead of `lidClosed`. |
 | Smoothing window | 100 ms | 50…500 | EMA window over Δangle/Δt to suppress jitter. |
 
 ## Detection: ambient light
@@ -96,14 +96,20 @@ Lux via SPU HID usage 7. Two-second ring buffer + step detector.
 |---|---|---|---|
 | Cover-drop threshold | 0.95 (95 %) | 0.5…0.99 | Fractional lux drop required to fire `alsCovered` (hand over the sensor). |
 | Off-drop percent | 0.80 (80 %) | 0.5…0.99 | Fractional drop required to fire `lightsOff` (switch flipped). |
-| Off-floor lux | 30 lux | 1…300 | Post-drop ceiling — lux must end below this for `lightsOff` to fire. |
+| Off-floor lux | 30 lux | 1…300 | Post-drop ceiling. lux must end below this for `lightsOff` to fire. |
 | On-rise percent | 1.50 (150 %) | 0.5…5.0 | Fractional rise required to fire `lightsOn`. |
-| On-ceiling lux | 100 lux | 50…1000 | Post-rise floor — lux must end above this for `lightsOn` to fire. |
+| On-ceiling lux | 100 lux | 50…1000 | Post-rise floor. lux must end above this for `lightsOn` to fire. |
 | Window | 2.0 s | 0.5…10.0 | Ring-buffer duration the step detector compares before-and-after over. |
 
 ## Detection: thermal
 
-`ThermalSource` observes `NSProcessInfo.thermalStateDidChangeNotification`. **No tunable knobs.** The state set, the transition gates, and the cadence are all OS-defined. Cold-start suppression: the initial state captured at start does not publish (otherwise launching Yamete on an already-warm Mac would always fire `thermalFair`).
+`ThermalSource` observes `NSProcessInfo.thermalStateDidChangeNotification`. The state set, the transition gates, and the cadence are all OS-defined. The user-facing knob is the **reactivity floor ratchet** that gates which state transitions actually publish a `Reaction`.
+
+| Setting | Default | Range | What it does |
+|---|---|---|---|
+| Thermal reactivity floor | 2 | 0...4 | 0=off, 1=critical only, 2=serious+critical, 3=fair+serious+critical, 4=all states. The gate consults `floorProvider` from `SettingsStore` at publish time so live changes take effect immediately. |
+
+Cold-start suppression always applies: the initial state captured at start does not publish (otherwise launching Yamete on an already-warm Mac would always fire `thermalFair`). The floor gates ON TOP of the dedup, not in place of it.
 
 ## Detection: microphone
 
@@ -159,7 +165,7 @@ Pinned in `ReactionsConfig`. These are not user-tunable.
 
 ## Per-event synthesised intensity
 
-`ReactionsConfig.eventIntensity` — every non-impact reaction publishes with a fixed intensity since there is no measured magnitude. Used for face selection, audio clip pick, flash opacity, LED brightness.
+`ReactionsConfig.eventIntensity`. every non-impact reaction publishes with a fixed intensity since there is no measured magnitude. Used for face selection, audio clip pick, flash opacity, LED brightness.
 
 | Reaction | Intensity | Reaction | Intensity |
 |---|---|---|---|
@@ -201,13 +207,13 @@ Used by `LEDFlash` (Caps Lock + keyboard backlight).
 
 ## Hardware constants (BMI286)
 
-`AccelHardwareConstants` — read from the IOKit HID device descriptor. Not tunable.
+`AccelHardwareConstants`. read from the IOKit HID device descriptor. Not tunable.
 
 | Field | Value | Why |
 |---|---|---|
 | HID usage page | `0xFF00` | Apple-vendor HID page. |
 | HID usage | `3` | Accelerometer device. (Gyro = 9, lid = 8, ALS = 7.) |
-| Required transport | `"SPU"` | Safety check — only the on-package Sensor Processing Unit qualifies. |
+| Required transport | `"SPU"` | Safety check. only the on-package Sensor Processing Unit qualifies. |
 | Decimation factor | 2 | Hardware reports at 100 Hz; decimate to 50 Hz. |
 | Magnitude min | 0.3 g | Sane lower bound for valid reads. |
 | Magnitude max | 4.0 g | Sane upper bound. |

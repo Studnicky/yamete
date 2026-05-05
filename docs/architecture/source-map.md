@@ -5,7 +5,7 @@ description: Every Swift file in the project, one line each. The cheat sheet.
 
 # Source map
 
-*Reference. One line per file across the four SPM targets plus the host app. Updated by hand at release time.*
+*Reference. One line per file across the four SPM targets plus the host app. Maintained by the human; expect drift between releases - check the commit dates if a row looks suspicious.*
 
 | File | Module | Role |
 |---|---|---|
@@ -51,9 +51,9 @@ description: Every Swift file in the project, one line each. The cheat sheet.
 | KeyboardActivitySource.swift | SensorKit | CGEvent tap (key-press rate threshold), MockEventMonitor in tests |
 | MouseActivitySource.swift | SensorKit | CGEvent tap (mouse-down + scroll-wheel), TCC-aware, RealEventMonitor seam |
 | TrackpadActivitySource.swift | SensorKit | NSEvent monitor + IOKit HID multitouch listener for circling/contact/sliding/tapping |
-| HIDDeviceMonitor.swift | SensorKit | Real/Mock seam for IOHIDManager device queries — used by KeyboardActivitySource and others |
+| HIDDeviceMonitor.swift | SensorKit | Real/Mock seam for IOHIDManager device queries. used by KeyboardActivitySource and others |
 | EventMonitor.swift | SensorKit | Real/Mock seam for CGEvent tap subscription |
-| MicrophoneEngineDriver.swift | SensorKit | Real/Mock seam for AVAudioEngine — keeps MicrophoneAdapter testable without spinning up a real engine |
+| MicrophoneEngineDriver.swift | SensorKit | Real/Mock seam for AVAudioEngine. keeps MicrophoneAdapter testable without spinning up a real engine |
 | HeadphoneMotionDriver.swift | SensorKit | Real/Mock seam for CMHeadphoneMotionManager |
 | AudioPlaybackDriver.swift | ResponseKit | Real/Mock seam for NSSound playback |
 | SystemVolumeDriver.swift | ResponseKit | Volume read/write via Core Audio |
@@ -65,7 +65,7 @@ description: Every Swift file in the project, one line each. The cheat sheet.
 | DisplayBrightnessFlash.swift | ResponseKit | Display-backlight pulse output (spring envelope) |
 | DisplayTintDriver.swift | ResponseKit | Real/Mock seam for display tint via CoreGraphics gamma table |
 | DisplayTintFlash.swift | ResponseKit | Display-tint pulse output (gradient overlay via tint table) |
-| ReactiveOutput.swift | ResponseKit | Output protocol the bus dispatches against — every responder conforms |
+| ReactiveOutput.swift | ResponseKit | Output protocol the bus dispatches against. every responder conforms |
 | SystemNotificationDriver.swift | ResponseKit | Real/Mock seam for UNUserNotificationCenter |
 | Updater.swift | YameteApp | GitHub releases version check, update prompt (Direct build only) |
 

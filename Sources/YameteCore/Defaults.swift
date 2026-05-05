@@ -75,4 +75,17 @@ public enum Defaults {
     public static let hpRiseRate: Double = 0.05
     public static let hpConfirmations: Int = 2
     public static let hpWarmup: Int = 50
+
+
+    // MARK: - Thermal sensitivity ratchet
+    //
+    // Gates which `ProcessInfo.ThermalState` transitions actually publish
+    // a reaction. Acts like a "ratchet crank" sensitivity: position N
+    // includes states with a severity rank >= (4 - N).
+    //   0 = off     (no thermal reactions fire)
+    //   1 = critical only
+    //   2 = serious + critical            <- default
+    //   3 = fair + serious + critical
+    //   4 = nominal + fair + serious + critical (everything)
+    public static let thermalReactivityFloor: Int = 2
 }

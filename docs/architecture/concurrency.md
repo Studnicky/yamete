@@ -108,4 +108,4 @@ NotificationResponder.consume()"]:::mainactor
         
 
         
-A subtle constraint: `continuation.finish()` and `continuation.yield()` must be called *outside* each sensor's `OSAllocatedUnfairLock`. `AsyncThrowingStream._Storage` acquires its own `os_unfair_lock` inside those methods, and `os_unfair_lock` is non-reentrant — calling yield or finish while already holding an unfair lock abort-traps (cause 89859). Each sensor captures the continuation reference as the critical section's return value, releases the lock, then calls the stream method outside the lock.
+A subtle constraint: `continuation.finish()` and `continuation.yield()` must be called *outside* each sensor's `OSAllocatedUnfairLock`. `AsyncThrowingStream._Storage` acquires its own `os_unfair_lock` inside those methods, and `os_unfair_lock` is non-reentrant. calling yield or finish while already holding an unfair lock abort-traps (cause 89859). Each sensor captures the continuation reference as the critical section's return value, releases the lock, then calls the stream method outside the lock.
