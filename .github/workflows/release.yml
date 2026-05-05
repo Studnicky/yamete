@@ -63,7 +63,7 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           {
-            awk "/^## \[${version}\]/{found=1; next} /^## \[/{found=0} found" CHANGELOG.md
+            awk "/^## \[${version}\]/{found=1; next} /^## \[/{found=0} found" docs/CHANGELOG.md
             echo ""
             echo "---"
             echo "SHA256: ${{ steps.checksum.outputs.sha256 }}"
