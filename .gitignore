@@ -47,3 +47,8 @@ yamete_vector_art_plans/
 yamete_vector_art_plans.zip
 yamete-browser-review-*.png
 AGENTS.md
+
+# VitePress build output + node_modules
+node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/

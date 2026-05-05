@@ -1,3 +1,8 @@
+---
+title: Architecture
+description: Yamete's SPM module graph, signal pipeline, fusion engine, and concurrency model.
+---
+
 # Architecture
 
 Yamete is a macOS menu bar app that detects physical impacts on Apple Silicon MacBooks and responds with audio and visual feedback. Four SPM modules with a unidirectional dependency graph:

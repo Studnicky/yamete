@@ -1,0 +1,14 @@
+{
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  },
+  "name": "yamete-docs",
+  "private": true,
+  "scripts": {
+    "docs:build": "vitepress build docs",
+    "docs:dev": "vitepress dev docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "type": "module",
+  "version": "0.0.0"
+}
