@@ -202,7 +202,7 @@ final class SettingsStoreTests: XCTestCase {
         }
     }
 
-    // MARK: - UI-gate mutation anchors (Phase 7)
+    // MARK: - UI-gate mutation anchors
     //
     // These cells exist to give the mutation catalog stable single-purpose
     // anchors for individual SettingsStore gates. Each assertion message

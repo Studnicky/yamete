@@ -61,22 +61,28 @@ private let log = AppLog(category: "Accelerometer")
 
 // MARK: - Kernel driver seam
 //
-// Wraps every IOKit call that AccelerometerReader makes so that fidelity
-// gates around `KERN_SUCCESS`, `kIOReturnSuccess`, iterator sentinels and
-// `maxSize > 0` are reachable from XCTest.
+// Wraps every IOKit call that AccelerometerReader and AppleSPUDevice make
+// so that fidelity gates around `KERN_SUCCESS`, `kIOReturnSuccess`,
+// iterator sentinels and `maxSize > 0` are reachable from XCTest.
 //
-// `RealAccelerometerKernelDriver` is the default and forwards 1:1 to the
-// kernel — production behaviour through `AccelerometerSource()` is
-// unchanged. `MockAccelerometerKernelDriver` (under Tests/Mocks) lets
-// cells force per-call failure codes and short-circuit iterators so the
-// success-only branches become observable.
+// `RealSPUKernelDriver` is the default and forwards 1:1 to the kernel —
+// production behaviour through `AccelerometerSource()` is unchanged.
+// `MockSPUKernelDriver` (under Tests/Mocks) lets cells force per-call
+// failure codes and short-circuit iterators so the success-only branches
+// become observable.
 //
 // The protocol is `Sendable` because all method results are scalar values
 // or framework handles (`IOHIDManager`, `IOHIDDevice`) whose lifecycle
-// the surrounding `AccelHardware.openStream` already manages — the
-// driver itself holds no mutable state in the production path. The mock
-// uses a lock-protected state struct.
-public protocol AccelerometerKernelDriver: Sendable {
+// the surrounding device-open code already manages — the driver itself
+// holds no mutable state in the production path. The mock uses a
+// lock-protected state struct.
+//
+// Renamed from `AccelerometerKernelDriver` to `SPUKernelDriver` in v2.1.0
+// when `AppleSPUDevice` was introduced as the multi-subscriber broker for
+// the SPU HID device. The protocol surface is unchanged; the rename
+// reflects that the seam covers ALL SPU device I/O (accel, and future
+// gyro/lid/ALS subscribers), not just accelerometer reads.
+public protocol SPUKernelDriver: Sendable {
     // Mach / IOService surface
     func getMatchingServices(matching: CFDictionary?) -> (kr: kern_return_t, iterator: io_iterator_t)
     func iteratorNext(_ iterator: io_iterator_t) -> io_service_t
@@ -110,7 +116,7 @@ public protocol AccelerometerKernelDriver: Sendable {
 /// Production driver. Each method forwards 1:1 to the kernel API so the
 /// default-arg path through `AccelerometerSource()` produces byte-identical
 /// IOKit traffic to the pre-seam build.
-public struct RealAccelerometerKernelDriver: AccelerometerKernelDriver {
+public struct RealSPUKernelDriver: SPUKernelDriver {
     public init() {}
 
     public func getMatchingServices(matching: CFDictionary?) -> (kr: kern_return_t, iterator: io_iterator_t) {
@@ -216,12 +222,17 @@ public final class AccelerometerSource: SensorSource, Sendable {
     public let detectorConfig: ImpactDetectorConfig
     public let bandpassLowHz: Float
     public let bandpassHighHz: Float
-    /// Kernel-call seam. Default `RealAccelerometerKernelDriver` forwards
-    /// 1:1 to IOKit, so `AccelerometerSource()` produces byte-identical
-    /// kernel traffic to the pre-seam build. Tests inject
-    /// `MockAccelerometerKernelDriver` to make kernel-fidelity gates
-    /// reachable from XCTest.
-    internal let kernelDriver: AccelerometerKernelDriver
+    /// Kernel-call seam. Default `RealSPUKernelDriver` forwards 1:1 to
+    /// IOKit, so `AccelerometerSource()` produces byte-identical kernel
+    /// traffic to the pre-seam build. Tests inject `MockSPUKernelDriver`
+    /// to make kernel-fidelity gates reachable from XCTest.
+    internal let kernelDriver: SPUKernelDriver
+    /// Broker the source subscribes to for HID reports. Production
+    /// callers share `AppleSPUDevice.shared`; tests that inject a mock
+    /// kernel driver get a private broker wired with that same driver
+    /// so the per-source seam continues to route every IOKit call
+    /// through the mock.
+    internal let broker: AppleSPUDevice
 
     public convenience init(reportIntervalUS: Int = 10000,
                             bandpassLowHz: Float = 20.0, bandpassHighHz: Float = 25.0,
@@ -230,23 +241,43 @@ public final class AccelerometerSource: SensorSource, Sendable {
             reportIntervalUS: reportIntervalUS,
             bandpassLowHz: bandpassLowHz, bandpassHighHz: bandpassHighHz,
             detectorConfig: detectorConfig,
-            kernelDriver: RealAccelerometerKernelDriver()
+            kernelDriver: RealSPUKernelDriver(),
+            broker: AppleSPUDevice.shared
         )
     }
 
-    /// Designated initializer accepting a kernel-driver injection. Public
-    /// callers reach the convenience overload which selects
-    /// `RealAccelerometerKernelDriver`; tests use this overload to inject a
-    /// mock.
+    /// Test-overload init: caller supplies a kernel driver and the source
+    /// builds a private broker wired with the same driver. Existing test
+    /// cells continue to use `AccelerometerSource(kernelDriver: mock)`
+    /// and observe every IOKit call routed through the mock.
+    internal convenience init(reportIntervalUS: Int = 10000,
+                              bandpassLowHz: Float = 20.0, bandpassHighHz: Float = 25.0,
+                              detectorConfig: ImpactDetectorConfig = .accelerometer(),
+                              kernelDriver: SPUKernelDriver) {
+        self.init(
+            reportIntervalUS: reportIntervalUS,
+            bandpassLowHz: bandpassLowHz, bandpassHighHz: bandpassHighHz,
+            detectorConfig: detectorConfig,
+            kernelDriver: kernelDriver,
+            broker: AppleSPUDevice(driver: kernelDriver)
+        )
+    }
+
+    /// Designated initializer. Public callers reach the convenience
+    /// overload which selects `RealSPUKernelDriver` + the singleton
+    /// broker; tests use the kernel-driver-only overload which builds a
+    /// private broker wired with the test driver.
     internal init(reportIntervalUS: Int = 10000,
                   bandpassLowHz: Float = 20.0, bandpassHighHz: Float = 25.0,
                   detectorConfig: ImpactDetectorConfig = .accelerometer(),
-                  kernelDriver: AccelerometerKernelDriver) {
+                  kernelDriver: SPUKernelDriver,
+                  broker: AppleSPUDevice) {
         self.reportIntervalUS = reportIntervalUS
         self.bandpassLowHz = bandpassLowHz
         self.bandpassHighHz = bandpassHighHz
         self.detectorConfig = detectorConfig
         self.kernelDriver = kernelDriver
+        self.broker = broker
     }
 
     /// Whether the adapter should be offered to the pipeline.
@@ -293,28 +324,95 @@ public final class AccelerometerSource: SensorSource, Sendable {
     }
 
     public func impacts() -> AsyncThrowingStream<SensorImpact, Error> {
-        let intervalUS = reportIntervalUS
+        let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
 
-        // Best-effort activation. In Direct (unsandboxed) builds this writes
-        // ReportInterval / SensorPropertyReportingState / SensorPropertyPowerState
-        // on AppleSPUHIDDriver and returns true. In App Store (sandboxed)
-        // builds it returns false because IORegistryEntrySetCFProperty
-        // returns kIOReturnNotPermitted — but the system has HID
-        // EventServiceProperties.ReportInterval already set, so reports
-        // continue to flow through IOHIDManager regardless.
-        let activated = SensorActivation.activate(reportIntervalUS: intervalUS, driver: kernelDriver)
-        if !activated {
-            log.info("activity:SensorActivation isPendingOn entity:SystemActivation falling through to passive read")
+        let ctx = ReportContext(
+            adapterID: id,
+            continuation: continuation,
+            hpFilter: HighPassFilter(cutoffHz: bandpassLowHz, sampleRate: AccelHardwareConstants.defaultSampleRate),
+            lpFilter: LowPassFilter(cutoffHz: bandpassHighHz, sampleRate: AccelHardwareConstants.defaultSampleRate),
+            detector: ImpactDetector(config: detectorConfig, adapterName: name)
+        )
+
+        // Subscribe to the broker. The broker handles device open +
+        // sensor activation on first subscriber and close + deactivation
+        // on last. The handler runs on the broker's HID worker thread
+        // (a dedicated CFRunLoop thread) and decodes the raw bytes via
+        // the existing `ReportContext.handleReport` body — same offsets
+        // (6/10/14), same filters, same detector, same yield path as
+        // pre-broker production.
+        let token = broker.subscribe(
+            usagePage: AccelHardwareConstants.hidUsagePage,
+            usage: AccelHardwareConstants.hidUsage,
+            dispatch: .accel,
+            reportIntervalUS: reportIntervalUS
+        ) { [ctx] report in
+            // `UnsafeMutablePointer(mutating:)` is sound because
+            // `handleReport` only reads from the buffer; the cast is
+            // necessary because the broker exposes `UnsafePointer<UInt8>`
+            // (immutable view) but the existing handleReport signature
+            // takes the mutable variant for backwards-compat with the
+            // mutation-anchor cells in `MatrixAccelerometerReader_Tests`.
+            let mutPtr = UnsafeMutablePointer<UInt8>(mutating: report.bytes)
+            ctx.handleReport(report: mutPtr, length: report.length)
         }
 
-        return AccelHardware.openStream(
-            adapterID: id, adapterName: name,
-            reportIntervalUS: intervalUS,
-            bandpassLowHz: bandpassLowHz, bandpassHighHz: bandpassHighHz,
-            detectorConfig: detectorConfig,
-            driver: kernelDriver
-        )
+        guard let token else {
+            continuation.finish(throwing: SensorError.deviceNotFound)
+            return stream
+        }
+
+        log.info("activity:SensorReading wasStartedBy agent:\(name)")
+
+        // Per-subscriber watchdog. Each AccelerometerSource owns its
+        // own stall detector — when the broker is shared across multiple
+        // sources, each subscriber surfaces its own stall to its own
+        // continuation independently.
+        let watchdogTask = Task.detached(priority: .background) { [ctx] in
+            let stallThreshold: TimeInterval = 5.0
+            let pollInterval: TimeInterval = 1.0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(pollInterval))
+                let snapshot = ctx.watchdogSnapshot()
+                let now = Date()
+                switch AccelHardware.evaluateWatchdogTick(snapshot: snapshot, now: now, stallThreshold: stallThreshold) {
+                case .invalidated:
+                    return
+                case .alive:
+                    continue
+                case .stalled(let staleness):
+                    log.warning("activity:SensorReading wasInvalidatedBy entity:Watchdog staleness=\(String(format: "%.1f", staleness))s sampleCount=\(snapshot.sampleCounter)")
+                    ctx.surfaceStall(SensorError.ioKitError("accelerometer report stream stalled (\(Int(staleness))s without data)"))
+                    return
+                }
+            }
+        }
+
+        let cleanup = OnceCleanup(BrokerSubscription(
+            broker: broker, token: token, ctx: ctx,
+            watchdog: WatchdogHandle(task: watchdogTask)
+        ))
+
+        continuation.onTermination = { @Sendable _ in
+            cleanup.perform { r in
+                r.watchdog.task.cancel()
+                r.ctx.invalidate()
+                r.broker.unsubscribe(r.token)
+            }
+            log.info("activity:SensorReading wasEndedBy agent:\(self.name)")
+        }
+
+        return stream
     }
+}
+
+/// Resource bundle for one `AccelerometerSource` subscription.
+/// Sendable because every field is itself Sendable.
+private struct BrokerSubscription: Sendable {
+    let broker: AppleSPUDevice
+    let token: SPUSubscription
+    let ctx: ReportContext
+    let watchdog: WatchdogHandle
 }
 
 // MARK: - Sensor activation via IORegistry
@@ -323,7 +421,7 @@ public final class AccelerometerSource: SensorSource, Sendable {
 // property keys. See file-level comment for rationale.
 
 internal enum SensorActivation {
-    static func activate(reportIntervalUS: Int, driver: AccelerometerKernelDriver) -> Bool {
+    static func activate(reportIntervalUS: Int, driver: SPUKernelDriver) -> Bool {
         let matching = IOServiceMatching("AppleSPUHIDDriver")
         let (kr, iterator) = driver.getMatchingServices(matching: matching)
         guard kr == KERN_SUCCESS else { return false }
@@ -352,7 +450,7 @@ internal enum SensorActivation {
         return activated
     }
 
-    static func deactivate(driver: AccelerometerKernelDriver) {
+    static func deactivate(driver: SPUKernelDriver) {
         let matching = IOServiceMatching("AppleSPUHIDDriver")
         let (kr, iterator) = driver.getMatchingServices(matching: matching)
         guard kr == KERN_SUCCESS else { return }
@@ -388,7 +486,7 @@ internal enum SensorActivation {
 
 internal enum AccelHardware {
 
-    static func isSPUDevicePresent(driver: AccelerometerKernelDriver = RealAccelerometerKernelDriver()) -> Bool {
+    static func isSPUDevicePresent(driver: SPUKernelDriver = RealSPUKernelDriver()) -> Bool {
         let manager = driver.hidManagerCreate()
         guard driver.hidManagerOpen(manager) == kIOReturnSuccess else { return false }
         defer { driver.hidManagerClose(manager) }
@@ -419,7 +517,7 @@ internal enum AccelHardware {
     ///
     /// Read-only IORegistry lookup. Works from inside App Sandbox
     /// (sandbox blocks property WRITES, not reads).
-    static func isSensorActivelyReporting(driver: AccelerometerKernelDriver = RealAccelerometerKernelDriver()) -> Bool {
+    static func isSensorActivelyReporting(driver: SPUKernelDriver = RealSPUKernelDriver()) -> Bool {
         let matching = IOServiceMatching("AppleSPUHIDDriver")
         let (kr, iterator) = driver.getMatchingServices(matching: matching)
         guard kr == KERN_SUCCESS else {
@@ -470,7 +568,7 @@ internal enum AccelHardware {
         bandpassLowHz: Float = 20.0,
         bandpassHighHz: Float = 25.0,
         detectorConfig: ImpactDetectorConfig,
-        driver: AccelerometerKernelDriver = RealAccelerometerKernelDriver()
+        driver: SPUKernelDriver = RealSPUKernelDriver()
     ) -> AsyncThrowingStream<SensorImpact, Error> {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
 
@@ -713,7 +811,7 @@ internal enum AccelHardware {
         [kIOHIDPrimaryUsagePageKey as String: pageAccel, kIOHIDPrimaryUsageKey as String: usageAccel] as CFDictionary
     }
 
-    static func findSPUDevice(in devices: CFSet, driver: AccelerometerKernelDriver = RealAccelerometerKernelDriver()) -> IOHIDDevice? {
+    static func findSPUDevice(in devices: CFSet, driver: SPUKernelDriver = RealSPUKernelDriver()) -> IOHIDDevice? {
         let count = CFSetGetCount(devices)
         var values = [UnsafeRawPointer?](repeating: nil, count: count)
         CFSetGetValues(devices, &values)

@@ -15,9 +15,9 @@ import CoreGraphics
 // so tests can drive presence detection deterministically without touching
 // real hardware.
 //
-// `HIDMatcher` is a strict-typed replacement for the `[String: Any]`
-// CFDictionary literals that previously appeared at every IOHIDManager
-// call site.
+// `HIDMatcher` is the strict-typed shape every IOHIDManager call site
+// builds its match dictionary from — keeps the `[String: Any]`
+// CFDictionary plumbing localised to the bridging helpers.
 
 public struct HIDMatcher: Sendable, Equatable, Hashable {
     public var transport: String?

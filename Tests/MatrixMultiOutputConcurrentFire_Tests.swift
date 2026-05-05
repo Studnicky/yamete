@@ -37,11 +37,12 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
     /// observed on each call. Each spy carries its own slot identity so
     /// failure messages can name the offender directly.
     ///
-    /// `pauseUntil` mirrors `MatrixSpyOutput.pauseUntil`: when set, `action()`
-    /// blocks on the token instead of sleeping `actionDuration`. Round 5
-    /// added this so `testTwoBackToBack_dropDuringInflight_perOutput` could
-    /// pin A in flight deterministically while B publishes, instead of
-    /// racing wall-clock sleeps that the slow CI runner could re-order.
+    /// `pauseUntil` mirrors `MatrixSpyOutput.pauseUntil`: when set,
+    /// `action()` blocks on the token instead of sleeping
+    /// `actionDuration`. The drop-during-inflight cells use this to
+    /// pin A's `action()` deterministically while B publishes, so the
+    /// drop is asserted against a known scheduler position rather than
+    /// a wall-clock sleep.
     private final class TaggedSpy: ReactiveOutput {
         let slot: OutputSlot
         var preCalls: [(kind: ReactionKind, ts: Date)] = []
@@ -209,11 +210,11 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
     /// The drop-not-cancel rule: if the second reaction arrives during the
     /// first's lifecycle (post-coalesce, mid-action), it is dropped.
     ///
-    /// Round 5 hardening: instead of racing a wall-clock 50 ms `actionDuration`
-    /// against the slow CI runner (the previous approach occasionally let
-    /// A's lifecycle finish before B even published, falsifying the
-    /// drop-not-cancel coordinates), pin every spy's action on a shared
-    /// `PauseToken`. Sequence:
+    /// Pins every spy's `action()` on a shared `PauseToken` so the
+    /// drop-not-cancel coordinates are deterministic — racing a
+    /// wall-clock `actionDuration` against B's publish lets A's
+    /// lifecycle finish before B publishes on slow schedulers and
+    /// falsifies the test. Sequence:
     ///   1. publish A → poll until each spy records `preCalls.count >= 1`
     ///      (action() has begun for every output and is blocked on the gate)
     ///   2. publish B → must be dropped because every spy's lifecycleTask is
@@ -435,6 +436,17 @@ final class MatrixMultiOutputConcurrentFire_Tests: XCTestCase {
         case .mouseClicked:      return .mouseClicked
         case .mouseScrolled:     return .mouseScrolled
         case .keyboardTyped:     return .keyboardTyped
+        case .gyroSpike:     return .gyroSpike
+        case .lidOpened:     return .lidOpened
+        case .lidClosed:     return .lidClosed
+        case .lidSlammed:    return .lidSlammed
+        case .alsCovered:    return .alsCovered
+        case .lightsOff:     return .lightsOff
+        case .lightsOn:      return .lightsOn
+        case .thermalNominal:  return .thermalNominal
+        case .thermalFair:     return .thermalFair
+        case .thermalSerious:  return .thermalSerious
+        case .thermalCritical: return .thermalCritical
         }
     }
 

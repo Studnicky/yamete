@@ -5,16 +5,14 @@ import AppKit
 
 /// Trackpad OS-event-surface matrix.
 ///
-/// Bug class: trackpad detection (touching, sliding, contact, tapping,
-/// circling) was previously only exercised via `_testEmit(kind)`, which
-/// publishes directly to the bus and bypasses every detection path
-/// (RMS windowing, contact timer, tap-rate accumulation, circle angle
-/// integration, attribution gate). A regression in any of those paths
-/// would slip through.
-///
-/// Strategy: drive synthetic NSEvents (built via CGEvent for phase
-/// support) through `MockEventMonitor.emit(_:ofType:)` and assert that
-/// the production detection logic produces the expected reactions.
+/// Drives synthetic NSEvents (built via CGEvent for phase support)
+/// through `MockEventMonitor.emit(_:ofType:)` so the production
+/// detection logic — RMS windowing, contact timer, tap-rate
+/// accumulation, circle angle integration, attribution gate — runs
+/// end-to-end and the resulting reactions can be asserted on the bus.
+/// `_testEmit(kind)` shortcuts the bus directly and bypasses these
+/// detectors; this matrix exists so a regression in any of them gets
+/// caught at the OS-event surface.
 @MainActor
 final class MatrixTrackpadOSEvents_Tests: XCTestCase {
 

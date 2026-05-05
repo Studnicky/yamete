@@ -6,7 +6,7 @@ import os
 @testable import SensorKit
 import YameteCore
 
-/// Test double for `AccelerometerKernelDriver`. Cells configure failure
+/// Test double for `SPUKernelDriver`. Cells configure failure
 /// codes for individual kernel calls — the next call returns the canned
 /// failure (and the iteration is consumed, single-shot semantics) so the
 /// production code's success-only branch is forced into its
@@ -43,7 +43,7 @@ import YameteCore
 /// The mock counts each call so cells can pin "production loop body
 /// actually ran" via call-count assertions, which is how iterator
 /// sentinel gates (`service != 0 else break`) get caught.
-final class MockAccelerometerKernelDriver: AccelerometerKernelDriver, @unchecked Sendable {
+final class MockSPUKernelDriver: SPUKernelDriver, @unchecked Sendable {
 
     private struct State: Sendable {
         // Failure knobs
@@ -119,7 +119,7 @@ final class MockAccelerometerKernelDriver: AccelerometerKernelDriver, @unchecked
     var hidDeviceMaxReportSizeCalls: Int { state.withLock { $0.hidDeviceMaxReportSizeCalls } }
     var hidDeviceTransportCalls: Int { state.withLock { $0.hidDeviceTransportCalls } }
 
-    // MARK: - AccelerometerKernelDriver conformance
+    // MARK: - SPUKernelDriver conformance
 
     func getMatchingServices(matching: CFDictionary?) -> (kr: kern_return_t, iterator: io_iterator_t) {
         state.withLock { s in

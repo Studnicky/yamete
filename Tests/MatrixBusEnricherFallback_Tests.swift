@@ -78,11 +78,11 @@ final class MatrixBusEnricherFallback_Tests: XCTestCase {
 
     func testEnricher_underTimeout_resultDelivered() async throws {
         let bus = ReactionBus()
-        // Production timeout is 500 ms. 200 ms enricher leaves 300 ms of
-        // headroom — robust under CI schedulers that can delay an awaiting
-        // task by 100+ ms. The 0.4 s value used previously was within 100 ms
-        // of the timeout and flaked on slow runners (got fallback's [0]
-        // instead of [42]).
+        // Production timeout is 500 ms. A 200 ms enricher leaves 300 ms
+        // of headroom, which is robust under CI schedulers that can
+        // delay an awaiting task by 100+ ms. Cutting closer to the
+        // timeout flakes on slow runners (fallback `[0]` lands instead
+        // of the enricher result `[42]`).
         let enricherDelayMs = 200
         await bus.setEnricher { reaction, publishedAt in
             try? await Task.sleep(for: .milliseconds(enricherDelayMs))

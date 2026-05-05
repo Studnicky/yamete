@@ -52,11 +52,20 @@ internal struct ResponseSection: View {
         }
     }
 
+    @State private var reactionsGroupExpanded: Bool = false
+
     public var body: some View {
         @Bindable var s = settings
         let lw = tuningLabelWidth
 
-        VStack(spacing: 0) {
+        SensorAccordionCard(
+            title: NSLocalizedString("section_reactions", comment: "Reactions master group title"),
+            icon: "waveform.path",
+            isEnabled: masterReactionsBinding(),
+            isExpanded: $reactionsGroupExpanded,
+            help: NSLocalizedString("help_reactions", comment: "Reactions master toggle help")
+        ) {
+            VStack(spacing: 0) {
 
             // Audio (includes Volume Override in Direct builds)
             SensorAccordionCard(
@@ -209,6 +218,26 @@ internal struct ResponseSection: View {
                 }
             }
 
+            }
+            // Reactions master OFF → dim every output card AND its
+            // expanded content so the user sees what was configured
+            // but cannot interact until the override is released.
+            .dimmedWhenMasterOff(settings.reactionsMasterEnabled)
         }
+    }
+
+    /// Override-disable kill switch for the Reactions group. Reads and
+    /// writes `settings.reactionsMasterEnabled` only; never mutates any
+    /// per-output toggle. When `false`, `ReactiveOutput.consume` skips
+    /// dispatch via `OutputConfigProvider.reactionsMasterIsOn()` so no
+    /// output fires regardless of its per-output toggle or per-reaction
+    /// matrix entry. When `true`, individual settings flow through
+    /// unchanged.
+    private func masterReactionsBinding() -> Binding<Bool> {
+        @Bindable var s = settings
+        return Binding(
+            get: { s.reactionsMasterEnabled },
+            set: { newValue in s.reactionsMasterEnabled = newValue }
+        )
     }
 }

@@ -61,8 +61,12 @@ public struct SensorID: Hashable, Sendable, RawRepresentable, CustomStringConver
     public var description: String { rawValue }
 
     public static let accelerometer = SensorID("accelerometer")
+    public static let gyroscope = SensorID("gyroscope")
+    public static let lidAngle = SensorID("lidAngle")
+    public static let ambientLight = SensorID("ambientLight")
     public static let microphone = SensorID("microphone")
     public static let headphoneMotion = SensorID("headphone-motion")
+    public static let thermal = SensorID("thermal")
 
     /// Event sources — same identifier surface as sensor sources so the
     /// settings store can persist a single `enabledSensorIDs`-shaped list.

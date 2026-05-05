@@ -26,12 +26,66 @@ struct AccordionAnimationDurationKey: PreferenceKey {
 }
 
 /// Shared app color palette and reusable style modifiers.
+///
+/// **Semantic-role contract.** Every menu element binds a color to one
+/// of the named *state roles* below. The raw palette names (`pink`,
+/// `deepRose`, `mauve`, `lightPink`, `dark`) are kept for source
+/// continuity but new code should reach for the role aliases so the
+/// meaning of "what does this colour mean here?" stays consistent
+/// across the app:
+///
+///   - `Theme.stateActive`        — an enabled / active control's
+///     primary accent (toggle thumb, accordion title text and icon
+///     when the card is enabled, focus indicator).
+///   - `Theme.stateActiveStroke`  — outline / frame around an active
+///     component (`SensorAccordionCard` border, list backing).
+///   - `Theme.stateWarning`       — paused / suspended / non-fatal
+///     warning surface (paused-pill, sensor error banner, recoverable
+///     state indicator).
+///   - `Theme.stateHighlight`     — secondary highlight / hover /
+///     interactive emphasis where `stateActive` would feel too loud.
+///   - `Theme.stateInert`         — semantic alias for the system
+///     `Color.secondary` used for disabled labels, secondary copy,
+///     muted icons.
+///
+/// **Master-kill-switch dimming.** When a group's master kill switch
+/// is OFF (override-disable engaged), the group's content is dimmed to
+/// `Theme.disabledByMasterOpacity` and made non-interactive via the
+/// `.dimmedWhenMasterOff(_:)` ViewModifier (declared at the bottom of
+/// this file). The opacity value is centralised here so the same
+/// muted state reads identically across SensorSection, StimuliSection,
+/// and ResponseSection.
 enum Theme {
+    // MARK: - Raw palette
     static let pink      = Color(red: 0.867, green: 0.357, blue: 0.522)  // #DD5B85
     static let deepRose  = Color(red: 0.643, green: 0.165, blue: 0.357)  // #A42A5B
     static let mauve     = Color(red: 0.784, green: 0.471, blue: 0.663)  // #C878A9
     static let lightPink = Color(red: 0.949, green: 0.588, blue: 0.659)  // #F296A8
     static let dark      = Color(red: 0.055, green: 0.055, blue: 0.055)  // #0E0E0E
+
+    // MARK: - Semantic roles (prefer these over raw palette names)
+
+    /// Enabled / active control accent. Toggle thumb when on, accordion
+    /// header text + icon when the card is enabled, focus indicator.
+    static let stateActive       = pink
+    /// Outline / frame around an active component.
+    static let stateActiveStroke = deepRose
+    /// Paused / suspended / non-fatal warning. Sensor errors, the
+    /// "paused" pill in the header, recoverable state indicators.
+    static let stateWarning      = mauve
+    /// Secondary highlight / hover / interactive emphasis where
+    /// `stateActive` would feel too loud.
+    static let stateHighlight    = lightPink
+    /// Semantic alias for the system secondary colour. Use for muted
+    /// labels, secondary copy, disabled-by-toggle icons.
+    static let stateInert        = Color.secondary
+
+    /// Opacity multiplier applied to a group's content when its master
+    /// kill switch is OFF. Tuned to read as clearly muted while leaving
+    /// enough contrast that the user can still read their per-item
+    /// settings (so they know what will resume when the master flips
+    /// back on).
+    static let disabledByMasterOpacity: Double = 0.60
 
     // MARK: - Layout constants
 
@@ -362,3 +416,36 @@ struct SettingHeader: View {
         }
     }
 }
+
+// MARK: - Master-kill-switch dimming modifier
+//
+// Applies the canonical disabled-by-master appearance to a view: the
+// content fades to `Theme.disabledByMasterOpacity` and gates user
+// interaction off via `.disabled(true)` so a user looking at a muted
+// group can still see what was in it (per-item settings preserved
+// verbatim — see SettingsStore master-flag doc) without being able to
+// interact with the gated controls until they re-enable the master.
+// The fade is animated with a short ease-in-out so the override-on /
+// override-off transition reads as a deliberate state change rather
+// than a flicker.
+
+private struct DimmedWhenMasterOff: ViewModifier {
+    let masterEnabled: Bool
+    func body(content: Content) -> some View {
+        content
+            .opacity(masterEnabled ? 1.0 : Theme.disabledByMasterOpacity)
+            .disabled(!masterEnabled)
+            .animation(.easeInOut(duration: 0.25), value: masterEnabled)
+    }
+}
+
+extension View {
+    /// Dims and disables this view when the controlling master kill
+    /// switch is OFF. Use at every group boundary that ships a master
+    /// toggle so the disabled-by-master appearance is identical across
+    /// SensorSection, StimuliSection, and ResponseSection.
+    func dimmedWhenMasterOff(_ masterEnabled: Bool) -> some View {
+        modifier(DimmedWhenMasterOff(masterEnabled: masterEnabled))
+    }
+}
+

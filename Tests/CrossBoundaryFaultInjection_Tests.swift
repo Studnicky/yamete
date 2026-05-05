@@ -3,7 +3,7 @@ import IOKit
 @testable import YameteCore
 @testable import SensorKit
 
-/// Phase 8 — cross-boundary simultaneous fault injection.
+/// Cross-boundary simultaneous fault injection.
 ///
 /// Existing `_force*` seams (USB / Bluetooth / Thunderbolt
 /// `_forceKernelFailureKr`, AudioPeripheral `_forceListenerStatus`,
@@ -151,7 +151,7 @@ final class CrossBoundaryFaultInjection_Tests: XCTestCase {
     // stream finishes throwing without ever yielding an impact). The
     // two sources do not corrupt each other's state.
     func test_crossfault_cell_accel_open_fail_during_mic_start() async {
-        let accelMock = MockAccelerometerKernelDriver()
+        let accelMock = MockSPUKernelDriver()
         accelMock.setForceManagerOpenFailure(kIOReturnNotPermitted)
         let accel = AccelerometerSource(kernelDriver: accelMock)
 

@@ -5,18 +5,15 @@ import AppKit
 
 /// Keyboard OS-event-surface matrix.
 ///
-/// Bug class: keyboard rate-detection logic (`handleKeyPress` → `keyWindow`
-/// → `tapRateThreshold` → `typingDebounce`) was previously only exercised
-/// via `_testEmit(.keyboardTyped)`, which publishes directly to the bus
-/// and bypasses the entire detection pipeline. A regression in window
-/// pruning, threshold comparison, or debounce gate management would slip
-/// through.
-///
-/// Strategy: drive synthetic key presses through `_injectKeyPress` (the
-/// new test seam that calls the same `handleKeyPress` the real IOHID
-/// callback uses). Assert that the production rate-window + debounce
-/// pipeline produces the right number of `.keyboardTyped` reactions for
-/// each input pattern.
+/// Drives synthetic key presses through `_injectKeyPress` (the test
+/// seam that calls the same `handleKeyPress` path the real IOHID
+/// callback uses) so the rate-detection pipeline — `keyWindow` →
+/// `tapRateThreshold` → `typingDebounce` — runs end-to-end. Asserts
+/// the production pipeline produces the right number of
+/// `.keyboardTyped` reactions for each input pattern.
+/// `_testEmit(.keyboardTyped)` publishes to the bus directly and
+/// bypasses the detector, which would let regressions in window
+/// pruning, threshold compare, or debounce gating slip through.
 @MainActor
 final class MatrixKeyboardOSEvents_Tests: XCTestCase {
 

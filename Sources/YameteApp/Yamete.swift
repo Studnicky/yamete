@@ -50,6 +50,14 @@ public final class Yamete {
     public let microphoneSource: MicrophoneSource
     public let headphoneMotionSource: HeadphoneMotionSource
 
+    // Gyroscope is a direct-publish reaction source (does NOT participate in
+    // fusion); declared here so its lifecycle hooks into `rebuildEventSources`
+    // alongside trackpad / mouse / keyboard.
+    public let gyroscopeSource = GyroscopeSource()
+    public let lidAngleSource = LidAngleSource()
+    public let ambientLightSource = AmbientLightSource()
+    public let thermalSource = ThermalSource()
+
     // Event sources
     public let usbSource = USBSource()
     public let powerSource = PowerSource()
@@ -292,7 +300,12 @@ public final class Yamete {
     }
 
     private func rebuildSensorPipeline() {
-        let enabled = Set(settings.enabledSensorIDs)
+        // Impact master kill switch: when off, the impact pipeline does not
+        // run regardless of `enabledSensorIDs`. Per-sensor selection is
+        // preserved verbatim — flipping the master back on resumes.
+        let enabled = settings.impactMasterEnabled
+            ? Set(settings.enabledSensorIDs)
+            : Set<String>()
         let sources: [any SensorSource] = allSensorSources.filter { enabled.contains($0.id.rawValue) }
 
         let config = FusionConfig(
@@ -304,14 +317,18 @@ public final class Yamete {
             lastPushedFusionConfig = config
         }
 
-        let shouldRun = settings.soundEnabled
-            || settings.flashEnabled
-            || settings.notificationsEnabled
-            || settings.ledEnabled
-            || settings.hapticEnabled
-            || settings.displayBrightnessEnabled
-            || settings.displayTintEnabled
-            || settings.volumeSpikeEnabled
+        // Reactions master kill switch shorts out the per-output OR test:
+        // if every output is muted globally, there is no reason to run the
+        // detection pipeline either.
+        let shouldRun = settings.reactionsMasterEnabled
+            && (settings.soundEnabled
+                || settings.flashEnabled
+                || settings.notificationsEnabled
+                || settings.ledEnabled
+                || settings.hapticEnabled
+                || settings.displayBrightnessEnabled
+                || settings.displayTintEnabled
+                || settings.volumeSpikeEnabled)
         if shouldRun && !sources.isEmpty {
             fusion.start(sources: sources, bus: bus)
         } else {
@@ -320,7 +337,13 @@ public final class Yamete {
     }
 
     private func rebuildEventSources() {
-        let desired = Set(settings.enabledStimulusSourceIDs)
+        // Stimuli master kill switch: when off, every stimulus source is
+        // stopped regardless of per-source selection. Per-source selection
+        // is preserved verbatim so flipping the master back on restores
+        // exactly the prior set without any reconstruction.
+        let desired = settings.stimuliMasterEnabled
+            ? Set(settings.enabledStimulusSourceIDs)
+            : Set<String>()
         guard desired != enabledStimulusSources else { return }
 
         for sourceID in desired.subtracting(enabledStimulusSources) {
@@ -353,6 +376,32 @@ public final class Yamete {
                 mouseActivitySource.start(publishingTo: bus)
             case SensorID.keyboardActivity.rawValue:
                 keyboardActivitySource.start(publishingTo: bus)
+            case SensorID.gyroscope.rawValue:
+                // Gyroscope is direct-publish like trackpad/mouse/keyboard but
+                // gates on SPU HID hardware presence. Skip start when the host
+                // does not expose a BMI286.
+                if AppleSPUDevice.isHardwarePresent() {
+                    gyroscopeSource.start(publishingTo: bus)
+                }
+            case SensorID.lidAngle.rawValue:
+                // Lid angle is direct-publish, state-machine over hinge angle.
+                // Same SPU-broker hardware-presence gate as gyroscope.
+                if AppleSPUDevice.isHardwarePresent() {
+                    lidAngleSource.start(publishingTo: bus)
+                }
+            case SensorID.ambientLight.rawValue:
+                // Ambient light is direct-publish over a continuous lux
+                // stream. Same SPU-broker hardware-presence gate as
+                // gyroscope and lid.
+                if AppleSPUDevice.isHardwarePresent() {
+                    ambientLightSource.start(publishingTo: bus)
+                }
+            case SensorID.thermal.rawValue:
+                // Thermal is direct-publish over OS-level
+                // `ProcessInfo.thermalState` transitions. Universal —
+                // every macOS host exposes thermal state, no hardware
+                // gate.
+                thermalSource.start(publishingTo: bus)
             default: break
             }
         }
@@ -368,6 +417,10 @@ public final class Yamete {
             case SensorID.trackpadActivity.rawValue: trackpadActivitySource.stop()
             case SensorID.mouseActivity.rawValue:    mouseActivitySource.stop()
             case SensorID.keyboardActivity.rawValue: keyboardActivitySource.stop()
+            case SensorID.gyroscope.rawValue:        gyroscopeSource.stop()
+            case SensorID.lidAngle.rawValue:         lidAngleSource.stop()
+            case SensorID.ambientLight.rawValue:     ambientLightSource.stop()
+            case SensorID.thermal.rawValue:          thermalSource.stop()
             default: break
             }
         }
@@ -389,6 +442,10 @@ public final class Yamete {
                         _ = self.settings.enabledStimulusSourceIDs
                         _ = self.settings.consensusRequired
                         _ = self.settings.debounce
+                        _ = self.settings.impactMasterEnabled
+                        _ = self.settings.stimuliMasterEnabled
+                        _ = self.settings.reactionsMasterEnabled
+                        _ = self.settings.devicesMasterEnabled
                     } onChange: {
                         continuation.resume(returning: true)
                     }

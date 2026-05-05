@@ -4,6 +4,9 @@ import YameteCore
 #if !RAW_SWIFTC_LUMP
 import ResponseKit
 #endif
+#if !RAW_SWIFTC_LUMP
+import SensorKit
+#endif
 import SwiftUI
 
 // MARK: - Stimuli section (cable / power / device / trackpad reactions)
@@ -15,7 +18,7 @@ internal struct StimuliSection: View {
     // Per-source expanded state
     @State private var expandedSources: Set<String> = []
 
-    private struct StimulusRow {
+    internal struct StimulusRow {
         let sourceID: String
         let title: String
         let icon: String
@@ -59,6 +62,11 @@ internal struct StimuliSection: View {
               icon: "moon.zzz",
               help: NSLocalizedString("help_source_sleep_wake", comment: "Sleep/wake source help"),
               kinds: [.willSleep, .didWake]),
+        .init(sourceID: SensorID.thermal.rawValue,
+              title: NSLocalizedString("event_thermal", comment: "Thermal pressure events"),
+              icon: "thermometer.medium",
+              help: NSLocalizedString("help_source_thermal", comment: "Thermal source help"),
+              kinds: [.thermalNominal, .thermalFair, .thermalSerious, .thermalCritical]),
     ]
 
     private var activeRows: [StimulusRow] {
@@ -90,30 +98,105 @@ internal struct StimuliSection: View {
                 kinds: [.keyboardTyped]
             ))
         }
+        if AppleSPUDevice.isHardwarePresent() {
+            result.append(.init(
+                sourceID: SensorID.gyroscope.rawValue,
+                title: NSLocalizedString("event_gyroscope", comment: "Gyroscope events"),
+                icon: "gyroscope",
+                help: NSLocalizedString("help_source_gyroscope", comment: "Gyroscope source help"),
+                kinds: [.gyroSpike]
+            ))
+            result.append(.init(
+                sourceID: SensorID.lidAngle.rawValue,
+                title: NSLocalizedString("event_lid_angle", comment: "Lid angle events"),
+                icon: "laptopcomputer",
+                help: NSLocalizedString("help_source_lid_angle", comment: "Lid angle source help"),
+                kinds: [.lidOpened, .lidClosed, .lidSlammed]
+            ))
+            result.append(.init(
+                sourceID: SensorID.ambientLight.rawValue,
+                title: NSLocalizedString("event_ambient_light", comment: "Ambient light events"),
+                icon: "sun.max.circle",
+                help: NSLocalizedString("help_source_ambient_light", comment: "Ambient light source help"),
+                kinds: [.alsCovered, .lightsOff, .lightsOn]
+            ))
+        }
         return result
     }
 
+    /// Active (enabled) stimuli render above inactive (disabled) ones;
+    /// each group is alphabetised by its localised title using the
+    /// `collationLocale`'s collation rules (case- and diacritic-
+    /// insensitive). Pure-functional, exposed `internal static` so unit
+    /// tests can assert ordering without instantiating SwiftUI.
+    internal static func orderedRows(_ rows: [StimulusRow],
+                                     enabledIDs: Set<String>,
+                                     collationLocale: Locale) -> [StimulusRow] {
+        let compare: (StimulusRow, StimulusRow) -> Bool = { lhs, rhs in
+            lhs.title.compare(rhs.title,
+                              options: [.caseInsensitive, .diacriticInsensitive],
+                              range: nil,
+                              locale: collationLocale) == .orderedAscending
+        }
+        let active   = rows.filter {  enabledIDs.contains($0.sourceID) }.sorted(by: compare)
+        let inactive = rows.filter { !enabledIDs.contains($0.sourceID) }.sorted(by: compare)
+        return active + inactive
+    }
+
+    private var orderedRows: [StimulusRow] {
+        Self.orderedRows(activeRows,
+                         enabledIDs: Set(settings.enabledStimulusSourceIDs),
+                         collationLocale: Locale(identifier: settings.resolvedNotificationLocale))
+    }
+
+    @State private var stimuliGroupExpanded: Bool = false
+
     public var body: some View {
-        VStack(spacing: 0) {
-            ForEach(activeRows, id: \.sourceID) { row in
-                let isExpanded = Binding(
-                    get: { expandedSources.contains(row.sourceID) },
-                    set: { expanded in
-                        if expanded { expandedSources.insert(row.sourceID) }
-                        else { expandedSources.remove(row.sourceID) }
+        SensorAccordionCard(
+            title: NSLocalizedString("section_stimuli", comment: "Stimuli master group title"),
+            icon: "dot.radiowaves.left.and.right",
+            isEnabled: masterStimuliBinding(),
+            isExpanded: $stimuliGroupExpanded,
+            help: NSLocalizedString("help_stimuli", comment: "Stimuli master toggle help")
+        ) {
+            VStack(spacing: 0) {
+                ForEach(orderedRows, id: \.sourceID) { row in
+                    let isExpanded = Binding(
+                        get: { expandedSources.contains(row.sourceID) },
+                        set: { expanded in
+                            if expanded { expandedSources.insert(row.sourceID) }
+                            else { expandedSources.remove(row.sourceID) }
+                        }
+                    )
+                    SensorAccordionCard(
+                        title: row.title,
+                        icon: row.icon,
+                        isEnabled: sourceBinding(id: row.sourceID),
+                        isExpanded: isExpanded,
+                        help: row.help
+                    ) {
+                        sourceContent(row: row)
                     }
-                )
-                SensorAccordionCard(
-                    title: row.title,
-                    icon: row.icon,
-                    isEnabled: sourceBinding(id: row.sourceID),
-                    isExpanded: isExpanded,
-                    help: row.help
-                ) {
-                    sourceContent(row: row)
                 }
             }
+            // Stimuli master OFF → dim every row AND its expanded content
+            // so the user sees what was configured but can't interact.
+            .dimmedWhenMasterOff(settings.stimuliMasterEnabled)
         }
+    }
+
+    /// Override-disable kill switch for the Stimuli group. Reads and
+    /// writes `settings.stimuliMasterEnabled` only; never mutates
+    /// `enabledStimulusSourceIDs`. When `false`, `Yamete.rebuildEventSources`
+    /// computes a desired set of `[]` so every stimulus source is
+    /// stopped. When `true`, the per-source selection in
+    /// `enabledStimulusSourceIDs` flows through unchanged.
+    private func masterStimuliBinding() -> Binding<Bool> {
+        @Bindable var s = settings
+        return Binding(
+            get: { s.stimuliMasterEnabled },
+            set: { newValue in s.stimuliMasterEnabled = newValue }
+        )
     }
 
     // MARK: - Source accordion content
@@ -366,6 +449,17 @@ internal struct StimuliSection: View {
         case .mouseClicked:             NSLocalizedString("kind_mouse_clicked",  comment: "Mouse clicked label")
         case .mouseScrolled:            NSLocalizedString("kind_mouse_scrolled", comment: "Mouse scrolled label")
         case .keyboardTyped:            NSLocalizedString("kind_keyboard_typed", comment: "Keyboard typed label")
+        case .gyroSpike:                NSLocalizedString("kind_gyro_spike",     comment: "Gyroscope spike label")
+        case .lidOpened:                NSLocalizedString("kind_lid_opened",     comment: "Lid opened label")
+        case .lidClosed:                NSLocalizedString("kind_lid_closed",     comment: "Lid closed label")
+        case .lidSlammed:               NSLocalizedString("kind_lid_slammed",    comment: "Lid slammed label")
+        case .alsCovered:               NSLocalizedString("kind_als_covered",    comment: "Ambient light covered label")
+        case .lightsOff:                NSLocalizedString("kind_lights_off",     comment: "Lights off label")
+        case .lightsOn:                 NSLocalizedString("kind_lights_on",      comment: "Lights on label")
+        case .thermalNominal:           NSLocalizedString("kind_thermal_nominal",  comment: "Thermal nominal label")
+        case .thermalFair:              NSLocalizedString("kind_thermal_fair",     comment: "Thermal fair label")
+        case .thermalSerious:           NSLocalizedString("kind_thermal_serious",  comment: "Thermal serious label")
+        case .thermalCritical:          NSLocalizedString("kind_thermal_critical", comment: "Thermal critical label")
         case .impact:                   ""
         }
     }

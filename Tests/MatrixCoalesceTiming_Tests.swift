@@ -103,14 +103,13 @@ final class MatrixCoalesceTiming_Tests: XCTestCase {
     /// the first lifecycle is still running. Second is dropped (no coalesce
     /// window restart, lifecycle in flight).
     ///
-    /// Round 6 hardening: the wall-clock `actionDur=80ms` knob raced the
-    /// slow CI scheduler — a 30/50ms inter-arrival sleep could drift past
-    /// the 80ms action window, letting A's lifecycle finish before B
-    /// published and producing 2 actions instead of the dropped-second 1.
-    /// Switch to the round-4 PauseToken pattern: A's spy blocks
-    /// deterministically until the test releases it. Publish A, poll for
-    /// `actionKinds().contains(...)` (action() has begun), publish B,
-    /// settle, assert exactly 1 action, then release.
+    /// Uses the `PauseToken` pattern: A's spy blocks deterministically
+    /// in `action()` until the test releases the token. Publish A, poll
+    /// for `actionKinds().contains(...)` to confirm `action()` has
+    /// begun, publish B, settle, assert exactly 1 action, then release.
+    /// A wall-clock `actionDuration` knob would race slow CI schedulers
+    /// — the inter-arrival sleep can drift past the action window and
+    /// let A finish before B publishes.
     func testSecondStimulusDropsWhileLifecycleInFlight() async throws {
         // Two cells exercise different scheduler points between A and B.
         // The actionDur knob is gone — A is pinned in flight by the token,

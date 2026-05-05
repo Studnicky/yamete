@@ -2,6 +2,7 @@
 import YameteCore
 #endif
 import Foundation
+import Observation
 
 private let log = AppLog(category: "ImpactFusion")
 
@@ -30,6 +31,7 @@ public struct FusionConfig: Equatable, Sendable {
 /// Lifecycle is owned by this class — `start()` spawns one task per source
 /// plus the fan-in/fusion task. `stop()` cancels them all and resets state.
 @MainActor
+@Observable
 public final class ImpactFusion {
     public private(set) var config: FusionConfig
     public private(set) var isRunning: Bool = false
