@@ -108,17 +108,12 @@ public final class RealLEDBrightnessDriver: LEDBrightnessDriver, @unchecked Send
         ]
         IOHIDManagerSetDeviceMatching(manager, match as CFDictionary)
 
-        // Request Input Monitoring access for Caps Lock LED writes. The
-        // public IOHIDCheckAccess is synchronous; IOHIDRequestAccess shows
-        // the system dialog when status is .unknown.
-        let granted: Bool = {
-            let currentAccess = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
-            switch currentAccess {
-            case kIOHIDAccessTypeGranted: return true
-            case kIOHIDAccessTypeUnknown: return IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
-            default:                      return false  // explicitly denied
-            }
-        }()
+        // Caps Lock LED writes require Input Monitoring. `Yamete.bootstrap()`
+        // owns the one-shot prompt; here we only consult the cached
+        // status. If the user denies, the LED responder stays disabled
+        // for the lifetime of this process — that's by design (macOS
+        // only honors one prompt per process anyway).
+        let granted = (InputMonitoringAccess.status() == .granted)
         accessState.withLock { $0 = granted }
         if granted {
             IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))

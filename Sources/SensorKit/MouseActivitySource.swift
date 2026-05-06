@@ -95,10 +95,10 @@ public final class MouseActivitySource: StimulusSource {
         // prevent ambient OS clicks bleeding into matrix runs even when the
         // dev terminal has been granted Input Monitoring. Scroll path still
         // works independently via the NSEvent global monitor above.
-        if enableHIDClickDetection && IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted {
-            startClickHID()
-        } else if !enableHIDClickDetection {
+        if !enableHIDClickDetection {
             log.debug("entity:MouseActivitySource startClickHID skipped — disabled by caller (test seam)")
+        } else if InputMonitoringAccess.status() == .granted {
+            startClickHID()
         } else {
             log.warning("entity:MouseActivitySource startClickHID skipped — Input Monitoring not granted")
         }

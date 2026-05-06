@@ -18,6 +18,7 @@ If you came here to read the joke, the [home page](/) explains the joke. If you 
 - **[Sensitivity gate](/architecture/sensitivity)** User-facing sensitivity becomes an inverted threshold band that decides which impacts even reach the bus.
 - **[Bus enricher](/architecture/enricher)** One pre-fan-out pass that resolves the audio clip, picks the face, and stamps `publishedAt`. So every output sees the same reaction.
 - **[Response dispatch](/architecture/responses)** Independent subscribers on the bus, each gated by the per-output per-reaction toggle matrix.
+- **[Display / audio pairing](/architecture/display-audio-pairing)** How Yamete pairs monitor speakers with their displays via EDID, and the topologies where the pairing falls back to "we don't know."
 - **[LED flash detail](/architecture/led-flash)** Caps Lock PWM dithering + a damped spring on the keyboard backlight. The crash-recovery sentinel that puts the brightness back if everything explodes mid-pulse.
 - **[Concurrency model](/architecture/concurrency)** Swift 6 strict concurrency. Where each actor lives, what crosses isolation, why the bus is an actor.
 - **[Pipeline lifecycle](/architecture/lifecycle)** How the orchestrator brings the bus, sources, and outputs up. How it tears them down without leaking the IOKit handle.

@@ -12,14 +12,21 @@ public struct AudioOutputConfig: Sendable {
     public var volumeMax: Float
     public var deviceUIDs: [String]
     public var perReaction: [ReactionKind: Bool]
+    /// When true, ignore `deviceUIDs` and route to the system default
+    /// audio output (UID `nil`, which `AudioPlaybackDriver.play` maps
+    /// to NSSound's default routing). Mirrors `FlashOutputConfig.
+    /// activeDisplayOnly` for the audio side.
+    public var activeOutputOnly: Bool
 
     public init(enabled: Bool, volumeMin: Float, volumeMax: Float,
-                deviceUIDs: [String], perReaction: [ReactionKind: Bool]) {
+                deviceUIDs: [String], perReaction: [ReactionKind: Bool],
+                activeOutputOnly: Bool = false) {
         self.enabled = enabled
         self.volumeMin = volumeMin
         self.volumeMax = volumeMax
         self.deviceUIDs = deviceUIDs
         self.perReaction = perReaction
+        self.activeOutputOnly = activeOutputOnly
     }
 }
 

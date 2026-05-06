@@ -92,8 +92,10 @@ public final class KeyboardActivitySource: StimulusSource {
             log.debug("entity:KeyboardActivitySource startHID skipped — disabled by caller (test seam)")
             return
         }
-        // Requires Input Monitoring TCC permission
-        guard IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted else {
+        // Requires Input Monitoring TCC permission. We never trigger
+        // the prompt from a source `start()` — `Yamete.bootstrap()`
+        // owns the one-shot prompt; sources only check.
+        guard InputMonitoringAccess.status() == .granted else {
             log.warning("entity:KeyboardActivitySource wasInvalidatedBy activity:Start — Input Monitoring not granted")
             return
         }
