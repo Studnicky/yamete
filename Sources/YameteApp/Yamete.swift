@@ -72,12 +72,20 @@ public final class Yamete {
 
     public private(set) var sensorError: String?
     public private(set) var activeSensorIDs: Set<SensorID> = []
+    /// TCC outcome for the Input Monitoring privilege class. Drives the
+    /// inline warning row in the Stimuli section when `.denied`. Updated
+    /// at `bootstrap()` (which prompts once if `.unknown`) and refreshed
+    /// from a `NSApplication.didBecomeActiveNotification` observer so
+    /// the warning clears automatically when the user grants permission
+    /// via System Settings and returns to Yamete.
+    public private(set) var inputMonitoringStatus: InputMonitoringAccess.Status = .unknown
 
     private var settingsTask: Task<Void, Never>?
     private var outputTasks: [Task<Void, Never>] = []
     private var lastPushedFusionConfig: FusionConfig?
     private var enabledStimulusSources: Set<String> = []
     private var deviceChangeObserver: (any NSObjectProtocol)?
+    private var foregroundObserver: (any NSObjectProtocol)?
 
     public init(settings: SettingsStore) {
         self.settings = settings
@@ -198,6 +206,17 @@ public final class Yamete {
     /// Call once at app launch.
     public func bootstrap() {
         AppLog.debugEnabled = AppLog.supportsDebugLogging && settings.debugLogging
+        // One-shot Input Monitoring prompt. macOS only honors a single
+        // `IOHIDRequestAccess` per process lifetime; doing it here at
+        // bootstrap (before any source `start()` runs) guarantees the
+        // grant is settled by the time the pipeline asks for it. Sources
+        // themselves only consult `status()` and never prompt.
+        inputMonitoringStatus = InputMonitoringAccess.requestIfUnknown()
+        switch inputMonitoringStatus {
+        case .granted: log.info("activity:InputMonitoringCheck wasGeneratedBy entity:Yamete status=granted")
+        case .denied:  log.warning("entity:Yamete wasInvalidatedBy activity:InputMonitoringCheck status=denied — keyboard/mouse-click/Caps-LED disabled until user grants in System Settings")
+        case .unknown: log.warning("entity:Yamete wasInvalidatedBy activity:InputMonitoringCheck status=unknown — prompt did not resolve")
+        }
         ledFlash.setUp()
         startOutputs()
         rebuildPipeline()
@@ -214,6 +233,81 @@ public final class Yamete {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in self?.refreshHardwarePresence() }
         }
+        // Refresh Input Monitoring status whenever the app comes back
+        // to the foreground — catches the round-trip through System
+        // Settings without polling.
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refreshInputMonitoringStatus() }
+        }
+    }
+
+    /// Re-reads the cached Input Monitoring status without prompting.
+    /// Called from the `didBecomeActiveNotification` observer; also
+    /// callable from rebuildPipeline if a stimulus source's start()
+    /// signals the cached value is stale.
+    public func refreshInputMonitoringStatus() {
+        let new = InputMonitoringAccess.status()
+        guard new != inputMonitoringStatus else { return }
+        log.info("activity:InputMonitoringCheck wasGeneratedBy entity:Yamete status=\(String(describing: new)) (was \(String(describing: inputMonitoringStatus)))")
+        inputMonitoringStatus = new
+    }
+
+    /// Live list of user-facing diagnostics rendered in the menu's
+    /// diagnostics row directly below the header. Recomputed on every
+    /// observer access — cheap (an array build of <5 entries) and
+    /// reactive to `inputMonitoringStatus`, `fusion.isRunning`, and
+    /// `sensorError` because all three are observable on Yamete.
+    public var diagnostics: [Diagnostic] {
+        var items: [Diagnostic] = []
+
+        // Pipeline paused / kill-switched. Promoted to the diagnostics
+        // row so the header's top bar can stay 2x2 instead of growing
+        // a centred pill that pushes the impacts counter around.
+        if !fusion.isRunning {
+            items.append(Diagnostic(
+                id: "pipeline-paused",
+                severity: .info,
+                title: NSLocalizedString("status_paused", comment: "Detection paused indicator")
+            ))
+        }
+
+        // Input Monitoring TCC denied — the user clicked "Don't Allow"
+        // at some point, OR (more commonly during local dev) the
+        // bundle's cdhash changed across an ad-hoc-signed reinstall and
+        // macOS silently revoked the prior grant. The CTA opens the
+        // Privacy & Security pane scrolled to the Input Monitoring list
+        // so the user can flip Yamete back on.
+        if inputMonitoringStatus == .denied {
+            items.append(Diagnostic(
+                id: "input-monitoring-denied",
+                severity: .warning,
+                title: NSLocalizedString("diagnostic_input_monitoring_title",
+                                          comment: "Input Monitoring permission missing diagnostic title"),
+                cta: Diagnostic.CallToAction(
+                    label: NSLocalizedString("diagnostic_open_system_settings",
+                                              comment: "Open System Settings call-to-action label"),
+                    url: InputMonitoringAccess.settingsURL
+                )
+            ))
+        }
+
+        // Hard sensor error surfaced from the fusion engine (e.g. the
+        // accelerometer watchdog stall). Already rendered elsewhere in
+        // the popover but worth elevating to the diagnostics row so it
+        // doesn't get hidden inside an accordion.
+        if let err = sensorError {
+            items.append(Diagnostic(
+                id: "sensor-error",
+                severity: .error,
+                title: err
+            ))
+        }
+
+        return items
     }
 
     /// Tears down the pipeline on app quit.
@@ -225,6 +319,8 @@ public final class Yamete {
     public func shutdown() {
         if let obs = deviceChangeObserver { NotificationCenter.default.removeObserver(obs) }
         deviceChangeObserver = nil
+        if let obs = foregroundObserver { NotificationCenter.default.removeObserver(obs) }
+        foregroundObserver = nil
         for task in outputTasks { task.cancel() }
         outputTasks.removeAll()
         settingsTask?.cancel()

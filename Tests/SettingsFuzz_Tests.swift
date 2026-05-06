@@ -144,6 +144,7 @@ final class SettingsFuzz_Tests: XCTestCase {
         // Bool keys → String
         for k in [SettingsStore.Key.soundEnabled, .debugLogging, .ledEnabled,
                   .keyboardBrightnessEnabled, .flashEnabled, .flashActiveDisplayOnly,
+                  .audioActiveOutputOnly,
                   .notificationsEnabled, .hapticEnabled, .displayBrightnessEnabled,
                   .displayTintEnabled, .volumeSpikeEnabled,
                   .trackpadTouchingEnabled, .trackpadSlidingEnabled,

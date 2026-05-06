@@ -11,13 +11,22 @@ Open the menu bar by clicking the face icon. The panel is grouped into three col
 
 ## Header
 
-The strip at the top of the panel.
+The strip at the top of the panel. A 2x2 grid: title + impacts counter on the first row, rotating subtext + last-impact tier on the second.
 
 * **The face.** Reacts on every detected impact. Eleven expressions, scaled to hit intensity. Reacts whether Flash Mode is on or off. It does not look away.
 * **Yamete (title) + tagline strip.** A slow-rotating one-liner that pulls from the spicy moan pool (Direct build) or the tame copy (App Store).
-* **Paused indicator.** Appears as a small "PAUSED" pill when the impact pipeline is stopped. Re-renders live when fusion stops or starts.
 * **Impacts today counter.** Counts fused impacts since local midnight.
 * **Last impact tier.** The tier name (`tap` / `light` / `medium` / `firm` / `hard`) of the most recent impact.
+
+## Diagnostics row
+
+Sits directly below the header. Hidden when there are no active diagnostics. When something needs your attention, this is where it shows up — so you don't have to scroll an accordion to find it.
+
+| Diagnostic | When it shows | Action |
+|---|---|---|
+| **Paused** | Impact pipeline is stopped (master toggle off, or sensor pruning emptied the active set). | Informational. Re-enable a sensor or flip the Impact Detection master back on. |
+| **Input Monitoring required** | The macOS TCC privilege class for keyboard, mouse clicks, and Caps Lock LED is missing. Most common after `make install` rebuilds the bundle (cdhash changes, macOS revokes the prior grant). | Click **Open System Settings…** to deep-link to Privacy & Security → Input Monitoring. Toggle Yamete Direct on. |
+| **Sensor error** | The fusion engine raised a hard error from one of the impact sensors (most often: accelerometer report stream stalled past the 5-second watchdog). | Surfaces the underlying error message verbatim. The fix usually lives in [Architecture > Detection gates](/architecture/detection-gates). |
 
 ## Impact Detection
 
@@ -96,9 +105,20 @@ Pick which physical devices the outputs talk to.
 
 | Picker | What it controls |
 |---|---|
-| **Audio output** | Which Core Audio device(s) the sound clips play on. Multi-select. |
+| **Audio output** | Which Core Audio device(s) the sound clips play on. Multi-select. Each row carries an icon derived from its CoreAudio transport class (laptop = built-in, TV = DisplayPort/HDMI, cable = USB, headphones = wireless or analog). When the audio device is paired to a connected display via EDID match (DisplayPort/HDMI) or built-in association (MacBook speakers + built-in display), an "attached to *<display>*" footnote appears under the device name. See [Architecture > Display / audio pairing](/architecture/display-audio-pairing) for the matching algorithm and the topologies it can't resolve. |
 | **Display** | Which monitor(s) get the screen-flash overlay. Multi-select. |
 | **Keyboard** | Which physical keyboard the LED + backlight pulse drives. Useful when an external keyboard is attached. |
+
+### Active-only toggles
+
+Both display and audio device lists offer an "active *X* only" toggle that **only renders when ≥2 devices are selected** — with 0 or 1 selected the toggle adds no signal and is hidden.
+
+| Toggle | Effect when ON |
+|---|---|
+| **Active display only** (above the display list) | The screen flash routes to `NSScreen.main` (the display with key focus at impact time) regardless of which displays are selected below. The list is dimmed and not interactive while the toggle is on. |
+| **Active output only** (above the audio list) | Impact sounds route to the system default audio output (whatever you're currently listening through), ignoring the per-device selection below. The list is dimmed and not interactive while the toggle is on. |
+
+Both toggles are disabled-by-default. They survive across launches.
 
 ## Footer
 

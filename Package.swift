@@ -24,6 +24,7 @@ let package = Package(
             path: "Sources/YameteCore",
             linkerSettings: [
                 .linkedFramework("AppKit"),
+                .linkedFramework("IOKit"),
             ]
         ),
 

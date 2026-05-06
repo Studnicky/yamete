@@ -32,6 +32,12 @@ public struct MenuBarView: View {
             HeaderSection()
             Divider()
 
+            // Active diagnostics (paused, missing permissions, sensor
+            // errors) sit between the header and the scrollable body so
+            // the user sees them on every panel open without scrolling.
+            // The row collapses to zero height when there are none.
+            DiagnosticsRow()
+
             // fixedSize makes the ScrollView report its content's ideal height (not the
             // panel frame height) so NSHostingView.fittingSize is correct.
             // frame(maxHeight:) caps it — scroll activates when content exceeds the screen.
@@ -223,26 +229,17 @@ internal struct HeaderSection: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                // Top row, three columns: title (leading), paused-pill
-                // (centred — only rendered when the fusion engine is
-                // stopped, so the centre column collapses to zero
-                // width otherwise and the impacts counter occupies its
-                // own trailing slot via a `Spacer` either way),
-                // impacts-today counter (trailing).
+                // Top row, two columns: title (leading), impacts-today
+                // counter (trailing). The paused indicator that used to
+                // sit between them moved to the `DiagnosticsRow` below
+                // the header divider, so the layout is a clean 2x2
+                // grid (title | impacts; subtext | last-impact) with no
+                // conditional column collapse.
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(NSLocalizedString("app_title", comment: "Application name"))
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(Theme.stateActive)
                     Spacer(minLength: 4)
-                    if !yamete.fusion.isRunning {
-                        Text(NSLocalizedString("status_paused", comment: "Detection paused indicator"))
-                            .font(.caption2)
-                            .foregroundStyle(Theme.stateWarning)
-                            .padding(.horizontal, 5).padding(.vertical, 1)
-                            .background(Theme.stateWarning.opacity(0.15))
-                            .clipShape(Capsule())
-                        Spacer(minLength: 4)
-                    }
                     Text(impactsLine)
                         .font(.caption)
                         .foregroundStyle(Theme.stateInert)

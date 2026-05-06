@@ -11,6 +11,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-05-06
+
+### Added
+- **Diagnostics row.** New surface in the menu directly below the header
+  that aggregates active warnings/errors (paused state, missing
+  Input Monitoring permission, sensor errors). Hidden when no
+  diagnostics are active. The "paused" indicator that previously sat
+  inside the top header row moved here so the header is back to a clean
+  2x2 grid (title | impacts; subtext | last-impact).
+- **Input Monitoring permission sentinel.** Yamete now consults
+  `IOHIDCheckAccess` at launch and on app foreground. When permission
+  is missing (most commonly because `make install`'s ad-hoc resign
+  changed the bundle's cdhash and macOS silently revoked the prior
+  grant), the diagnostics row surfaces "Input Monitoring required" with
+  an "Open System Settings…" button that deep-links to the Privacy &
+  Security pane. The previous failure mode was silent — no mouse clicks,
+  no keyboard typing, no Caps Lock LED, with only a single warn-level
+  log line as evidence.
+- **`InputMonitoringAccess` helper** (`Sources/YameteCore/`)
+  consolidates the three previously-inline TCC checks
+  (`MouseActivitySource`, `KeyboardActivitySource`,
+  `RealLEDBrightnessDriver`) onto a single `status()` /
+  `requestIfUnknown()` API. Sources never prompt; only
+  `Yamete.bootstrap()` does, matching macOS's "one prompt per process
+  lifetime" semantics.
+- **Active output only toggle for audio.** Mirrors the existing
+  active-display-only toggle: when on, impact sounds route to the
+  system default audio device only, ignoring the per-device selection.
+  Hidden when ≤1 audio device is selected (same gating rule applied
+  to the active-display-only toggle for consistency). Useful when the
+  user wants the sound to follow "wherever I'm listening right now"
+  instead of fanning out across configured outputs.
+- **Audio transport class tagging.** Each audio output row in the
+  menu now renders an icon derived from
+  `kAudioDevicePropertyTransportType`: `laptopcomputer` for built-in
+  speakers, `tv` for DisplayPort/HDMI, `cable.connector` for USB,
+  `headphones.bluetooth` for wireless, `headphones` for analog jack,
+  `bolt.horizontal` for Thunderbolt, `hifispeaker` otherwise. Lets the
+  user tell at a glance which outputs are monitor speakers vs USB
+  headsets vs wireless devices.
+- **EDID-based monitor↔speaker pairing.** Audio devices that ride on a
+  display's video cable (DisplayPort, HDMI, MacBook built-in) now get
+  paired to the display they belong to. The pairing reads the standard
+  EDID identifier triple (vendor, product, serial) from the audio
+  device's IORegistry ancestors and matches against
+  `CGDisplayVendorNumber`/`ModelNumber`/`SerialNumber`. Built-in
+  speakers pair structurally to whatever display reports
+  `CGDisplayIsBuiltin == 1`. Audio rows render an "attached to *<display>*"
+  footnote when pairing succeeds. See
+  [docs/architecture/display-audio-pairing](architecture/display-audio-pairing)
+  for failure modes (USB-C docks, KVMs, adapter chains, monitors with
+  zero-EDID-serial).
+
+### Changed
+- **`AppleSPUDevice` lifecycle race fix.** The multi-subscriber broker
+  for the SPU HID device serialised concurrent open/close transitions
+  through a new `transitionLock`. Previous behaviour: when the four
+  initial subscribers (accel, gyro, ALS, lid) raced into the
+  refcount-zero open path, the loser's cleanup called
+  `SensorActivation.deactivate()` on the winner's still-live session,
+  killing the report stream after one report and tripping the 5-second
+  watchdog. The fix eliminates the race-loser teardown path entirely;
+  there is now exactly one IOKit lifecycle operation in flight at a
+  time across the broker. New regression test
+  `testConcurrentSubscribes_openDeviceCalledExactlyOnce` pins the
+  invariant.
+- **Active-display-only toggle visibility.** The toggle now only
+  renders when ≥2 displays are selected. With 0 or 1 displays
+  selected the toggle adds no signal and was UI noise. The audio
+  side gets the same treatment.
+- **Header layout simplification.** The top bar's centre column
+  (which held the conditional "Paused" pill) is gone. Header is now a
+  clean 2x2: title and impacts counter on the first row, rotating
+  subtext and last-impact tier on the second. The paused indicator
+  surfaces in the diagnostics row instead.
+
+### Fixed
+- **`MainActor` mentions in commit messages and prose.** All future
+  mentions in markdown / prose contexts use `MainActor` without the
+  `@` prefix to avoid GitHub's @-mention parser indexing an unrelated
+  user. Source code (`*.swift`) keeps the `@MainActor` attribute as
+  required by the Swift compiler.
+
 ## [2.2.0] - 2026-05-05
 
 ### Added

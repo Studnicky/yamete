@@ -80,7 +80,7 @@ final class MatrixSettingsToConfig_Tests: XCTestCase {
         ]
         runFloatCells(cells)
 
-        // Bool: enabled ↔ soundEnabled
+        // Bool: enabled ↔ soundEnabled, activeOutputOnly ↔ audioActiveOutputOnly
         let boolCells: [BoolCell] = [
             .init(label: "audio.enabled",
                   setA: { $0.soundEnabled = false },
@@ -88,6 +88,12 @@ final class MatrixSettingsToConfig_Tests: XCTestCase {
                   expectedA: false,
                   setB: { $0.soundEnabled = true },
                   expectedB: true),
+            .init(label: "audio.activeOutputOnly",
+                  setA: { $0.audioActiveOutputOnly = true },
+                  readConfig: { $0.audioConfig().activeOutputOnly },
+                  expectedA: true,
+                  setB: { $0.audioActiveOutputOnly = false },
+                  expectedB: false),
         ]
         runBoolCells(boolCells)
     }

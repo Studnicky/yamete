@@ -425,3 +425,15 @@
 "thermal_floor_serious"     = "serious+";
 "thermal_floor_fair"        = "fair+";
 "thermal_floor_all"         = "all";
+
+/* Input Monitoring permission missing diagnostic title */
+"diagnostic_input_monitoring_title" = "Input Monitoring required for keyboard, mouse clicks, and Caps Lock LED.";
+
+/* Open System Settings call-to-action label */
+"diagnostic_open_system_settings" = "Open System Settings…";
+
+/* Audio active output only toggle label */
+"setting_audio_active_output" = "Active output only";
+
+/* Audio device paired with display footnote */
+"audio_paired_with_display" = "attached to %@";
