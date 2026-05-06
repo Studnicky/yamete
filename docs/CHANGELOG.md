@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-05-05
+
+### Added
+- **Thermal sensitivity ratchet.** New `thermalRatchet` tunable gates
+  the sensitivity of thermal state transitions to prevent hair-triggering
+  during power/load transients. Configurable per-state thresholds (nominal,
+  fair, serious, critical) with separate warmup and cooldown windows.
+
+### Changed
+- **Documentation reorganization.** ARCHITECTURE and CONFIGURATION guides
+  split into dedicated pages in `docs/`. README streamlined to link to
+  full documentation.
+- **Diagram enhancements.** Architecture diagrams now support zoom and
+  improved visual clarity for large sensor topology graphs.
+
+### Fixed
+- **Lint configuration alignment.** ESLint and TypeScript strict checks
+  unified across the build system.
+
 ## [2.1.1] - 2026-05-04
 
 ### Fixed
