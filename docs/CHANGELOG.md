@@ -17,10 +17,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Build-variant pill in the footer.** A small capsule beside the
   version number identifies which flavour of Yamete is running:
   pink "Direct" for Developer-ID-signed Direct builds, mauve
-  "App Store" for the sandboxed App Store variant. Mirrors the
-  styling the previous "Paused" pill used in the header. Lets the
-  user tell at a glance which lane a screenshot or bug report came
-  from.
+  "App Store" for the sandboxed App Store variant. Lets the user
+  tell at a glance which lane a screenshot or bug report came from.
+
+### Changed
+- **Footer reorganisation.** Footer cells render in a single
+  priority-ordered list flowing column-major into a 2-column grid:
+  Debug Logging (Direct only) → Launch at Login → Version → Reset
+  Settings → Info Links → Quit. When Debug Logging isn't present
+  (App Store), every later cell shifts one slot up so Launch at
+  Login becomes the top-left entry. Drops the central inter-column
+  divider that read as a table border.
+- **List containers no longer render a wrapping background.** The
+  faint grey rounded-rect that wrapped DeviceToggleList,
+  SelectionList, and NotificationLocalePicker is gone; per-row
+  dividers carry the "this is a list" affordance. The diagnostics
+  pills lose their stroke for the same reason — the tinted fill is
+  enough.
 
 ### Changed
 - **Pre-push hook auto-refreshes host-app snapshot baselines.** New

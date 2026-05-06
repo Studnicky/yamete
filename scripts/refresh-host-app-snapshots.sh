@@ -1,40 +1,36 @@
 #!/usr/bin/env bash
 # Pre-push companion to scripts/check-host-app-tests-fresh.sh.
 #
-# Solves the problem the 2.3.0 release push hit: the host-app test
-# target's sandbox mirror at
-# `~/Library/Containers/com.studnicky.yamete/Data/tmp/yamete-snapshots/HostApp/SnapshotUI_Tests/`
-# accumulates stale baseline PNGs from previous test runs. When the
-# source-tree baseline is missing for a cell (e.g. a layout change
-# deleted it pending re-record), `SnapshotUI_Tests.snapshotDirectory`
-# seeds the mirror from source — but mirror entries that exist ONLY in
-# the mirror linger and become stale references the next time SwiftUI
-# emits subtly different pixels. Result: `Snapshot does not match
-# reference` failures even though the source tree is in a clean state.
+# Refreshes the host-app test target's snapshot baselines so a push
+# never carries a stale comparison reference into CI.
 #
-# This script automates the manual cleanup-record-sync flow:
+# The host-app sandbox mirror lives at
+# `~/Library/Containers/com.studnicky.yamete/Data/tmp/yamete-snapshots/HostApp/SnapshotUI_Tests/`
+# and is the only path the SnapshotTesting library can read or write
+# from inside the App Sandbox. `SnapshotUI_Tests.snapshotDirectory`
+# seeds it from `Tests/__Snapshots__/HostApp/SnapshotUI_Tests/` on
+# first call; entries that exist only in the mirror linger across
+# runs and serve as references the next time SwiftUI emits subtly
+# different pixels — manifesting as "Snapshot does not match
+# reference" even on a clean source tree.
+#
+# Flow:
 #
 #   1. Wipe the sandbox mirror's HostApp PNGs so the next test run
-#      seeds fresh from source tree (no stale state survives).
-#   2. Run `make test-host-app`. Stale or missing baselines are
-#      recorded into the mirror under recordMode=.missing semantics.
-#   3. Sync mirror PNGs back to source tree at
+#      reseeds entirely from source.
+#   2. Run `make test-host-app`. Missing or invalidated baselines
+#      record into the mirror under recordMode=.missing semantics.
+#   3. Copy mirror PNGs back to source tree at
 #      Tests/__Snapshots__/HostApp/SnapshotUI_Tests/.
-#   4. If the source tree changed as a result, fail the push with a
-#      clear "stage and commit these and re-push" message. Never
-#      auto-commit baselines — the developer must acknowledge them.
+#   4. Refuse the push if the source tree moved as a result — the
+#      developer must commit recorded baselines explicitly.
 #
-# Skipped when:
-#   - Running on CI (CI=true). CI seeds via .github/workflows/snapshot-baseline-seed.yml.
-#   - Branch is not release/* or hotfix/*. Feature branches get this
-#     enforcement via the existing freshness gate (pre-push.host-app);
-#     the slow record-and-sync flow is reserved for the release path.
-#
-# Why a sandbox container path? Yamete.app's App Sandbox forbids
-# writes outside the container, so the SnapshotTesting library
-# cannot persist baselines into the source tree directly. The mirror
-# under `NSTemporaryDirectory()` resolves into the container's tmp
-# dir; this script bridges that one-way wall.
+# Self-skips when:
+#   - Running on CI (`CI=true`). CI seeds via the
+#     `.github/workflows/snapshot-baseline-seed.yml` workflow.
+#   - The push target is not `release/*` or `hotfix/*`. Feature
+#     branches push without this gate; the slow record-and-sync flow
+#     is reserved for the release path.
 
 set -euo pipefail
 

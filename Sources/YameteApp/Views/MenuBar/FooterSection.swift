@@ -16,81 +16,123 @@ internal struct FooterSection: View {
     @State private var launchAtLogin = (SMAppService.mainApp.status == .enabled)
 
     public var body: some View {
-        @Bindable var s = settings
+        // Single priority-ordered list of footer cells. Layout flows
+        // column-major: the left column gets the first ceil(N/2)
+        // entries, the right column gets the rest. When debug logging
+        // isn't available (App Store build), the entry collapses out
+        // and every later cell shifts one slot up, so "Launch at login"
+        // becomes the top-left entry instead.
+        let cells = orderedFooterCells
+        let leftCount = (cells.count + 1) / 2
+        let leftColumn = Array(cells.prefix(leftCount))
+        let rightColumn = Array(cells.dropFirst(leftCount))
 
         HStack(alignment: .top, spacing: 0) {
-
-            // Left footer — System preferences
             VStack(spacing: 0) {
-                FooterRow(icon: "power",
-                          label: NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label")) {
-                    Toggle("", isOn: $launchAtLogin)
-                        .themeMiniSwitch()
-                        .accessibilityLabel(Text(NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label")))
-                        .onChange(of: launchAtLogin) { _, on in
-                            do {
-                                if on { try SMAppService.mainApp.register() }
-                                else  { try SMAppService.mainApp.unregister() }
-                            } catch { launchAtLogin = !on }
-                        }
-                }
-
-                if AppLog.supportsDebugLogging {
-                    FooterRow(icon: "ladybug",
-                              label: NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label")) {
-                        Toggle("", isOn: $s.debugLogging)
-                            .themeMiniSwitch()
-                            .accessibilityLabel(Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label")))
-                    }
-                }
-
-                FooterRow(icon: "arrow.counterclockwise",
-                          label: NSLocalizedString("label_reset_settings", comment: "Reset settings label")) {
-                    PillButton(title: NSLocalizedString("button_reset", comment: "Reset to defaults button"),
-                               action: { confirmAndReset() })
-                }
-                .padding(.bottom, 4)
+                ForEach(leftColumn) { $0.view }
             }
             .frame(width: Theme.columnWidth)
 
-            Rectangle()
-                .fill(Color.secondary.opacity(0.18))
-                .frame(width: 1)
-
-            // Right footer — Info + actions
             VStack(spacing: 0) {
-                // Version / update status
-                FooterRow(
-                    leading: { updateStatusLeading },
-                    label: { updateStatusLabel },
-                    trailing: { updateStatusTrailing }
-                )
-
-                // Links
-                FooterRow(icon: "link",
-                          label: NSLocalizedString("label_links", comment: "Footer links section label")) {
-                    HStack(spacing: 6) {
-                        LinkPillButton(title: NSLocalizedString("button_privacy", comment: "Privacy policy button"),
-                                       url: Self.privacyPolicyURL)
-                        LinkPillButton(title: NSLocalizedString("button_support", comment: "Support button"),
-                                       url: Self.supportURL)
-                    }
-                }
-
-                // Quit
-                FooterRow(icon: "power.circle",
-                          label: NSLocalizedString("label_quit", comment: "Quit label")) {
-                    Button(action: { NSApp.terminate(nil) }) {
-                        Text(NSLocalizedString("button_quit", comment: "Quit application button"))
-                            .themePillButton(bold: true)
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut("q")
-                }
-                .padding(.bottom, 4)
+                ForEach(rightColumn) { $0.view }
             }
             .frame(width: Theme.columnWidth)
         }
+        .padding(.bottom, 4)
+    }
+
+    /// Type-erased footer cell descriptor. Lets `body` express layout
+    /// purely as ordered-list-into-grid without each call site repeating
+    /// `FooterRow(...)` boilerplate, and lets the cells reorder
+    /// dynamically when conditional members (Debug Logging) drop out.
+    private struct FooterCell: Identifiable {
+        let id: String
+        let view: AnyView
+    }
+
+    /// Priority-ordered list of footer cells. Order survives any
+    /// dropouts: each present cell keeps its index in the list, so
+    /// "Launch at login" sliding into the top-left when Debug Logging
+    /// isn't available is purely emergent — no separate code path.
+    ///
+    ///   1. Debug logging (Direct build only)
+    ///   2. Launch at login
+    ///   3. Version + build-variant pill
+    ///   4. Reset settings
+    ///   5. Info links
+    ///   6. Quit
+    @MainActor
+    private var orderedFooterCells: [FooterCell] {
+        @Bindable var s = settings
+        var cells: [FooterCell] = []
+
+        if AppLog.supportsDebugLogging {
+            cells.append(FooterCell(id: "debug-logging", view: AnyView(
+                FooterRow(icon: "ladybug",
+                          label: NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label")) {
+                    Toggle("", isOn: $s.debugLogging)
+                        .themeMiniSwitch()
+                        .accessibilityLabel(Text(NSLocalizedString("label_debug_logging", comment: "Debug logging toggle label")))
+                }
+            )))
+        }
+
+        cells.append(FooterCell(id: "launch-at-login", view: AnyView(
+            FooterRow(icon: "power",
+                      label: NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label")) {
+                Toggle("", isOn: $launchAtLogin)
+                    .themeMiniSwitch()
+                    .accessibilityLabel(Text(NSLocalizedString("label_launch_at_login", comment: "Launch at login toggle label")))
+                    .onChange(of: launchAtLogin) { _, on in
+                        do {
+                            if on { try SMAppService.mainApp.register() }
+                            else  { try SMAppService.mainApp.unregister() }
+                        } catch { launchAtLogin = !on }
+                    }
+            }
+        )))
+
+        cells.append(FooterCell(id: "version", view: AnyView(
+            FooterRow(
+                leading: { updateStatusLeading },
+                label: { updateStatusLabel },
+                trailing: { updateStatusTrailing }
+            )
+        )))
+
+        cells.append(FooterCell(id: "reset", view: AnyView(
+            FooterRow(icon: "arrow.counterclockwise",
+                      label: NSLocalizedString("label_reset_settings", comment: "Reset settings label")) {
+                PillButton(title: NSLocalizedString("button_reset", comment: "Reset to defaults button"),
+                           action: { confirmAndReset() })
+            }
+        )))
+
+        cells.append(FooterCell(id: "links", view: AnyView(
+            FooterRow(icon: "link",
+                      label: NSLocalizedString("label_links", comment: "Footer links section label")) {
+                HStack(spacing: 6) {
+                    LinkPillButton(title: NSLocalizedString("button_privacy", comment: "Privacy policy button"),
+                                   url: Self.privacyPolicyURL)
+                    LinkPillButton(title: NSLocalizedString("button_support", comment: "Support button"),
+                                   url: Self.supportURL)
+                }
+            }
+        )))
+
+        cells.append(FooterCell(id: "quit", view: AnyView(
+            FooterRow(icon: "power.circle",
+                      label: NSLocalizedString("label_quit", comment: "Quit label")) {
+                Button(action: { NSApp.terminate(nil) }) {
+                    Text(NSLocalizedString("button_quit", comment: "Quit application button"))
+                        .themePillButton(bold: true)
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut("q")
+            }
+        )))
+
+        return cells
     }
 
     private func confirmAndReset() {
@@ -142,11 +184,9 @@ internal struct FooterSection: View {
         }
     }
 
-    /// Build-variant indicator. Sits next to the version number as a
-    /// small capsule, mirroring the styling the previous "paused" pill
-    /// used in the header. Direct builds (Developer-ID-signed,
-    /// notarized, unsandboxed) tint with the brand pink to make them
-    /// visually distinct from the App-Store-sandboxed variant.
+    /// Build-variant indicator. A small capsule next to the version
+    /// number; pink for Direct (Developer-ID-signed, unsandboxed),
+    /// mauve for the App-Store sandboxed variant.
     private var buildVariantPill: some View {
         #if DIRECT_BUILD
         let label = NSLocalizedString("build_variant_direct",
