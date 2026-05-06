@@ -53,7 +53,7 @@ public final class SettingsStore {
         case soundReactionMatrix, flashReactionMatrix, notificationReactionMatrix, ledReactionMatrix
         // Independent output master toggles (replaces 3-way visualResponseMode gate)
         case flashEnabled
-        case flashActiveDisplayOnly
+        case flashActiveDisplayOnly, audioActiveOutputOnly
         case notificationsEnabled
         // Haptic output
         case hapticEnabled, hapticIntensity
@@ -158,6 +158,7 @@ public final class SettingsStore {
         // Independent output toggles — flash on by default, notifications opt-in
         Key.flashEnabled.rawValue:              true,
         Key.flashActiveDisplayOnly.rawValue:    false,
+        Key.audioActiveOutputOnly.rawValue:     false,
         Key.notificationsEnabled.rawValue:      false,
         // Haptic output
         Key.hapticEnabled.rawValue:                false,
@@ -793,6 +794,18 @@ public final class SettingsStore {
         }
     }
 
+    /// When true, the audio dispatch routes the impact sound only to the
+    /// system default output device, ignoring the enabled-audio-device
+    /// list. Mirrors `flashActiveDisplayOnly` semantically — the user
+    /// has multiple outputs configured but wants the sound to follow
+    /// "wherever I'm listening right now" instead of fanning out.
+    public var audioActiveOutputOnly: Bool {
+        didSet {
+            guard audioActiveOutputOnly != oldValue else { return }
+            persist(audioActiveOutputOnly, .audioActiveOutputOnly)
+        }
+    }
+
     public var notificationsEnabled: Bool {
         didSet {
             guard notificationsEnabled != oldValue else { return }
@@ -1198,6 +1211,7 @@ public final class SettingsStore {
             flashEnabled = (mode == .overlay)
         }
         flashActiveDisplayOnly = d.bool(forKey: Key.flashActiveDisplayOnly.rawValue)
+        audioActiveOutputOnly = d.bool(forKey: Key.audioActiveOutputOnly.rawValue)
         notificationsEnabled = d.bool(forKey: Key.notificationsEnabled.rawValue)
 
         // Event sources
@@ -1425,6 +1439,7 @@ public final class SettingsStore {
         keyboardBrightnessEnabled = false
         flashEnabled             = true
         flashActiveDisplayOnly   = false
+        audioActiveOutputOnly    = false
         notificationsEnabled  = false
         enabledStimulusSourceIDs = StimulusSourceDefaults.allStimulusSourceIDs
         soundReactionMatrix        = ReactionToggleMatrix()
@@ -1488,7 +1503,8 @@ extension SettingsStore: OutputConfigProvider {
             volumeMin: Float(volumeMin),
             volumeMax: Float(volumeMax),
             deviceUIDs: devicesMasterEnabled ? enabledAudioDevices : [],
-            perReaction: soundReactionMatrix.asDictionary()
+            perReaction: soundReactionMatrix.asDictionary(),
+            activeOutputOnly: audioActiveOutputOnly
         )
     }
 

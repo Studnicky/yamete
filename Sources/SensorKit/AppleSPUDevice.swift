@@ -57,13 +57,29 @@ import os
 //
 // Concurrency
 // -----------
-// • `AppleSPUDevice` is `@unchecked Sendable`. All mutable state lives
-//   behind an `OSAllocatedUnfairLock<State>`. The justification matches
-//   the existing `FilterState` pattern (see `MicrophoneAdapter.swift`):
+// • `AppleSPUDevice` is `@unchecked Sendable`. Two locks coordinate
+//   access:
+//   - `state` (`OSAllocatedUnfairLock<State>`) — guards the subscribers
+//     dict, the `openDevice` handle bundle, and the `refCount`. Held
+//     for as briefly as possible; never held across IOKit calls.
+//   - `transitionLock` (`NSLock`) — serializes broker lifecycle
+//     transitions (open ↔ close). Held across `openSPUDevice` and
+//     `closeSPUDevice` so exactly one IOKit lifecycle operation runs at
+//     a time across the whole broker. This makes `SensorActivation.
+//     activate`/`deactivate` mutually exclusive — without it, a
+//     concurrent open's deactivate-on-cleanup could stomp on another
+//     subscriber's just-completed activate, killing the report stream
+//     for the whole device.
+//   Lock order: `transitionLock` outer, `state` inner. Never the
+//   reverse. Reports on the HID worker thread acquire `state` only,
+//   never `transitionLock`, so they cannot deadlock with a concurrent
+//   open or close.
+// • The justification for the `@unchecked Sendable` tag matches the
+//   existing `FilterState` pattern (see `MicrophoneAdapter.swift`):
 //   non-Sendable framework handles (IOHIDManager, IOHIDDevice, CFRunLoop,
 //   UnsafeMutablePointer) are kept lock-protected and never escape
 //   without serialization. The HID input-report callback runs on the
-//   broker's worker thread — it acquires the lock, snapshots the
+//   broker's worker thread — it acquires the state lock, snapshots the
 //   subscriber list, releases the lock, then invokes handlers. Handlers
 //   that need to touch main-actor state marshal via `Task { @MainActor in ... }`
 //   themselves, mirroring `EventSources.swift`.
@@ -220,6 +236,12 @@ public final class AppleSPUDevice: @unchecked Sendable {
     private let state: OSAllocatedUnfairLock<State>
     private let driver: SPUKernelDriver
 
+    /// Serializes broker lifecycle transitions (open ↔ close). Distinct
+    /// from `state` so the fast-path subscribe (device already open)
+    /// stays free of IOKit-call serialization. Lock order: `transitionLock`
+    /// outer, `state` inner — never the reverse. See file header.
+    private let transitionLock = NSLock()
+
     /// Designated initializer accepting a kernel-driver injection. Tests
     /// use this to inject `MockSPUKernelDriver`. Production callers reach
     /// the singleton via `AppleSPUDevice.shared`.
@@ -265,55 +287,55 @@ public final class AppleSPUDevice: @unchecked Sendable {
             handler: handler
         )
 
-        // Decide under the lock whether this subscribe is the
-        // refcount-zero opener, then either open the device (releasing
-        // the lock around the IOKit calls) and re-acquire to publish,
-        // or simply append the record.
-        let needsOpen: Bool = state.withLock { s in
-            if s.openDevice == nil {
-                return true
-            }
+        // Fast path: device already open. Pure register — no IOKit, no
+        // transition contention. Most subscribes hit this path because
+        // sources start in lockstep but only the first arrival opens.
+        let registered: Bool = state.withLock { s in
+            guard s.openDevice != nil else { return false }
             s.subscribers[record.id] = record
             s.refCount += 1
-            return false
+            return true
         }
-        if !needsOpen {
+        if registered {
             log.info("activity:Subscribe wasGeneratedBy entity:AppleSPUDevice dispatch=\(dispatch.rawValue) refCount=\(currentRefCount())")
             return token
         }
 
-        // Refcount-zero path. Open outside the state lock — IOKit calls
-        // can block briefly; we don't want to serialize unrelated
-        // subscribers behind that.
+        // Slow path: device may need opening. Serialize with other
+        // open/close transitions via `transitionLock`. Inside this
+        // critical section exactly one IOKit lifecycle operation runs
+        // across the whole broker, so `SensorActivation.activate` /
+        // `deactivate` cannot interleave with each other.
+        transitionLock.lock()
+        defer { transitionLock.unlock() }
+
+        // Re-check under transitionLock — another subscriber may have
+        // opened the device while we were contending for this lock. If
+        // so, register fast-path style and return.
+        let alreadyOpen: Bool = state.withLock { s in s.openDevice != nil }
+        if alreadyOpen {
+            state.withLock { s in
+                s.subscribers[record.id] = record
+                s.refCount += 1
+            }
+            log.info("activity:Subscribe wasGeneratedBy entity:AppleSPUDevice dispatch=\(dispatch.rawValue) refCount=\(currentRefCount())")
+            return token
+        }
+
+        // We hold transitionLock and openDevice is nil — this is the
+        // unique opener. No concurrent subscribe or unsubscribe can
+        // interleave with the IOKit calls below.
         guard let opened = openSPUDevice(reportIntervalUS: reportIntervalUS) else {
             log.warning("entity:AppleSPUDevice wasInvalidatedBy activity:OpenDevice dispatch=\(dispatch.rawValue)")
             return nil
         }
 
-        let installed: Bool = state.withLock { s in
-            // Race: a concurrent subscriber may have already opened the
-            // device between our `needsOpen=true` decision and arriving
-            // here. If so, drop our open and use the winner's.
-            if s.openDevice != nil {
-                return false
-            }
+        state.withLock { s in
             s.openDevice = opened
             s.subscribers[record.id] = record
             s.refCount += 1
-            return true
         }
-
-        if !installed {
-            // Lost the open race; tear our open down before returning.
-            closeSPUDevice(opened)
-            // Retry as a non-opener; the winner's open is now live.
-            state.withLock { s in
-                s.subscribers[record.id] = record
-                s.refCount += 1
-            }
-        }
-
-        log.info("activity:Subscribe wasGeneratedBy entity:AppleSPUDevice dispatch=\(dispatch.rawValue) refCount=\(currentRefCount()) wasOpener=\(installed)")
+        log.info("activity:Subscribe wasGeneratedBy entity:AppleSPUDevice dispatch=\(dispatch.rawValue) refCount=\(currentRefCount()) wasOpener=true")
         return token
     }
 
@@ -321,6 +343,15 @@ public final class AppleSPUDevice: @unchecked Sendable {
     /// and deactivates the sensor. Idempotent — unsubscribing an already-
     /// removed token is a no-op.
     public func unsubscribe(_ token: SPUSubscription) {
+        // Hold transitionLock for the entire operation so the close
+        // phase cannot race with a concurrent slow-path subscribe — a
+        // close mid-flight would otherwise call `SensorActivation.
+        // deactivate` while a fresh subscriber's open was activating
+        // the same hardware, killing the report stream for the new
+        // session.
+        transitionLock.lock()
+        defer { transitionLock.unlock() }
+
         let toClose: OpenDevice? = state.withLock { s in
             guard s.subscribers.removeValue(forKey: token.id) != nil else {
                 return nil

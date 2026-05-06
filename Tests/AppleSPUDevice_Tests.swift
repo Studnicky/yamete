@@ -219,6 +219,57 @@ final class AppleSPUDevice_Tests: XCTestCase {
         broker.unsubscribe(token)
     }
 
+    // MARK: - Concurrency: parallel subscribes never race
+
+    /// Many concurrent `subscribe` calls must produce exactly ONE
+    /// `hidManagerOpen` and ONE `hidDeviceOpen` across the whole burst,
+    /// and the broker must end up with all subscribers registered. The
+    /// previous implementation allowed a race where two threads would
+    /// both call `openSPUDevice`, the loser's cleanup would call
+    /// `SensorActivation.deactivate` on the winner's still-live session,
+    /// and the report stream would die after the first report. The
+    /// `transitionLock` rewrite makes the open path single-threaded;
+    /// this cell pins that invariant.
+    func testConcurrentSubscribes_openDeviceCalledExactlyOnce() async {
+        let mock = MockSPUKernelDriver()
+        let broker = AppleSPUDevice(driver: mock)
+
+        let dispatches: [SPUDispatchKey] = [.accel, .gyro, .lid, .als,
+                                            .accel, .gyro, .lid, .als]
+        let tokens = await withTaskGroup(of: SPUSubscription?.self) { group in
+            for d in dispatches {
+                group.addTask {
+                    broker.subscribe(usagePage: 0xFF00, usage: 3, dispatch: d) { _ in }
+                }
+            }
+            var collected: [SPUSubscription] = []
+            for await maybe in group {
+                if let t = maybe { collected.append(t) }
+            }
+            return collected
+        }
+
+        XCTAssertEqual(tokens.count, dispatches.count,
+            "[apple-spu-broker=concurrent-subscribe] every concurrent subscribe must succeed (got \(tokens.count), expected \(dispatches.count))")
+        XCTAssertEqual(mock.hidManagerOpenCalls, 1,
+            "[apple-spu-broker=concurrent-subscribe] exactly one IOHIDManagerOpen across the burst (got \(mock.hidManagerOpenCalls))")
+        XCTAssertEqual(mock.hidDeviceOpenCalls, 1,
+            "[apple-spu-broker=concurrent-subscribe] exactly one IOHIDDeviceOpen across the burst (got \(mock.hidDeviceOpenCalls))")
+        XCTAssertEqual(broker._testActiveSubscriptionCount(), dispatches.count,
+            "[apple-spu-broker=concurrent-subscribe] all subscribers registered (got \(broker._testActiveSubscriptionCount()))")
+        XCTAssertTrue(broker._testIsDeviceOpen(),
+            "[apple-spu-broker=concurrent-subscribe] device must be open after the burst")
+
+        // Tear down. Symmetric: exactly one close on the burst of
+        // unsubscribes — no race-loser teardown.
+        for t in tokens { broker.unsubscribe(t) }
+        let closed = await awaitUntil(timeout: 1.0) { @MainActor in
+            !broker._testIsDeviceOpen()
+        }
+        XCTAssertTrue(closed,
+            "[apple-spu-broker=concurrent-subscribe] device must close after all unsubscribes")
+    }
+
     // MARK: - Static helper: hardware presence
 
     /// `AppleSPUDevice.isHardwarePresent(driver:)` accepts an injected

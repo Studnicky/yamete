@@ -11,6 +11,91 @@ public struct AudioOutputDevice: Identifiable, Sendable {
     public let name: String
     /// Disambiguated display name (appends " (2)" etc. for duplicates)
     public let displayName: String
+    /// Transport class — drives the row icon in the menu and feeds the
+    /// display-pairing heuristic for monitor speakers.
+    public let transport: AudioTransport
+    /// EDID-derived identifiers for display-class audio devices
+    /// (DisplayPort/HDMI). Nil when not a display-class device or when
+    /// the IORegistry walk could not extract them. Used to pair the
+    /// audio device with the display whose speakers it represents.
+    public let edid: AudioDeviceEDID?
+
+    public init(id: AudioDeviceID, uid: String, name: String, displayName: String,
+                transport: AudioTransport, edid: AudioDeviceEDID?) {
+        self.id = id
+        self.uid = uid
+        self.name = name
+        self.displayName = displayName
+        self.transport = transport
+        self.edid = edid
+    }
+}
+
+/// Coarse transport class for an audio output device. Mirrors the
+/// macOS `kAudioDeviceTransportType` constants but exposed as a Swift
+/// enum so call-sites pattern-match without dragging the FourCharCode
+/// constants into UI code.
+public enum AudioTransport: Sendable, Hashable {
+    /// Built-in laptop speakers (transportType == `kAudioDeviceTransportTypeBuiltIn`).
+    /// On a MacBook, this is the speakers behind the internal display.
+    case builtIn
+    /// External display speakers carried over DisplayPort
+    /// (transportType == `kAudioDeviceTransportTypeDisplayPort`).
+    case displayPort
+    /// External display speakers carried over HDMI
+    /// (transportType == `kAudioDeviceTransportTypeHDMI`).
+    case hdmi
+    /// USB audio interface, USB speakers, USB headset, etc.
+    case usb
+    /// Bluetooth or AirPlay headphones / speakers.
+    case bluetooth
+    /// Wired analog headphones (3.5mm jack on Macs that still have one).
+    case headphone
+    /// Thunderbolt-attached audio (rare — most TB speakers identify as
+    /// USB or DisplayPort downstream of the dock).
+    case thunderbolt
+    /// Recognised transport type that does not map to any of the above
+    /// or transport type was not reported. Treated as a generic speaker
+    /// in the UI.
+    case unknown
+}
+
+/// EDID block extracted from a display-class audio device's IORegistry
+/// node. The four identifiers here are the same fields the display
+/// itself reports through `CGDisplayVendorNumber` /
+/// `CGDisplayModelNumber` / `CGDisplaySerialNumber`, so they pair
+/// 1:1 when both sides parse cleanly.
+public struct AudioDeviceEDID: Sendable, Hashable {
+    /// EDID manufacturer ID — a packed 16-bit value formed from three
+    /// 5-bit letter codes (bytes 8–9 of the EDID block).
+    public let vendorID: UInt32
+    /// EDID product code (bytes 10–11 of the EDID block).
+    public let productID: UInt32
+    /// EDID serial number (bytes 12–15 of the EDID block). Often zero
+    /// on cheap monitors that do not implement the optional serial
+    /// descriptor.
+    public let serialNumber: UInt32
+}
+
+extension AudioTransport {
+    /// Maps the raw `kAudioDeviceTransportType` FourCharCode to a
+    /// classified Swift case. Unknown / unhandled values fall through
+    /// to `.unknown`.
+    init(transportType: UInt32) {
+        switch transportType {
+        case kAudioDeviceTransportTypeBuiltIn:     self = .builtIn
+        case kAudioDeviceTransportTypeDisplayPort: self = .displayPort
+        case kAudioDeviceTransportTypeHDMI:        self = .hdmi
+        case kAudioDeviceTransportTypeUSB:         self = .usb
+        case kAudioDeviceTransportTypeBluetooth,
+             kAudioDeviceTransportTypeBluetoothLE,
+             kAudioDeviceTransportTypeAirPlay:     self = .bluetooth
+        case kAudioDeviceTransportTypeThunderbolt: self = .thunderbolt
+        case 0x686477:  // 'hdwr' — analog headphone jack on older Macs
+                                                   self = .headphone
+        default:                                   self = .unknown
+        }
+    }
 }
 
 public enum AudioDeviceManager {
@@ -23,12 +108,25 @@ public enum AudioDeviceManager {
 
     private static func filterPhysicalOutputDevices(from deviceIDs: [AudioDeviceID]) -> [AudioOutputDevice] {
         deviceIDs.compactMap { deviceID -> AudioOutputDevice? in
+            let transport = transportType(deviceID)
             guard outputChannelCount(deviceID) > 0,
-                  !isAggregateDevice(deviceID),
+                  transport != kAudioDeviceTransportTypeAggregate,
+                  transport != kAudioDeviceTransportTypeVirtual,
                   let uid = stringProperty(deviceID, selector: kAudioDevicePropertyDeviceUID),
                   let name = stringProperty(deviceID, selector: kAudioObjectPropertyName)
             else { return nil }
-            return AudioOutputDevice(id: deviceID, uid: uid, name: name, displayName: name)
+            let classified = AudioTransport(transportType: transport)
+            // EDID extraction only meaningful for display-class audio.
+            // For other transport classes we skip the IORegistry walk
+            // entirely — saves work and avoids spurious matches.
+            let edid: AudioDeviceEDID? = {
+                switch classified {
+                case .displayPort, .hdmi: return EDIDExtractor.edid(forAudioDeviceUID: uid)
+                default:                  return nil
+                }
+            }()
+            return AudioOutputDevice(id: deviceID, uid: uid, name: name, displayName: name,
+                                     transport: classified, edid: edid)
         }
     }
 
@@ -40,7 +138,9 @@ public enum AudioDeviceManager {
             guard counts[d.name, default: 0] > 1 else { return d }
             let idx = index[d.name, default: 0] + 1
             index[d.name] = idx
-            return AudioOutputDevice(id: d.id, uid: d.uid, name: d.name, displayName: "\(d.name) (\(idx))")
+            return AudioOutputDevice(id: d.id, uid: d.uid, name: d.name,
+                                     displayName: "\(d.name) (\(idx))",
+                                     transport: d.transport, edid: d.edid)
         }
     }
 
@@ -80,8 +180,12 @@ public enum AudioDeviceManager {
         return ids
     }
 
-    /// Returns true for aggregate or virtual audio devices (Teams, Zoom, Audio MIDI Setup, etc.).
-    private static func isAggregateDevice(_ deviceID: AudioDeviceID) -> Bool {
+    /// Reads `kAudioDevicePropertyTransportType` for a device. Returns
+    /// `0` (treated as `unknown` by `AudioTransport`) when the property
+    /// is unavailable. Used both to filter aggregate/virtual devices
+    /// out of the list and to drive the row icon + display-pairing
+    /// heuristic for the survivors.
+    private static func transportType(_ deviceID: AudioDeviceID) -> UInt32 {
         var addr = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyTransportType,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -89,10 +193,8 @@ public enum AudioDeviceManager {
         )
         var transport: UInt32 = 0
         var size = UInt32(MemoryLayout<UInt32>.size)
-        guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, &transport) == noErr else { return false }
-        // kAudioDeviceTransportTypeAggregate = 'grup', kAudioDeviceTransportTypeVirtual = 'virt'
-        return transport == kAudioDeviceTransportTypeAggregate
-            || transport == kAudioDeviceTransportTypeVirtual
+        guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, &transport) == noErr else { return 0 }
+        return transport
     }
 
     /// Returns the number of output channels for a device (0 = input-only).

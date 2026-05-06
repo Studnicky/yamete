@@ -372,6 +372,42 @@ final class SnapshotUI_Tests: XCTestCase {
         assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 240))
     }
 
+    /// DeviceSection with three synthetic audio devices spanning three
+    /// transport classes (built-in / USB / Bluetooth) and ≥2 selected so
+    /// the new active-output-only toggle renders. Locks the layout
+    /// for the transport-icon column and the toggle's gating rule. The
+    /// "attached to display" footnote is NOT exercised here (would
+    /// require synthesised NSScreens, which are not available in the
+    /// snapshot host) — that path has direct unit-test coverage in
+    /// `DisplayAudioPairing_Tests`.
+    func test_cell_deviceSection_expanded_multipleAudioDevices() throws {
+        try skipIfNonEnglishLocale()
+        try skipIfCIBaselineMissing(
+            directory: Self.snapshotDirectory(filePath: #filePath),
+            expectedFiles: ["test_cell_deviceSection_expanded_multipleAudioDevices.1.png"]
+        )
+        let settings = SettingsStore()
+        settings.enabledAudioDevices = ["builtin-uid", "usb-uid"]
+        let audioDevices: [AudioOutputDevice] = [
+            AudioOutputDevice(id: 1, uid: "builtin-uid", name: "MacBook Pro Speakers",
+                              displayName: "MacBook Pro Speakers", transport: .builtIn, edid: nil),
+            AudioOutputDevice(id: 2, uid: "usb-uid", name: "USB Headset",
+                              displayName: "USB Headset", transport: .usb, edid: nil),
+            AudioOutputDevice(id: 3, uid: "bt-uid", name: "AirPods Pro",
+                              displayName: "AirPods Pro", transport: .bluetooth, edid: nil),
+        ]
+        let view = AccordionCard(
+            title: "Devices",
+            isExpanded: .constant(true)
+        ) {
+            DeviceSection(audioDevices: audioDevices, displays: [])
+        }
+        .environment(settings)
+        .frame(width: Theme.menuWidth, height: 320)
+        .preferredColorScheme(.light)
+        assertImageSnapshot(of: view, size: CGSize(width: Theme.menuWidth, height: 320))
+    }
+
     // MARK: - Cell 4: TrackpadTuningSection expanded
 
     /// TrackpadTuningSection is itself an AccordionCard. Its private

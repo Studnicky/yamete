@@ -207,6 +207,7 @@ final class MatrixSettingsMigration_Tests: XCTestCase {
             (.ledReactionMatrix, "ledReactionMatrix"),
             (.flashEnabled, "flashEnabled"),
             (.flashActiveDisplayOnly, "flashActiveDisplayOnly"),
+            (.audioActiveOutputOnly, "audioActiveOutputOnly"),
             (.notificationsEnabled, "notificationsEnabled"),
             (.hapticEnabled, "hapticEnabled"),
             (.hapticIntensity, "hapticIntensity"),
@@ -262,6 +263,7 @@ final class MatrixSettingsMigration_Tests: XCTestCase {
             .init(key: .displayTintEnabled, read: { $0.displayTintEnabled }),
             .init(key: .volumeSpikeEnabled, read: { $0.volumeSpikeEnabled }),
             .init(key: .flashActiveDisplayOnly, read: { $0.flashActiveDisplayOnly }),
+            .init(key: .audioActiveOutputOnly, read: { $0.audioActiveOutputOnly }),
             .init(key: .keyboardBrightnessEnabled, read: { $0.keyboardBrightnessEnabled }),
             .init(key: .firstLaunchDramaFired, read: { $0.firstLaunchDramaFired }),
         ]

@@ -101,8 +101,13 @@ public final class AudioPlayer {
 
             recordPlayed(url)
 
-            if !config.deviceUIDs.isEmpty {
-                let volume = config.volumeMin + fired.intensity * (config.volumeMax - config.volumeMin)
+            let volume = config.volumeMin + fired.intensity * (config.volumeMax - config.volumeMin)
+            if config.activeOutputOnly {
+                // Route to the system default — passing nil tells the
+                // driver "use NSSound's default routing," which is the
+                // device the user is currently listening through.
+                driver.play(url: url, deviceUID: nil, volume: volume)
+            } else if !config.deviceUIDs.isEmpty {
                 for uid in config.deviceUIDs {
                     driver.play(url: url, deviceUID: uid, volume: volume)
                 }
