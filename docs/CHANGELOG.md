@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-05-06
+
+### Changed
+- **Pre-push hook auto-refreshes host-app snapshot baselines.** New
+  `scripts/refresh-host-app-snapshots.sh` runs only for pushes to
+  `release/*` and `hotfix/*` branches; it wipes the sandbox-mirror
+  at `~/Library/Containers/com.studnicky.yamete/Data/tmp/yamete-snapshots/HostApp/`,
+  invokes `make test-host-app`, and syncs freshly-recorded baselines
+  back to `Tests/__Snapshots__/HostApp/SnapshotUI_Tests/`. If the
+  source tree moved as a result, the push is refused with a clear
+  "stage and commit these and re-push" message. Eliminates the manual
+  cleanup the 2.3.0 release push had to do by hand when stale
+  sandbox-mirror baselines diverged from a changed layout. Feature
+  branches and CI runs self-skip.
+
 ## [2.3.0] - 2026-05-06
 
 ### Added
