@@ -457,3 +457,9 @@
 
 /* Audio device paired with display footnote */
 "audio_paired_with_display" = "attached to %@";
+
+/* Direct build variant pill label */
+"build_variant_direct" = "Direct";
+
+/* App Store build variant pill label */
+"build_variant_appstore" = "App Store";

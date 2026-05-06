@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.3.1] - 2026-05-06
 
+### Added
+- **Build-variant pill in the footer.** A small capsule beside the
+  version number identifies which flavour of Yamete is running:
+  pink "Direct" for Developer-ID-signed Direct builds, mauve
+  "App Store" for the sandboxed App Store variant. Mirrors the
+  styling the previous "Paused" pill used in the header. Lets the
+  user tell at a glance which lane a screenshot or bug report came
+  from.
+
 ### Changed
 - **Pre-push hook auto-refreshes host-app snapshot baselines.** New
   `scripts/refresh-host-app-snapshots.sh` runs only for pushes to

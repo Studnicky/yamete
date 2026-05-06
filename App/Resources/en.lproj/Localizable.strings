@@ -285,6 +285,12 @@
 /* App version label */
 "version_format" = "v%@";
 
+/* Direct build variant pill label */
+"build_variant_direct" = "Direct";
+
+/* App Store build variant pill label */
+"build_variant_appstore" = "App Store";
+
 /* Auto-update status labels (Direct build only) */
 "update_checking" = "Checking for updates…";
 "update_available_format" = "v%@ available";
