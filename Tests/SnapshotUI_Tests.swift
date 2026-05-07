@@ -69,10 +69,19 @@ final class SnapshotUI_Tests: XCTestCase {
     private static let imagePrecision: Float = 0.99
     private static let perceptualPrecision: Float = 0.98
 
-    /// Set this to `.all` and run once locally to (re)record every baseline.
-    /// Commit the resulting `__Snapshots__/` directory and revert this back
-    /// to `.missing` before pushing.
-    private static let recordMode: SnapshotTestingConfiguration.Record = .missing
+    /// Default `.missing` records absent baselines and compares present
+    /// ones. Set `SNAPSHOT_RECORD_ALL=1` in the environment to force
+    /// `.all` for the run — every baseline re-records regardless of
+    /// presence. The `scripts/refresh-host-app-snapshots.sh` pre-push
+    /// hook sets this for its recording iteration so source-tree-seeded
+    /// mirror entries get overwritten when the rendered pixels diverge
+    /// from the committed baseline.
+    private static let recordMode: SnapshotTestingConfiguration.Record = {
+        if ProcessInfo.processInfo.environment["SNAPSHOT_RECORD_ALL"] != nil {
+            return .all
+        }
+        return .missing
+    }()
 
     /// Per-build-variant snapshot directory.
     ///

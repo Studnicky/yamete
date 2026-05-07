@@ -78,22 +78,40 @@ fi
 
 printf "  refresh   host-app snapshot mirror (%s)\n" "$MIRROR_ROOT"
 
-# Step 1 — wipe stale mirror entries. The mirror only lives inside
-# the sandbox container, so this is local-only state — no remote
-# implications. `rm -rf` against a non-existent path is fine.
-rm -rf "$MIRROR_ROOT"
+# Stash source-tree baselines to a temp dir so a real test failure
+# during the recording iteration doesn't leave the working tree with
+# zero baselines. Restored on any error path that exits non-zero.
+STASH_DIR="$(mktemp -d -t yamete-host-app-snapshots-stash)"
+restore_stash() {
+  if [[ -d "$STASH_DIR" ]]; then
+    rsync -a --delete "$STASH_DIR/" "$SOURCE_DIR/" 2>/dev/null || true
+    rm -rf "$STASH_DIR"
+  fi
+}
+trap 'restore_stash' EXIT
+rsync -a "$SOURCE_DIR/" "$STASH_DIR/"
 
-# Step 2 — recording iteration. With the mirror cleared, the
-# SnapshotTesting library re-records every baseline under
-# recordMode=.missing semantics. Each recording surfaces as a test
-# failure ("no reference was found"); the test target exits non-zero
-# even though the recordings land in the mirror successfully. This
-# is by library design — tolerate the exit and move on.
+# Step 1 — wipe both the sandbox mirror and the source-tree
+# baselines. The seed step in `SnapshotUI_Tests.snapshotDirectory`
+# copies source-tree PNGs into the mirror on first call; if the
+# source-tree PNG is stale (rendered pixels have moved on since the
+# last record), the mirror inherits the staleness and the
+# `recordMode=.missing` library skips re-recording on a file that
+# already exists. Wiping both forces every cell into the
+# "no reference, record fresh" branch.
+rm -rf "$MIRROR_ROOT"
+find "$SOURCE_DIR" -maxdepth 1 -name '*.png' -delete 2>/dev/null
+
+# Step 2 — recording iteration. With both source tree and mirror
+# wiped, every cell records under `recordMode=.missing` semantics.
+# Each recording surfaces as a test failure ("recorded snapshot")
+# so the test target exits non-zero — tolerate it.
 printf "  record    initial baseline pass (recordings surface as failures by design)\n"
 make test-host-app >/dev/null 2>&1 || true
 
-# Step 3 — sync mirror PNGs back to the source tree. Only PNGs;
-# don't trample sentinels or other files that may live alongside.
+# Step 3 — sync mirror PNGs back to the source tree. Source tree
+# was wiped before recording, so this populates the entire HostApp
+# baseline set from what the test just rendered.
 synced=0
 if [[ -d "$MIRROR_ROOT" ]]; then
   shopt -s nullglob
@@ -106,6 +124,23 @@ if [[ -d "$MIRROR_ROOT" ]]; then
     fi
   done
   shopt -u nullglob
+fi
+
+# Step 3a — bail with stash restore if recording produced nothing.
+# A real test crash (build failure, signal-11) would leave both
+# source tree and mirror empty; restoring from stash lets the
+# developer iterate without losing the prior baselines.
+if [[ $synced -eq 0 ]]; then
+  cat >&2 <<EOF
+✗ refresh-host-app-snapshots: recording iteration produced no
+   baselines. Either the test target failed to build, or every
+   cell crashed before reaching its assertImageSnapshot call.
+   Restoring the prior baselines from stash. Inspect the
+   xcodebuild output above and fix the underlying failure.
+
+   To bypass in a true emergency, \`git push --no-verify\` (DISCOURAGED).
+EOF
+  exit 1
 fi
 
 # Step 4 — verification iteration. Source tree now matches the mirror
@@ -150,6 +185,12 @@ $(echo "$changed_paths" | sed 's/^/   /')
 EOF
   exit 1
 fi
+
+# Clear the stash trap on the success path so the freshly-recorded
+# baselines aren't reverted on normal exit. Stash dir cleanup runs
+# explicitly here.
+trap - EXIT
+rm -rf "$STASH_DIR"
 
 if [[ $synced -gt 0 ]]; then
   printf "  sync      %d baseline(s) refreshed (no source-tree drift)\n" "$synced"
