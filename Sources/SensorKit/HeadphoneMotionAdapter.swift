@@ -22,6 +22,56 @@ private let log = AppLog(category: "HeadphoneMotion")
 //   https://developer.apple.com/documentation/coremotion/cmheadphonemotionmanager
 //   https://developer.apple.com/documentation/coremotion/cmheadphonemotionmanager/3552067-startdevicemotionupdates
 //   https://developer.apple.com/documentation/coremotion/cmdevicemotion/1616149-useracceleration
+//
+// macOS gate: `CMHeadphoneMotionManager` is macOS 14.0+ (Sonoma). Yamete's
+// minimum deployment target is macOS 14, so the symbol is always
+// available — no `@available` guard needed at the source level.
+// `NSMotionUsageDescription` is supplied in `App/Config/Info.plist` and
+// localized across all 40 lproj bundles; first call to
+// `startDeviceMotionUpdates` triggers the consent prompt on macOS.
+//
+// Per-model coverage. `CMHeadphoneMotionManager` surfaces motion only
+// for headphones whose firmware exposes the IMU stream over Bluetooth —
+// the same set Apple labels "Personalized Spatial Audio with dynamic
+// head tracking." Audio-only routing (AirPods 1/2, EarPods, Beats W1
+// devices, third-party) does not produce motion.
+//
+//   ╭─────────────────────────────────────────╥─────────────────────╮
+//   │  Model                                  ║  Motion via CMHM    │
+//   ╞═════════════════════════════════════════╬═════════════════════╡
+//   │  AirPods (1st gen)                      ║  no — no IMU        │
+//   │  AirPods (2nd gen)                      ║  no — no IMU        │
+//   │  AirPods (3rd gen)                      ║  yes                │
+//   │  AirPods (4th gen) / 4 with ANC         ║  yes (INFERRED)     │
+//   │  AirPods Pro (1st gen)                  ║  yes                │
+//   │  AirPods Pro (2nd gen, Lightning)       ║  yes                │
+//   │  AirPods Pro (2nd gen, USB-C)           ║  yes (INFERRED)     │
+//   │  AirPods Max (Lightning)                ║  yes                │
+//   │  AirPods Max (USB-C)                    ║  yes (INFERRED)     │
+//   │  EarPods (Lightning / USB-C, wired)     ║  no — no IMU        │
+//   │  Beats Solo Pro / Studio3 / Solo3       ║  no — W1 era        │
+//   │  Beats Solo 4                           ║  yes                │
+//   │  Beats Studio Pro                       ║  yes                │
+//   │  Beats Studio Buds                      ║  no                 │
+//   │  Beats Studio Buds+                     ║  yes                │
+//   │  Beats Fit Pro                          ║  yes                │
+//   │  Powerbeats Pro (1st gen)               ║  no — H1 era        │
+//   │  Powerbeats Pro 2                       ║  yes                │
+//   │  Sony / Bose / 3rd-party                ║  no — Apple-protocol│
+//   │                                         ║  only               │
+//   ╰─────────────────────────────────────────╨─────────────────────╯
+//
+// Runtime detection nuance: `manager.isDeviceMotionAvailable` is
+// framework-level and returns true on every macOS 14+ host. A real
+// "is the IMU streaming" answer requires a sample or a `didConnect`
+// delegate callback — the framework only fires `didConnect` for
+// IMU-capable headphones. `HeadphoneConnectionTracker` (in
+// `HeadphoneMotionDriver.swift`) flips its flag only on either of those
+// two signals, so `isHeadphonesConnected` is capability-based — false
+// for AirPods 1/2 paired audio-only, true for an active AirPods Pro.
+// The startup probe holds the manager open for ~400ms so a paired
+// motion-capable device can deliver the first sample before any
+// `impacts()` consumer arrives.
 
 /// Detects impact vibrations via AirPods/Beats accelerometer using CoreMotion.
 /// Requires connected headphones with motion sensors.
