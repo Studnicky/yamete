@@ -41,14 +41,14 @@ Impact detections (accelerometer, microphone, headphone motion) get the same per
 
 ### How do I get it running?
 
-Grab the DMG from the [latest release.](https://github.com/Studnicky/yamete/releases/latest) Drag `Yamete Direct.app` into Applications. Open it. A face appears in your menu bar. Click the face. Tune whatever you like. First launch asks for microphone permission. Say yes unless you specifically don't want the microphone path.
+Grab the DMG from the [latest release.](https://github.com/Studnicky/yamete/releases/latest) Drag `Yamete+.app` into Applications. Open it. A face appears in your menu bar. Click the face. Tune whatever you like. First launch asks for microphone permission. Say yes unless you specifically don't want the microphone path.
 
 The App Store build installs normally once App Review stops blushing.
 
-### What's the difference between Yamete and Yamete Direct?
+### What's the difference between Yamete and Yamete+?
 
 * **Yamete** is the Mac App Store build, rated 12+. Tame notification copy: "Mm, again?", "Show off~", "OUCH". Probably safe for office use.
-* **Yamete Direct** is the notarised direct download. Notification copy is much hornier. Same everything else: engine, sounds, face, settings, 40 locales. Just has more to say about what you did.
+* **Yamete+** is the notarised direct download. Notification copy is much hornier. Same everything else: engine, sounds, face, settings, 40 locales. Just has more to say about what you did.
 
 ### Does it work on Intel Macs, iMacs, Mac Mini, Mac Studio, Mac Pro?
 
@@ -121,11 +121,11 @@ Idle should be under 2 percent. If higher: raise the Report Interval (20ms inste
 
 ### How do I uninstall?
 
-**Yamete Direct:**
+**Yamete+:**
 
-1. Drag `Yamete Direct.app` from Applications to the Trash.
-2. Delete `~/Library/Preferences/com.studnicky.yamete.direct.plist`.
-3. Delete `~/Library/Application Support/Yamete Direct/` if you want the logs gone too.
+1. Drag `Yamete+.app` from Applications to the Trash.
+2. Delete `~/Library/Preferences/com.studnicky.yamete.plus.plist`.
+3. Delete `~/Library/Application Support/Yamete+/` if you want the logs gone too.
 
 **Yamete (App Store):**
 

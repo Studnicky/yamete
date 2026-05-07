@@ -1,25 +1,25 @@
 # Yamete — Build Pipeline
 #
 # Source layout mirrors the final .app bundle:
-#   App/Config/Info.plist               → Yamete Direct.app/Contents/Info.plist
-#   App/Config/PkgInfo                  → Yamete Direct.app/Contents/PkgInfo
-#   App/Resources/*                     → Yamete Direct.app/Contents/Resources/*
-#   Sources/**/*.swift                  → compiled into Contents/MacOS/yamete-direct
+#   App/Config/Info.plist               → Yamete+.app/Contents/Info.plist
+#   App/Config/PkgInfo                  → Yamete+.app/Contents/PkgInfo
+#   App/Resources/*                     → Yamete+.app/Contents/Resources/*
+#   Sources/**/*.swift                  → compiled into Contents/MacOS/yamete-plus
 #
 # Build stages:
 #   1. compile    swiftc -O → binary
 #   2. minify     strip symbols, optimize SVGs (if svgo installed)
-#   3. bundle     copy App/ layout + binary → dist/Yamete Direct.app
+#   3. bundle     copy App/ layout + binary → dist/Yamete+.app
 #   4. sign       codesign with entitlements + hardened runtime
 #   5. verify     validate structure, signature, asset counts
 
 # ── Build variant selection ───────────────────────────────────
 # BUILD_VARIANT controls which app gets built:
-#   direct   → Yamete Direct.app (notarized direct download, spicy content)
-#   appstore → Yamete.app        (Mac App Store, tame content only)
-# Default is direct so existing `make`, `make install`, `make build` keep
-# their previous behavior. Use `make appstore` or `make appstore-install`
-# (or `BUILD_VARIANT=appstore make build`) for the App Store variant.
+#   direct   → Yamete+.app  (notarized direct download, spicy content)
+#   appstore → Yamete.app   (Mac App Store, tame content only)
+# Default is direct so `make`, `make install`, `make build` build the
+# Direct variant. Use `make appstore` or `make appstore-install` (or
+# `BUILD_VARIANT=appstore make build`) for the App Store variant.
 BUILD_VARIANT ?= direct
 
 ifeq ($(BUILD_VARIANT),appstore)
@@ -30,9 +30,9 @@ ENTITLE    := App/Config/AppStore.entitlements
 VARIANT_FLAGS :=
 APPLY_DIRECT_OVERLAY := 0
 else ifeq ($(BUILD_VARIANT),direct)
-APP        := Yamete Direct
-EXECUTABLE := yamete-direct
-BUNDLE_ID  := com.studnicky.yamete.direct
+APP        := Yamete+
+EXECUTABLE := yamete-plus
+BUNDLE_ID  := com.studnicky.yamete.plus
 ENTITLE    := App/Config/Direct.entitlements
 VARIANT_FLAGS := -D DIRECT_BUILD
 APPLY_DIRECT_OVERLAY := 1
@@ -101,7 +101,8 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 SIGNING_ID ?= -
 
 .PHONY: all build test test-host-app install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
-        appstore appstore-install appstore-lint mutate mutate-pr perf-baseline perf-baseline-record check-versions hooks
+        appstore appstore-install appstore-lint mutate mutate-pr mutate-catalog-validate mutate-catalog-fix \
+        perf-baseline perf-baseline-record check-versions hooks
 
 all: build
 
@@ -325,7 +326,7 @@ perf-baseline-record:
 # can be wired into release gating without further wrapping. Catalog
 # additions happen in JSON, not here — never commits, never modifies
 # Sources/ permanently.
-mutate:
+mutate: mutate-catalog-validate
 	@scripts/mutation-test.sh
 
 # Phase 2.1 sustainability target. Sliced mutate: filters
@@ -338,8 +339,25 @@ mutate:
 # `make mutate` still runs nightly + on push to master/develop to catch
 # drift the slice can miss (catalog edits on un-touched files, refactors
 # that move a search snippet without renaming targetFile, etc.).
-mutate-pr:
+mutate-pr: mutate-catalog-validate
 	@scripts/mutation-test-slice.sh
+
+# Catalog drift gate. Resolves every entry's `expectedFailingTest`
+# against the live test surface; refuses the run if any entry names a
+# class that no longer exists or a method that lives in a different
+# class. Stale catalog entries silently degrade mutation coverage
+# (an unfindable test "passes" by running zero cells, the runner
+# classifies the mutation as ESCAPED), so this gate runs before every
+# mutate / mutate-pr invocation.
+mutate-catalog-validate:
+	@printf "  catalog   resolve mutation-catalog vs live test surface\n"
+	@python3 scripts/mutation-catalog-resolve.py
+
+# Auto-rewrite catalog entries whose method moved to a new class.
+# Only fixes one-class-only matches; ambiguous and missing entries
+# still need manual resolution. Safe to run repeatedly.
+mutate-catalog-fix:
+	@python3 scripts/mutation-catalog-resolve.py --fix
 
 # ── Verify ────────────────────────────────────────────────────
 verify: build

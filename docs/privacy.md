@@ -16,7 +16,7 @@ Yamete collects and stores the following data **locally on your Mac only**.
 ## Activity logs
 
 * Timestamped sensor and detection events written to the app's log directory
-  (`~/Library/Application Support/Yamete Direct/logs/` for direct downloads,
+  (`~/Library/Application Support/Yamete+/logs/` for direct downloads,
   `~/Library/Containers/com.studnicky.yamete/Data/Library/Application Support/Yamete/logs/` for the Mac App Store build).
 * Logs may include your Mac's accelerometer serial number (a hardware identifier, used only for debugging).
 * **Retention: 24 hours.** Log files older than 24 hours are automatically deleted.

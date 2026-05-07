@@ -8,7 +8,7 @@ title: Installation
 
 - macOS 14.0+ (Sonoma)
 - Built with Swift 6 (complete strict concurrency)
-- Latest release: 2.3.0
+- Latest release: 2.4.0
 
 ### Sensor compatibility by Mac model
 
@@ -22,10 +22,10 @@ Compatible headphones for motion detection: AirPods Pro, AirPods Max, AirPods (3
 
 ## Install from DMG
 
-Download the latest direct-distribution `.dmg` from [Releases](https://github.com/Studnicky/yamete/releases), open it, and drag **Yamete Direct.app** to `/Applications`.
+Download the latest direct-distribution `.dmg` from [Releases](https://github.com/Studnicky/yamete/releases), open it, and drag **Yamete+.app** to `/Applications`.
 
 On first launch:
-1. MacOS may prompt "Yamete Direct is from an identified developer". Click **Open**
+1. MacOS may prompt "Yamete+ is from an identified developer". Click **Open**
 2. The app appears in the menu bar (no Dock icon)
 3. Grant microphone permission when prompted (optional. Accelerometer works without it)
 
@@ -41,10 +41,10 @@ make install        # builds and copies to /Applications
 
 | Command | Output | Purpose |
 |---------|--------|---------|
-| `make build` | `dist/Yamete Direct.app` | Debug direct build, ad-hoc signed |
-| `make release` | `dist/Yamete Direct.app` | Optimized direct build, Developer ID signed |
-| `make dmg` | `dist/Yamete Direct.dmg` | Direct-download disk image |
-| `make install` | `/Applications/Yamete Direct.app` | Build and install the direct product |
+| `make build` | `dist/Yamete+.app` | Debug direct build, ad-hoc signed |
+| `make release` | `dist/Yamete+.app` | Optimized direct build, Developer ID signed |
+| `make dmg` | `dist/Yamete+.dmg` | Direct-download disk image |
+| `make install` | `/Applications/Yamete+.app` | Build and install the direct product |
 | `make test` |. | Run the full test suite (unit, integration, E2E) |
 | `make clean` |. | Remove build artifacts |
 
@@ -73,7 +73,7 @@ The repo ships two products with different runtime models:
 | Product | Bundle ID | Runtime model |
 |---------|-----------|---------------|
 | `Yamete` | `com.studnicky.yamete` | Mac App Store build, App Sandbox enabled |
-| `Yamete Direct` | `com.studnicky.yamete.direct` | Direct-download build, unsandboxed |
+| `Yamete+` | `com.studnicky.yamete.plus` | Direct-download build, unsandboxed |
 
 App Store entitlements:
 
@@ -136,7 +136,7 @@ Expand the **Sensitivity & Sensors** accordion for advanced tuning:
 - Verify Apple Silicon Mac (Intel Macs lack the BMI286 sensor)
 - Check that `com.apple.security.device.usb` entitlement is present
 - Try lowering Spike Threshold and increasing Reactivity range
-- In `Yamete Direct`, enable Debug Logging, reproduce the issue, then check the direct-build logs
+- In `Yamete+`, enable Debug Logging, reproduce the issue, then check the direct-build logs
 
 **No impacts detected (microphone)**
 - Grant microphone permission in System Settings > Privacy & Security > Microphone
@@ -152,5 +152,5 @@ Expand the **Sensitivity & Sensors** accordion for advanced tuning:
 - Other settings apply immediately via observation tracking
 
 **Logs location**
-- Direct download builds: `~/Library/Application Support/Yamete Direct/logs/`
+- Direct download builds: `~/Library/Application Support/Yamete+/logs/`
 - Mac App Store builds: `~/Library/Containers/com.studnicky.yamete/Data/Library/Application Support/Yamete/logs/`

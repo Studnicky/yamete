@@ -78,7 +78,7 @@ public enum InputMonitoringAccess {
     /// Privacy & Security pane deep-link to the Input Monitoring entry
     /// list. Open via `NSWorkspace.shared.open(_:)`. The path the user
     /// lands on contains every app that has prompted for Input
-    /// Monitoring — Yamete Direct's row will be visible there even if
+    /// Monitoring — Yamete+'s row will be visible there even if
     /// its grant has been silently revoked, so the user can flip it
     /// back on without hunting through nested panes.
     public static let settingsURL: URL = URL(string:

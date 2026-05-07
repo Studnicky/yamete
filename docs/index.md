@@ -147,7 +147,7 @@ On an Intel Mac, iMac, Mac Mini, Mac Studio, or Mac Pro: microphone detection wo
 ## Two builds
 
 * **Yamete.** The Mac App Store build, rated 12+, with tame notification copy ("Mm, again?", "Show off~", "OUCH"). Plausibly deniable in most workplaces.
-* **Yamete Direct.** A notarised direct download with notification copy that has fewer brakes on. Not submitted to the App Store. For consenting adults who knew what they were clicking.
+* **Yamete+.** A notarised direct download with notification copy that has fewer brakes on. Not submitted to the App Store. For consenting adults who knew what they were clicking.
 
 Same detection engine. Same event sources. Same sounds. Same face library. Same 40 locales. Only difference: what your Mac says about it.
 

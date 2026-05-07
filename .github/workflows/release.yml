@@ -51,10 +51,19 @@ jobs:
       - name: Build DMG (Direct variant)
         run: make dmg
 
+      - name: Stage transitional alias DMG for legacy updaters
+        # Yamete users on 2.3.x and earlier ship an Updater whose
+        # `dmgAssetName` is hardcoded to `Yamete.Direct.dmg`. Publish
+        # the renamed Yamete+ DMG under both filenames so legacy
+        # installs find the asset and pick up the renamed bundle on
+        # next auto-update. The transitional alias goes away once
+        # 2.3.x has aged out of the install base.
+        run: cp "dist/Yamete+.dmg" "dist/Yamete.Direct.dmg"
+
       - name: Compute SHA256 of DMG
         id: checksum
         run: |
-          SHA256=$(shasum -a 256 "dist/Yamete Direct.dmg" | awk '{print $1}')
+          SHA256=$(shasum -a 256 "dist/Yamete+.dmg" | awk '{print $1}')
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "SHA256: $SHA256"
 
@@ -74,5 +83,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           body_path: /tmp/release_notes.md
-          files: dist/Yamete Direct.dmg
+          files: |
+            dist/Yamete+.dmg
+            dist/Yamete.Direct.dmg
           generate_release_notes: false

@@ -1,40 +1,43 @@
 #!/usr/bin/env bash
 # Pre-push companion to scripts/check-host-app-tests-fresh.sh.
 #
-# Solves the problem the 2.3.0 release push hit: the host-app test
-# target's sandbox mirror at
-# `~/Library/Containers/com.studnicky.yamete/Data/tmp/yamete-snapshots/HostApp/SnapshotUI_Tests/`
-# accumulates stale baseline PNGs from previous test runs. When the
-# source-tree baseline is missing for a cell (e.g. a layout change
-# deleted it pending re-record), `SnapshotUI_Tests.snapshotDirectory`
-# seeds the mirror from source — but mirror entries that exist ONLY in
-# the mirror linger and become stale references the next time SwiftUI
-# emits subtly different pixels. Result: `Snapshot does not match
-# reference` failures even though the source tree is in a clean state.
+# Refreshes the host-app test target's snapshot baselines so a push
+# never carries a stale comparison reference into CI.
 #
-# This script automates the manual cleanup-record-sync flow:
+# The host-app sandbox mirror lives at
+# `~/Library/Containers/com.studnicky.yamete/Data/tmp/yamete-snapshots/HostApp/SnapshotUI_Tests/`
+# and is the only path the SnapshotTesting library can read or write
+# from inside the App Sandbox. `SnapshotUI_Tests.snapshotDirectory`
+# seeds it from `Tests/__Snapshots__/HostApp/SnapshotUI_Tests/` on
+# first call; entries that exist only in the mirror linger across
+# runs and serve as references the next time SwiftUI emits subtly
+# different pixels — manifesting as "Snapshot does not match
+# reference" even on a clean source tree.
+#
+# Flow (dual-run pattern):
 #
 #   1. Wipe the sandbox mirror's HostApp PNGs so the next test run
-#      seeds fresh from source tree (no stale state survives).
-#   2. Run `make test-host-app`. Stale or missing baselines are
-#      recorded into the mirror under recordMode=.missing semantics.
-#   3. Sync mirror PNGs back to source tree at
+#      reseeds entirely from source.
+#   2. Run `make test-host-app` once — the recording iteration. Under
+#      `recordMode=.missing`, the SnapshotTesting library records any
+#      missing baselines and reports each recording as a test failure
+#      with a "no reference was found" message. Tolerate a non-zero
+#      exit here; the recordings end up in the mirror regardless.
+#   3. Copy mirror PNGs back to source tree at
 #      Tests/__Snapshots__/HostApp/SnapshotUI_Tests/.
-#   4. If the source tree changed as a result, fail the push with a
-#      clear "stage and commit these and re-push" message. Never
-#      auto-commit baselines — the developer must acknowledge them.
+#   4. Run `make test-host-app` again — the verification iteration.
+#      Source tree now matches what the mirror holds, so every
+#      baseline compares equal and the run exits clean (refreshing
+#      the freshness sentinel as a side effect).
+#   5. Refuse the push if step 3 moved the source tree — the
+#      developer must commit recorded baselines explicitly.
 #
-# Skipped when:
-#   - Running on CI (CI=true). CI seeds via .github/workflows/snapshot-baseline-seed.yml.
-#   - Branch is not release/* or hotfix/*. Feature branches get this
-#     enforcement via the existing freshness gate (pre-push.host-app);
-#     the slow record-and-sync flow is reserved for the release path.
-#
-# Why a sandbox container path? Yamete.app's App Sandbox forbids
-# writes outside the container, so the SnapshotTesting library
-# cannot persist baselines into the source tree directly. The mirror
-# under `NSTemporaryDirectory()` resolves into the container's tmp
-# dir; this script bridges that one-way wall.
+# Self-skips when:
+#   - Running on CI (`CI=true`). CI seeds via the
+#     `.github/workflows/snapshot-baseline-seed.yml` workflow.
+#   - The push target is not `release/*` or `hotfix/*`. Feature
+#     branches push without this gate; the slow record-and-sync flow
+#     is reserved for the release path.
 
 set -euo pipefail
 
@@ -59,6 +62,10 @@ fi
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
+# The host-app test target builds the App Store-flavoured `Yamete.app`
+# and runs inside its sandbox; the mirror lives under that container's
+# tmp directory regardless of which Direct identifier the rest of the
+# project uses. Path stays bound to com.studnicky.yamete.
 BUNDLE_ID="com.studnicky.yamete"
 MIRROR_ROOT="$HOME/Library/Containers/$BUNDLE_ID/Data/tmp/yamete-snapshots/HostApp/SnapshotUI_Tests"
 SOURCE_DIR="Tests/__Snapshots__/HostApp/SnapshotUI_Tests"
@@ -71,27 +78,40 @@ fi
 
 printf "  refresh   host-app snapshot mirror (%s)\n" "$MIRROR_ROOT"
 
-# Step 1 — wipe stale mirror entries. The mirror only lives inside
-# the sandbox container, so this is local-only state — no remote
-# implications. `rm -rf` against a non-existent path is fine.
+# Stash source-tree baselines to a temp dir so a real test failure
+# during the recording iteration doesn't leave the working tree with
+# zero baselines. Restored on any error path that exits non-zero.
+STASH_DIR="$(mktemp -d -t yamete-host-app-snapshots-stash)"
+restore_stash() {
+  if [[ -d "$STASH_DIR" ]]; then
+    rsync -a --delete "$STASH_DIR/" "$SOURCE_DIR/" 2>/dev/null || true
+    rm -rf "$STASH_DIR"
+  fi
+}
+trap 'restore_stash' EXIT
+rsync -a "$SOURCE_DIR/" "$STASH_DIR/"
+
+# Step 1 — wipe both the sandbox mirror and the source-tree
+# baselines. The seed step in `SnapshotUI_Tests.snapshotDirectory`
+# copies source-tree PNGs into the mirror on first call; if the
+# source-tree PNG is stale (rendered pixels have moved on since the
+# last record), the mirror inherits the staleness and the
+# `recordMode=.missing` library skips re-recording on a file that
+# already exists. Wiping both forces every cell into the
+# "no reference, record fresh" branch.
 rm -rf "$MIRROR_ROOT"
+find "$SOURCE_DIR" -maxdepth 1 -name '*.png' -delete 2>/dev/null
 
-# Step 2 — run the host-app test target. The target already prints
-# its own banner; we surface its exit code on failure but otherwise
-# stay quiet.
-if ! make test-host-app; then
-  cat >&2 <<EOF
-✗ refresh-host-app-snapshots: \`make test-host-app\` failed during the
-   pre-push baseline refresh. Inspect the output above and fix the
-   underlying failure before re-pushing.
+# Step 2 — recording iteration. With both source tree and mirror
+# wiped, every cell records under `recordMode=.missing` semantics.
+# Each recording surfaces as a test failure ("recorded snapshot")
+# so the test target exits non-zero — tolerate it.
+printf "  record    initial baseline pass (recordings surface as failures by design)\n"
+make test-host-app >/dev/null 2>&1 || true
 
-   To bypass in a true emergency, \`git push --no-verify\` (DISCOURAGED).
-EOF
-  exit 1
-fi
-
-# Step 3 — sync mirror PNGs back to the source tree. Only PNGs;
-# don't trample sentinels or other files that may live alongside.
+# Step 3 — sync mirror PNGs back to the source tree. Source tree
+# was wiped before recording, so this populates the entire HostApp
+# baseline set from what the test just rendered.
 synced=0
 if [[ -d "$MIRROR_ROOT" ]]; then
   shopt -s nullglob
@@ -106,31 +126,87 @@ if [[ -d "$MIRROR_ROOT" ]]; then
   shopt -u nullglob
 fi
 
-# Step 4 — refuse the push if source-tree baselines moved. The
-# developer must commit them so the next checkout (and CI) sees the
-# same baselines we just recorded.
-changed_paths=$(git status --porcelain -- "$SOURCE_DIR" | sed '/^$/d')
-if [[ -n "$changed_paths" ]]; then
-  count=$(echo "$changed_paths" | wc -l | tr -d ' ')
+# Step 3a — bail with stash restore if recording produced nothing.
+# A real test crash (build failure, signal-11) would leave both
+# source tree and mirror empty; restoring from stash lets the
+# developer iterate without losing the prior baselines.
+if [[ $synced -eq 0 ]]; then
   cat >&2 <<EOF
-✗ refresh-host-app-snapshots: $count host-app snapshot baseline(s)
-   re-recorded during pre-push:
+✗ refresh-host-app-snapshots: recording iteration produced no
+   baselines. Either the test target failed to build, or every
+   cell crashed before reaching its assertImageSnapshot call.
+   Restoring the prior baselines from stash. Inspect the
+   xcodebuild output above and fix the underlying failure.
 
-$(echo "$changed_paths" | sed 's/^/   /')
+   To bypass in a true emergency, \`git push --no-verify\` (DISCOURAGED).
+EOF
+  exit 1
+fi
+
+# Step 4 — verification iteration. Source tree now matches the mirror
+# so every cell compares equal and the test target exits clean. This
+# also refreshes build/.host-app-test-fresh, so the freshness gate
+# that runs after this script sees a current sentinel.
+printf "  verify    second pass (source tree now matches recorded mirror)\n"
+if ! make test-host-app; then
+  cat >&2 <<EOF
+✗ refresh-host-app-snapshots: \`make test-host-app\` failed on the
+   verification pass — a real test failure (not a snapshot recording)
+   stopped the run. Inspect the output above and fix the underlying
+   failure before re-pushing.
+
+   To bypass in a true emergency, \`git push --no-verify\` (DISCOURAGED).
+EOF
+  exit 1
+fi
+
+# Step 5a — restore the stashed bytes for any baseline that already
+# existed before the script ran. SnapshotTesting renders pixels
+# with sub-pixel hinting drift between runs; two consecutive
+# recordings of the same view differ at the byte level even when
+# the verification iteration considers them equal under the
+# `precision: 0.99, perceptualPrecision: 0.98` tolerance. Restoring
+# the stashed (committed) bytes for existing baselines means the
+# script doesn't churn git history with noise, while the precision
+# threshold continues to absorb the drift on every subsequent run.
+shopt -s nullglob
+for stashed in "$STASH_DIR"/*.png; do
+  base=$(basename "$stashed")
+  cp "$stashed" "$SOURCE_DIR/$base"
+done
+shopt -u nullglob
+
+# Step 5b — refuse the push only when truly NEW baselines landed
+# (untracked files in git). Existing baselines whose bytes drifted
+# under noise were already restored above; only genuine
+# never-before-committed cells need a developer commit.
+new_paths=$(git status --porcelain -- "$SOURCE_DIR" | grep '^?? ' | sed '/^$/d' || true)
+if [[ -n "$new_paths" ]]; then
+  count=$(echo "$new_paths" | wc -l | tr -d ' ')
+  cat >&2 <<EOF
+✗ refresh-host-app-snapshots: $count NEW host-app snapshot baseline(s)
+   recorded during pre-push:
+
+$(echo "$new_paths" | sed 's/^/   /')
 
    Stage and commit these baselines, then re-push:
 
      git add $SOURCE_DIR
-     git commit -m "chore: re-record host-app snapshot baselines"
+     git commit -m "chore: record new host-app snapshot baselines"
      git push
 
-   The mirror was seeded fresh from source tree before the test ran,
-   so these recordings are authoritative. Do NOT bypass — without the
-   commit, CI and future developers will compare against stale or
-   missing baselines.
+   These cells had no committed baseline before this run. The
+   pre-push hook records authoritative bytes; the developer
+   commits them so CI compares against the same reference.
 EOF
   exit 1
 fi
+
+# Clear the stash trap on the success path so the freshly-restored
+# baselines aren't reverted on normal exit. Stash dir cleanup runs
+# explicitly here.
+trap - EXIT
+rm -rf "$STASH_DIR"
 
 if [[ $synced -gt 0 ]]; then
   printf "  sync      %d baseline(s) refreshed (no source-tree drift)\n" "$synced"

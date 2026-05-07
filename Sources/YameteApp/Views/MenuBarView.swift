@@ -230,16 +230,22 @@ internal struct HeaderSection: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 // Top row, two columns: title (leading), impacts-today
-                // counter (trailing). The paused indicator that used to
-                // sit between them moved to the `DiagnosticsRow` below
-                // the header divider, so the layout is a clean 2x2
-                // grid (title | impacts; subtext | last-impact) with no
-                // conditional column collapse.
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                // counter (trailing). The Direct build appends a `+`
+                // glyph to the title so the menu reads as "Yamete+";
+                // App Store renders the unmarked "Yamete". The
+                // diagnostics row below the header carries
+                // paused / permission / sensor-error state.
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text(NSLocalizedString("app_title", comment: "Application name"))
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(Theme.stateActive)
-                    Spacer(minLength: 4)
+                    #if DIRECT_BUILD
+                    Text(verbatim: "+")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Theme.pink)
+                        .accessibilityLabel(Text(NSLocalizedString("build_variant_direct_a11y", comment: "VoiceOver label appended to the app title for Direct builds")))
+                    #endif
+                    Spacer(minLength: 8)
                     Text(impactsLine)
                         .font(.caption)
                         .foregroundStyle(Theme.stateInert)
