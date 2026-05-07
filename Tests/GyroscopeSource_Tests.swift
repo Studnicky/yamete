@@ -262,14 +262,25 @@ final class GyroscopeSource_Tests: XCTestCase {
     // MARK: - Hardware presence parity
 
     func test_isAvailable_followsHardwarePresence() {
-        // The source's isAvailable consults AppleSPUDevice.isHardwarePresent()
-        // (with the production default driver), which is the same call the
-        // app's UI gates the gyro card on. The contract this cell pins is
-        // surface parity: same call, same result, no per-source override.
+        // The source's isAvailable now combines two signals:
+        //   • Direct build: device presence only (Direct can write
+        //     IORegistry properties to activate the sensor on demand).
+        //   • App Store build: device presence + activity probe via
+        //     `_last_event_timestamp` on the `dispatchGyro` service —
+        //     guards against the App Store sandbox blocker, where the
+        //     device matches but the kernel driver never streams because
+        //     the activation write was rejected.
         let mock = MockSPUKernelDriver()
         let source = GyroscopeSource(detectorConfig: Self.permissiveConfig(), kernelDriver: mock)
 
-        XCTAssertEqual(source.isAvailable, AppleSPUDevice.isHardwarePresent(),
-            "[gyroscope=isAvailable-parity] source.isAvailable must mirror AppleSPUDevice.isHardwarePresent")
+        let devicePresent = AppleSPUDevice.isHardwarePresent()
+        #if DIRECT_BUILD
+        let expected = devicePresent
+        #else
+        let expected = devicePresent
+            && AccelHardware.isSensorActivelyReporting(dispatchKey: "dispatchGyro")
+        #endif
+        XCTAssertEqual(source.isAvailable, expected,
+            "[gyroscope=isAvailable-parity] source.isAvailable must match the DIRECT/AppStore contract")
     }
 }

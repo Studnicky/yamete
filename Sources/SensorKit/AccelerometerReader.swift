@@ -518,6 +518,29 @@ internal enum AccelHardware {
     /// Read-only IORegistry lookup. Works from inside App Sandbox
     /// (sandbox blocks property WRITES, not reads).
     static func isSensorActivelyReporting(driver: SPUKernelDriver = RealSPUKernelDriver()) -> Bool {
+        isSensorActivelyReporting(dispatchKey: "dispatchAccel", driver: driver)
+    }
+
+    /// Generalised activity probe: same `_last_event_timestamp` semantics
+    /// as the accel probe, but parameterised over the dispatch label so
+    /// `GyroscopeSource` (`dispatchGyro`) and `AmbientLightSource`
+    /// (`dispatchAls`) can mirror it. Each `AppleSPUHIDDriver` service
+    /// instance carries its own `DebugState` dict with a per-channel
+    /// `_last_event_timestamp` — confirmed on M4 Max ioreg (accel and
+    /// gyro both expose the field with millisecond-fresh timestamps when
+    /// streaming).
+    ///
+    /// Multiple services may be flagged with the same dispatch key —
+    /// the SPU IORegistry on M4 Max shows several `dispatchGyro = Yes`
+    /// instances, some of which never streamed (`_last_event_timestamp
+    /// = 0`) while a sibling is actively reporting. The probe scans
+    /// every matching service and returns true if ANY of them is fresh;
+    /// it returns false only after exhausting the iterator without a
+    /// hit.
+    static func isSensorActivelyReporting(
+        dispatchKey: String,
+        driver: SPUKernelDriver = RealSPUKernelDriver()
+    ) -> Bool {
         let matching = IOServiceMatching("AppleSPUHIDDriver")
         let (kr, iterator) = driver.getMatchingServices(matching: matching)
         guard kr == KERN_SUCCESS else {
@@ -533,11 +556,11 @@ internal enum AccelHardware {
             guard service != 0 else { break }
             defer { driver.objectRelease(service) }
 
-            // The SPU bus also hosts gyro, temperature, and hinge-angle
-            // services. Only the one carrying `dispatchAccel = Yes` is
-            // ours.
-            let dispatchAccel = driver.registryCreateCFProperty(
-                service, key: "dispatchAccel" as CFString
+            // The SPU bus hosts a service per sensor (accel, gyro, ALS,
+            // hinge angle). Only the one carrying the requested dispatch
+            // flag is ours.
+            let dispatched = driver.registryCreateCFProperty(
+                service, key: dispatchKey as CFString
             ) as? Bool ?? false
             let debug = driver.registryCreateCFProperty(
                 service, key: "DebugState" as CFString
@@ -546,15 +569,14 @@ internal enum AccelHardware {
             let now = mach_absolute_time()
 
             switch evaluateActivity(
-                dispatchAccel: dispatchAccel,
+                dispatchAccel: dispatched,
                 lastTsRaw: lastTsRaw,
                 now: now,
                 timebaseNumer: timebase.numer,
                 timebaseDenom: timebase.denom,
                 stalenessNs: AccelHardwareConstants.sensorActivityStalenessNs
             ) {
-            case .skip: continue
-            case .unreporting, .clockNonMonotonic, .stale: return false
+            case .skip, .unreporting, .clockNonMonotonic, .stale: continue
             case .reporting: return true
             }
         }
