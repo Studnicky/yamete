@@ -47,10 +47,20 @@ import IOKit.pwr_mgt
 
 // MARK: - IORegistry helpers
 
-/// Iterates every `AppleSPUHIDDriver` service flagged `dispatchAccel = Yes`
-/// and invokes `body` on each. The SPU bus also hosts gyro, temperature,
-/// and hinge-angle services; `dispatchAccel` disambiguates.
-func iterateAccelServices(_ body: (io_service_t) -> Void) {
+/// Activation dispatch labels handled by the helper. Each
+/// `AppleSPUHIDDriver` service carries exactly one of these flags
+/// (accel / gyro / ALS); the helper writes the activation triplet to
+/// every matched service so all three sensors stream after boot.
+let dispatchKeys: [String] = ["dispatchAccel", "dispatchGyro", "dispatchAls"]
+
+/// Iterates every `AppleSPUHIDDriver` service flagged with one of the
+/// activation `dispatchKeys` and invokes `body(service, dispatchKey)`
+/// on each. The SPU bus also hosts other services (hinge-angle on M2+
+/// is a separate device altogether) that we do not touch — only services
+/// that self-identify as accel/gyro/ALS are activated. Earlier revisions
+/// filtered on `dispatchAccel` only, which left gyro and ALS silent on
+/// App Store builds because the activation write never reached them.
+func iterateActivatableServices(_ body: (io_service_t, String) -> Void) {
     var iterator: io_iterator_t = 0
     let matching = IOServiceMatching("AppleSPUHIDDriver")
     guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {
@@ -66,12 +76,26 @@ func iterateAccelServices(_ body: (io_service_t) -> Void) {
         guard service != 0 else { break }
         defer { IOObjectRelease(service) }
 
-        let dispatchAccel = IORegistryEntryCreateCFProperty(
-            service, "dispatchAccel" as CFString, kCFAllocatorDefault, 0
-        )?.takeRetainedValue() as? Bool ?? false
-        guard dispatchAccel else { continue }
+        for key in dispatchKeys {
+            let flagged = IORegistryEntryCreateCFProperty(
+                service, key as CFString, kCFAllocatorDefault, 0
+            )?.takeRetainedValue() as? Bool ?? false
+            if flagged {
+                body(service, key)
+                break
+            }
+        }
+    }
+}
 
-        body(service)
+/// Backwards-compat shim — calls the unfiltered iterator and only
+/// invokes `body` for the accel service. Retained so the `probe`
+/// command keeps surfacing the accel-specific stats it has logged
+/// since 1.0.0; gyro/ALS get their own probes via the source-side
+/// runtime activity check (`AccelHardware.isSensorActivelyReporting`).
+func iterateAccelServices(_ body: (io_service_t) -> Void) {
+    iterateActivatableServices { service, key in
+        if key == "dispatchAccel" { body(service) }
     }
 }
 
@@ -121,15 +145,18 @@ func probe() -> Int32 {
 }
 
 /// Writes the three activation properties that tell the driver to start
-/// the BMI286 streaming at 100Hz (ReportInterval = 10000 µs). The writes
-/// are command channels — success doesn't update a stored value in the
+/// streaming at 100Hz (ReportInterval = 10000 µs). The writes are
+/// command channels — success doesn't update a stored value in the
 /// IOKit property dict, it triggers a hardware command.
-/// Exit code 0 on success, 1 on any write failure, 2 if no hardware.
+/// Activates EVERY SPU sensor the helper recognises (accel / gyro / ALS)
+/// in one pass so a sandboxed app can subscribe to any of them.
+/// Exit code 0 if any activation succeeds, 1 on total failure, 2 if no
+/// hardware.
 @discardableResult
 func kickstart(intervalUS: Int = 10000) -> Int32 {
     var anyFound = false
     var anySuccess = false
-    iterateAccelServices { service in
+    iterateActivatableServices { service, dispatchKey in
         anyFound = true
         let r1 = IORegistryEntrySetCFProperty(
             service, "ReportInterval" as CFString, intervalUS as CFNumber
@@ -143,13 +170,13 @@ func kickstart(intervalUS: Int = 10000) -> Int32 {
         let ok = r1 == KERN_SUCCESS && r2 == KERN_SUCCESS && r3 == KERN_SUCCESS
         if ok { anySuccess = true }
         print(String(
-            format: "kickstart: r1=0x%08x r2=0x%08x r3=0x%08x ok=%@",
-            r1, r2, r3, ok ? "true" : "false"
+            format: "kickstart [%@]: r1=0x%08x r2=0x%08x r3=0x%08x ok=%@",
+            dispatchKey, r1, r2, r3, ok ? "true" : "false"
         ))
     }
     if !anyFound {
         FileHandle.standardError.write(
-            "yamete-sensor-kickstart: no dispatchAccel=Yes service found — not an Apple Silicon MacBook with BMI286?\n".data(using: .utf8)!
+            "yamete-sensor-kickstart: no AppleSPUHIDDriver service with dispatchAccel/Gyro/Als found — not an Apple Silicon MacBook with BMI286?\n".data(using: .utf8)!
         )
         return 2
     }
@@ -157,10 +184,11 @@ func kickstart(intervalUS: Int = 10000) -> Int32 {
 }
 
 /// Opposite of kickstart: writes 0 to the three activation properties to
-/// stop the sensor streaming. Useful for testing fallback behavior.
+/// stop the sensor streaming on every recognised dispatch service.
+/// Useful for testing fallback behavior.
 func deactivate() -> Int32 {
     var anyFound = false
-    iterateAccelServices { service in
+    iterateActivatableServices { service, dispatchKey in
         anyFound = true
         let r1 = IORegistryEntrySetCFProperty(
             service, "ReportInterval" as CFString, 0 as CFNumber
@@ -172,8 +200,8 @@ func deactivate() -> Int32 {
             service, "SensorPropertyPowerState" as CFString, 0 as CFNumber
         )
         print(String(
-            format: "deactivate: r1=0x%08x r2=0x%08x r3=0x%08x",
-            r1, r2, r3
+            format: "deactivate [%@]: r1=0x%08x r2=0x%08x r3=0x%08x",
+            dispatchKey, r1, r2, r3
         ))
     }
     return anyFound ? 0 : 2
