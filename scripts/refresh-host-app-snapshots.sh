@@ -14,15 +14,22 @@
 # different pixels — manifesting as "Snapshot does not match
 # reference" even on a clean source tree.
 #
-# Flow:
+# Flow (dual-run pattern):
 #
 #   1. Wipe the sandbox mirror's HostApp PNGs so the next test run
 #      reseeds entirely from source.
-#   2. Run `make test-host-app`. Missing or invalidated baselines
-#      record into the mirror under recordMode=.missing semantics.
+#   2. Run `make test-host-app` once — the recording iteration. Under
+#      `recordMode=.missing`, the SnapshotTesting library records any
+#      missing baselines and reports each recording as a test failure
+#      with a "no reference was found" message. Tolerate a non-zero
+#      exit here; the recordings end up in the mirror regardless.
 #   3. Copy mirror PNGs back to source tree at
 #      Tests/__Snapshots__/HostApp/SnapshotUI_Tests/.
-#   4. Refuse the push if the source tree moved as a result — the
+#   4. Run `make test-host-app` again — the verification iteration.
+#      Source tree now matches what the mirror holds, so every
+#      baseline compares equal and the run exits clean (refreshing
+#      the freshness sentinel as a side effect).
+#   5. Refuse the push if step 3 moved the source tree — the
 #      developer must commit recorded baselines explicitly.
 #
 # Self-skips when:
@@ -55,6 +62,10 @@ fi
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
+# The host-app test target builds the App Store-flavoured `Yamete.app`
+# and runs inside its sandbox; the mirror lives under that container's
+# tmp directory regardless of which Direct identifier the rest of the
+# project uses. Path stays bound to com.studnicky.yamete.
 BUNDLE_ID="com.studnicky.yamete"
 MIRROR_ROOT="$HOME/Library/Containers/$BUNDLE_ID/Data/tmp/yamete-snapshots/HostApp/SnapshotUI_Tests"
 SOURCE_DIR="Tests/__Snapshots__/HostApp/SnapshotUI_Tests"
@@ -72,19 +83,14 @@ printf "  refresh   host-app snapshot mirror (%s)\n" "$MIRROR_ROOT"
 # implications. `rm -rf` against a non-existent path is fine.
 rm -rf "$MIRROR_ROOT"
 
-# Step 2 — run the host-app test target. The target already prints
-# its own banner; we surface its exit code on failure but otherwise
-# stay quiet.
-if ! make test-host-app; then
-  cat >&2 <<EOF
-✗ refresh-host-app-snapshots: \`make test-host-app\` failed during the
-   pre-push baseline refresh. Inspect the output above and fix the
-   underlying failure before re-pushing.
-
-   To bypass in a true emergency, \`git push --no-verify\` (DISCOURAGED).
-EOF
-  exit 1
-fi
+# Step 2 — recording iteration. With the mirror cleared, the
+# SnapshotTesting library re-records every baseline under
+# recordMode=.missing semantics. Each recording surfaces as a test
+# failure ("no reference was found"); the test target exits non-zero
+# even though the recordings land in the mirror successfully. This
+# is by library design — tolerate the exit and move on.
+printf "  record    initial baseline pass (recordings surface as failures by design)\n"
+make test-host-app >/dev/null 2>&1 || true
 
 # Step 3 — sync mirror PNGs back to the source tree. Only PNGs;
 # don't trample sentinels or other files that may live alongside.
@@ -102,9 +108,26 @@ if [[ -d "$MIRROR_ROOT" ]]; then
   shopt -u nullglob
 fi
 
-# Step 4 — refuse the push if source-tree baselines moved. The
-# developer must commit them so the next checkout (and CI) sees the
-# same baselines we just recorded.
+# Step 4 — verification iteration. Source tree now matches the mirror
+# so every cell compares equal and the test target exits clean. This
+# also refreshes build/.host-app-test-fresh, so the freshness gate
+# that runs after this script sees a current sentinel.
+printf "  verify    second pass (source tree now matches recorded mirror)\n"
+if ! make test-host-app; then
+  cat >&2 <<EOF
+✗ refresh-host-app-snapshots: \`make test-host-app\` failed on the
+   verification pass — a real test failure (not a snapshot recording)
+   stopped the run. Inspect the output above and fix the underlying
+   failure before re-pushing.
+
+   To bypass in a true emergency, \`git push --no-verify\` (DISCOURAGED).
+EOF
+  exit 1
+fi
+
+# Step 5 — refuse the push if source-tree baselines moved. The
+# developer must commit them so the next checkout (and CI) compares
+# against the same baselines this run recorded.
 changed_paths=$(git status --porcelain -- "$SOURCE_DIR" | sed '/^$/d')
 if [[ -n "$changed_paths" ]]; then
   count=$(echo "$changed_paths" | wc -l | tr -d ' ')
@@ -120,9 +143,9 @@ $(echo "$changed_paths" | sed 's/^/   /')
      git commit -m "chore: re-record host-app snapshot baselines"
      git push
 
-   The mirror was seeded fresh from source tree before the test ran,
-   so these recordings are authoritative. Do NOT bypass — without the
-   commit, CI and future developers will compare against stale or
+   The mirror seeds fresh from source tree before the test runs,
+   so these recordings are authoritative. Do NOT bypass — without
+   the commit, CI and future developers compare against stale or
    missing baselines.
 EOF
   exit 1

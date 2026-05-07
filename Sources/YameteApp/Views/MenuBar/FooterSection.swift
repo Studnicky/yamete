@@ -178,36 +178,6 @@ internal struct FooterSection: View {
 
     @ViewBuilder
     private var updateStatusLabel: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            updateStatusCaption
-            buildVariantPill
-        }
-    }
-
-    /// Build-variant indicator. A small capsule next to the version
-    /// number; pink for Direct (Developer-ID-signed, unsandboxed),
-    /// mauve for the App-Store sandboxed variant.
-    private var buildVariantPill: some View {
-        #if DIRECT_BUILD
-        let label = NSLocalizedString("build_variant_direct",
-                                      comment: "Direct build variant pill label")
-        let tint = Theme.pink
-        #else
-        let label = NSLocalizedString("build_variant_appstore",
-                                      comment: "App Store build variant pill label")
-        let tint = Theme.mauve
-        #endif
-        return Text(label)
-            .font(.caption2)
-            .foregroundStyle(tint)
-            .padding(.horizontal, 5).padding(.vertical, 1)
-            .background(tint.opacity(0.15))
-            .clipShape(Capsule())
-            .accessibilityLabel(Text(label))
-    }
-
-    @ViewBuilder
-    private var updateStatusCaption: some View {
         #if DIRECT_BUILD
         switch updater.state {
         case .checking:

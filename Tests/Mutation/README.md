@@ -88,7 +88,7 @@ Pixel-baseline snapshot tests use a runtime variant resolver in
 `Tests/SnapshotUI_Tests.swift` and `Tests/SnapshotUI_Direct_Tests.swift`
 that selects the baseline directory based on environment:
 
-- `HostApp` — running inside `Yamete.app` / `Yamete Direct.app` (host-app xcodebuild lane).
+- `HostApp` — running inside `Yamete.app` / `Yamete+.app` (host-app xcodebuild lane).
 - `CI` — `ProcessInfo.processInfo.environment["CI"] == "true"` (GitHub Actions runner).
 - `Direct` — SPM build with `-DDIRECT_BUILD`.
 - `AppStore` — default SPM build.
@@ -1802,7 +1802,7 @@ The host-app lane adds a host-app test path so those cells run.
 
 These cells gate their Real-driver assertions on a Bundle-URL check
 that detects whether the host process is `xctest` (skip) or
-`Yamete.app` / `Yamete Direct.app` (run). Under
+`Yamete.app` / `Yamete+.app` (run). Under
 `make test-host-app` the suffix-match flips and the Real half runs:
 
 - `Tests/DriverParity_Tests.swift` —

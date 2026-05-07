@@ -11,42 +11,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.3.1] - 2026-05-06
+## [2.4.0] - 2026-05-06
 
 ### Added
-- **Build-variant pill in the footer.** A small capsule beside the
-  version number identifies which flavour of Yamete is running:
-  pink "Direct" for Developer-ID-signed Direct builds, mauve
-  "App Store" for the sandboxed App Store variant. Lets the user
-  tell at a glance which lane a screenshot or bug report came from.
-
-### Changed
-- **Footer reorganisation.** Footer cells render in a single
+- **Yamete+ rebrand for the Direct download.** The notarised
+  Developer-ID-signed download is now named **Yamete+** instead of
+  "Yamete Direct". The bundle is `Yamete+.app`, the executable is
+  `yamete-plus`, the bundle identifier is
+  `com.studnicky.yamete.plus`, the DMG asset is `Yamete+.dmg`. The
+  App Store variant keeps its existing `Yamete` / `com.studnicky.yamete`
+  identity. The menu's header title now reads "Yamete+" with a pink
+  `+` glyph for Direct builds; App Store renders an unmarked
+  "Yamete". The previous footer build-variant pill is gone — the
+  header carries the indicator.
+- **Footer reorganisation.** Footer cells render as a single
   priority-ordered list flowing column-major into a 2-column grid:
   Debug Logging (Direct only) → Launch at Login → Version → Reset
-  Settings → Info Links → Quit. When Debug Logging isn't present
-  (App Store), every later cell shifts one slot up so Launch at
-  Login becomes the top-left entry. Drops the central inter-column
-  divider that read as a table border.
-- **List containers no longer render a wrapping background.** The
-  faint grey rounded-rect that wrapped DeviceToggleList,
-  SelectionList, and NotificationLocalePicker is gone; per-row
-  dividers carry the "this is a list" affordance. The diagnostics
-  pills lose their stroke for the same reason — the tinted fill is
-  enough.
+  Settings → Info Links → Quit. With Debug Logging absent (App
+  Store), Launch at Login slides into the top-left slot. The
+  central inter-column divider that read as a table border is gone.
 
 ### Changed
+- **Auto-update path from "Yamete Direct" to "Yamete+".** Existing
+  pre-2.4.0 installs auto-update through their legacy `Yamete.Direct.dmg`
+  asset name, which the 2.4.0 release publishes as a transitional
+  alias alongside the canonical `Yamete+.dmg`. After the update
+  installs, a one-shot bundle-relocation step at app launch detects
+  the legacy `/Applications/Yamete Direct.app` path, copies the
+  bundle to `/Applications/Yamete+.app`, removes the legacy bundle,
+  and relaunches from the canonical path. UserDefaults migrate from
+  `com.studnicky.yamete.direct` to `com.studnicky.yamete.plus` on
+  first launch under the new identifier — every existing setting
+  carries over. Input Monitoring TCC grants do **not** carry over
+  (macOS scopes them per-bundle-identifier); the diagnostics row
+  surfaces the missing-permission state with an "Open System
+  Settings…" deep-link the moment a feature that needs it is used.
+- **List containers drop their wrapping background.** The faint
+  grey rounded-rect around DeviceToggleList, SelectionList, and
+  NotificationLocalePicker is gone; per-row dividers carry the
+  "this is a list" affordance. Diagnostics pills lose their stroke
+  for the same reason — the tinted fill is enough.
 - **Pre-push hook auto-refreshes host-app snapshot baselines.** New
   `scripts/refresh-host-app-snapshots.sh` runs only for pushes to
   `release/*` and `hotfix/*` branches; it wipes the sandbox-mirror
   at `~/Library/Containers/com.studnicky.yamete/Data/tmp/yamete-snapshots/HostApp/`,
-  invokes `make test-host-app`, and syncs freshly-recorded baselines
-  back to `Tests/__Snapshots__/HostApp/SnapshotUI_Tests/`. If the
-  source tree moved as a result, the push is refused with a clear
-  "stage and commit these and re-push" message. Eliminates the manual
-  cleanup the 2.3.0 release push had to do by hand when stale
-  sandbox-mirror baselines diverged from a changed layout. Feature
-  branches and CI runs self-skip.
+  invokes `make test-host-app` twice (recording iteration tolerates
+  the standard ".missing"-mode failures, verification iteration
+  must pass clean), and syncs freshly-recorded baselines back to
+  `Tests/__Snapshots__/HostApp/SnapshotUI_Tests/`. If the source
+  tree moved, the push is refused with a clear "stage and commit
+  these and re-push" message. Feature branches and CI self-skip.
 
 ## [2.3.0] - 2026-05-06
 

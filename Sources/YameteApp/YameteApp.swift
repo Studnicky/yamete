@@ -26,6 +26,23 @@ import YameteApp
 struct YameteApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    init() {
+        // Yamete+ ships under a renamed bundle path and a fresh
+        // CFBundleIdentifier. The legacy 2.3.x auto-updater overwrites
+        // `/Applications/Yamete Direct.app` with the new bundle's
+        // contents, leaving the bundle at the wrong filesystem path
+        // and disconnected from the legacy UserDefaults plist. Both
+        // migration steps run before SettingsStore reads any value,
+        // so the relocated bundle launches with the user's settings
+        // intact at its canonical path.
+        MainActor.assumeIsolated {
+            if LegacyBundleMigration.relocateIfNeeded() {
+                exit(0)
+            }
+            LegacyBundleMigration.migrateUserDefaultsIfNeeded()
+        }
+    }
+
     var body: some Scene {
         // The menu bar UI is managed by StatusBarController (NSStatusItem +
         // custom NSPanel) rather than MenuBarExtra, giving us direct control

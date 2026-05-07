@@ -1,25 +1,25 @@
 # Yamete — Build Pipeline
 #
 # Source layout mirrors the final .app bundle:
-#   App/Config/Info.plist               → Yamete Direct.app/Contents/Info.plist
-#   App/Config/PkgInfo                  → Yamete Direct.app/Contents/PkgInfo
-#   App/Resources/*                     → Yamete Direct.app/Contents/Resources/*
-#   Sources/**/*.swift                  → compiled into Contents/MacOS/yamete-direct
+#   App/Config/Info.plist               → Yamete+.app/Contents/Info.plist
+#   App/Config/PkgInfo                  → Yamete+.app/Contents/PkgInfo
+#   App/Resources/*                     → Yamete+.app/Contents/Resources/*
+#   Sources/**/*.swift                  → compiled into Contents/MacOS/yamete-plus
 #
 # Build stages:
 #   1. compile    swiftc -O → binary
 #   2. minify     strip symbols, optimize SVGs (if svgo installed)
-#   3. bundle     copy App/ layout + binary → dist/Yamete Direct.app
+#   3. bundle     copy App/ layout + binary → dist/Yamete+.app
 #   4. sign       codesign with entitlements + hardened runtime
 #   5. verify     validate structure, signature, asset counts
 
 # ── Build variant selection ───────────────────────────────────
 # BUILD_VARIANT controls which app gets built:
-#   direct   → Yamete Direct.app (notarized direct download, spicy content)
-#   appstore → Yamete.app        (Mac App Store, tame content only)
-# Default is direct so existing `make`, `make install`, `make build` keep
-# their previous behavior. Use `make appstore` or `make appstore-install`
-# (or `BUILD_VARIANT=appstore make build`) for the App Store variant.
+#   direct   → Yamete+.app  (notarized direct download, spicy content)
+#   appstore → Yamete.app   (Mac App Store, tame content only)
+# Default is direct so `make`, `make install`, `make build` build the
+# Direct variant. Use `make appstore` or `make appstore-install` (or
+# `BUILD_VARIANT=appstore make build`) for the App Store variant.
 BUILD_VARIANT ?= direct
 
 ifeq ($(BUILD_VARIANT),appstore)
@@ -30,9 +30,9 @@ ENTITLE    := App/Config/AppStore.entitlements
 VARIANT_FLAGS :=
 APPLY_DIRECT_OVERLAY := 0
 else ifeq ($(BUILD_VARIANT),direct)
-APP        := Yamete Direct
-EXECUTABLE := yamete-direct
-BUNDLE_ID  := com.studnicky.yamete.direct
+APP        := Yamete+
+EXECUTABLE := yamete-plus
+BUNDLE_ID  := com.studnicky.yamete.plus
 ENTITLE    := App/Config/Direct.entitlements
 VARIANT_FLAGS := -D DIRECT_BUILD
 APPLY_DIRECT_OVERLAY := 1

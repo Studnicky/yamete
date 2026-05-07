@@ -25,7 +25,7 @@ Sits directly below the header. Hidden when there are no active diagnostics. Whe
 | Diagnostic | When it shows | Action |
 |---|---|---|
 | **Paused** | Impact pipeline is stopped (master toggle off, or sensor pruning emptied the active set). | Informational. Re-enable a sensor or flip the Impact Detection master back on. |
-| **Input Monitoring required** | The macOS TCC privilege class for keyboard, mouse clicks, and Caps Lock LED is missing. Most common after `make install` rebuilds the bundle (cdhash changes, macOS revokes the prior grant). | Click **Open System Settings…** to deep-link to Privacy & Security → Input Monitoring. Toggle Yamete Direct on. |
+| **Input Monitoring required** | The macOS TCC privilege class for keyboard, mouse clicks, and Caps Lock LED is missing. Most common after `make install` rebuilds the bundle (cdhash changes, macOS revokes the prior grant). | Click **Open System Settings…** to deep-link to Privacy & Security → Input Monitoring. Toggle Yamete+ on. |
 | **Sensor error** | The fusion engine raised a hard error from one of the impact sensors (most often: accelerometer report stream stalled past the 5-second watchdog). | Surfaces the underlying error message verbatim. The fix usually lives in [Architecture > Detection gates](/architecture/detection-gates). |
 
 ## Impact Detection

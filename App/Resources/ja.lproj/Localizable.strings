@@ -458,8 +458,7 @@
 /* Audio device paired with display footnote */
 "audio_paired_with_display" = "attached to %@";
 
-/* Direct build variant pill label */
-"build_variant_direct" = "Direct";
 
-/* App Store build variant pill label */
-"build_variant_appstore" = "App Store";
+
+/* VoiceOver label for the "+" glyph appended to the app title in Direct builds */
+"build_variant_direct_a11y" = "Plus, the Direct download variant";
