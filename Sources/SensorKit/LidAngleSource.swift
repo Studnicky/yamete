@@ -9,31 +9,62 @@ import os
 // MARK: - LidAngleSource — direct-publish reaction source for lid hinge angle
 //
 // Apple ships hinge angle on a dedicated HID device, NOT on the SPU
-// IMU stream. Two independent open-source decoders agree byte-for-byte
-// (samhenrigold/LidAngleSensor, deepakness/LidAngle):
+// IMU stream. There is exactly ONE source on Apple Silicon — no SMC
+// fallback (the SMC plane was retired with the M-series transition,
+// `LIDA`/`MSLD` keys do not exist), no public `CMHinge` CoreMotion
+// type, no IOPlatform property. Three independent open-source
+// decoders agree byte-for-byte (samhenrigold/LidAngleSensor,
+// deepakness/LidAngle, wangfu91/lid-angle-rs):
 //
 //   • IOHID match: VendorID 0x05AC, ProductID 0x8104,
 //     UsagePage 0x0020 (HID Sensors), Usage 0x008A.
 //   • Transport: Feature report, ReportID = 1, fetched on demand via
 //     `IOHIDDeviceGetReport(.., kIOHIDReportTypeFeature, 1, ..)`. Not
-//     an Input Report stream — there is no callback, just a poll.
-//   • Layout: `[reportID, angle_lo, angle_hi]` (length ≥ 3).
+//     an Input Report stream — there is no callback, just a poll. An
+//     input-report streamed shape exists (olvvier/macimu) but needs
+//     root + a property-set wake sequence, so we use the polled feature
+//     report path.
+//   • Layout: `[reportID, angle_lo, angle_hi]` (length ≥ 3); first byte
+//     echoes the report ID `0x01`.
 //   • Decode: `UInt16 LE` at bytes [1..2], unsigned, **already in whole
 //     degrees** — no Int16, no `÷100`, no sign extension.
 //   • Range: 0..~135°, 1° resolution. Physical clamshell limit is well
 //     under 180° on every shipping MacBook.
-//   • Hardware: present on M2 Pro/Max, M3 family, and M4 family across
-//     the line. Absent on M1 and M2 Air — `isAvailable` returns false
-//     there and the menu toggle hides.
+//
+// Per-model coverage table. The runtime probe (match dict + feature-
+// report read) is the source of truth — this table is documentation
+// of expected coverage, not a dispatch table. New silicon respins are
+// frequent enough that hardcoding identifiers rots quickly.
+//
+//   ╭──────────────────────────────────────────╥─────────────────────╮
+//   │  Hardware                                ║  Lid HID strategy   │
+//   ╞══════════════════════════════════════════╬═════════════════════╡
+//   │  M1 MacBook Air (MacBookAir10,1)         ║  none — no sensor   │
+//   │  M1 13" MacBook Pro (MacBookPro17,1)     ║  none — no sensor   │
+//   │  M1 Pro/Max 14"/16" MacBook Pro          ║  HID 0x0020/0x008A  │
+//   │  M2 base MacBook Air (Mac14,2)           ║  device on wrong    │
+//   │  M2 base 13" MBP (Mac14,7)               ║  usage page 0xFF00 │
+//   │                                          ║  → match fails →   │
+//   │                                          ║  none               │
+//   │  M2 Pro/Max 14"/16" MBP                  ║  HID 0x0020/0x008A  │
+//   │  M3 / M3 Pro / M3 Max — Air & Pro        ║  HID 0x0020/0x008A  │
+//   │  M4 / M4 Pro / M4 Max — Air & Pro        ║  HID 0x0020/0x008A  │
+//   │  Mac mini / iMac / Mac Studio / Mac Pro  ║  no clamshell       │
+//   ╰──────────────────────────────────────────╨─────────────────────╯
+//
+// On models where the strategy is "none," `isAvailable` returns false,
+// the Stimuli > Lid Angle menu row hides, and the source is never
+// started. There is no second mechanism to fall back to.
 //
 // Earlier revisions of this source subscribed to the SPU broker for
 // `usagePage 0xFF00 / usage 8` and decoded an `Int16 LE / 100` at byte
 // offset 18 of the 22-byte report. That channel was wrong on every
-// count — `0xFF00 / usage 3` is accel, `0xFF00 / usage 9` is gyro, and
-// the offsets 6/10/14 (3× Int32 LE) consume the entire IMU payload.
-// Bytes 18..21 are uninitialized tail. The old decoder produced
-// negative-half garbage that drove the slam state machine into a loop;
-// the wire format documented above is the actual source of truth.
+// count — `0xFF00 / usage 3` is accel, `0xFF00 / usage 9` is gyro,
+// `0xFF00 / usage 5` is ALS, and offsets 6/10/14 (3× Int32 LE) consume
+// the entire IMU payload. Bytes 18..21 are uninitialized tail. The old
+// decoder produced negative-half garbage that drove the slam state
+// machine into a loop; the wire format documented above is the actual
+// source of truth.
 
 private let log = AppLog(category: "LidAngleSource")
 
@@ -114,6 +145,15 @@ public final class RealLidAngleHIDDriver: LidAngleHIDDriver, @unchecked Sendable
             }
             guard result == kIOReturnSuccess, length >= 3 else {
                 log.debug("activity:HIDGetReport result=\(String(format:"0x%08X", UInt32(bitPattern: result))) length=\(length)")
+                return nil
+            }
+            // First byte echoes the report ID. A mismatch indicates we
+            // matched a device that responds to feature-report 1 with
+            // an unrelated payload — defensive guard, not expected to
+            // trigger because the match dict already filters on
+            // UsagePage 0x0020 / Usage 0x008A.
+            guard buffer[0] == UInt8(Self.reportID) else {
+                log.warning("entity:LidAngleHIDDriver wasInvalidatedBy activity:ReportIDMismatch reportID=\(buffer[0])")
                 return nil
             }
             // UInt16 LE at bytes [1..2]; unsigned; whole degrees.
