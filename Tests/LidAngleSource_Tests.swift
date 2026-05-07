@@ -4,22 +4,21 @@ import os
 @testable import YameteCore
 
 /// Behavioural cells for `LidAngleSource`, the direct-publish reaction
-/// source over the BMI286 lid hinge channel of the SPU HID device.
+/// source over the dedicated lid-angle HID device (vendor 0x05AC,
+/// product 0x8104, usagePage 0x0020, usage 0x008A).
 ///
-/// The source subscribes to a private `AppleSPUDevice` broker (built
-/// with a `MockSPUKernelDriver`) and decodes synthesised report bytes
-/// through `_testInjectAngle` / `_testInjectReport` on its own
-/// injection seam. The cells exercise:
-///   • Lifecycle: start/stop idempotency, broker refcount returns to
-///     0 after stop.
+/// The source polls Feature Report 1 via `LidAngleHIDDriver`. Tests
+/// pair a `NoOpLidAngleHIDDriver` with the source and drive
+/// deterministic angle traces through `_testInjectAngle`, bypassing
+/// the polling loop and IOKit entirely. The cells exercise:
+///   • Lifecycle: start/stop idempotency, polling task cancels on stop.
 ///   • Cold-start suppression: the very first sample after start does
 ///     NOT publish (launch-time replay protection).
 ///   • State machine: open/close transitions emit exactly once;
 ///     hysteresis prevents oscillation.
 ///   • Slam path: a steep close fires `.lidSlammed` and SUPPRESSES
 ///     the parallel gentle-close emission.
-///   • Hardware presence: `isAvailable` mirrors
-///     `AppleSPUDevice.isHardwarePresent`.
+///   • Hardware presence: `isAvailable` mirrors the injected driver.
 final class LidAngleSource_Tests: XCTestCase {
 
     // MARK: - Helpers
@@ -36,10 +35,10 @@ final class LidAngleSource_Tests: XCTestCase {
         )
     }
 
-    static func makeSource(config: LidAngleStateMachineConfig = defaultConfig()) -> (LidAngleSource, MockSPUKernelDriver) {
-        let mock = MockSPUKernelDriver()
-        let source = LidAngleSource(machineConfig: config, kernelDriver: mock)
-        return (source, mock)
+    static func makeSource(config: LidAngleStateMachineConfig = defaultConfig()) -> (LidAngleSource, NoOpLidAngleHIDDriver) {
+        let driver = NoOpLidAngleHIDDriver()
+        let source = LidAngleSource(machineConfig: config, driver: driver)
+        return (source, driver)
     }
 
     /// Subscribe FIRST, then run `inject`, await `windowMs`, close the
@@ -95,21 +94,21 @@ final class LidAngleSource_Tests: XCTestCase {
 
         source.start(publishingTo: bus)
         source.start(publishingTo: bus)
-        XCTAssertEqual(source.broker._testActiveSubscriptionCount(), 1,
-            "[lid=lifecycle-start-idempotent] second start must be a no-op (got \(source.broker._testActiveSubscriptionCount()))")
+        XCTAssertTrue(source._testIsRunning,
+            "[lid=lifecycle-start-idempotent] second start must be a no-op (still running)")
 
         source.stop()
         source.stop()
-        XCTAssertEqual(source.broker._testActiveSubscriptionCount(), 0,
-            "[lid=lifecycle-stop-idempotent] subscription count must drop to 0 after stop (got \(source.broker._testActiveSubscriptionCount()))")
+        XCTAssertFalse(source._testIsRunning,
+            "[lid=lifecycle-stop-idempotent] polling task must cancel on stop")
 
         // Restart cycle works.
         source.start(publishingTo: bus)
-        XCTAssertEqual(source.broker._testActiveSubscriptionCount(), 1,
-            "[lid=lifecycle-restart] restart after stop must re-subscribe")
+        XCTAssertTrue(source._testIsRunning,
+            "[lid=lifecycle-restart] restart after stop must re-arm polling")
         source.stop()
-        XCTAssertEqual(source.broker._testActiveSubscriptionCount(), 0,
-            "[lid=lifecycle-final-stop] final stop must release the subscription")
+        XCTAssertFalse(source._testIsRunning,
+            "[lid=lifecycle-final-stop] final stop must cancel polling")
 
         await bus.close()
     }
@@ -242,9 +241,12 @@ final class LidAngleSource_Tests: XCTestCase {
     // MARK: - Hardware presence parity
 
     func test_isAvailable_followsHardwarePresence() {
-        let mock = MockSPUKernelDriver()
-        let source = LidAngleSource(machineConfig: Self.defaultConfig(), kernelDriver: mock)
-        XCTAssertEqual(source.isAvailable, AppleSPUDevice.isHardwarePresent(),
-            "[lid=isAvailable-parity] source.isAvailable must mirror AppleSPUDevice.isHardwarePresent")
+        let driver = NoOpLidAngleHIDDriver(isPresent: false)
+        let source = LidAngleSource(machineConfig: Self.defaultConfig(), driver: driver)
+        XCTAssertFalse(source.isAvailable,
+            "[lid=isAvailable-absent] driver reports absent → source must report unavailable")
+        driver._setPresent(true)
+        XCTAssertTrue(source.isAvailable,
+            "[lid=isAvailable-present] driver reports present → source must report available")
     }
 }

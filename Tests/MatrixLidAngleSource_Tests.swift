@@ -20,8 +20,8 @@ final class MatrixLidAngleSource_Tests: XCTestCase {
     // MARK: - Helpers
 
     private static func makeSource(config: LidAngleStateMachineConfig) -> LidAngleSource {
-        let mock = MockSPUKernelDriver()
-        return LidAngleSource(machineConfig: config, kernelDriver: mock)
+        let driver = NoOpLidAngleHIDDriver()
+        return LidAngleSource(machineConfig: config, driver: driver)
     }
 
     /// Subscribe FIRST, run `inject`, await `windowMs`, close the

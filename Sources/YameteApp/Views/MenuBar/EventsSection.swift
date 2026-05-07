@@ -107,18 +107,24 @@ internal struct StimuliSection: View {
                 kinds: [.gyroSpike]
             ))
             result.append(.init(
-                sourceID: SensorID.lidAngle.rawValue,
-                title: NSLocalizedString("event_lid_angle", comment: "Lid angle events"),
-                icon: "laptopcomputer",
-                help: NSLocalizedString("help_source_lid_angle", comment: "Lid angle source help"),
-                kinds: [.lidOpened, .lidClosed, .lidSlammed]
-            ))
-            result.append(.init(
                 sourceID: SensorID.ambientLight.rawValue,
                 title: NSLocalizedString("event_ambient_light", comment: "Ambient light events"),
                 icon: "sun.max.circle",
                 help: NSLocalizedString("help_source_ambient_light", comment: "Ambient light source help"),
                 kinds: [.alsCovered, .lightsOff, .lightsOn]
+            ))
+        }
+        // Lid angle has its own dedicated HID device, distinct from the
+        // SPU IMU stream — present on M2 Pro/Max, M3, M4 family, absent
+        // on M1 and M2 Air. Gate on the source's own availability so
+        // the toggle hides on hosts that lack the device.
+        if yamete.lidAngleSource.isAvailable {
+            result.append(.init(
+                sourceID: SensorID.lidAngle.rawValue,
+                title: NSLocalizedString("event_lid_angle", comment: "Lid angle events"),
+                icon: "laptopcomputer",
+                help: NSLocalizedString("help_source_lid_angle", comment: "Lid angle source help"),
+                kinds: [.lidOpened, .lidClosed, .lidSlammed]
             ))
         }
         return result

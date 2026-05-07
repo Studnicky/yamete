@@ -488,9 +488,11 @@ public final class Yamete {
                     gyroscopeSource.start(publishingTo: bus)
                 }
             case SensorID.lidAngle.rawValue:
-                // Lid angle is direct-publish, state-machine over hinge angle.
-                // Same SPU-broker hardware-presence gate as gyroscope.
-                if AppleSPUDevice.isHardwarePresent() {
+                // Lid angle is direct-publish over a dedicated HID device
+                // (vendor 0x05AC / product 0x8104 / usagePage 0x0020 /
+                // usage 0x008A) — NOT the SPU IMU stream. The source's
+                // own driver matches that device; gate on its presence.
+                if lidAngleSource.isAvailable {
                     lidAngleSource.start(publishingTo: bus)
                 }
             case SensorID.ambientLight.rawValue:
