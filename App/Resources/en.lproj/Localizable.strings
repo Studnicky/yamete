@@ -363,6 +363,11 @@
 "setting_led_enabled" = "Caps Lock LED";
 "setting_keyboard_leds" = "Keyboard";
 "help_keyboard_leds" = "Flashes the Caps Lock LED and oscillates the keyboard backlight on each reaction. Both restore to their original state after the animation.";
+"setting_keyboard_brightness" = "Keyboard Brightness";
+"help_keyboard_brightness" = "Oscillates the keyboard backlight on each reaction and restores the original level after the animation.";
+"setting_caps_lock_led" = "Caps Lock LED";
+"help_caps_lock_led" = "Flashes the Caps Lock LED on each reaction. Restores to its previous state after the animation.";
+"desc_caps_lock_led" = "Pulses the Caps Lock indicator alongside other reactions. Requires Input Monitoring access.";
 "setting_led_brightness" = "LED Brightness";
 "help_led_brightness" = "Range of pulse brightness scaled by impact intensity. Min for the lightest reactions, Max for the strongest.";
 
@@ -460,6 +465,8 @@
 "legend_flash"  = "Flash";
 "legend_notif"  = "Notif";
 "legend_led"    = "LED";
+"legend_keyboard_brightness" = "KbBright";
+"legend_caps_lock"           = "Caps";
 "legend_haptic" = "Haptic";
 "legend_bright" = "Bright";
 "legend_tint"   = "Tint";

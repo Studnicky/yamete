@@ -428,6 +428,7 @@ public final class Yamete {
                 || settings.flashEnabled
                 || settings.notificationsEnabled
                 || settings.ledEnabled
+                || settings.keyboardBrightnessEnabled
                 || settings.hapticEnabled
                 || settings.displayBrightnessEnabled
                 || settings.displayTintEnabled
@@ -540,6 +541,7 @@ public final class Yamete {
                         _ = self.settings.flashEnabled
                         _ = self.settings.notificationsEnabled
                         _ = self.settings.ledEnabled
+                        _ = self.settings.keyboardBrightnessEnabled
                         _ = self.settings.debugLogging
                         _ = self.settings.enabledSensorIDs
                         _ = self.settings.enabledStimulusSourceIDs
