@@ -57,7 +57,7 @@ public struct AppLog: Sendable {
 /// File-based log store with automatic 24-hour retention.
 ///
 /// Writes to `Application Support/<Product>/logs/yamete-YYYY-MM-DD.log`.
-/// The direct build uses `Yamete Direct/logs`; the App Store build is
+/// The direct build uses `Yamete+/logs`; the App Store build is
 /// sandbox-redirected to its app container and keeps `Yamete/logs`.
 /// On startup and at each day boundary, log files older than 24 hours are deleted.
 ///

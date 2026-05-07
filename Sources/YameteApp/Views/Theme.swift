@@ -113,7 +113,12 @@ enum Theme {
     static let twoColumnMenuWidth: CGFloat = 581
     static let listCornerRadius: CGFloat = 6
     static let buttonCornerRadius: CGFloat = 5
-    static let listBackground = Color.secondary.opacity(0.08)
+    /// Wrapping container background for grouped lists (DeviceToggleList,
+    /// SelectionList, NotificationLocalePicker). `.clear` so list
+    /// elements read as self-contained rows rather than entries in a
+    /// faint-bordered table — the per-row dividers carry the "this is a
+    /// list" affordance on their own.
+    static let listBackground = Color.clear
     static let listDividerInset: CGFloat = 22
 }
 

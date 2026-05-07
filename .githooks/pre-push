@@ -1,9 +1,35 @@
 #!/usr/bin/env bash
 # Repo's checked-in pre-push hook. Activated via `make hooks` (sets
-# core.hooksPath = .githooks). Forwards stdin to the host-app freshness
-# gate. Add additional pre-push checks below as needed.
+# core.hooksPath = .githooks).
+#
+# Two cooperating gates run for every push to release/* or hotfix/*
+# (feature branches skip both):
+#
+#   1. refresh-host-app-snapshots  Wipes the host-app sandbox-mirror
+#      baselines (which accumulate stale references across releases),
+#      runs `make test-host-app` to record fresh ones, and syncs the
+#      mirror back into Tests/__Snapshots__/HostApp/. Refuses the push
+#      if source-tree baselines moved — the developer must commit
+#      them so CI sees the same baselines locally recorded.
+#   2. check-host-app-tests-fresh  Confirms the freshness sentinel
+#      (build/.host-app-test-fresh) was written by a host-app run that
+#      saw every source-set file currently in the working tree.
+#      Belt + braces in case `make test-host-app` was invoked outside
+#      the pre-push flow with a dirty tree.
+#
+# Both scripts read git's pre-push stdin format
+# (<local-ref> <local-sha> <remote-ref> <remote-sha>) and self-skip
+# when the target ref is not release/* or hotfix/*. To run both with
+# the same stdin we tee through a tmp file rather than re-prompt git.
 
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
-exec "$ROOT/scripts/check-host-app-tests-fresh.sh"
+
+# Capture pre-push stdin once, replay it to each gate.
+STDIN_TMP="$(mktemp -t yamete-pre-push-stdin)"
+trap 'rm -f "$STDIN_TMP"' EXIT
+cat > "$STDIN_TMP"
+
+"$ROOT/scripts/refresh-host-app-snapshots.sh" < "$STDIN_TMP"
+"$ROOT/scripts/check-host-app-tests-fresh.sh" < "$STDIN_TMP"

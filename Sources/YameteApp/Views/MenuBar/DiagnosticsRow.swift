@@ -65,10 +65,6 @@ private struct DiagnosticPill: View {
         .padding(.horizontal, 8).padding(.vertical, 4)
         .background(tint.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(tint.opacity(0.30), lineWidth: 0.5)
-        )
         .accessibilityElement(children: .combine)
     }
 

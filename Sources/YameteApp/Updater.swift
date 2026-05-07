@@ -7,7 +7,7 @@ import Observation
 
 #if DIRECT_BUILD
 
-/// Checks GitHub Releases for new versions of Yamete Direct, downloads the
+/// Checks GitHub Releases for new versions of Yamete+, downloads the
 /// DMG, replaces the installed app, and relaunches. Auto-checks on launch
 /// (throttled to once per 4 hours) and exposes manual check/install actions
 /// to the UI.
@@ -34,8 +34,18 @@ public final class Updater {
     private static let repo = "Studnicky/yamete"
     private static let checkInterval: TimeInterval = 4 * 60 * 60
     private static let lastCheckKey = "updaterLastCheckDate"
-    private static let dmgAssetName = "Yamete.Direct.dmg"
-    private static let appName = "Yamete Direct"
+    /// Preferred DMG asset name in the GitHub release. Tried first.
+    private static let dmgAssetName = "Yamete+.dmg"
+    /// Legacy DMG asset name shipped by 2.3.x and earlier. Tried as a
+    /// fallback so a 2.3.x updater that finds neither name still has
+    /// a path forward when the release publishes only the renamed
+    /// asset. The 2.4.0 release publishes both for one cycle.
+    private static let dmgAssetNameLegacy = "Yamete.Direct.dmg"
+    private static let appName = "Yamete+"
+    /// Legacy bundle path. The self-relocation step at startup
+    /// migrates from this path to `/Applications/\(appName).app`
+    /// when the running bundle resolves to the legacy location.
+    private static let legacyAppPath = "/Applications/Yamete Direct.app"
 
     // MARK: - Private state
 
@@ -117,7 +127,8 @@ public final class Updater {
             UserDefaults.standard.set(lastCheckDate, forKey: Self.lastCheckKey)
 
             if Self.isNewer(remote: remote, local: currentVersion),
-               let asset = release.assets.first(where: { $0.name == Self.dmgAssetName }),
+               let asset = release.assets.first(where: { $0.name == Self.dmgAssetName })
+                        ?? release.assets.first(where: { $0.name == Self.dmgAssetNameLegacy }),
                let downloadURL = URL(string: asset.browserDownloadURL) {
                 state = .available(version: remote, downloadURL: downloadURL)
                 Self.log.info("Update available: v\(remote)")

@@ -457,3 +457,8 @@
 
 /* Audio device paired with display footnote */
 "audio_paired_with_display" = "attached to %@";
+
+
+
+/* VoiceOver label for the "+" glyph appended to the app title in Direct builds */
+"build_variant_direct_a11y" = "Plus, the Direct download variant";

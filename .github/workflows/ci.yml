@@ -57,8 +57,8 @@ jobs:
         run: make appstore
       - name: Verify bundle contents
         run: |
-          test -f "dist/Yamete Direct.app/Contents/MacOS/yamete-direct"
-          test -f "dist/Yamete Direct.app/Contents/Info.plist"
+          test -f "dist/Yamete+.app/Contents/MacOS/yamete-plus"
+          test -f "dist/Yamete+.app/Contents/Info.plist"
           test -f "dist/Yamete.app/Contents/MacOS/yamete"
           test -f "dist/Yamete.app/Contents/Info.plist"
           test -d "dist/Yamete.app/Contents/Resources/faces"
