@@ -242,6 +242,20 @@ final class SnapshotUI_Tests: XCTestCase {
         #endif
     }
 
+    /// Skip the cell when running inside the YameteHostTest sandbox
+    /// (HostApp / HostApp_CI variants). Used by snapshot tests whose
+    /// rendered output is sensitive to the runloop state of the
+    /// hosting Yamete.app process — e.g. SwiftUI `.onAppear`
+    /// firing order combined with rotators that advance their state
+    /// over time. The SPM Direct + AppStore lanes cover the same
+    /// view under a deterministic xctest runloop.
+    static func skipIfHostAppLane(reason: String, file: StaticString = #filePath, line: UInt = #line) throws {
+        let variant = Self.snapshotVariant()
+        if variant == "HostApp" || variant == "HostApp_CI" {
+            throw XCTSkip("snapshot skipped on \(variant) lane: \(reason)", file: file, line: line)
+        }
+    }
+
     private func assertImageSnapshot<V: View>(
         of view: V,
         named name: String? = nil,
@@ -296,6 +310,7 @@ final class SnapshotUI_Tests: XCTestCase {
     /// `fusion.isRunning == false` so the capsule is captured.
     func test_cell_headerSection_lightScheme() throws {
         try skipIfNonEnglishLocale()
+        try Self.skipIfHostAppLane(reason: "HeaderSection rotator + onAppear timing produces non-deterministic bitmaps inside the YameteHostTest sandbox; the SPM Direct + AppStore lanes cover this view.")
         try skipIfCIBaselineMissing(
             directory: Self.snapshotDirectory(filePath: #filePath),
             expectedFiles: ["test_cell_headerSection_lightScheme.1.png"]
@@ -314,6 +329,7 @@ final class SnapshotUI_Tests: XCTestCase {
 
     func test_cell_headerSection_darkScheme() throws {
         try skipIfNonEnglishLocale()
+        try Self.skipIfHostAppLane(reason: "HeaderSection rotator + onAppear timing produces non-deterministic bitmaps inside the YameteHostTest sandbox; the SPM Direct + AppStore lanes cover this view.")
         try skipIfCIBaselineMissing(
             directory: Self.snapshotDirectory(filePath: #filePath),
             expectedFiles: ["test_cell_headerSection_darkScheme.1.png"]
