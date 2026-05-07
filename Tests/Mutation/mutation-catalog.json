@@ -931,7 +931,7 @@
     },
     {
       "description": "Updater.currentVersion(bundle:) \u2014 mutate the App-Store-stub fallback literal from \"1.0.0\" to \"0.0.0\"; when Bundle.infoDictionary is nil the helper must return the canonical \"1.0.0\" so the menu-bar footer never displays a degraded version. Multi-line search anchors on the App-Store-branch doc comment to disambiguate from the identical literal in the DIRECT_BUILD branch.",
-      "expectedFailingTest": "UIGatesPhase7B_Tests/testUIGate_updater_currentVersion_fallbackWhenInfoDictionaryNil",
+      "expectedFailingTest": "UIGatesIntegrationTests/testUIGate_updater_currentVersion_fallbackWhenInfoDictionaryNil",
       "expectedFailureSubstring": "[ui-gate=updater-currentVersion-fallback]",
       "id": "ui-updater-currentVersion-fallback",
       "replace": "own `Bundle.main` always supplies a non-nil version, so without\n    /// the seam the `?? \"1.0.0\"` branch would be unreachable.\n    internal static func currentVersion(bundle: Bundle = .main) -> String {\n        bundle.infoDictionary?[\"CFBundleShortVersionString\"] as? String ?? \"0.0.0\"",
