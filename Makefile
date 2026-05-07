@@ -101,7 +101,8 @@ SWIFTFLAGS := -O -module-name YameteApp -target arm64-apple-macosx14.0 -parse-as
 SIGNING_ID ?= -
 
 .PHONY: all build test test-host-app install uninstall clean dmg lint lint-frameworks docs-check verify release notarize \
-        appstore appstore-install appstore-lint mutate mutate-pr perf-baseline perf-baseline-record check-versions hooks
+        appstore appstore-install appstore-lint mutate mutate-pr mutate-catalog-validate mutate-catalog-fix \
+        perf-baseline perf-baseline-record check-versions hooks
 
 all: build
 
@@ -325,7 +326,7 @@ perf-baseline-record:
 # can be wired into release gating without further wrapping. Catalog
 # additions happen in JSON, not here — never commits, never modifies
 # Sources/ permanently.
-mutate:
+mutate: mutate-catalog-validate
 	@scripts/mutation-test.sh
 
 # Phase 2.1 sustainability target. Sliced mutate: filters
@@ -338,8 +339,25 @@ mutate:
 # `make mutate` still runs nightly + on push to master/develop to catch
 # drift the slice can miss (catalog edits on un-touched files, refactors
 # that move a search snippet without renaming targetFile, etc.).
-mutate-pr:
+mutate-pr: mutate-catalog-validate
 	@scripts/mutation-test-slice.sh
+
+# Catalog drift gate. Resolves every entry's `expectedFailingTest`
+# against the live test surface; refuses the run if any entry names a
+# class that no longer exists or a method that lives in a different
+# class. Stale catalog entries silently degrade mutation coverage
+# (an unfindable test "passes" by running zero cells, the runner
+# classifies the mutation as ESCAPED), so this gate runs before every
+# mutate / mutate-pr invocation.
+mutate-catalog-validate:
+	@printf "  catalog   resolve mutation-catalog vs live test surface\n"
+	@python3 scripts/mutation-catalog-resolve.py
+
+# Auto-rewrite catalog entries whose method moved to a new class.
+# Only fixes one-class-only matches; ambiguous and missing entries
+# still need manual resolution. Safe to run repeatedly.
+mutate-catalog-fix:
+	@python3 scripts/mutation-catalog-resolve.py --fix
 
 # ── Verify ────────────────────────────────────────────────────
 verify: build
