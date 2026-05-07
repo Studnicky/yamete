@@ -160,33 +160,49 @@ EOF
   exit 1
 fi
 
-# Step 5 — refuse the push if source-tree baselines moved. The
-# developer must commit them so the next checkout (and CI) compares
-# against the same baselines this run recorded.
-changed_paths=$(git status --porcelain -- "$SOURCE_DIR" | sed '/^$/d')
-if [[ -n "$changed_paths" ]]; then
-  count=$(echo "$changed_paths" | wc -l | tr -d ' ')
-  cat >&2 <<EOF
-✗ refresh-host-app-snapshots: $count host-app snapshot baseline(s)
-   re-recorded during pre-push:
+# Step 5a — restore the stashed bytes for any baseline that already
+# existed before the script ran. SnapshotTesting renders pixels
+# with sub-pixel hinting drift between runs; two consecutive
+# recordings of the same view differ at the byte level even when
+# the verification iteration considers them equal under the
+# `precision: 0.99, perceptualPrecision: 0.98` tolerance. Restoring
+# the stashed (committed) bytes for existing baselines means the
+# script doesn't churn git history with noise, while the precision
+# threshold continues to absorb the drift on every subsequent run.
+shopt -s nullglob
+for stashed in "$STASH_DIR"/*.png; do
+  base=$(basename "$stashed")
+  cp "$stashed" "$SOURCE_DIR/$base"
+done
+shopt -u nullglob
 
-$(echo "$changed_paths" | sed 's/^/   /')
+# Step 5b — refuse the push only when truly NEW baselines landed
+# (untracked files in git). Existing baselines whose bytes drifted
+# under noise were already restored above; only genuine
+# never-before-committed cells need a developer commit.
+new_paths=$(git status --porcelain -- "$SOURCE_DIR" | grep '^?? ' | sed '/^$/d' || true)
+if [[ -n "$new_paths" ]]; then
+  count=$(echo "$new_paths" | wc -l | tr -d ' ')
+  cat >&2 <<EOF
+✗ refresh-host-app-snapshots: $count NEW host-app snapshot baseline(s)
+   recorded during pre-push:
+
+$(echo "$new_paths" | sed 's/^/   /')
 
    Stage and commit these baselines, then re-push:
 
      git add $SOURCE_DIR
-     git commit -m "chore: re-record host-app snapshot baselines"
+     git commit -m "chore: record new host-app snapshot baselines"
      git push
 
-   The mirror seeds fresh from source tree before the test runs,
-   so these recordings are authoritative. Do NOT bypass — without
-   the commit, CI and future developers compare against stale or
-   missing baselines.
+   These cells had no committed baseline before this run. The
+   pre-push hook records authoritative bytes; the developer
+   commits them so CI compares against the same reference.
 EOF
   exit 1
 fi
 
-# Clear the stash trap on the success path so the freshly-recorded
+# Clear the stash trap on the success path so the freshly-restored
 # baselines aren't reverted on normal exit. Stash dir cleanup runs
 # explicitly here.
 trap - EXIT
