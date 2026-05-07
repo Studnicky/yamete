@@ -213,6 +213,17 @@ public final class LidAngleSource: Sendable {
         // precision for hinge sensors.
         let angleDeg = Double(rawAngle) / 100.0
 
+        // Physical sanity gate. A clamshell hinge cannot read negative
+        // degrees, and 180° is well past the mechanical limit on every
+        // shipping MacBook. Anything outside this envelope is decoder
+        // garbage — most likely a different field of the SPU report
+        // bleeding through this offset on a hardware revision the
+        // wire-format assumption (see file header) does not cover.
+        // Field reports of nonstop `.lidSlammed` firing on real
+        // hardware all decoded to angles in [-327°, -200°] at hundreds
+        // of °/s, which is the failure mode this gate intercepts.
+        guard (0...180).contains(angleDeg) else { return }
+
         // Resolve the publish decision under the lock, then perform
         // bus.publish() outside the lock — `bus.publish` is async and
         // we must not hold an unfair lock across an await.
