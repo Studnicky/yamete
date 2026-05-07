@@ -255,7 +255,6 @@
 "help_haptic_intensity" = "Multiplier for the number of haptic pulses per reaction. Higher values produce denser bursts.";
 "help_hp_rise_rate" = "Minimum magnitude increase between motion samples. Sharp head jolts rise fast. Gradual movement rises slowly.";
 "help_hp_spike_threshold" = "Minimum userAcceleration magnitude (g-force) to consider as impact. Normal head movement is below 0.05g.";
-"help_keyboard_leds" = "Flashes the Caps Lock LED and oscillates the keyboard backlight on each reaction. Both restore to their original state after the animation.";
 "help_led_brightness" = "Range of pulse brightness scaled by impact intensity. Min for the lightest reactions, Max for the strongest.";
 "help_mic_rise_rate" = "Minimum amplitude increase between audio buffers. Sharp transients rise fast. Gradual ambient changes rise slowly.";
 "help_mic_spike_threshold" = "Minimum HP-filtered audio amplitude to consider as impact. Higher values require louder desk sounds.";
@@ -304,7 +303,6 @@
 "legend_bright" = "Bright";
 "legend_flash" = "Flash";
 "legend_haptic" = "Haptic";
-"legend_led" = "LED";
 "legend_notif" = "Notif";
 "legend_sound" = "Sound";
 "legend_tint" = "Tint";
@@ -322,9 +320,7 @@
 "setting_display_tint" = "Screen Tint";
 "setting_haptic" = "Haptic Feedback";
 "setting_haptic_intensity" = "Pulse Density";
-"setting_keyboard_leds" = "Keyboard";
 "setting_led_brightness" = "LED Brightness";
-"setting_led_enabled" = "Caps Lock LED";
 "setting_notification_locale" = "Notification Language";
 "setting_notifications" = "Notifications";
 "setting_tint_intensity" = "Tint Depth";
@@ -462,3 +458,12 @@
 
 /* VoiceOver label for the "+" glyph appended to the app title in Direct builds */
 "build_variant_direct_a11y" = "Plus, the Direct download variant";
+
+/* Keyboard / Caps Lock split (untranslated — falls back to English) */
+"setting_keyboard_brightness" = "Keyboard Brightness";
+"help_keyboard_brightness" = "Oscillates the keyboard backlight on each reaction and restores the original level after the animation.";
+"setting_caps_lock_led" = "Caps Lock LED";
+"help_caps_lock_led" = "Flashes the Caps Lock LED on each reaction. Restores to its previous state after the animation.";
+"desc_caps_lock_led" = "Pulses the Caps Lock indicator alongside other reactions. Requires Input Monitoring access.";
+"legend_keyboard_brightness" = "KbBright";
+"legend_caps_lock" = "Caps";

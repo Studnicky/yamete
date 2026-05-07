@@ -360,9 +360,6 @@
 "mic_onboarding_skip" = "Skip";
 
 /* LED / Keyboard section */
-"setting_led_enabled" = "Caps Lock LED";
-"setting_keyboard_leds" = "Keyboard";
-"help_keyboard_leds" = "Flashes the Caps Lock LED and oscillates the keyboard backlight on each reaction. Both restore to their original state after the animation.";
 "setting_keyboard_brightness" = "Keyboard Brightness";
 "help_keyboard_brightness" = "Oscillates the keyboard backlight on each reaction and restores the original level after the animation.";
 "setting_caps_lock_led" = "Caps Lock LED";
@@ -464,7 +461,6 @@
 "legend_sound"  = "Sound";
 "legend_flash"  = "Flash";
 "legend_notif"  = "Notif";
-"legend_led"    = "LED";
 "legend_keyboard_brightness" = "KbBright";
 "legend_caps_lock"           = "Caps";
 "legend_haptic" = "Haptic";
