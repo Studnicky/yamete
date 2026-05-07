@@ -79,7 +79,16 @@ BMI286 angular velocity in deg/s. Same SPU broker, different HID usage (9 vs 3).
 
 ## Detection: lid angle
 
-Hinge angle in degrees via SPU HID usage 8. State-machine driven.
+Hinge angle in degrees via the dedicated lid HID device (Vendor `0x05AC`,
+Product `0x8104`, UsagePage `0x0020`, Usage `0x008A`), Feature Report 1
+polled at 30 Hz. NOT on the SPU IMU stream — that channel carries no
+lid data at any offset. State-machine driven downstream of the decode.
+
+Coverage: M2 Pro/Max, M3 family, and M4 family laptops have the device.
+M1 (any), M2 base MacBook Air, M2 base 13" MacBook Pro, and every
+desktop (Mac mini / Mac Studio / Mac Pro / iMac) do not surface lid
+angle — `isAvailable` returns false on those hosts and the menu toggle
+hides.
 
 | Setting | Default | Range | What it does |
 |---|---|---|---|
@@ -90,7 +99,14 @@ Hinge angle in degrees via SPU HID usage 8. State-machine driven.
 
 ## Detection: ambient light
 
-Lux via SPU HID usage 7. Two-second ring buffer + step detector.
+Lux via SPU HID usage 5. Two-second ring buffer + step detector.
+
+Coverage: every Apple Silicon MacBook except the M1 13" MacBook Pro
+(2020). iMac is inferred to support it via the same channel. Mac mini,
+Mac Studio, and Mac Pro have no built-in display and no internal ALS;
+the menu toggle hides on those hosts. External displays (Studio Display,
+Pro Display XDR) carry their own ALS via `AppleUSBALSService` on
+UsagePage `0x0020` — that path is independent of this source.
 
 | Setting | Default | Range | What it does |
 |---|---|---|---|
@@ -212,7 +228,7 @@ Used by `LEDFlash` (Caps Lock + keyboard backlight).
 | Field | Value | Why |
 |---|---|---|
 | HID usage page | `0xFF00` | Apple-vendor HID page. |
-| HID usage | `3` | Accelerometer device. (Gyro = 9, lid = 8, ALS = 7.) |
+| HID usage | `3` | Accelerometer device. (Gyro = 9, ALS = 5.) Lid angle lives on a separate dedicated HID device — see the lid section above. |
 | Required transport | `"SPU"` | Safety check. only the on-package Sensor Processing Unit qualifies. |
 | Decimation factor | 2 | Hardware reports at 100 Hz; decimate to 50 Hz. |
 | Magnitude min | 0.3 g | Sane lower bound for valid reads. |
