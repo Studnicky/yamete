@@ -18,21 +18,26 @@ private let log = AppLog(category: "LegacyBundleMigration")
 ///
 /// Both steps are idempotent — once the relocation has happened the
 /// legacy path no longer exists and subsequent launches no-op.
+///
+/// Exposed publicly so YameteApp.swift (which compiles into the
+/// `Yamete` target under xcodebuild and imports the YameteApp SPM
+/// library) can reach the migration entry points before
+/// `applicationDidFinishLaunching` runs.
 @MainActor
-internal enum LegacyBundleMigration {
+public enum LegacyBundleMigration {
 
     /// Legacy bundle path the 2.3.x auto-updater installs to.
-    static let legacyAppPath = "/Applications/Yamete Direct.app"
+    public static let legacyAppPath = "/Applications/Yamete Direct.app"
     /// Canonical Yamete+ bundle path.
-    static let canonicalAppPath = "/Applications/Yamete+.app"
+    public static let canonicalAppPath = "/Applications/Yamete+.app"
     /// Pre-2.4.0 bundle identifier that owns the legacy UserDefaults
     /// plist at `~/Library/Preferences/com.studnicky.yamete.direct.plist`.
-    static let legacyBundleIdentifier = "com.studnicky.yamete.direct"
+    public static let legacyBundleIdentifier = "com.studnicky.yamete.direct"
     /// Sentinel key written into the new identifier's defaults after
     /// the prefs migration completes; subsequent launches skip the
     /// re-copy and avoid clobbering live settings with stale legacy
     /// values.
-    static let prefsMigratedKey = "legacyPrefsMigrated_v2.4"
+    public static let prefsMigratedKey = "legacyPrefsMigrated_v2.4"
 
     /// Detect if the running bundle lives at the legacy path. When
     /// true, copy the bundle to the canonical Yamete+ path, remove
@@ -40,7 +45,7 @@ internal enum LegacyBundleMigration {
     /// caller exits the current process. Returns `false` when the
     /// running bundle is already at the canonical path or anywhere
     /// outside `/Applications/` (developer build run from `dist/`).
-    static func relocateIfNeeded() -> Bool {
+    public static func relocateIfNeeded() -> Bool {
         let bundlePath = Bundle.main.bundlePath
         guard bundlePath == legacyAppPath else { return false }
 
@@ -91,7 +96,7 @@ internal enum LegacyBundleMigration {
     /// `com.studnicky.yamete.plus` defaults. Idempotent via
     /// `prefsMigratedKey` sentinel; never overwrites a key that
     /// already exists in the new identifier's defaults.
-    static func migrateUserDefaultsIfNeeded() {
+    public static func migrateUserDefaultsIfNeeded() {
         let defaults = UserDefaults.standard
         guard !defaults.bool(forKey: prefsMigratedKey) else { return }
 
