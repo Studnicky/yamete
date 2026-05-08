@@ -11,6 +11,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-05-07
+
+### Added
+- **Independent Caps Lock LED and Keyboard Brightness toggles.** The
+  Reactions group renders two separate accordion cards instead of one
+  bundled "Keyboard" card, and the per-event matrix in Stimuli has a
+  dedicated column per output (KbBright + Caps). Each output is gated
+  by its own `LEDOutputConfig` flag inside `LEDFlash.action` so a user
+  can enable the keyboard backlight without firing the Caps Lock LED,
+  or vice versa. The Keyboard Brightness card hides on hosts where the
+  backlight isn't available (Mac mini, Mac Pro, etc.).
+- **Per-model coverage tables in every sensor source header.**
+  `LidAngleSource.swift`, `GyroscopeSource.swift`,
+  `AmbientLightSource.swift`, and `HeadphoneMotionAdapter.swift` now
+  document expected reach across M1 → M4 silicon and headphone models.
+  The runtime probe is the source of truth; the tables are the
+  documentation.
+
+### Changed
+- **Lid angle now reads the dedicated Apple lid HID device, not the
+  SPU IMU stream.** Vendor `0x05AC`, Product `0x8104`, UsagePage
+  `0x0020`, Usage `0x008A`, Feature Report 1 polled at 30 Hz,
+  decoded as `UInt16 LE` whole degrees from bytes [1..2]. The previous
+  SPU `usagePage 0xFF00 / usage 8` subscription was decoding
+  uninitialized tail bytes — the IMU report is exhausted by accel/gyro
+  at offsets 6/10/14, with no lid channel anywhere in the buffer. M2
+  Pro/Max, M3 family, and M4 family laptops have the dedicated device;
+  M1 (any), M2 base MBA / 13" MBP, and every desktop have either no
+  device or no IMU silicon at all, and the toggle hides accordingly.
+- **Ambient light corrected from `usage 7` to `usage 5`.** The M4 Max
+  ioreg dump and AsahiLinux's reverse-engineering both confirm ALS
+  rides on `usagePage 0xFF00 / usage 5`. The `7` was a guess that
+  worked only because the SPU broker fans every report regardless of
+  usage tuple — `usage 7` does not exist on the SPU bus.
+- **Gyroscope and ALS gain App Store sandbox parity with the
+  accelerometer.** `isAvailable` now combines device presence with a
+  runtime activity probe via `_last_event_timestamp` on the
+  `dispatchGyro` and `dispatchAls` services respectively. On Direct
+  builds the probe is bypassed (the unsandboxed process can write the
+  activation properties directly); on App Store builds the probe must
+  report fresh-streaming for the toggle to surface. A one-shot
+  `activelyReporting=` log fires at every source start so silent
+  failures are visible in the audit log.
+- **`yamete-sensor-kickstart` now activates gyro and ALS alongside
+  accel.** The helper previously short-circuited the
+  `AppleSPUHIDDriver` iterator on `dispatchAccel`, leaving the gyro
+  and ALS kernel-driver instances silent on App Store builds. The
+  iterator now walks every service flagged with any of
+  `dispatchAccel`, `dispatchGyro`, or `dispatchAls` and writes the
+  activation triplet to each. Existing helper installs need a one-time
+  `sudo ./install.sh` to pick up the change.
+- **`AccelHardware.isSensorActivelyReporting` is now parameterised
+  over `dispatchKey`** so gyro and ALS can mirror the accel probe.
+  The probe also no longer bails on the first stale sibling — it
+  scans the entire `AppleSPUHIDDriver` iterator and returns true if
+  any matching service is fresh.
+
+### Fixed
+- **Lid sensor no longer fires nonstop `LidSlammed` reactions.** Field
+  audit logs from this release showed 3 500+ `lidSlammed` events per
+  hour with physically impossible angles (-322°, -244°, etc.) — the
+  consequence of the offset-18 garbage decode driving the slam-rate
+  state machine into a loop. The dedicated-device rewrite produces
+  real angles in the `[0°, 180°]` range, and a defensive sanity gate
+  rejects anything outside that envelope.
+- **`keyboardBrightnessEnabled` is now wired into pipeline rebuilds.**
+  Previously the impact pipeline's `shouldRun` predicate did not list
+  `keyboardBrightnessEnabled`, so flipping it on alone (with every
+  other output off) would not start sensors. The setting is now
+  observed by `Yamete.startSettingsObservation` and included in
+  `rebuildSensorPipeline.shouldRun`.
+- **40 lprojs synchronised with the new keyboard/Caps Lock string
+  keys.** `setting_led_enabled`, `setting_keyboard_leds`,
+  `help_keyboard_leds`, and `legend_led` are dropped (replaced by
+  `setting_keyboard_brightness`, `setting_caps_lock_led`,
+  `help_keyboard_brightness`, `help_caps_lock_led`,
+  `desc_caps_lock_led`, `legend_keyboard_brightness`,
+  `legend_caps_lock`). Non-en locales receive English copy as a
+  fallback for translator follow-up.
+
 ## [2.4.0] - 2026-05-06
 
 ### Added

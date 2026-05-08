@@ -4,12 +4,13 @@ import XCTest
 @testable import YameteApp
 
 /// `outputButtonSpecs` builds the per-kind row of output toggles in the
-/// menu bar. Always-on outputs (sound, flash, notification, LED) are
-/// followed by hardware-gated outputs (haptic, brightness, tint) only when
-/// available. A regression once rendered ALL buttons regardless of the
-/// availability flags — users on Macs without Force Touch trackpads saw a
-/// haptic button that did nothing. These assertions pin returned-count to
-/// the input matrix across every combination.
+/// menu bar. Always-on outputs (sound, flash, notification, keyboard
+/// brightness, caps lock LED) are followed by hardware-gated outputs
+/// (haptic, brightness, tint) only when available. A regression once
+/// rendered ALL buttons regardless of the availability flags — users on
+/// Macs without Force Touch trackpads saw a haptic button that did
+/// nothing. These assertions pin returned-count to the input matrix
+/// across every combination.
 @MainActor
 final class OutputButtonAvailabilityTests: XCTestCase {
 
@@ -20,7 +21,7 @@ final class OutputButtonAvailabilityTests: XCTestCase {
             let brightness: Bool
             let tint: Bool
             var expected: Int {
-                4 + (haptic ? 1 : 0) + (brightness ? 1 : 0) + (tint ? 1 : 0)
+                5 + (haptic ? 1 : 0) + (brightness ? 1 : 0) + (tint ? 1 : 0)
             }
         }
         var cells: [Cell] = []
@@ -43,27 +44,27 @@ final class OutputButtonAvailabilityTests: XCTestCase {
         }
     }
 
-    /// All-flags-off is the floor: exactly 4 always-on outputs (sound, flash,
-    /// notification, LED). If anyone changes the always-on set, this is the
-    /// canary that catches it.
-    func testFloorIsFourAlwaysOnButtons() {
+    /// All-flags-off is the floor: exactly 5 always-on outputs (sound, flash,
+    /// notification, keyboard brightness, caps lock LED). If anyone changes
+    /// the always-on set, this is the canary that catches it.
+    func testFloorIsFiveAlwaysOnButtons() {
         let count = StimuliSection.outputButtonCount(
             hapticAvailable: false,
             displayBrightnessAvailable: false,
             displayTintAvailable: false
         )
-        XCTAssertEqual(count, 4)
+        XCTAssertEqual(count, 5)
     }
 
-    /// All-flags-on is the ceiling: 4 + 3 = 7 outputs. Catches a regression
+    /// All-flags-on is the ceiling: 5 + 3 = 8 outputs. Catches a regression
     /// where one of the optional appends was deleted.
-    func testCeilingIsSevenButtonsWhenAllAvailable() {
+    func testCeilingIsEightButtonsWhenAllAvailable() {
         let count = StimuliSection.outputButtonCount(
             hapticAvailable: true,
             displayBrightnessAvailable: true,
             displayTintAvailable: true
         )
-        XCTAssertEqual(count, 7)
+        XCTAssertEqual(count, 8)
     }
 
     /// Each flag adds exactly one button — flipping flags individually must

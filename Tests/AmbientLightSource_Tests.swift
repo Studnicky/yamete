@@ -247,9 +247,21 @@ final class AmbientLightSource_Tests: XCTestCase {
     // MARK: - Hardware presence parity
 
     func test_isAvailable_followsHardwarePresence() {
+        // The source's isAvailable now combines two signals:
+        //   • Direct build: device presence only.
+        //   • App Store build: device presence + activity probe via
+        //     `_last_event_timestamp` on the `dispatchAls` service.
         let mock = MockSPUKernelDriver()
         let source = AmbientLightSource(detectorConfig: Self.defaultConfig(), kernelDriver: mock)
-        XCTAssertEqual(source.isAvailable, AppleSPUDevice.isHardwarePresent(),
-            "[als=isAvailable-parity] source.isAvailable must mirror AppleSPUDevice.isHardwarePresent")
+
+        let devicePresent = AppleSPUDevice.isHardwarePresent()
+        #if DIRECT_BUILD
+        let expected = devicePresent
+        #else
+        let expected = devicePresent
+            && AccelHardware.isSensorActivelyReporting(dispatchKey: "dispatchAls")
+        #endif
+        XCTAssertEqual(source.isAvailable, expected,
+            "[als=isAvailable-parity] source.isAvailable must match the DIRECT/AppStore contract")
     }
 }

@@ -40,12 +40,12 @@ description: Every Swift file in the project, one line each. The cheat sheet.
 | MenuBarFace.swift | YameteApp | Bus subscriber: impact-only face swap in NSStatusItem, daily impact counter |
 | StatusBarController.swift | YameteApp | NSStatusItem ownership, menu bar icon and popover management |
 | EventSettings.swift | YameteApp | EventSourceDefaults, ReactionToggleMatrix for per-output per-reaction toggle persistence |
-| AppleSPUDevice.swift | SensorKit | Ref-counted broker for the Apple Silicon SPU HID handle: accel, gyro, lid, ALS share one open device, decode their own bytes from the same input report, three-phase teardown when the last subscriber releases |
-| GyroscopeSource.swift | SensorKit | SPU HID usage 9 subscriber, GyroDetector pipeline, deg/s magnitude |
+| AppleSPUDevice.swift | SensorKit | Ref-counted broker for the Apple Silicon SPU HID handle: accel, gyro, ALS share one open device, decode their own bytes from the same input report, three-phase teardown when the last subscriber releases |
+| GyroscopeSource.swift | SensorKit | SPU HID usage 9 subscriber, GyroDetector pipeline, deg/s magnitude. App Store builds gate availability on `_last_event_timestamp` activity probe via `dispatchGyro`. |
 | GyroDetector.swift | SensorKit | Six-gate consensus pipeline tuned for gyroscope rotational spikes |
-| LidAngleSource.swift | SensorKit | SPU HID usage 8 subscriber, hinge angle stream → state machine |
+| LidAngleSource.swift | SensorKit | Owns its own IOHIDManager matching the dedicated lid HID device (Vendor 0x05AC / Product 0x8104 / UsagePage 0x0020 / Usage 0x008A). Polls Feature Report 1 at 30 Hz, decodes UInt16 LE bytes [1..2] as whole degrees, feeds the state machine. NOT on the SPU broker. |
 | LidAngleStateMachine.swift | SensorKit | closed/opening/open/closing transitions, slam-rate gate, EMA-smoothed Δangle/Δt |
-| AmbientLightSource.swift | SensorKit | SPU HID usage 7 subscriber, two-second ring buffer + step detector |
+| AmbientLightSource.swift | SensorKit | SPU HID usage 5 subscriber, two-second ring buffer + step detector. App Store builds gate availability on `_last_event_timestamp` activity probe via `dispatchAls`. |
 | AmbientLightDetector.swift | SensorKit | Step gates (lights flipped, sensor covered) with separate percent + floor/ceiling thresholds |
 | ThermalSource.swift | SensorKit | NSProcessInfo.thermalStateDidChangeNotification observer, cold-start suppressed, per-state dedup |
 | KeyboardActivitySource.swift | SensorKit | CGEvent tap (key-press rate threshold), MockEventMonitor in tests |

@@ -107,6 +107,7 @@ public final class LEDFlash: ReactiveOutput {
         guard envelope.total >= ReactionsConfig.ledMinPulseDuration else { return }
         let total = min(envelope.total, ReactionsConfig.ledMaxPulseDuration)
         let kbEnabled = config.keyboardBrightnessEnabled
+        let capsLockEnabled = config.enabled
 
         let base = Double(kbSnapshotLevel)
         let effectiveIntensity = min(1.0, fired.intensity * multiplier)
@@ -133,14 +134,16 @@ public final class LEDFlash: ReactiveOutput {
                 }
                 driver.setLevel(kbLevel)
             }
-            let dutyCyclePct = Int(level * 100)
-            let shouldBeOn = (pwmCounter % 100) < dutyCyclePct
-            driver.capsLockSet(shouldBeOn)
+            if capsLockEnabled {
+                let dutyCyclePct = Int(level * 100)
+                let shouldBeOn = (pwmCounter % 100) < dutyCyclePct
+                driver.capsLockSet(shouldBeOn)
+            }
             pwmCounter += 1
             try? await Task.sleep(nanoseconds: tickNs)
         }
 
-        driver.capsLockSet(false)
+        if capsLockEnabled { driver.capsLockSet(false) }
         log.debug("activity:LEDFlash wasStartedBy entity:LEDFlash duration=\(String(format: "%.2f", total))s")
     }
 

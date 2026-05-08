@@ -428,6 +428,7 @@ public final class Yamete {
                 || settings.flashEnabled
                 || settings.notificationsEnabled
                 || settings.ledEnabled
+                || settings.keyboardBrightnessEnabled
                 || settings.hapticEnabled
                 || settings.displayBrightnessEnabled
                 || settings.displayTintEnabled
@@ -487,9 +488,11 @@ public final class Yamete {
                     gyroscopeSource.start(publishingTo: bus)
                 }
             case SensorID.lidAngle.rawValue:
-                // Lid angle is direct-publish, state-machine over hinge angle.
-                // Same SPU-broker hardware-presence gate as gyroscope.
-                if AppleSPUDevice.isHardwarePresent() {
+                // Lid angle is direct-publish over a dedicated HID device
+                // (vendor 0x05AC / product 0x8104 / usagePage 0x0020 /
+                // usage 0x008A) — NOT the SPU IMU stream. The source's
+                // own driver matches that device; gate on its presence.
+                if lidAngleSource.isAvailable {
                     lidAngleSource.start(publishingTo: bus)
                 }
             case SensorID.ambientLight.rawValue:
@@ -540,6 +543,7 @@ public final class Yamete {
                         _ = self.settings.flashEnabled
                         _ = self.settings.notificationsEnabled
                         _ = self.settings.ledEnabled
+                        _ = self.settings.keyboardBrightnessEnabled
                         _ = self.settings.debugLogging
                         _ = self.settings.enabledSensorIDs
                         _ = self.settings.enabledStimulusSourceIDs
