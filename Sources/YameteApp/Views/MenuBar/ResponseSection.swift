@@ -12,18 +12,19 @@ internal struct ResponseSection: View {
     @Environment(SettingsStore.self) var settings
     @Environment(Yamete.self) var yamete
 
-    @State private var audioExpanded  = false
-    @State private var flashExpanded  = false
-    @State private var notifsExpanded = false
-    @State private var ledExpanded    = false
-    @State private var hapticExpanded = false
-    @State private var brightExpanded = false
-    @State private var tintExpanded   = false
+    @State private var audioExpanded     = false
+    @State private var flashExpanded     = false
+    @State private var notifsExpanded    = false
+    @State private var kbBrightExpanded  = false
+    @State private var capsLockExpanded  = false
+    @State private var hapticExpanded    = false
+    @State private var brightExpanded    = false
+    @State private var tintExpanded      = false
 
     /// Identifier for each output card rendered by this section. Used by tests
     /// to enumerate the per-output parameter keyPaths and assert independence.
     internal enum OutputID: String, CaseIterable, Sendable {
-        case audio, flash, notification, keyboardLED, haptic, displayBrightness, displayTint
+        case audio, flash, notification, keyboardBrightness, capsLock, haptic, displayBrightness, displayTint
     }
 
     /// Pure helper exposed for tests. For an output card, returns every
@@ -40,9 +41,11 @@ internal struct ResponseSection: View {
             return [\SettingsStore.flashOpacityMin, \SettingsStore.flashOpacityMax]
         case .notification:
             return [\SettingsStore.notificationLocale]
-        case .keyboardLED:
+        case .keyboardBrightness:
             return [\SettingsStore.ledBrightnessMin, \SettingsStore.ledBrightnessMax,
-                    \SettingsStore.ledEnabled]
+                    \SettingsStore.keyboardBrightnessEnabled]
+        case .capsLock:
+            return [\SettingsStore.ledEnabled]
         case .haptic:
             return [\SettingsStore.hapticIntensity]
         case .displayBrightness:
@@ -130,28 +133,40 @@ internal struct ResponseSection: View {
                 }.padding(Theme.accordionInner)
             }
 
-            // Keyboard (brightness + Caps Lock LED)
-            SensorAccordionCard(
-                title: NSLocalizedString("setting_keyboard_leds", comment: "Keyboard LED flash output title"),
-                icon: "keyboard.badge.eye",
-                isEnabled: $s.keyboardBrightnessEnabled,
-                isExpanded: $ledExpanded,
-                help: NSLocalizedString("help_keyboard_leds", comment: "Keyboard LED flash output help text")
-            ) {
-                VStack(spacing: 10) {
-                    if yamete.keyboardBacklightAvailable {
+            // Keyboard Brightness — independent of Caps Lock LED.
+            if yamete.keyboardBacklightAvailable {
+                SensorAccordionCard(
+                    title: NSLocalizedString("setting_keyboard_brightness", comment: "Keyboard brightness output title"),
+                    icon: "keyboard.badge.eye",
+                    isEnabled: $s.keyboardBrightnessEnabled,
+                    isExpanded: $kbBrightExpanded,
+                    help: NSLocalizedString("help_keyboard_brightness", comment: "Keyboard brightness output help text")
+                ) {
+                    VStack(spacing: 10) {
                         SettingRow(icon: "slider.horizontal.3",
                                    title: NSLocalizedString("setting_led_brightness", comment: "LED brightness slider label"),
                                    help: NSLocalizedString("help_led_brightness", comment: "LED brightness slider help")) {
                             RangeSlider(low: $s.ledBrightnessMin, high: $s.ledBrightnessMax,
                                         bounds: Detection.unitRange, labelWidth: lw, format: Fmt.percent)
                         }
-                        Divider()
-                    }
-                    EnableToggleRow(icon: "lightbulb.led",
-                                    title: NSLocalizedString("setting_led_enabled", comment: "LED flash output title"),
-                                    isOn: $s.ledEnabled,
-                                    dimmed: true)
+                    }.padding(Theme.accordionInner)
+                }
+            }
+
+            // Caps Lock LED — independent toggle, no inner sliders.
+            SensorAccordionCard(
+                title: NSLocalizedString("setting_caps_lock_led", comment: "Caps Lock LED output title"),
+                icon: "lightbulb.led",
+                isEnabled: $s.ledEnabled,
+                isExpanded: $capsLockExpanded,
+                help: NSLocalizedString("help_caps_lock_led", comment: "Caps Lock LED output help text")
+            ) {
+                VStack(spacing: 6) {
+                    Text(NSLocalizedString("desc_caps_lock_led",
+                                           comment: "Caps Lock LED output description"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }.padding(Theme.accordionInner)
             }
 

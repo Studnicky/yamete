@@ -7,10 +7,51 @@ import os
 // MARK: - AmbientLightSource — direct-publish reaction source for ALS lux
 //
 // Subscribes to the SPU HID broker (`AppleSPUDevice.shared`) for
-// usagePage 0xFF00 / usage 7 (Apple's ambient-light channel). The
-// broker fans every report out to every active subscriber irrespective
-// of usage tuple — see the broker file header for the rationale.
-// Subscribers decode their own bytes from their own offsets.
+// usagePage 0xFF00 / usage 5 (Apple's ambient-light channel — confirmed
+// via M4 Max ioreg dump and AsahiLinux / olvvier reverse-engineering).
+// The broker fans every report out to every active subscriber
+// irrespective of usage tuple — see the broker file header for the
+// rationale. Subscribers decode their own bytes from their own offsets.
+//
+// Per-model coverage table. Built-in display ALS rides the SPU HID
+// channel; external display ALS (Studio Display, Pro Display XDR) is a
+// separate `AppleUSBALSService` on UsagePage 0x0020 — that path is NOT
+// handled by this source. The runtime probe (`isAvailable`) is the
+// source of truth; this table is documentation of expected coverage.
+//
+//   ╭──────────────────────────────────────────╥─────────────────────╮
+//   │  Hardware                                ║  ALS available      │
+//   ╞══════════════════════════════════════════╬═════════════════════╡
+//   │  M1 MacBook Air                          ║  yes (INFERRED)     │
+//   │  M1 13" MacBook Pro (2020)               ║  no — confirmed     │
+//   │                                          ║  by olvvier         │
+//   │  M1 Pro/Max 14"/16" MacBook Pro          ║  yes (INFERRED)     │
+//   │  M2 base MacBook Air / 13" MBP           ║  yes                │
+//   │  M2 Pro/Max 14"/16" MBP                  ║  yes (INFERRED)     │
+//   │  M3 / M3 Pro / M3 Max — Air & Pro        ║  yes                │
+//   │  M4 / M4 Pro / M4 Max — Air & Pro        ║  yes                │
+//   │  iMac (any Apple Silicon)                ║  yes (INFERRED) —   │
+//   │                                          ║  on-display ALS for │
+//   │                                          ║  True Tone           │
+//   │  Mac mini / Mac Studio / Mac Pro         ║  no — no built-in   │
+//   │                                          ║  display, no ALS    │
+//   │  Studio Display / Pro Display XDR        ║  separate path —    │
+//   │                                          ║  AppleUSBALSService │
+//   │                                          ║  on UsagePage 0x20  │
+//   │                                          ║  (not handled here) │
+//   ╰──────────────────────────────────────────╨─────────────────────╯
+//
+// The runtime probe handles every row above:
+//   • Direct build: device-presence check via `AppleSPUDevice.isHardwarePresent()`.
+//     Direct can write IORegistry properties, so subscribing activates
+//     the ALS service.
+//   • App Store build: device presence + activity probe via
+//     `AccelHardware.isSensorActivelyReporting(dispatchKey:"dispatchAls")`.
+//     Reads `DebugState._last_event_timestamp` on the `dispatchAls = Yes`
+//     service. The kickstart helper must walk the full
+//     `AppleSPUHIDDriver` iterator (not filter on `dispatchAccel`) to
+//     activate ALS alongside accel/gyro; without that, the probe reads
+//     silent and the source reports unavailable.
 //
 // Wire-format assumption (UNVERIFIED — see verification note below):
 //   The internal SPU report buffer is 22 bytes. Accel/gyro use offsets
@@ -117,9 +158,17 @@ public final class AmbientLightSource: Sendable {
         self.state = OSAllocatedUnfairLock(initialState: State())
     }
 
-    /// True when SPU HID hardware is present in the IORegistry.
+    /// True when SPU HID hardware is present in the IORegistry AND, on
+    /// App Store builds, the ALS driver is actively streaming. Same
+    /// Direct/AppStore split as `AccelerometerSource.isAvailable` and
+    /// `GyroscopeSource.isAvailable`.
     public var isAvailable: Bool {
-        AppleSPUDevice.isHardwarePresent()
+        #if DIRECT_BUILD
+        return AppleSPUDevice.isHardwarePresent()
+        #else
+        return AppleSPUDevice.isHardwarePresent()
+            && AccelHardware.isSensorActivelyReporting(dispatchKey: "dispatchAls")
+        #endif
     }
 
     // MARK: - Lifecycle
@@ -142,7 +191,7 @@ public final class AmbientLightSource: Sendable {
 
         let token = broker.subscribe(
             usagePage: 0xFF00,
-            usage: 7,
+            usage: 5,
             dispatch: .als,
             reportIntervalUS: reportIntervalUS
         ) { [weak self] report in
@@ -156,7 +205,9 @@ public final class AmbientLightSource: Sendable {
         if token == nil {
             log.warning("entity:AmbientLightSource wasInvalidatedBy activity:Subscribe — broker refused open")
         } else {
-            log.info("entity:AmbientLightSource wasGeneratedBy activity:Start")
+            // One-shot activity probe — same role as the gyro probe.
+            let active = AccelHardware.isSensorActivelyReporting(dispatchKey: "dispatchAls")
+            log.info("entity:AmbientLightSource wasGeneratedBy activity:Start activelyReporting=\(active)")
         }
     }
 

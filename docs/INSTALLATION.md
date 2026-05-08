@@ -8,17 +8,24 @@ title: Installation
 
 - macOS 14.0+ (Sonoma)
 - Built with Swift 6 (complete strict concurrency)
-- Latest release: 2.4.0
+- Latest release: 2.5.0
 
 ### Sensor compatibility by Mac model
 
 | Sensor | MacBook Air/Pro (Apple Silicon) | iMac, Mac Mini, Studio, Pro | Intel Macs |
 |--------|------|------|------|
-| Accelerometer (BMI286) | Yes | No | No |
+| Accelerometer (BMI286) | Yes (M2 Air confirmed; M1 13" MBP absent) | No | No |
+| Gyroscope (BMI286) | Yes — same silicon as accel; binary-coupled | No | No |
+| Lid hinge angle (dedicated HID device) | M2 Pro/Max, M3 family, M4 family only — M1 (any) and M2 base laptops do not have the device | No | No |
+| Ambient light (built-in display) | Yes (except M1 13" MBP) | iMac yes; mini/Studio/Pro no | No |
 | Microphone | Yes | Yes | Yes |
 | Headphone Motion | Yes (with compatible headphones) | Yes (with compatible headphones) | Yes (with compatible headphones) |
 
-Compatible headphones for motion detection: AirPods Pro, AirPods Max, AirPods (3rd gen+), Beats Fit Pro.
+Compatible headphones for motion detection: AirPods 3rd/4th gen, AirPods Pro 1/2, AirPods Max, Beats Solo 4, Beats Studio Pro, Beats Studio Buds+, Beats Fit Pro, Powerbeats Pro 2. Not supported: AirPods 1st/2nd gen, EarPods, Beats W1-era headphones, third-party (Sony, Bose, etc.).
+
+The Stimuli toggles in the menu hide automatically when the host lacks
+the underlying hardware — the runtime probe is the source of truth, so
+no model configuration is needed.
 
 ## Install from DMG
 

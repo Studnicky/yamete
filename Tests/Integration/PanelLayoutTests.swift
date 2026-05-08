@@ -32,7 +32,7 @@ final class PanelLayoutTests: IntegrationTestCase {
     // MARK: - Output button count under presence matrix
 
     /// For every combination of (haptic × brightness × tint) presence,
-    /// `outputButtonCount` returns 4 + the number of hardware-gated outputs
+    /// `outputButtonCount` returns 5 + the number of hardware-gated outputs
     /// available. Drives the FlowLayout grid split inside StimuliSection.
     func testOutputButtonCount_allHardwarePresenceCombos() {
         for haptic in [false, true] {
@@ -43,27 +43,28 @@ final class PanelLayoutTests: IntegrationTestCase {
                         displayBrightnessAvailable: bright,
                         displayTintAvailable: tint
                     )
-                    let expected = 4 + (haptic ? 1 : 0) + (bright ? 1 : 0) + (tint ? 1 : 0)
+                    let expected = 5 + (haptic ? 1 : 0) + (bright ? 1 : 0) + (tint ? 1 : 0)
                     XCTAssertEqual(n, expected,
                                    "[haptic=\(haptic) bright=\(bright) tint=\(tint)] count drifted")
-                    XCTAssertGreaterThanOrEqual(n, 4,
+                    XCTAssertGreaterThanOrEqual(n, 5,
                                                 "[haptic=\(haptic) bright=\(bright) tint=\(tint)] always-on outputs missing")
-                    XCTAssertLessThanOrEqual(n, 7,
+                    XCTAssertLessThanOrEqual(n, 8,
                                              "[haptic=\(haptic) bright=\(bright) tint=\(tint)] count exceeds known max")
                 }
             }
         }
     }
 
-    /// The 4 always-on outputs (sound, flash, notif, LED) must remain
-    /// regardless of hardware presence. Catches "regression hides a baseline output".
-    func testOutputButtonCount_alwaysIncludesFourBaseOutputs() {
+    /// The 5 always-on outputs (sound, flash, notif, keyboard brightness,
+    /// caps lock LED) must remain regardless of hardware presence. Catches
+    /// "regression hides a baseline output".
+    func testOutputButtonCount_alwaysIncludesFiveBaseOutputs() {
         let n = StimuliSection.outputButtonCount(
             hapticAvailable: false,
             displayBrightnessAvailable: false,
             displayTintAvailable: false
         )
-        XCTAssertEqual(n, 4, "no hardware → exactly 4 always-on outputs")
+        XCTAssertEqual(n, 5, "no hardware → exactly 5 always-on outputs")
     }
 
     // MARK: - Yamete hardware-presence test seam

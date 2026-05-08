@@ -448,8 +448,8 @@
       "expectedFailingTest": "MatrixAccelerometerKernelDriver_Tests/testIsSensorActivelyReporting_iteratorYieldsOneService_loopBodyProbesTwoProperties",
       "expectedFailureSubstring": "[accel-kernel-gate=isSensorActivelyReporting-iterator-sentinel]",
       "id": "accel-kernel-isSensorActivelyReporting-iterator-sentinel-gate",
-      "replace": "guard service == 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            // The SPU bus also hosts gyro, temperature, and hinge-angle\n            // services. Only the one carrying `dispatchAccel = Yes` is\n            // ours.\n            let dispatchAccel = driver.registryCreateCFProperty(",
-      "search": "guard service != 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            // The SPU bus also hosts gyro, temperature, and hinge-angle\n            // services. Only the one carrying `dispatchAccel = Yes` is\n            // ours.\n            let dispatchAccel = driver.registryCreateCFProperty(",
+      "replace": "guard service == 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            // The SPU bus hosts a service per sensor (accel, gyro, ALS,\n            // hinge angle). Only the one carrying the requested dispatch\n            // flag is ours.\n            let dispatched = driver.registryCreateCFProperty(",
+      "search": "guard service != 0 else { break }\n            defer { driver.objectRelease(service) }\n\n            // The SPU bus hosts a service per sensor (accel, gyro, ALS,\n            // hinge angle). Only the one carrying the requested dispatch\n            // flag is ours.\n            let dispatched = driver.registryCreateCFProperty(",
       "targetFile": "Sources/SensorKit/AccelerometerReader.swift"
     },
     {

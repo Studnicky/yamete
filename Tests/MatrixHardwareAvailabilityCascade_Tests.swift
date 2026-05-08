@@ -53,8 +53,10 @@ final class MatrixHardwareAvailabilityCascade_Tests: XCTestCase {
                 keyboard: keyboard
             )
 
-            // Output button count formula from EventsSection.outputButtonCount
-            let expected = 4
+            // Output button count formula from EventsSection.outputButtonCount.
+            // Always-on floor is 5: sound, flash, notification, keyboard
+            // brightness, caps lock LED.
+            let expected = 5
                 + (haptic ? 1 : 0)
                 + (brightness ? 1 : 0)
                 + (tint ? 1 : 0)
@@ -67,7 +69,7 @@ final class MatrixHardwareAvailabilityCascade_Tests: XCTestCase {
                 displayBrightnessAvailable: yamete.displayBrightnessAvailable,
                 displayTintAvailable: runtimeTint
             )
-            let runtimeExpected = 4
+            let runtimeExpected = 5
                 + (haptic ? 1 : 0)
                 + (brightness ? 1 : 0)
                 + (runtimeTint ? 1 : 0)
@@ -172,14 +174,14 @@ final class MatrixHardwareAvailabilityCascade_Tests: XCTestCase {
     /// drift in the formula vs. the spec stored elsewhere.
     func testFormulaIncrement_perFlagFlip() {
         let cases: [(haptic: Bool, bright: Bool, tint: Bool, expected: Int)] = [
-            (false, false, false, 4),
-            (true,  false, false, 5),
-            (false, true,  false, 5),
-            (false, false, true,  5),
-            (true,  true,  false, 6),
-            (true,  false, true,  6),
-            (false, true,  true,  6),
-            (true,  true,  true,  7),
+            (false, false, false, 5),
+            (true,  false, false, 6),
+            (false, true,  false, 6),
+            (false, false, true,  6),
+            (true,  true,  false, 7),
+            (true,  false, true,  7),
+            (false, true,  true,  7),
+            (true,  true,  true,  8),
         ]
         for c in cases {
             let count = StimuliSection.outputButtonCount(

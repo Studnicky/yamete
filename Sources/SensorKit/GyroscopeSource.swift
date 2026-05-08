@@ -12,6 +12,42 @@ import os
 // the rationale. Subscribers decode their own bytes from their own
 // offsets.
 //
+// Per-model coverage table. Apple Silicon ships a single Bosch BMI286
+// 6-axis IMU (accel + gyro on the same silicon); per olvvier and
+// taigrr's reverse-engineering, gyro presence is binary-coupled to
+// accel presence. The runtime probe (`isAvailable`) is the source of
+// truth — this table is documentation of expected coverage.
+//
+//   ╭──────────────────────────────────────────╥─────────────────────╮
+//   │  Hardware                                ║  Gyro available     │
+//   ╞══════════════════════════════════════════╬═════════════════════╡
+//   │  M1 MacBook Air                          ║  INFERRED no        │
+//   │  M1 13" MacBook Pro (2020)               ║  no — confirmed     │
+//   │                                          ║  by olvvier         │
+//   │  M1 Pro/Max 14"/16" MacBook Pro          ║  yes (INFERRED)     │
+//   │  M2 base MacBook Air / 13" MBP           ║  yes (M2 Air        │
+//   │                                          ║  confirmed teardown)│
+//   │  M2 Pro/Max 14"/16" MBP                  ║  yes (INFERRED)     │
+//   │  M3 / M3 Pro / M3 Max — Air & Pro        ║  yes                │
+//   │  M4 / M4 Pro / M4 Max — Air & Pro        ║  yes                │
+//   │  Mac mini / iMac / Mac Studio / Mac Pro  ║  no — desktops      │
+//   │                                          ║  carry the SPU node │
+//   │                                          ║  but no IMU silicon │
+//   ╰──────────────────────────────────────────╨─────────────────────╯
+//
+// The runtime probe handles every row above:
+//   • Direct build: device-presence check via `AppleSPUDevice.isHardwarePresent()`.
+//     Direct can write IORegistry properties directly, so subscribing
+//     activates the gyro service.
+//   • App Store build: device presence + activity probe via
+//     `AccelHardware.isSensorActivelyReporting(dispatchKey:"dispatchGyro")`.
+//     Reads `DebugState._last_event_timestamp` on the `dispatchGyro = Yes`
+//     service. The kickstart helper (docs/sensor-kickstart) is responsible
+//     for activating the gyro driver alongside accel; without an
+//     unfiltered iterator the gyro will read as silent and the source
+//     will report unavailable, which is the correct fallback for an
+//     un-kickstarted host.
+//
 // Wire-format assumption (DOCUMENTED):
 //   The BMI286 SPU HID device emits one report layout for the accelerometer
 //   subscriber-channel and may emit a parallel layout for the gyro
@@ -113,13 +149,25 @@ public final class GyroscopeSource: Sendable {
         self.state = OSAllocatedUnfairLock(initialState: State())
     }
 
-    /// True when SPU HID hardware is present in the IORegistry. Mirrors
-    /// `AccelerometerSource.isAvailable` for the Direct build path: hardware
-    /// presence alone is sufficient because the broker handles activation
-    /// transparently. Tests can assert this property mirrors the broker's
-    /// `isHardwarePresent` static.
+    /// True when SPU HID hardware is present in the IORegistry AND, on
+    /// App Store builds, the gyro driver is actively streaming. Mirrors
+    /// `AccelerometerSource.isAvailable` exactly:
+    ///   • Direct build: device-presence check is sufficient — the
+    ///     unsandboxed process can activate the gyro service via
+    ///     IORegistry property writes.
+    ///   • App Store build: device presence + `_last_event_timestamp`
+    ///     freshness probe on the `dispatchGyro = Yes` service. If the
+    ///     sensor-kickstart helper has not activated the gyro driver,
+    ///     the timestamp reads as zero and this returns false — the
+    ///     toggle hides and the Stimuli pipeline does not start the
+    ///     source.
     public var isAvailable: Bool {
-        AppleSPUDevice.isHardwarePresent()
+        #if DIRECT_BUILD
+        return AppleSPUDevice.isHardwarePresent()
+        #else
+        return AppleSPUDevice.isHardwarePresent()
+            && AccelHardware.isSensorActivelyReporting(dispatchKey: "dispatchGyro")
+        #endif
     }
 
     // MARK: - Lifecycle
@@ -160,7 +208,13 @@ public final class GyroscopeSource: Sendable {
         if token == nil {
             log.warning("entity:GyroscopeSource wasInvalidatedBy activity:Subscribe — broker refused open")
         } else {
-            log.info("entity:GyroscopeSource wasGeneratedBy activity:Start")
+            // One-shot activity probe: log whether the gyro driver is
+            // actively streaming. On Direct builds this is informational;
+            // on App Store builds a "stale" reading here means the
+            // kickstart helper did not activate the gyro service and the
+            // source will read silence until the helper is reinstalled.
+            let active = AccelHardware.isSensorActivelyReporting(dispatchKey: "dispatchGyro")
+            log.info("entity:GyroscopeSource wasGeneratedBy activity:Start activelyReporting=\(active)")
         }
     }
 

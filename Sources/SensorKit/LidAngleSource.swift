@@ -2,90 +2,241 @@
 import YameteCore
 #endif
 @preconcurrency import Foundation
+@preconcurrency import IOKit
+@preconcurrency import IOKit.hid
 import os
 
 // MARK: - LidAngleSource — direct-publish reaction source for lid hinge angle
 //
-// Subscribes to the SPU HID broker (`AppleSPUDevice.shared`) for
-// usagePage 0xFF00 / usage 8 (Apple's lid-angle channel). The broker
-// fans every report out to every active subscriber irrespective of
-// usage tuple — see the broker file header for the rationale.
-// Subscribers decode their own bytes from their own offsets.
+// Apple ships hinge angle on a dedicated HID device, NOT on the SPU
+// IMU stream. There is exactly ONE source on Apple Silicon — no SMC
+// fallback (the SMC plane was retired with the M-series transition,
+// `LIDA`/`MSLD` keys do not exist), no public `CMHinge` CoreMotion
+// type, no IOPlatform property. Three independent open-source
+// decoders agree byte-for-byte (samhenrigold/LidAngleSensor,
+// deepakness/LidAngle, wangfu91/lid-angle-rs):
 //
-// Wire-format assumption (UNVERIFIED — see verification note below):
-//   The internal SPU report buffer is 22 bytes. The accelerometer
-//   reader reads Int32 LE axes at byte offsets 6 / 10 / 14 (4 bytes
-//   each), and the gyro reader reuses those same offsets. That leaves
-//   bytes 18..21 (4 bytes) as the next available slot in a 22-byte
-//   report. This source decodes the lid hinge angle as Int16 LE at
-//   byte offset 18, divided by 100 to yield degrees, on the assumption
-//   that:
-//     • The lid-angle channel emits a single scalar (no XYZ triple).
-//     • Apple's HID descriptor packs that scalar in the unused tail
-//       slot of the shared report layout, with a fixed-point
-//       Int16-by-100 encoding (matches the BMI286 register-file
-//       angle precision of ±327.67° / 0.01° resolution).
-//   This assumption is gated by:
-//     • The `lid-decode-byte-offset` mutation entry under
-//       `Tests/Mutation/mutation-catalog.json` (changes offset 18 to
-//       0; decoded angle collapses to zero degrees, no transitions
-//       fire, the matrix cell catches it).
-//     • A hardware integration test on real BMI286 silicon will
-//       surface zero-magnitude or saturated readings if Apple's wire
-//       format differs in production. Revisit the offset and scaling
-//       at that point — the test seam (`_testInjectReport`) lets us
-//       update the decoder without churning the test suite.
+//   • IOHID match: VendorID 0x05AC, ProductID 0x8104,
+//     UsagePage 0x0020 (HID Sensors), Usage 0x008A.
+//   • Transport: Feature report, ReportID = 1, fetched on demand via
+//     `IOHIDDeviceGetReport(.., kIOHIDReportTypeFeature, 1, ..)`. Not
+//     an Input Report stream — there is no callback, just a poll. An
+//     input-report streamed shape exists (olvvier/macimu) but needs
+//     root + a property-set wake sequence, so we use the polled feature
+//     report path.
+//   • Layout: `[reportID, angle_lo, angle_hi]` (length ≥ 3); first byte
+//     echoes the report ID `0x01`.
+//   • Decode: `UInt16 LE` at bytes [1..2], unsigned, **already in whole
+//     degrees** — no Int16, no `÷100`, no sign extension.
+//   • Range: 0..~135°, 1° resolution. Physical clamshell limit is well
+//     under 180° on every shipping MacBook.
 //
-// Reaction emission: state-machine transitions surface as
-// `Reaction.lidOpened`, `.lidClosed`, or `.lidSlammed` direct
-// publications onto the bus. The state machine inherently dedupes
-// emissions (a state cannot re-enter itself without an intervening
-// transition), so no per-source debounce window is needed beyond the
-// state model itself.
+// Per-model coverage table. The runtime probe (match dict + feature-
+// report read) is the source of truth — this table is documentation
+// of expected coverage, not a dispatch table. New silicon respins are
+// frequent enough that hardcoding identifiers rots quickly.
+//
+//   ╭──────────────────────────────────────────╥─────────────────────╮
+//   │  Hardware                                ║  Lid HID strategy   │
+//   ╞══════════════════════════════════════════╬═════════════════════╡
+//   │  M1 MacBook Air (MacBookAir10,1)         ║  none — no sensor   │
+//   │  M1 13" MacBook Pro (MacBookPro17,1)     ║  none — no sensor   │
+//   │  M1 Pro/Max 14"/16" MacBook Pro          ║  HID 0x0020/0x008A  │
+//   │  M2 base MacBook Air (Mac14,2)           ║  device on wrong    │
+//   │  M2 base 13" MBP (Mac14,7)               ║  usage page 0xFF00 │
+//   │                                          ║  → match fails →   │
+//   │                                          ║  none               │
+//   │  M2 Pro/Max 14"/16" MBP                  ║  HID 0x0020/0x008A  │
+//   │  M3 / M3 Pro / M3 Max — Air & Pro        ║  HID 0x0020/0x008A  │
+//   │  M4 / M4 Pro / M4 Max — Air & Pro        ║  HID 0x0020/0x008A  │
+//   │  Mac mini / iMac / Mac Studio / Mac Pro  ║  no clamshell       │
+//   ╰──────────────────────────────────────────╨─────────────────────╯
+//
+// On models where the strategy is "none," `isAvailable` returns false,
+// the Stimuli > Lid Angle menu row hides, and the source is never
+// started. There is no second mechanism to fall back to.
+//
+// Earlier revisions of this source subscribed to the SPU broker for
+// `usagePage 0xFF00 / usage 8` and decoded an `Int16 LE / 100` at byte
+// offset 18 of the 22-byte report. That channel was wrong on every
+// count — `0xFF00 / usage 3` is accel, `0xFF00 / usage 9` is gyro,
+// `0xFF00 / usage 5` is ALS, and offsets 6/10/14 (3× Int32 LE) consume
+// the entire IMU payload. Bytes 18..21 are uninitialized tail. The old
+// decoder produced negative-half garbage that drove the slam state
+// machine into a loop; the wire format documented above is the actual
+// source of truth.
 
 private let log = AppLog(category: "LidAngleSource")
 
-/// Direct-publish reaction source for the BMI286 lid hinge angle.
-/// Does NOT participate in fusion — emits `.lidOpened`, `.lidClosed`,
-/// `.lidSlammed` directly via the reaction bus, mirroring the
-/// discrete-stimulus pattern in `GyroscopeSource`. Not `@MainActor`
-/// because the report handler runs on the broker's HID worker thread
-/// and must not hop the main actor per sample.
+// MARK: - HID driver seam
+
+/// Abstraction over the dedicated lid-angle HID device. Polled, not
+/// pushed — the macOS lid sensor surfaces hinge angle as a Feature
+/// Report fetched via `IOHIDDeviceGetReport`. Production wires
+/// `RealLidAngleHIDDriver`; tests inject angle traces directly through
+/// the source's `_testInjectAngle` seam and pair it with a no-op
+/// driver so no IOKit machinery is touched.
+public protocol LidAngleHIDDriver: Sendable {
+    /// True when a matching lid-angle device is present in the
+    /// IORegistry. Cheap — a `IOServiceGetMatchingServices` walk and
+    /// an iterator drain.
+    var isHardwarePresent: Bool { get }
+
+    /// Read one Feature Report and return the decoded angle in
+    /// degrees. Returns `nil` when no device is open or the read
+    /// fails (transient — caller polls again).
+    func readAngleDeg() -> Double?
+}
+
+/// Production driver. Opens an `IOHIDManager` matching the dedicated
+/// lid-angle device, retains the first matched device, and answers
+/// `readAngleDeg()` by fetching Feature Report 1.
+public final class RealLidAngleHIDDriver: LidAngleHIDDriver, @unchecked Sendable {
+    private static let vendorID: Int = 0x05AC
+    private static let usagePage: Int = 0x0020
+    private static let usage: Int = 0x008A
+    private static let reportID: CFIndex = 1
+    private static let reportSize: Int = 8
+
+    private struct State {
+        var manager: IOHIDManager?
+        var device: IOHIDDevice?
+    }
+    private let state = OSAllocatedUnfairLock<State>(initialState: State())
+
+    public init() {}
+
+    deinit {
+        state.withLock { s in
+            if let device = s.device {
+                IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
+            }
+            if let manager = s.manager {
+                IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            }
+            s.manager = nil
+            s.device = nil
+        }
+    }
+
+    public var isHardwarePresent: Bool {
+        // Productive side-effect: matching, opening, and caching the
+        // device here also primes `readAngleDeg()` for the lifetime
+        // of the driver.
+        return state.withLock { s in
+            if s.device != nil { return true }
+            return Self.resolveAndOpen(into: &s)
+        }
+    }
+
+    public func readAngleDeg() -> Double? {
+        return state.withLock { s in
+            // Lazy resolve — caller may invoke `readAngleDeg()` before
+            // ever asking `isHardwarePresent`.
+            if s.device == nil {
+                _ = Self.resolveAndOpen(into: &s)
+            }
+            guard let device = s.device else { return nil }
+
+            var buffer = [UInt8](repeating: 0, count: Self.reportSize)
+            var length: CFIndex = CFIndex(Self.reportSize)
+            let result = buffer.withUnsafeMutableBufferPointer { bp -> IOReturn in
+                IOHIDDeviceGetReport(device, kIOHIDReportTypeFeature, Self.reportID, bp.baseAddress!, &length)
+            }
+            guard result == kIOReturnSuccess, length >= 3 else {
+                log.debug("activity:HIDGetReport result=\(String(format:"0x%08X", UInt32(bitPattern: result))) length=\(length)")
+                return nil
+            }
+            // First byte echoes the report ID. A mismatch indicates we
+            // matched a device that responds to feature-report 1 with
+            // an unrelated payload — defensive guard, not expected to
+            // trigger because the match dict already filters on
+            // UsagePage 0x0020 / Usage 0x008A.
+            guard buffer[0] == UInt8(Self.reportID) else {
+                log.warning("entity:LidAngleHIDDriver wasInvalidatedBy activity:ReportIDMismatch reportID=\(buffer[0])")
+                return nil
+            }
+            // UInt16 LE at bytes [1..2]; unsigned; whole degrees.
+            let raw = UInt16(buffer[1]) | (UInt16(buffer[2]) << 8)
+            return Double(raw)
+        }
+    }
+
+    /// Build the IOHIDManager (if missing), match on the lid device,
+    /// pick the first hit, and open it for Feature-report I/O. Caches
+    /// the manager and device on the state struct. Returns true when
+    /// a device was successfully opened.
+    ///
+    /// `IOHIDManagerOpen` opens the manager scope; it does NOT
+    /// implicitly open each matched device for I/O. `IOHIDDeviceGetReport`
+    /// against an unopened device returns `kIOReturnNotPermitted`
+    /// (0xE00002C2) silently, which is the failure mode that surfaced
+    /// on first deploy.
+    private static func resolveAndOpen(into s: inout State) -> Bool {
+        let manager = s.manager ?? makeManager()
+        s.manager = manager
+        guard let device = firstMatchedDevice(in: manager) else { return false }
+        let openResult = IOHIDDeviceOpen(device, IOOptionBits(kIOHIDOptionsTypeNone))
+        guard openResult == kIOReturnSuccess else {
+            log.warning("entity:LidAngleHIDDriver wasInvalidatedBy activity:DeviceOpen result=\(String(format:"0x%08X", UInt32(bitPattern: openResult)))")
+            return false
+        }
+        s.device = device
+        return true
+    }
+
+    private static func makeManager() -> IOHIDManager {
+        let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
+        let match: [String: Any] = [
+            kIOHIDVendorIDKey: vendorID,
+            kIOHIDDeviceUsagePageKey: usagePage,
+            kIOHIDDeviceUsageKey: usage,
+        ]
+        IOHIDManagerSetDeviceMatching(manager, match as CFDictionary)
+        IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        return manager
+    }
+
+    private static func firstMatchedDevice(in manager: IOHIDManager) -> IOHIDDevice? {
+        guard let set = IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice> else { return nil }
+        return set.first
+    }
+}
+
+// MARK: - LidAngleSource
+
+/// Direct-publish reaction source over the dedicated lid-angle HID
+/// device. Polls Feature Report 1 at a configurable interval and
+/// passes the decoded angle through `LidAngleStateMachine` for
+/// open/close/slam classification.
 public final class LidAngleSource: Sendable {
 
     public let id = SensorID.lidAngle
-    /// Localized display name. Resolved at access time via
-    /// `NSLocalizedString` so the menu UI surfaces the user's
-    /// preferred-locale string. The source's `id` (raw "lidAngle")
-    /// remains the persisted identifier — only the name varies.
     public var name: String {
         NSLocalizedString("sensor_lid_angle", comment: "Lid angle sensor name")
     }
 
     private let machineConfig: LidAngleStateMachineConfig
-    private let reportIntervalUS: Int
+    /// Polling interval in microseconds. 33,333 µs ≈ 30 Hz, matching the
+    /// reference open-source decoders. `LidAngleStateMachine` smooths over
+    /// `smoothingWindowMs` so the exact rate is not load-bearing.
+    private let pollIntervalUS: Int
+    private let driver: LidAngleHIDDriver
 
-    /// Broker the source subscribes to. Production callers share the
-    /// singleton; tests inject a private broker wired with a mock kernel
-    /// driver.
-    internal let broker: AppleSPUDevice
-
-    /// Lock-protected subscription / detector state. The state machine
-    /// is rebuilt on every `start()` so a stop / start cycle does not
-    /// retain stale lid-state.
     private struct State {
-        var token: SPUSubscription?
         var machine: LidAngleStateMachine?
         var bus: ReactionBus?
+        var pollTask: Task<Void, Never>?
     }
     private let state: OSAllocatedUnfairLock<State>
 
-    /// Public init. Defaults match `Defaults.lid*`.
+    /// Public init. Defaults match the reference decoders (~30 Hz poll)
+    /// and `Defaults.lid*` for the state-machine thresholds.
     public convenience init(openThresholdDeg: Double = Defaults.lidOpenThresholdDeg,
                             closedThresholdDeg: Double = Defaults.lidClosedThresholdDeg,
                             slamRateDegPerSec: Double = Defaults.lidSlamRateDegPerSec,
                             smoothingWindowMs: Int = Defaults.lidSmoothingWindowMs,
-                            reportIntervalUS: Int = 10000) {
+                            pollIntervalUS: Int = 33_333) {
         let config = LidAngleStateMachineConfig(
             openThresholdDeg: openThresholdDeg,
             closedThresholdDeg: closedThresholdDeg,
@@ -93,129 +244,93 @@ public final class LidAngleSource: Sendable {
             smoothingWindowMs: smoothingWindowMs
         )
         self.init(machineConfig: config,
-                  reportIntervalUS: reportIntervalUS,
-                  broker: AppleSPUDevice.shared)
+                  pollIntervalUS: pollIntervalUS,
+                  driver: RealLidAngleHIDDriver())
     }
 
-    /// Test-overload init: caller supplies a kernel driver and the
-    /// source builds a private broker wired with the same driver.
-    /// Mirrors `GyroscopeSource(kernelDriver:)` — cells inject a
-    /// `MockSPUKernelDriver` and observe every IOKit call routed
-    /// through the mock without touching the production singleton.
-    internal convenience init(machineConfig: LidAngleStateMachineConfig,
-                              reportIntervalUS: Int = 10000,
-                              kernelDriver: SPUKernelDriver) {
-        self.init(
-            machineConfig: machineConfig,
-            reportIntervalUS: reportIntervalUS,
-            broker: AppleSPUDevice(driver: kernelDriver)
-        )
-    }
-
-    /// Designated initializer accepting a broker injection. Public
-    /// callers reach the convenience overload which builds a real
-    /// driver and uses the singleton; tests use the kernel-driver
-    /// overload (above) which builds a private broker wired with the
-    /// test driver.
+    /// Designated initializer accepting an HID driver injection. Tests
+    /// pair this with a no-op driver and drive the state machine via
+    /// `_testInjectAngle`; production callers reach the convenience
+    /// overload which builds a real driver.
     internal init(machineConfig: LidAngleStateMachineConfig,
-                  reportIntervalUS: Int = 10000,
-                  broker: AppleSPUDevice) {
+                  pollIntervalUS: Int = 33_333,
+                  driver: LidAngleHIDDriver) {
         self.machineConfig = machineConfig
-        self.reportIntervalUS = reportIntervalUS
-        self.broker = broker
+        self.pollIntervalUS = pollIntervalUS
+        self.driver = driver
         self.state = OSAllocatedUnfairLock(initialState: State())
     }
 
-    /// True when SPU HID hardware is present in the IORegistry.
-    /// Mirrors `GyroscopeSource.isAvailable` — surface parity, no
-    /// per-source override.
-    public var isAvailable: Bool {
-        AppleSPUDevice.isHardwarePresent()
-    }
+    /// True when a dedicated lid-angle HID device is matched in the
+    /// IORegistry. Returns false on M1 and M2 Air; true on M2 Pro/Max,
+    /// M3, and M4 family Macs.
+    public var isAvailable: Bool { driver.isHardwarePresent }
 
     // MARK: - Lifecycle
 
-    /// Subscribe to the broker and begin publishing lid Reactions
-    /// onto the supplied bus on detected transitions. Idempotent —
-    /// calling while already started is a no-op.
     public func start(publishingTo bus: ReactionBus) {
-        let alreadyRunning = state.withLock { s -> Bool in
-            return s.token != nil
-        }
+        let alreadyRunning = state.withLock { $0.pollTask != nil }
         if alreadyRunning { return }
 
         let machine = LidAngleStateMachine(config: machineConfig)
+        let driver = self.driver
+        let intervalNs = UInt64(pollIntervalUS) * 1_000
+
+        // One-shot probe: emit the first successful angle read so the
+        // log proves the device decode works on this host. Without
+        // this, a host where the lid never moves leaves the source
+        // silent — indistinguishable from a broken decoder.
+        if let probe = driver.readAngleDeg() {
+            log.info("activity:Probe wasGeneratedBy entity:LidAngleSource angle=\(String(format: "%.1f", probe))°")
+        } else {
+            log.warning("entity:LidAngleSource wasInvalidatedBy activity:Probe — initial read returned nil")
+        }
+
+        let task = Task.detached { [weak self] in
+            while !Task.isCancelled {
+                if let angle = driver.readAngleDeg() {
+                    self?.handleAngle(angle, timestamp: Date())
+                }
+                try? await Task.sleep(nanoseconds: intervalNs)
+            }
+        }
 
         state.withLock { s in
             s.machine = machine
             s.bus = bus
+            s.pollTask = task
         }
-
-        let token = broker.subscribe(
-            usagePage: 0xFF00,
-            usage: 8,
-            dispatch: .lid,
-            reportIntervalUS: reportIntervalUS
-        ) { [weak self] report in
-            self?.handleReport(bytes: report.bytes, length: report.length, timestamp: report.timestamp)
-        }
-
-        state.withLock { s in
-            s.token = token
-        }
-
-        if token == nil {
-            log.warning("entity:LidAngleSource wasInvalidatedBy activity:Subscribe — broker refused open")
-        } else {
-            log.info("entity:LidAngleSource wasGeneratedBy activity:Start")
-        }
+        log.info("entity:LidAngleSource wasGeneratedBy activity:Start pollHz=\(String(format: "%.0f", 1_000_000.0 / Double(pollIntervalUS)))")
     }
 
-    /// Cancel the broker subscription and tear down internal state.
-    /// Idempotent.
     public func stop() {
-        let token = state.withLock { s -> SPUSubscription? in
-            let t = s.token
-            s.token = nil
+        let task: Task<Void, Never>? = state.withLock { s in
+            let t = s.pollTask
+            s.pollTask = nil
             s.machine = nil
             s.bus = nil
             return t
         }
-        if let token {
-            broker.unsubscribe(token)
+        if let task {
+            task.cancel()
             log.info("entity:LidAngleSource wasInvalidatedBy activity:Stop")
         }
     }
 
-    // MARK: - Report handling
+    // MARK: - Sample handling
 
-    /// Decode one HID report buffer, run it through the state
-    /// machine, and publish on a transition. The state machine
-    /// inherently dedupes — no per-source debounce window.
-    ///
-    /// Exposed `internal` so the matrix mutation cells in
-    /// `MatrixLidAngleSource_Tests` can drive the gate set with
-    /// synthesised payloads via the `_testInjectReport` seam.
-    internal func handleReport(bytes: UnsafePointer<UInt8>, length: Int, timestamp: Date) {
-        // Length floor — same minimum as the accel reader. Lid angle
-        // sits at byte offset 18 (Int16 LE / 100 → degrees), so we
-        // need at least 20 bytes. The accel min (18) is too tight;
-        // gate explicitly.
-        guard length >= 20 else { return }
+    /// Run one decoded angle sample through the state machine and
+    /// publish any emitted transition onto the bus. Same publish
+    /// pattern as the prior SPU-broker implementation — resolve
+    /// under-lock, publish outside the lock so we never await with
+    /// an unfair lock held.
+    internal func handleAngle(_ angleDeg: Double, timestamp: Date) {
+        // Defensive sanity gate. Even with the correct decoder, a
+        // misbehaving device or an unmapped variant could surface
+        // out-of-range values; the state machine assumes physical
+        // angles, so reject anything outside the clamshell envelope.
+        guard (0...180).contains(angleDeg) else { return }
 
-        // Int16 LE at byte offset 18 is NOT 2-byte aligned in
-        // general; `loadUnaligned` is the sanctioned API.
-        let raw = UnsafeRawPointer(bytes)
-        let rawAngle = raw.loadUnaligned(fromByteOffset: 18, as: Int16.self)
-
-        // Fixed-point decode: Int16 LE / 100 → degrees. ±327.67°
-        // resolution at 0.01° step matches the BMI286 register-file
-        // precision for hinge sensors.
-        let angleDeg = Double(rawAngle) / 100.0
-
-        // Resolve the publish decision under the lock, then perform
-        // bus.publish() outside the lock — `bus.publish` is async and
-        // we must not hold an unfair lock across an await.
         struct Pending {
             let bus: ReactionBus
             let event: LidEvent
@@ -238,30 +353,39 @@ public final class LidAngleSource: Sendable {
         }
     }
 
-    /// Test seam — synthesize a report directly. Lets cells drive
-    /// the state machine with deterministic angle traces without
-    /// touching the broker's IOKit machinery.
+    // MARK: - Test seams
+
     #if DEBUG
-    internal func _testInjectReport(bytes: UnsafePointer<UInt8>, length: Int, timestamp: Date) {
-        handleReport(bytes: bytes, length: length, timestamp: timestamp)
+    /// Inject a single decoded angle, bypassing the HID driver.
+    /// Drives the state machine directly so cells can author
+    /// deterministic angle traces with no IOKit involvement.
+    internal func _testInjectAngle(_ angleDeg: Double, at timestamp: Date) {
+        handleAngle(angleDeg, timestamp: timestamp)
     }
 
-    /// Test seam — synthesize an angle directly without composing the
-    /// raw byte buffer. Equivalent to `_testInjectReport` of a payload
-    /// whose offset-18 Int16 decodes to `angleDeg * 100`.
-    internal func _testInjectAngle(_ angleDeg: Double, at timestamp: Date) {
-        var rawAngle = Int16(max(-327.67, min(327.67, angleDeg)) * 100).littleEndian
-        withUnsafeMutableBytes(of: &rawAngle) { _ in }
-        let length = 22
-        let buf = UnsafeMutablePointer<UInt8>.allocate(capacity: length)
-        defer { buf.deallocate() }
-        buf.initialize(repeating: 0, count: length)
-        withUnsafeBytes(of: rawAngle) { bytes in
-            let p = bytes.bindMemory(to: UInt8.self).baseAddress!
-            buf[18] = p[0]
-            buf[19] = p[1]
-        }
-        handleReport(bytes: UnsafePointer(buf), length: length, timestamp: timestamp)
+    /// True while the polling task is alive. Replaces the prior
+    /// broker subscription-count assertion in lifecycle cells.
+    internal var _testIsRunning: Bool {
+        state.withLock { $0.pollTask != nil }
     }
     #endif
 }
+
+// MARK: - Test no-op driver
+
+#if DEBUG
+/// Driver that reports no hardware and never returns a sample. Tests
+/// pair this with `_testInjectAngle` so the source's state machine
+/// runs deterministically without IOKit traffic.
+public final class NoOpLidAngleHIDDriver: LidAngleHIDDriver, @unchecked Sendable {
+    private let presenceState: OSAllocatedUnfairLock<Bool>
+
+    public init(isPresent: Bool = false) {
+        self.presenceState = OSAllocatedUnfairLock(initialState: isPresent)
+    }
+
+    public var isHardwarePresent: Bool { presenceState.withLock { $0 } }
+    public func _setPresent(_ value: Bool) { presenceState.withLock { $0 = value } }
+    public func readAngleDeg() -> Double? { nil }
+}
+#endif
