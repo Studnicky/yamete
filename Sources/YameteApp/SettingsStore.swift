@@ -22,6 +22,7 @@ public final class SettingsStore {
         case flashOpacityMin, flashOpacityMax
         case volumeMin, volumeMax
         case soundEnabled, debugLogging, enabledDisplays, enabledAudioDevices, enabledSensorIDs
+        case sensorOrder
         case consensusRequired
         // Accelerometer detection
         case accelSpikeThreshold, accelCrestFactor, accelRiseRate, accelConfirmations
@@ -97,6 +98,7 @@ public final class SettingsStore {
         Key.enabledDisplays.rawValue: [Int](),
         Key.enabledAudioDevices.rawValue: [String](),
         Key.enabledSensorIDs.rawValue: [String](),
+        Key.sensorOrder.rawValue: [String](),
         Key.consensusRequired.rawValue: Defaults.consensus,
         // Accelerometer detection
         Key.accelSpikeThreshold.rawValue:  Defaults.accelSpikeThreshold,
@@ -420,6 +422,18 @@ public final class SettingsStore {
         didSet {
             guard enabledSensorIDs != oldValue else { return }
             persist(enabledSensorIDs, .enabledSensorIDs)
+        }
+    }
+
+    /// Explicit display order for the impact sensor list (accelerometer,
+    /// microphone, headphone-motion). Each entry is a `SensorID` raw value.
+    /// Enabled items appear above disabled items; within each group the user's
+    /// drag order is preserved. On first launch (or when absent) this is
+    /// seeded from the locale-aware alpha sort used by the legacy auto-sort.
+    public var sensorOrder: [String] {
+        didSet {
+            guard sensorOrder != oldValue else { return }
+            persist(sensorOrder, .sensorOrder)
         }
     }
 
@@ -1133,7 +1147,31 @@ public final class SettingsStore {
         volumeMax       = d.double(forKey: Key.volumeMax.rawValue)
         enabledDisplays = d.array(forKey: Key.enabledDisplays.rawValue) as? [Int] ?? []
         enabledAudioDevices = d.array(forKey: Key.enabledAudioDevices.rawValue) as? [String] ?? []
-        enabledSensorIDs = d.array(forKey: Key.enabledSensorIDs.rawValue) as? [String] ?? []
+        let loadedSensorIDs = d.array(forKey: Key.enabledSensorIDs.rawValue) as? [String] ?? []
+        enabledSensorIDs = loadedSensorIDs
+
+        // Sensor order: migrate from absent (empty) to locale-aware alpha-sort seed.
+        // When sensorOrder has never been written (empty default), derive the initial
+        // order from the canonical impact-sensor list sorted active-above-inactive,
+        // alpha within each group — matching the legacy `SensorSection.orderedSensorIDs`
+        // behaviour so existing users see no visual change on first upgrade.
+        // Use `loadedSensorIDs` (local) not `self.enabledSensorIDs` to avoid
+        // referencing self before all stored properties are initialized.
+        let persistedOrder = d.array(forKey: Key.sensorOrder.rawValue) as? [String] ?? []
+        if persistedOrder.isEmpty {
+            let impactIDs = [
+                SensorID.accelerometer.rawValue,
+                SensorID.microphone.rawValue,
+                SensorID.headphoneMotion.rawValue,
+            ]
+            let enabledSet = Set(loadedSensorIDs)
+            let active   = impactIDs.filter {  enabledSet.contains($0) }.sorted()
+            let inactive = impactIDs.filter { !enabledSet.contains($0) }.sorted()
+            sensorOrder = active + inactive
+        } else {
+            sensorOrder = persistedOrder
+        }
+
         consensusRequired     = d.integer(forKey: Key.consensusRequired.rawValue)
         thermalReactivityFloor = d.integer(forKey: Key.thermalReactivityFloor.rawValue)
         // Accelerometer
@@ -1401,6 +1439,7 @@ public final class SettingsStore {
         enabledDisplays       = []
         enabledAudioDevices   = []
         enabledSensorIDs      = []
+        sensorOrder           = []
         consensusRequired     = Defaults.consensus
         accelSpikeThreshold   = Defaults.accelSpikeThreshold
         accelCrestFactor      = Defaults.accelCrestFactor

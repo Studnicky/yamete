@@ -3,15 +3,22 @@ import YameteCore
 #endif
 import SwiftUI
 
+// MARK: - SensorListItem
+
+/// Lightweight wrapper around a SensorID raw value, giving it `Identifiable`
+/// and `Hashable` conformances for use with `OrderedToggleList`.
+private struct SensorListItem: Identifiable, Hashable {
+    let id: String
+}
+
 // MARK: - Sensors & Detection
 
 /// Impact Detection group. A master `SensorAccordionCard` wraps one
 /// inner `SensorAccordionCard` per available impact sensor
-/// (accelerometer, microphone, AirPods motion). Per-sensor cards sort
-/// active-above-inactive with locale-aware alpha-sort within each group.
-/// Reactivity, cooldown, and consensus controls render after the
-/// per-sensor cards so the auto-sort cannot reshuffle them away from
-/// the impact-fusion data they govern.
+/// (accelerometer, microphone, AirPods motion). Per-sensor cards are
+/// ordered by the user's explicit `sensorOrder` preference (enabled above
+/// disabled, user drag order within each group). Reactivity, cooldown, and
+/// consensus controls render after the per-sensor cards.
 internal struct SensorSection: View {
     @Environment(SettingsStore.self) var settings
     @Environment(Yamete.self) var yamete
@@ -59,9 +66,6 @@ internal struct SensorSection: View {
         @Bindable var s = settings
         let lw = tuningLabelWidth
         let enabledCount = availableSensors.filter { s.enabledSensorIDs.contains($0) }.count
-        let ordered = Self.orderedSensorIDs(availableSensors,
-                                            enabledIDs: Set(s.enabledSensorIDs),
-                                            collationLocale: Locale(identifier: s.resolvedNotificationLocale))
 
         SensorAccordionCard(
             title: NSLocalizedString("section_impact_detection", comment: "Impact detection master group title"),
@@ -71,10 +75,16 @@ internal struct SensorSection: View {
             help: NSLocalizedString("help_impact_detection", comment: "Impact detection master toggle help")
         ) {
             VStack(spacing: 0) {
-                // Per-sensor cards: active above inactive, alpha-sorted within.
-                ForEach(ordered, id: \.self) { sensorID in
-                    sensorCard(for: sensorID)
+                // Per-sensor cards via OrderedToggleList — user-drag order,
+                // enabled above disabled, toggle flips enabledSensorIDs.
+                OrderedToggleList(
+                    items: sensorOrderBinding(),
+                    enabledIDs: enabledIDsBinding(),
+                    pinnedIDs: []
+                ) { item in
+                    sensorCard(for: item.id)
                 }
+                .padding(.horizontal, 8).padding(.vertical, 4)
 
                 // Reactivity, cooldown, and consensus all govern the
                 // impact-fusion pipeline only — `sensitivityMin/Max`
@@ -116,9 +126,81 @@ internal struct SensorSection: View {
         .onChange(of: settings.enabledSensorIDs) { _, _ in clampConsensus() }
     }
 
+    // MARK: - Bindings for OrderedToggleList
+
+    /// Binding that bridges `settings.sensorOrder: [String]` to
+    /// `[SensorListItem]`, filtered to available sensors only.
+    private func sensorOrderBinding() -> Binding<[SensorListItem]> {
+        let store = settings
+        return Binding(
+            get: {
+                // Return items from sensorOrder that are in availableSensors,
+                // then append any available sensors not yet in the order.
+                let ordered = store.sensorOrder.filter { availableSensors.contains($0) }
+                let missing = availableSensors.filter { !store.sensorOrder.contains($0) }
+                return (ordered + missing).map { SensorListItem(id: $0) }
+            },
+            set: { newItems in
+                store.sensorOrder = newItems.map(\.id)
+            }
+        )
+    }
+
+    /// Binding that bridges `settings.enabledSensorIDs: [String]` to
+    /// `Set<String>` as required by `OrderedToggleList`.
+    private func enabledIDsBinding() -> Binding<Set<String>> {
+        let store = settings
+        return Binding(
+            get: { Set(store.enabledSensorIDs) },
+            set: { newSet in
+                // Preserve order: keep existing array order, add new entries at end.
+                var result = store.enabledSensorIDs.filter { newSet.contains($0) }
+                for id in newSet where !result.contains(id) { result.append(id) }
+                store.enabledSensorIDs = result
+            }
+        )
+    }
+
+    // MARK: - Sensor card builder
+
+    @ViewBuilder
+    private func sensorCard(for id: String) -> some View {
+        if id == SensorID.accelerometer.rawValue {
+            SensorAccordionCard(
+                title: Self.sensorTitle(id),
+                icon: "gyroscope",
+                isEnabled: sensorBinding(id: id),
+                isExpanded: $accelExpanded
+            ) { AccelTuningContent() }
+        } else if id == SensorID.microphone.rawValue {
+            SensorAccordionCard(
+                title: Self.sensorTitle(id),
+                icon: "mic",
+                isEnabled: sensorBinding(id: id),
+                isExpanded: $micExpanded
+            ) { MicTuningContent() }
+        } else if id == SensorID.headphoneMotion.rawValue {
+            SensorAccordionCard(
+                title: Self.sensorTitle(id),
+                icon: "headphones",
+                isEnabled: sensorBinding(id: id),
+                isExpanded: $hpExpanded
+            ) { HeadphoneTuningContent() }
+        }
+    }
+
+    private func sensorBinding(id: String) -> Binding<Bool> {
+        @Bindable var s = settings
+        return arrayToggleBinding($s.enabledSensorIDs, element: id)
+    }
+
+    // MARK: - Static helpers (preserved for tests)
+
     /// Pure-functional sort exposed for unit tests. Active sensors above
     /// inactive, each alphabetised by localised title under the
     /// `collationLocale`'s case- and diacritic-insensitive rules.
+    /// Retained for backward compatibility with existing test assertions;
+    /// the UI now uses `sensorOrder` from `SettingsStore` instead.
     @MainActor
     internal static func orderedSensorIDs(_ availableSensors: [String],
                                           enabledIDs: Set<String>,
@@ -154,36 +236,7 @@ internal struct SensorSection: View {
         }
     }
 
-    @ViewBuilder
-    private func sensorCard(for id: String) -> some View {
-        if id == SensorID.accelerometer.rawValue {
-            SensorAccordionCard(
-                title: Self.sensorTitle(id),
-                icon: "gyroscope",
-                isEnabled: sensorBinding(id: id),
-                isExpanded: $accelExpanded
-            ) { AccelTuningContent() }
-        } else if id == SensorID.microphone.rawValue {
-            SensorAccordionCard(
-                title: Self.sensorTitle(id),
-                icon: "mic",
-                isEnabled: sensorBinding(id: id),
-                isExpanded: $micExpanded
-            ) { MicTuningContent() }
-        } else if id == SensorID.headphoneMotion.rawValue {
-            SensorAccordionCard(
-                title: Self.sensorTitle(id),
-                icon: "headphones",
-                isEnabled: sensorBinding(id: id),
-                isExpanded: $hpExpanded
-            ) { HeadphoneTuningContent() }
-        }
-    }
-
-    private func sensorBinding(id: String) -> Binding<Bool> {
-        @Bindable var s = settings
-        return arrayToggleBinding($s.enabledSensorIDs, element: id)
-    }
+    // MARK: - Private helpers
 
     /// Override-disable kill switch for the impact group. Reads and
     /// writes `settings.impactMasterEnabled` only; never mutates
