@@ -50,7 +50,7 @@ public enum SensorError: Error, LocalizedError, Sendable {
     case permissionDenied
     case deviceNotFound
     case ioKitError(String)
-    case noAdaptersAvailable
+    case noSourcesAvailable
 
     public var errorDescription: String? {
         switch self {
@@ -60,8 +60,8 @@ public enum SensorError: Error, LocalizedError, Sendable {
             NSLocalizedString("Accelerometer not found. The built-in accelerometer is only available on MacBook Air and MacBook Pro (Apple Silicon).", comment: "Sensor not found error")
         case .ioKitError(let code):
             String(format: NSLocalizedString("Accelerometer unavailable (IOKit error %@). The built-in accelerometer requires a MacBook Air or MacBook Pro with Apple Silicon.", comment: "IOKit error with code"), code)
-        case .noAdaptersAvailable:
-            NSLocalizedString("No sensors available. Enable at least one sensor, or connect a microphone.", comment: "No adapters error")
+        case .noSourcesAvailable:
+            NSLocalizedString("No sensors available. Enable at least one sensor, or connect a microphone.", comment: "No sources error")
         }
     }
 }

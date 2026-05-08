@@ -202,7 +202,7 @@
 /* Impact tier name: hardest */
 "tier_hard_full" = "强击";
 
-/* Sensor Error Messages (already wrapped in SensorAdapter.swift) */
+/* Sensor Error Messages (already wrapped in SensorSource.swift) */
 
 /* Sensor permission error */
 "Motion sensor access denied — grant Input Monitoring permission in System Settings > Privacy & Security." = "运动传感器访问被拒绝——请在系统设置 > 隐私与安全性中授予输入监控权限。";

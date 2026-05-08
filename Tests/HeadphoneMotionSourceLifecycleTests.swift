@@ -219,7 +219,7 @@ final class HeadphoneMotionSourceLifecycleTests: XCTestCase {
         XCTAssertNotNil(surfaced, "mid-stream error must terminate the stream with a throw")
     }
 
-    /// Mutation-anchor cell for `HeadphoneMotionAdapter.swift` line 150
+    /// Mutation-anchor cell for `HeadphoneMotionSource.swift` line 150
     /// (`guard driver.isHeadphonesConnected else { return }`). Removing
     /// the gate would let post-disconnect samples reach the detector
     /// even after the connection tracker flips. Distinct from
@@ -279,7 +279,7 @@ final class HeadphoneMotionSourceLifecycleTests: XCTestCase {
         )
     }
 
-    /// Pins `HeadphoneMotionAdapter.swift:89` `guard driver.isDeviceMotionAvailable
+    /// Pins `HeadphoneMotionSource.swift:89` `guard driver.isDeviceMotionAvailable
     /// else { return }` in `startConnectionProbe()`. When the framework reports
     /// motion-unavailable, the probe must NOT call `driver.startUpdates`. Mock
     /// driver records `startUpdatesCalls`; production gate keeps it at 0.
@@ -293,7 +293,7 @@ final class HeadphoneMotionSourceLifecycleTests: XCTestCase {
         )
     }
 
-    /// Pins `HeadphoneMotionAdapter.swift:104` `guard stage == .running` in the
+    /// Pins `HeadphoneMotionSource.swift:104` `guard stage == .running` in the
     /// deferred probe-stop body. After `impacts()` takes over the manager, the
     /// stage flips to `.takenOver`; the deferred stop must no-op so the
     /// in-flight consumer keeps the manager alive.

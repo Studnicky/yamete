@@ -167,7 +167,7 @@ public final class HeadphoneMotionSource: SensorSource, Sendable {
         }
         if shouldStop {
             driver.stopUpdates()
-            log.info("activity:HeadphoneProbe wasEndedBy agent:HeadphoneMotionAdapter connected=\(driver.isHeadphonesConnected)")
+            log.info("activity:HeadphoneProbe wasEndedBy agent:HeadphoneMotionSource connected=\(driver.isHeadphonesConnected)")
         }
     }
 
@@ -187,8 +187,8 @@ public final class HeadphoneMotionSource: SensorSource, Sendable {
 
     public func impacts() -> AsyncThrowingStream<SensorImpact, Error> {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
-        let adapterID = self.id
-        let detector = ImpactDetector(config: detectorConfig, adapterName: name)
+        let sourceID = self.id
+        let detector = ImpactDetector(config: detectorConfig, sourceName: name)
 
         // If a probe is in progress, take over the manager. This both
         // suppresses the probe's deferred stop and lets us cleanly restart
@@ -210,7 +210,7 @@ public final class HeadphoneMotionSource: SensorSource, Sendable {
 
         driver.startUpdates { [driver] sample, error in
             if let error {
-                log.warning("activity:SensorReading wasInvalidatedBy agent:HeadphoneMotionAdapter — \(error.localizedDescription)")
+                log.warning("activity:SensorReading wasInvalidatedBy agent:HeadphoneMotionSource — \(error.localizedDescription)")
                 continuation.finish(throwing: error)
                 return
             }
@@ -230,15 +230,15 @@ public final class HeadphoneMotionSource: SensorSource, Sendable {
 
             let now = Date()
             if let intensity = detector.process(magnitude: mag, timestamp: now) {
-                continuation.yield(SensorImpact(source: adapterID, timestamp: now, intensity: intensity))
+                continuation.yield(SensorImpact(source: sourceID, timestamp: now, intensity: intensity))
             }
         }
 
-        log.info("activity:SensorReading wasStartedBy agent:HeadphoneMotionAdapter")
+        log.info("activity:SensorReading wasStartedBy agent:HeadphoneMotionSource")
 
         continuation.onTermination = { @Sendable [driver] _ in
             driver.stopUpdates()
-            log.info("activity:SensorReading wasEndedBy agent:HeadphoneMotionAdapter")
+            log.info("activity:SensorReading wasEndedBy agent:HeadphoneMotionSource")
         }
 
         return stream

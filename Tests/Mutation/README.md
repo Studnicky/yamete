@@ -379,9 +379,9 @@ runner does not consult this section — it is a rationale anchor for
 auditors and future contributors who run `--coverage` and want to
 know why these gate-shaped lines are not in the JSON catalog.
 
-### `Sources/SensorKit/AccelerometerReader.swift` — entire module
+### `Sources/SensorKit/AccelerometerSource.swift` — entire module
 
-`AccelerometerReader.swift` is a self-contained IOKit / IOHIDManager
+`AccelerometerSource.swift` is a self-contained IOKit / IOHIDManager
 adapter for the BMI286 accelerometer on Apple Silicon. It builds its
 own `IOHIDManager`, registers a C-level
 `IOHIDDeviceRegisterInputReportCallback`, and runs a `ReportContext`
@@ -389,7 +389,7 @@ that consumes the callback.
 
 The 19 gates flagged by `--coverage` now split as **18 catalogued / 1
 degenerate** after the kernel-driver kernel-driver seam was added on top of
-the original `Tests/MatrixAccelerometerReader_Tests.swift` seam. The
+the original `Tests/MatrixAccelerometerSource_Tests.swift` seam. The
 seam comprises four production changes:
 
 - `ReportContext` (and its `init`, `handleReport`, `invalidate`,
@@ -595,7 +595,7 @@ outcome:
 
 No degenerate gates. 5 / 5 gates catalogued.
 
-### `Sources/SensorKit/ImpactDetection.swift`
+### `Sources/SensorKit/ImpactFusion.swift`
 
 | Catalog id | Source line | Anchor cell |
 |------------|-------------|-------------|
@@ -615,7 +615,7 @@ guard removed, calling `stop()` against a not-running engine flips
 
 4 of 4 gates catalogued. 0 degenerate.
 
-### `Sources/SensorKit/HeadphoneMotionAdapter.swift`
+### `Sources/SensorKit/HeadphoneMotionSource.swift`
 
 | Catalog id | Source line | Anchor cell |
 |------------|-------------|-------------|
@@ -653,7 +653,7 @@ Cells:
 
 4 of 4 gates catalogued. 0 degenerate.
 
-### `Sources/SensorKit/MicrophoneAdapter.swift`
+### `Sources/SensorKit/MicrophoneSource.swift`
 
 | Catalog id | Source line | Anchor cell |
 |------------|-------------|-------------|
@@ -767,9 +767,9 @@ cannot be exercised by `swift test`.
 
 ### Tally
 
-- `Sources/SensorKit/ImpactDetection.swift` — 0 truly unreachable.
-- `Sources/SensorKit/HeadphoneMotionAdapter.swift` — 0 truly unreachable.
-- `Sources/SensorKit/MicrophoneAdapter.swift` — 0 truly unreachable.
+- `Sources/SensorKit/ImpactFusion.swift` — 0 truly unreachable.
+- `Sources/SensorKit/HeadphoneMotionSource.swift` — 0 truly unreachable.
+- `Sources/SensorKit/MicrophoneSource.swift` — 0 truly unreachable.
 - `Sources/SensorKit/HIDDeviceMonitor.swift` — 2 truly unreachable
   (lines 83, 102).
 
@@ -1142,7 +1142,7 @@ realisable in-process):
   threshold) or `Int` (count). The wraparound arithmetic that
   does exist lives in `AccelHardware.evaluateActivity` and is
   covered by Cell 7.
-- "AccelerometerReader watchdog `mach_absolute_time` wraparound"
+- "AccelerometerSource watchdog `mach_absolute_time` wraparound"
   in-process — production watchdog uses `Date` (TimeInterval /
   Double), not `mach_absolute_time`. `mach_absolute_time` rollover
   is itself unreachable in-process (~584 years to wrap on
@@ -1168,8 +1168,8 @@ crash-handling suite is the integrative regression net.
 ## Driver parity cells
 
 `Tests/DriverParity_Tests.swift` complements the per-driver
-lifecycle / mock tests (e.g. `MicrophoneAdapterLifecycleTests`,
-`HeadphoneMotionAdapterLifecycleTests`,
+lifecycle / mock tests (e.g. `MicrophoneSourceLifecycleTests`,
+`HeadphoneMotionSourceLifecycleTests`,
 `NotificationResponderTests`, etc.) with eight cells that exercise
 each driver protocol's `Real*` and `Mock*` implementations through
 the SAME call sequence and assert the protocol's CONTRACT holds on

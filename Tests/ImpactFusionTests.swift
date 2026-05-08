@@ -5,63 +5,6 @@ import os
 @testable import ResponseKit
 @testable import YameteApp
 
-// MARK: - ImpactDetector tests (per-adapter gate pipeline)
-
-final class ImpactDetectorTests: XCTestCase {
-
-    private func permissiveConfig(threshold: Float = 0.01, warmup: Int = 0) -> ImpactDetectorConfig {
-        ImpactDetectorConfig(
-            spikeThreshold: threshold, minRiseRate: 0, minCrestFactor: 0,
-            minConfirmations: 1, warmupSamples: warmup,
-            intensityFloor: 0.01, intensityCeiling: 1.0
-        )
-    }
-
-    func testImpactDetectedAboveThreshold() {
-        let detector = ImpactDetector(config: permissiveConfig(), adapterName: "test")
-        let result = detector.process(magnitude: 0.5, timestamp: Date())
-        XCTAssertNotNil(result)
-        XCTAssertGreaterThan(result ?? 0, 0)
-    }
-
-    func testBelowThresholdDoesNotTrigger() {
-        let detector = ImpactDetector(config: permissiveConfig(threshold: 0.5), adapterName: "test")
-        let result = detector.process(magnitude: 0.3, timestamp: Date())
-        XCTAssertNil(result)
-    }
-
-    func testWarmupGate() {
-        let detector = ImpactDetector(config: permissiveConfig(warmup: 10), adapterName: "test")
-        let now = Date()
-
-        // During warmup
-        for i in 0..<9 {
-            let result = detector.process(magnitude: 0.8, timestamp: now.addingTimeInterval(Double(i) * 0.02))
-            XCTAssertNil(result, "Should not trigger during warmup (sample \(i))")
-        }
-
-        // After warmup
-        let result = detector.process(magnitude: 0.8, timestamp: now.addingTimeInterval(0.20))
-        XCTAssertNotNil(result, "Should trigger after warmup")
-    }
-
-    func testIntensityMapping() {
-        let config = ImpactDetectorConfig(
-            spikeThreshold: 0.01, minRiseRate: 0, minCrestFactor: 0,
-            minConfirmations: 1, warmupSamples: 0,
-            intensityFloor: 0.1, intensityCeiling: 1.0
-        )
-        let detector = ImpactDetector(config: config, adapterName: "test")
-
-        let result = detector.process(magnitude: 0.55, timestamp: Date())
-        XCTAssertNotNil(result)
-        // (0.55 - 0.1) / (1.0 - 0.1) = 0.5
-        XCTAssertEqual(result ?? 0, 0.5, accuracy: 0.01)
-    }
-}
-
-// MARK: - ImpactFusion tests
-
 @MainActor
 final class ImpactFusionTests: XCTestCase {
 
@@ -128,12 +71,12 @@ final class ImpactFusionTests: XCTestCase {
     // MARK: - Mutation-anchor cells
     //
     // These cells exist specifically to anchor mutation-catalog entries
-    // for `ImpactDetection.swift`. Each cell pins ONE production guard
+    // for `ImpactFusion.swift`. Each cell pins ONE production guard
     // to a deterministic synthetic input, and the failure messages
     // embed `[fusion-gate=...]` coordinates that the catalog substrings
     // pin to.
 
-    /// `ImpactDetection.swift` line 161: rearmDuration guard. Removing
+    /// `ImpactFusion.swift` line 161: rearmDuration guard. Removing
     /// it would let an impact within the rearm window re-trigger.
     func testFusionRearmGate_withinRearm_returnsNil() {
         let engine = ImpactFusion(config: FusionConfig(
@@ -162,7 +105,7 @@ final class ImpactFusionTests: XCTestCase {
         )
     }
 
-    /// `ImpactDetection.swift` line 168: consensus participating-sources
+    /// `ImpactFusion.swift` line 168: consensus participating-sources
     /// gate. Removing it would let one source meet a 2-source consensus
     /// requirement.
     func testFusionConsensusGate_singleSource_belowRequired_returnsNil() {
@@ -195,11 +138,9 @@ final class ImpactFusionTests: XCTestCase {
     }
 }
 
-// MARK: - ImpactFusion start() availability gate
-
-/// `ImpactDetection.swift` line 85: empty-availability gate inside
+/// `ImpactFusion.swift` line 85: empty-availability gate inside
 /// `start(sources:bus:)`. Removing it would silently mark the fusion
-/// engine running with zero sources and never surface the no-adapters
+/// engine running with zero sources and never surface the no-sources
 /// error to the UI.
 @MainActor
 final class ImpactFusionAvailabilityGateTests: XCTestCase {
@@ -250,7 +191,7 @@ final class ImpactFusionAvailabilityGateTests: XCTestCase {
     }
 }
 
-/// Pins `ImpactDetection.swift:135` `guard isRunning else { return }` in
+/// Pins `ImpactFusion.swift:135` `guard isRunning else { return }` in
 /// `stop()`. Removing the gate would let `stop()` proceed to invalidate
 /// already-invalid resources (cancel nil tasks, finish nil continuations),
 /// which CFRuntime tolerates silently — observable only via `_testHooks`.

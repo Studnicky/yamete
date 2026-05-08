@@ -53,7 +53,7 @@ final class MatrixImpactDetector_Tests: XCTestCase {
     func testWarmupGate_belowSampleCount_returnsNil() {
         let detector = ImpactDetector(
             config: config(warmupSamples: 50),
-            adapterName: "matrix-warmup"
+            sourceName: "matrix-warmup"
         )
         // First 49 samples are below warmup threshold (sampleCount=1..49).
         let now = Date()
@@ -80,7 +80,7 @@ final class MatrixImpactDetector_Tests: XCTestCase {
     func testSpikeGate_belowThreshold_returnsNil() {
         let detector = ImpactDetector(
             config: config(spikeThreshold: 0.500, minConfirmations: 0),
-            adapterName: "matrix-spike"
+            sourceName: "matrix-spike"
         )
         // Magnitude well below the spike threshold — must be rejected.
         // With minConfirmations=0, the confirmations gate is permissive,
@@ -106,7 +106,7 @@ final class MatrixImpactDetector_Tests: XCTestCase {
                 minRiseRate: 0.500,
                 minConfirmations: 1
             ),
-            adapterName: "matrix-rise"
+            sourceName: "matrix-rise"
         )
         // 10-sample ramp with consecutive rises of exactly 0.020 — well
         // below the 0.500 minRiseRate. Final magnitude (0.300) clears
@@ -143,7 +143,7 @@ final class MatrixImpactDetector_Tests: XCTestCase {
                 minCrestFactor: 5.0,
                 minConfirmations: 1
             ),
-            adapterName: "matrix-crest"
+            sourceName: "matrix-crest"
         )
         // 200 samples at 0.030 to push backgroundMeanSq up.
         let now = Date()
@@ -181,7 +181,7 @@ final class MatrixImpactDetector_Tests: XCTestCase {
                 spikeThreshold: 0.020,
                 minConfirmations: 5
             ),
-            adapterName: "matrix-confirm"
+            sourceName: "matrix-confirm"
         )
         // Single above-threshold sample — fewer than 5 confirmations.
         let result = detector.process(magnitude: 0.080, timestamp: Date())

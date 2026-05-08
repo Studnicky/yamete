@@ -75,7 +75,7 @@ import os
 //   never `transitionLock`, so they cannot deadlock with a concurrent
 //   open or close.
 // • The justification for the `@unchecked Sendable` tag matches the
-//   existing `FilterState` pattern (see `MicrophoneAdapter.swift`):
+//   existing `FilterState` pattern (see `MicrophoneSource.swift`):
 //   non-Sendable framework handles (IOHIDManager, IOHIDDevice, CFRunLoop,
 //   UnsafeMutablePointer) are kept lock-protected and never escape
 //   without serialization. The HID input-report callback runs on the
@@ -149,7 +149,7 @@ private struct SubscriberRecord: Sendable {
 // MARK: - Open device handles
 
 /// Framework-handle bundle for the open SPU device. Mirrors the existing
-/// `IOKitHandles` pattern in `AccelerometerReader.swift` — every field is
+/// `IOKitHandles` pattern in `AccelerometerSource.swift` — every field is
 /// a non-Sendable framework type kept inside a narrow `@unchecked Sendable`
 /// boundary. Access is serialized by the broker's outer state lock.
 private struct OpenDevice: @unchecked Sendable {
@@ -168,7 +168,7 @@ private struct OpenDevice: @unchecked Sendable {
 // MARK: - HID run loop thread (broker-owned variant)
 
 /// Dedicated CFRunLoop-hosting thread for the broker's IOHIDManager.
-/// Mirrors the existing `HIDRunLoopThread` in `AccelerometerReader.swift`
+/// Mirrors the existing `HIDRunLoopThread` in `AccelerometerSource.swift`
 /// (private file scope there); duplicated here to keep the broker
 /// self-contained and avoid widening the existing type's visibility.
 private struct HIDRunLoopThread: Sendable {

@@ -75,8 +75,8 @@ public final class MicrophoneSource: SensorSource, @unchecked Sendable {
 
     public func impacts() -> AsyncThrowingStream<SensorImpact, Error> {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
-        let adapterID = self.id
-        let detector = ImpactDetector(config: detectorConfig, adapterName: name)
+        let sourceID = self.id
+        let detector = ImpactDetector(config: detectorConfig, sourceName: name)
 
         let driver = driverFactory()
         let format = driver.inputFormat
@@ -89,7 +89,7 @@ public final class MicrophoneSource: SensorSource, @unchecked Sendable {
         // teardown on CI run 24548266785. Fail fast with a typed error
         // instead of touching the tap machinery at all.
         guard format.channelCount > 0, format.sampleRate > 0 else {
-            log.error("activity:SensorReading wasInvalidatedBy agent:MicrophoneAdapter — invalid input format (channels=\(format.channelCount) sampleRate=\(format.sampleRate))")
+            log.error("activity:SensorReading wasInvalidatedBy agent:MicrophoneSource — invalid input format (channels=\(format.channelCount) sampleRate=\(format.sampleRate))")
             continuation.finish(throwing: SensorError.deviceNotFound)
             return stream
         }
@@ -116,15 +116,15 @@ public final class MicrophoneSource: SensorSource, @unchecked Sendable {
             // Run detector — returns 0-1 intensity if impact detected
             let now = Date()
             if let intensity = detector.process(magnitude: magnitude, timestamp: now) {
-                continuation.yield(SensorImpact(source: adapterID, timestamp: now, intensity: intensity))
+                continuation.yield(SensorImpact(source: sourceID, timestamp: now, intensity: intensity))
             }
         }
 
         do {
             try driver.start()
-            log.info("activity:SensorReading wasStartedBy agent:MicrophoneAdapter")
+            log.info("activity:SensorReading wasStartedBy agent:MicrophoneSource")
         } catch {
-            log.error("activity:SensorReading wasInvalidatedBy agent:MicrophoneAdapter — \(error.localizedDescription)")
+            log.error("activity:SensorReading wasInvalidatedBy agent:MicrophoneSource — \(error.localizedDescription)")
             // engine.start() failed — we already have a tap installed. Pair
             // the removal with the start-failure branch so we don't leak a
             // tap + continue into an undefined state.
@@ -145,7 +145,7 @@ public final class MicrophoneSource: SensorSource, @unchecked Sendable {
                 d.stop()
                 d.removeTap()
             }
-            log.info("activity:SensorReading wasEndedBy agent:MicrophoneAdapter")
+            log.info("activity:SensorReading wasEndedBy agent:MicrophoneSource")
         }
 
         return stream

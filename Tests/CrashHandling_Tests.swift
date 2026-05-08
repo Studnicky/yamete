@@ -131,7 +131,7 @@ final class CrashHandling_Tests: XCTestCase {
             "[crash-cell=trackpad-circle-zero-delta] zero-delta samples must NOT produce any reaction (mag>2.0 gate prevents NaN/0-mag path); got \(count)")
     }
 
-    // MARK: - Cell 3 — MicrophoneAdapter zero-frame buffer pointer access
+    // MARK: - Cell 3 — MicrophoneSource zero-frame buffer pointer access
     //
     // Trap class: out-of-bounds pointer read. A mutation that drops the
     // `frameLength > 0` guard combined with downstream code that does
@@ -196,7 +196,7 @@ final class CrashHandling_Tests: XCTestCase {
             minConfirmations: 1, warmupSamples: 0,
             intensityFloor: 0.01, intensityCeiling: 1.0
         )
-        let det = ImpactDetector(config: cfg, adapterName: "crash-cell")
+        let det = ImpactDetector(config: cfg, sourceName: "crash-cell")
 
         let now = Date()
         for i in 0..<100 {
@@ -217,7 +217,7 @@ final class CrashHandling_Tests: XCTestCase {
             minConfirmations: 1, warmupSamples: 0,
             intensityFloor: 0.0, intensityCeiling: 1.0
         )
-        let det = ImpactDetector(config: cfg, adapterName: "crash-cell")
+        let det = ImpactDetector(config: cfg, sourceName: "crash-cell")
         let r = det.process(magnitude: 1.0, timestamp: Date())
         if let value = r {
             XCTAssertTrue(value.isFinite,
@@ -350,7 +350,7 @@ final class CrashHandling_Tests: XCTestCase {
     //    is covered by Cell 7. No production code path reads a
     //    UInt64.max-valued Settings field.
     //
-    // 2. "AccelerometerReader watchdog mach_absolute_time wraparound"
+    // 2. "AccelerometerSource watchdog mach_absolute_time wraparound"
     //    in-process — degenerate: the production watchdog uses Date
     //    (TimeInterval / Double) for staleness, not mach_absolute_time.
     //    mach_absolute_time rollover is unreachable in-process

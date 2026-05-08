@@ -59,7 +59,7 @@ import os
 //   triples but is exposed via the SPU bridge as Int32 to match the
 //   accel-channel framing). This assumption is gated by:
 //     • The same `magnitudeMin` / `magnitudeMax` sanity bracket that
-//       `AccelerometerReader` uses, but recalibrated for deg/s.
+//       `AccelerometerSource` uses, but recalibrated for deg/s.
 //     • The `gyro-decode-byte-offset` mutation entry under
 //       `Tests/Mutation/mutation-catalog.json`, which CHANGES one of the
 //       offsets to a wrong value and asserts the matrix cell catches the

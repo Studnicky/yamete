@@ -85,7 +85,7 @@ public final class ImpactFusion {
         if isRunning { stop() }
         let available = sources.filter { $0.isAvailable }
         guard !available.isEmpty else {
-            onError?(SensorError.noAdaptersAvailable.localizedDescription)
+            onError?(SensorError.noSourcesAvailable.localizedDescription)
             return
         }
         isRunning = true

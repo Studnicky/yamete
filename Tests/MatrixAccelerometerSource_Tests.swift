@@ -2,11 +2,11 @@ import XCTest
 @testable import SensorKit
 @testable import YameteCore
 
-/// Mutation-anchor cells for `Sources/SensorKit/AccelerometerReader.swift`.
+/// Mutation-anchor cells for `Sources/SensorKit/AccelerometerSource.swift`.
 /// Each test pins a single behavioural gate so removing the gate flips
 /// the assertion and makes `make mutate` report the entry CAUGHT.
 ///
-/// Architectural note: AccelerometerReader has no protocol-shaped DI seam
+/// Architectural note: AccelerometerSource has no protocol-shaped DI seam
 /// over IOKit (no `SPUKernelDriver`-style abstraction). The
 /// gates exercised here are reachable because:
 ///
@@ -33,13 +33,13 @@ import XCTest
 /// guards (`KERN_SUCCESS`, `kIOReturnSuccess`, `IOIteratorNext != 0`,
 /// `maxSize > 0`) whose failure modes can only be driven from a real
 /// kernel mock, not from a swift-test process.
-final class MatrixAccelerometerReader_Tests: XCTestCase {
+final class MatrixAccelerometerSource_Tests: XCTestCase {
 
     // MARK: - Helpers
 
     /// Permissive detector config: every detector-internal gate is open
     /// so that the only thing keeping a synthesised report from yielding
-    /// is the AccelerometerReader gate under test. `warmupSamples = 0`
+    /// is the AccelerometerSource gate under test. `warmupSamples = 0`
     /// removes the detector's own warmup window so a single in-range
     /// sample is enough to surface as an impact.
     private static func permissiveDetectorConfig() -> ImpactDetectorConfig {
@@ -62,11 +62,11 @@ final class MatrixAccelerometerReader_Tests: XCTestCase {
     ) -> (ReportContext, AsyncThrowingStream<SensorImpact, Error>) {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
         let ctx = ReportContext(
-            adapterID: SensorID.accelerometer,
+            sourceID: SensorID.accelerometer,
             continuation: continuation,
             hpFilter: HighPassFilter(cutoffHz: 1.0, sampleRate: 50.0),
             lpFilter: LowPassFilter(cutoffHz: 25.0, sampleRate: 50.0),
-            detector: ImpactDetector(config: config, adapterName: "test")
+            detector: ImpactDetector(config: config, sourceName: "test")
         )
         return (ctx, stream)
     }

@@ -167,7 +167,7 @@ final class MicrophoneSourceLifecycleTests: XCTestCase {
         }
     }
 
-    /// Mutation-anchor cell for `MicrophoneAdapter.swift` line 91: the
+    /// Mutation-anchor cell for `MicrophoneSource.swift` line 91: the
     /// input-format validity gate (`channelCount > 0, sampleRate > 0`).
     /// A driver reporting a zero-channel format must surface
     /// `SensorError.deviceNotFound` AND must not install a tap. Removing
@@ -257,7 +257,7 @@ final class MicrophoneSourceLifecycleTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(mock.removeTapCalls, 1, "tap removed on stream cancellation")
     }
 
-    /// Pins `MicrophoneAdapter.swift:104` `guard frameLength > 0 else { return }`.
+    /// Pins `MicrophoneSource.swift:104` `guard frameLength > 0 else { return }`.
     /// Drive 5 strong-transient buffers through the permissive detector via the
     /// existing `MockMicrophoneEngineDriver.emit(buffer:)` seam. The production
     /// gate must let nonzero-length buffers through; mutation that inverts the

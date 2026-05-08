@@ -4,7 +4,7 @@ import IOKit
 @testable import YameteCore
 
 /// Mutation-anchor cells for the kernel-result fidelity gates in
-/// `Sources/SensorKit/AccelerometerReader.swift`. Each cell drives a
+/// `Sources/SensorKit/AccelerometerSource.swift`. Each cell drives a
 /// real production entry point (`SensorActivation.activate`,
 /// `SensorActivation.deactivate`, `AccelHardware.isSPUDevicePresent`,
 /// `AccelHardware.isSensorActivelyReporting`, `AccelHardware.openStream`)
@@ -176,8 +176,8 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
         mock.setForceManagerOpenFailure(kIOReturnNotPermitted)
 
         let stream = AccelHardware.openStream(
-            adapterID: SensorID.accelerometer,
-            adapterName: "test",
+            sourceID: SensorID.accelerometer,
+            sourceName: "test",
             reportIntervalUS: 10000,
             bandpassLowHz: 20.0, bandpassHighHz: 25.0,
             detectorConfig: .accelerometer(),
@@ -216,8 +216,8 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
         mock.setForceDeviceOpenFailure(kIOReturnNotPermitted)
 
         let stream = AccelHardware.openStream(
-            adapterID: SensorID.accelerometer,
-            adapterName: "test",
+            sourceID: SensorID.accelerometer,
+            sourceName: "test",
             reportIntervalUS: 10000,
             bandpassLowHz: 20.0, bandpassHighHz: 25.0,
             detectorConfig: .accelerometer(),
@@ -259,8 +259,8 @@ final class MatrixAccelerometerKernelDriver_Tests: XCTestCase {
         mock.setForceMaxReportSizeZero(true)
 
         let stream = AccelHardware.openStream(
-            adapterID: SensorID.accelerometer,
-            adapterName: "test",
+            sourceID: SensorID.accelerometer,
+            sourceName: "test",
             reportIntervalUS: 10000,
             bandpassLowHz: 20.0, bandpassHighHz: 25.0,
             detectorConfig: .accelerometer(),

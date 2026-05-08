@@ -91,7 +91,7 @@ public struct ImpactDetectorConfig: Sendable {
 /// Thread safety: mutable state protected by OSAllocatedUnfairLock.
 public final class ImpactDetector: Sendable {
     private let config: ImpactDetectorConfig
-    private let adapterName: String
+    private let sourceName: String
     private static let rmsAlpha: Float = Detection.rmsAlpha
 
     private struct State {
@@ -101,9 +101,9 @@ public final class ImpactDetector: Sendable {
     }
     private let state: OSAllocatedUnfairLock<State>
 
-    public init(config: ImpactDetectorConfig, adapterName: String) {
+    public init(config: ImpactDetectorConfig, sourceName: String) {
         self.config = config
-        self.adapterName = adapterName
+        self.sourceName = sourceName
         self.state = OSAllocatedUnfairLock(initialState: State(
             backgroundMeanSq: config.intensityFloor * config.intensityFloor
         ))
@@ -139,7 +139,7 @@ public final class ImpactDetector: Sendable {
                 if rise > windowPeakRise { windowPeakRise = rise }
             }
             guard windowPeakRise >= config.minRiseRate else {
-                log.debug("entity:Gate blocked=riseRate adapter=\(adapterName) rise=\(String(format: "%.4f", windowPeakRise)) required=\(config.minRiseRate)")
+                log.debug("entity:Gate blocked=riseRate adapter=\(sourceName) rise=\(String(format: "%.4f", windowPeakRise)) required=\(config.minRiseRate)")
                 return nil
             }
 
@@ -148,7 +148,7 @@ public final class ImpactDetector: Sendable {
                 let windowPeak = s.window.map(\.magnitude).max() ?? 0
                 let crest = windowPeak / backgroundRMS
                 guard crest >= config.minCrestFactor else {
-                    log.debug("entity:Gate blocked=crestFactor adapter=\(adapterName) crest=\(String(format: "%.2f", crest)) required=\(config.minCrestFactor)")
+                    log.debug("entity:Gate blocked=crestFactor adapter=\(sourceName) crest=\(String(format: "%.2f", crest)) required=\(config.minCrestFactor)")
                     return nil
                 }
             }
@@ -156,7 +156,7 @@ public final class ImpactDetector: Sendable {
             // Confirmation count
             let confirmed = s.window.filter { $0.magnitude >= config.spikeThreshold }.count
             guard confirmed >= config.minConfirmations else {
-                log.debug("entity:Gate blocked=confirmations adapter=\(adapterName) count=\(confirmed) required=\(config.minConfirmations)")
+                log.debug("entity:Gate blocked=confirmations adapter=\(sourceName) count=\(confirmed) required=\(config.minConfirmations)")
                 return nil
             }
 
@@ -164,7 +164,7 @@ public final class ImpactDetector: Sendable {
             let intensityRange = max(config.intensityCeiling - config.intensityFloor, Detection.intensityEpsilon)
             let intensity = ((magnitude - config.intensityFloor) / intensityRange).clamped(to: 0...1)
 
-            log.debug("entity:Impact adapter=\(adapterName) intensity=\(String(format: "%.2f", intensity)) mag=\(String(format: "%.4f", magnitude)) crest=\(String(format: "%.1f", backgroundRMS > 0 ? magnitude / backgroundRMS : 0))")
+            log.debug("entity:Impact adapter=\(sourceName) intensity=\(String(format: "%.2f", intensity)) mag=\(String(format: "%.4f", magnitude)) crest=\(String(format: "%.1f", backgroundRMS > 0 ? magnitude / backgroundRMS : 0))")
 
             return intensity
         }

@@ -65,7 +65,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
 
     func testWarmupPeriodRejectsAllSamples() {
         let warmup = 50
-        let detector = ImpactDetector(config: accelConfig(warmupSamples: warmup), adapterName: "accel-e2e")
+        let detector = ImpactDetector(config: accelConfig(warmupSamples: warmup), sourceName: "accel-e2e")
         let now = Date()
 
         // Feed strong samples during warmup -- all should be rejected
@@ -83,7 +83,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
             minConfirmations: 1, warmupSamples: warmup,
             intensityFloor: 0.01, intensityCeiling: 1.0
         )
-        let detector = ImpactDetector(config: config, adapterName: "accel-e2e")
+        let detector = ImpactDetector(config: config, sourceName: "accel-e2e")
         let now = Date()
 
         // Feed warmup samples
@@ -100,7 +100,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
 
     func testSubThresholdSamplesRejected() {
         let config = accelConfig(spikeThreshold: 0.020, warmupSamples: 0)
-        let detector = ImpactDetector(config: config, adapterName: "accel-e2e")
+        let detector = ImpactDetector(config: config, sourceName: "accel-e2e")
         let now = Date()
 
         // Feed 100 samples all below threshold
@@ -113,7 +113,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
 
     func testBarelyBelowThresholdRejected() {
         let config = accelConfig(spikeThreshold: 0.020, warmupSamples: 0)
-        let detector = ImpactDetector(config: config, adapterName: "accel-e2e")
+        let detector = ImpactDetector(config: config, sourceName: "accel-e2e")
         let result = detector.process(magnitude: 0.0199, timestamp: Date())
         XCTAssertNil(result, "Sample barely below threshold should be rejected")
     }
@@ -122,7 +122,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
 
     func testDeskHitProducesSensorImpact() {
         let config = accelConfig(warmupSamples: 10)
-        let detector = ImpactDetector(config: config, adapterName: "accel-e2e")
+        let detector = ImpactDetector(config: config, sourceName: "accel-e2e")
         let now = Date()
 
         // Phase 1: warmup with quiet background
@@ -148,7 +148,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
 
     func testWeakDeskHitDetected() {
         let config = accelConfig(warmupSamples: 5)
-        let detector = ImpactDetector(config: config, adapterName: "accel-e2e")
+        let detector = ImpactDetector(config: config, sourceName: "accel-e2e")
         let now = Date()
 
         // Short warmup
@@ -173,7 +173,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
 
     func testIntensityOutputInZeroOneRange() {
         let config = accelConfig(warmupSamples: 5)
-        let detector = ImpactDetector(config: config, adapterName: "accel-e2e")
+        let detector = ImpactDetector(config: config, sourceName: "accel-e2e")
         let now = Date()
 
         // Warmup
@@ -191,7 +191,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
                 spikeThreshold: 0.01, minRiseRate: 0, minCrestFactor: 0,
                 minConfirmations: 1, warmupSamples: 0,
                 intensityFloor: 0.002, intensityCeiling: 0.060
-            ), adapterName: "range-test")
+            ), sourceName: "range-test")
             let ts = now.addingTimeInterval(Double(idx) * 0.5)
             if let intensity = det.process(magnitude: mag, timestamp: ts) {
                 intensities.append(intensity)
@@ -212,7 +212,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
             minConfirmations: 1, warmupSamples: 0,
             intensityFloor: 0.01, intensityCeiling: 0.05
         )
-        let detector = ImpactDetector(config: config, adapterName: "saturation-test")
+        let detector = ImpactDetector(config: config, sourceName: "saturation-test")
         let result = detector.process(magnitude: 1.0, timestamp: Date())
         XCTAssertNotNil(result)
         XCTAssertEqual(result ?? 0, 1.0, accuracy: 0.001, "Magnitude far above ceiling should saturate at 1.0")
@@ -224,7 +224,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
             minConfirmations: 1, warmupSamples: 0,
             intensityFloor: 0.01, intensityCeiling: 1.0
         )
-        let detector = ImpactDetector(config: config, adapterName: "floor-test")
+        let detector = ImpactDetector(config: config, sourceName: "floor-test")
         let result = detector.process(magnitude: 0.02, timestamp: Date())
         XCTAssertNotNil(result)
         XCTAssertLessThan(result ?? 1, 0.05, "Magnitude near floor should produce low intensity")
@@ -237,7 +237,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
             spikeThreshold: 0.010, minRiseRate: 0.010,
             minCrestFactor: 0, minConfirmations: 1, warmupSamples: 0
         )
-        let detector = ImpactDetector(config: config, adapterName: "rise-test")
+        let detector = ImpactDetector(config: config, sourceName: "rise-test")
         let now = Date()
 
         // Feed a very gradual ramp -- each step less than minRiseRate
@@ -263,7 +263,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
             spikeThreshold: 0.010, minRiseRate: 0.010,
             minCrestFactor: 0, minConfirmations: 1, warmupSamples: 0
         )
-        let detector = ImpactDetector(config: config, adapterName: "rise-test")
+        let detector = ImpactDetector(config: config, sourceName: "rise-test")
         let now = Date()
 
         // Quiet then sharp spike
@@ -280,7 +280,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
             spikeThreshold: 0.015, minRiseRate: 0, minCrestFactor: 3.0,
             minConfirmations: 1, warmupSamples: 0
         )
-        let detector = ImpactDetector(config: config, adapterName: "crest-test")
+        let detector = ImpactDetector(config: config, sourceName: "crest-test")
         let now = Date()
 
         // Feed many samples at moderate level to raise background RMS
@@ -301,7 +301,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
             spikeThreshold: 0.020, minRiseRate: 0, minCrestFactor: 0,
             minConfirmations: 3, warmupSamples: 0
         )
-        let detector = ImpactDetector(config: config, adapterName: "confirm-test")
+        let detector = ImpactDetector(config: config, sourceName: "confirm-test")
         let now = Date()
 
         // Single sample above threshold -- not enough confirmations
@@ -321,7 +321,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
 
     func testFullRealisticAccelerometerSequence() {
         let config = accelConfig()  // All defaults: 50 warmup, real thresholds
-        let detector = ImpactDetector(config: config, adapterName: "full-e2e")
+        let detector = ImpactDetector(config: config, sourceName: "full-e2e")
         let now = Date()
         var detections: [(index: Int, intensity: Float)] = []
 
@@ -382,7 +382,7 @@ final class ImpactDetectorE2ETests: XCTestCase {
 
     func testWindowPruningDoesNotCrash() {
         let config = accelConfig(warmupSamples: 0)
-        let detector = ImpactDetector(config: config, adapterName: "prune-test")
+        let detector = ImpactDetector(config: config, sourceName: "prune-test")
         let now = Date()
 
         // Feed 1000 samples over 20 seconds -- tests window pruning under load

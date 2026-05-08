@@ -61,7 +61,7 @@ private let log = AppLog(category: "Accelerometer")
 
 // MARK: - Kernel driver seam
 //
-// Wraps every IOKit call that AccelerometerReader and AppleSPUDevice make
+// Wraps every IOKit call that AccelerometerSource and AppleSPUDevice make
 // so that fidelity gates around `KERN_SUCCESS`, `kIOReturnSuccess`,
 // iterator sentinels and `maxSize > 0` are reachable from XCTest.
 //
@@ -327,11 +327,11 @@ public final class AccelerometerSource: SensorSource, Sendable {
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: SensorImpact.self)
 
         let ctx = ReportContext(
-            adapterID: id,
+            sourceID: id,
             continuation: continuation,
             hpFilter: HighPassFilter(cutoffHz: bandpassLowHz, sampleRate: AccelHardwareConstants.defaultSampleRate),
             lpFilter: LowPassFilter(cutoffHz: bandpassHighHz, sampleRate: AccelHardwareConstants.defaultSampleRate),
-            detector: ImpactDetector(config: detectorConfig, adapterName: name)
+            detector: ImpactDetector(config: detectorConfig, sourceName: name)
         )
 
         // Subscribe to the broker. The broker handles device open +
@@ -352,7 +352,7 @@ public final class AccelerometerSource: SensorSource, Sendable {
             // necessary because the broker exposes `UnsafePointer<UInt8>`
             // (immutable view) but the existing handleReport signature
             // takes the mutable variant for backwards-compat with the
-            // mutation-anchor cells in `MatrixAccelerometerReader_Tests`.
+            // mutation-anchor cells in `MatrixAccelerometerSource_Tests`.
             let mutPtr = UnsafeMutablePointer<UInt8>(mutating: report.bytes)
             ctx.handleReport(report: mutPtr, length: report.length)
         }
@@ -584,8 +584,8 @@ internal enum AccelHardware {
     }
 
     static func openStream(
-        adapterID: SensorID,
-        adapterName: String,
+        sourceID: SensorID,
+        sourceName: String,
         reportIntervalUS: Int = 10000,
         bandpassLowHz: Float = 20.0,
         bandpassHighHz: Float = 25.0,
@@ -620,7 +620,7 @@ internal enum AccelHardware {
             return stream
         }
 
-        log.info("entity:AccelDevice wasAssociatedWith agent:\(adapterName)")
+        log.info("entity:AccelDevice wasAssociatedWith agent:\(sourceName)")
 
         let maxSize = driver.hidDeviceMaxReportSize(device)
         guard maxSize > 0 else {
@@ -634,11 +634,11 @@ internal enum AccelHardware {
         buffer.initialize(repeating: 0, count: maxSize)
 
         let ctx = ReportContext(
-            adapterID: adapterID,
+            sourceID: sourceID,
             continuation: continuation,
             hpFilter: HighPassFilter(cutoffHz: bandpassLowHz, sampleRate: AccelHardwareConstants.defaultSampleRate),
             lpFilter: LowPassFilter(cutoffHz: bandpassHighHz, sampleRate: AccelHardwareConstants.defaultSampleRate),
-            detector: ImpactDetector(config: detectorConfig, adapterName: adapterName)
+            detector: ImpactDetector(config: detectorConfig, sourceName: sourceName)
         )
         let ctxPtr = Unmanaged.passRetained(ctx)
 
@@ -665,7 +665,7 @@ internal enum AccelHardware {
         }
         driver.hidManagerScheduleWithRunLoop(manager, runLoop: runLoop, mode: rlMode.rawValue)
 
-        log.info("activity:SensorReading wasStartedBy agent:\(adapterName)")
+        log.info("activity:SensorReading wasStartedBy agent:\(sourceName)")
 
         // Watchdog: monitors the report stream for stalls. Critical for the
         // App Store sandbox path because activation writes are denied — the
@@ -766,7 +766,7 @@ internal enum AccelHardware {
                 k.buffer.deallocate()
                 k.ctxPtr.release()
             }
-            log.info("activity:SensorReading wasEndedBy agent:\(adapterName)")
+            log.info("activity:SensorReading wasEndedBy agent:\(sourceName)")
         }
 
         return stream
@@ -917,13 +917,13 @@ private struct WatchdogHandle: Sendable {
 /// All mutable and non-Sendable state is lock-protected.
 ///
 /// Exposed as `internal` (rather than `private`) so mutation-coverage cells
-/// in `Tests/MatrixAccelerometerReader_Tests.swift` can drive
+/// in `Tests/MatrixAccelerometerSource_Tests.swift` can drive
 /// `handleReport(report:length:)` with synthesised payloads. This is the
 /// minimum surface needed to make the four behavioural gates inside
 /// `handleReport` (length floor, running guard, decimation, magnitude
 /// bounds) directly catchable by `make mutate`.
 internal final class ReportContext: Sendable {
-    let adapterID: SensorID
+    let sourceID: SensorID
 
     /// Every field is now Sendable on its own: the continuation, filters,
     /// and detector are all Sendable value- or lock-protected types, so the
@@ -944,11 +944,11 @@ internal final class ReportContext: Sendable {
     }
     private let state: OSAllocatedUnfairLock<State>
 
-    internal init(adapterID: SensorID,
+    internal init(sourceID: SensorID,
                   continuation: AsyncThrowingStream<SensorImpact, Error>.Continuation,
                   hpFilter: HighPassFilter, lpFilter: LowPassFilter,
                   detector: ImpactDetector) {
-        self.adapterID = adapterID
+        self.sourceID = sourceID
         self.state = OSAllocatedUnfairLock(initialState: State(
             continuation: continuation, hpFilter: hpFilter,
             lpFilter: lpFilter, detector: detector))
@@ -1002,9 +1002,9 @@ internal final class ReportContext: Sendable {
             // logging proves the passive HID subscription works long-term,
             // not just for an initial burst.
             if s.sampleCounter == 0 {
-                log.info("activity:SensorReading wasGeneratedBy entity:FirstReport adapter=\(self.adapterID) length=\(length)")
+                log.info("activity:SensorReading wasGeneratedBy entity:FirstReport adapter=\(self.sourceID) length=\(length)")
             } else if s.sampleCounter % 1000 == 0 {
-                log.info("activity:SensorReading wasGeneratedBy entity:Report adapter=\(self.adapterID) sampleCount=\(s.sampleCounter)")
+                log.info("activity:SensorReading wasGeneratedBy entity:Report adapter=\(self.sourceID) sampleCount=\(s.sampleCounter)")
             }
             s.sampleCounter += 1
             guard s.sampleCounter % decimationFactor == 0 else { return nil }
@@ -1018,7 +1018,7 @@ internal final class ReportContext: Sendable {
 
             let now = Date()
             guard let intensity = s.detector.process(magnitude: filteredMag, timestamp: now) else { return nil }
-            return (s.continuation, SensorImpact(source: self.adapterID, timestamp: now, intensity: intensity))
+            return (s.continuation, SensorImpact(source: self.sourceID, timestamp: now, intensity: intensity))
         }
         if let pending { pending.cont.yield(pending.impact) }
     }
