@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="Yamete — a macOS app that reacts when you smack your laptop">
+
+  <defs>
+    <linearGradient id="bgGradient" x1="0" y1="0" x2="1280" y2="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0"   stop-color="#33101a"/>
+      <stop offset="0.5" stop-color="#1f0810"/>
+      <stop offset="1"   stop-color="#120509"/>
+    </linearGradient>
+
+    <radialGradient id="logoGlow" cx="290" cy="320" r="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0"   stop-color="#ff6b8a" stop-opacity="0.35"/>
+      <stop offset="1"   stop-color="#ff6b8a" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="rightAccent" x1="540" y1="0" x2="1280" y2="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0"   stop-color="#9d1a3d" stop-opacity="0.07"/>
+      <stop offset="1"   stop-color="#ff6b8a" stop-opacity="0.04"/>
+    </linearGradient>
+
+    <filter id="iconShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="26" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+
+    <g id="impactRays">
+      <g stroke="#ff6b8a" stroke-linecap="round" stroke-width="6" opacity="0.55">
+        <line x1="0" y1="-240" x2="0" y2="-195"/>
+        <line x1="0" y1="240"  x2="0" y2="195"/>
+        <line x1="-240" y1="0" x2="-195" y2="0"/>
+        <line x1="240" y1="0"  x2="195" y2="0"/>
+        <line x1="-170" y1="-170" x2="-138" y2="-138"/>
+        <line x1="170"  y1="-170" x2="138"  y2="-138"/>
+        <line x1="-170" y1="170"  x2="-138" y2="138"/>
+        <line x1="170"  y1="170"  x2="138"  y2="138"/>
+      </g>
+      <g stroke="#ffb3c4" stroke-linecap="round" stroke-width="3" opacity="0.7">
+        <line x1="-92" y1="-222" x2="-74" y2="-181"/>
+        <line x1="92"  y1="-222" x2="74"  y2="-181"/>
+        <line x1="-92" y1="222"  x2="-74" y2="181"/>
+        <line x1="92"  y1="222"  x2="74"  y2="181"/>
+        <line x1="-222" y1="-92" x2="-181" y2="-74"/>
+        <line x1="222"  y1="-92" x2="181"  y2="-74"/>
+        <line x1="-222" y1="92"  x2="-181" y2="74"/>
+        <line x1="222"  y1="92"  x2="181"  y2="74"/>
+      </g>
+    </g>
+
+    <style>
+      .title {
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        fill: #fff5f7;
+      }
+      .tagline {
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        fill: #ffc8d4;
+        opacity: 0.92;
+      }
+      .meta {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-weight: 500;
+        fill: #ff9bb3;
+        opacity: 0.7;
+      }
+      .repoMeta {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-weight: 600;
+        fill: #ffc8d4;
+        opacity: 0.7;
+        letter-spacing: 0.04em;
+      }
+      .divider {
+        stroke: #ff6b8a;
+        stroke-opacity: 0.35;
+        stroke-width: 1.5;
+      }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="640" fill="url(#bgGradient)"/>
+  <rect x="0" y="0" width="1280" height="640" fill="url(#rightAccent)"/>
+  <ellipse cx="290" cy="320" rx="290" ry="290" fill="url(#logoGlow)"/>
+
+  <g transform="translate(290, 320)">
+    <use href="#impactRays"/>
+    <image href="__ICON_DATA_URI__" x="-160" y="-160" width="320" height="320" filter="url(#iconShadow)" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <line x1="580" y1="80" x2="580" y2="560" class="divider"/>
+
+  <g transform="translate(620, 175)">
+    <text class="repoMeta" x="0" y="0" font-size="22">STUDNICKY / YAMETE</text>
+    <text class="title"    x="0" y="100" font-size="124">Yamete</text>
+    <text class="tagline"  x="0" y="170" font-size="32">a macOS menu bar app</text>
+    <text class="tagline"  x="0" y="212" font-size="32">that reacts when you smack it</text>
+
+    <g transform="translate(0, 252)">
+      <circle cx="14"  cy="14" r="14" fill="#ff6b8a"/>
+      <circle cx="58"  cy="14" r="14" fill="#ffb3c4"/>
+      <circle cx="102" cy="14" r="14" fill="#9ed8ff"/>
+    </g>
+
+    <text class="meta" x="0" y="332" font-size="22">accelerometer · microphone · AirPods IMU</text>
+  </g>
+</svg>

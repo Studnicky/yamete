@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Yamete __VERSION__">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Yamete — a macOS app that reacts when you smack your laptop">
 
   <defs>
     <linearGradient id="bgGradient" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
@@ -7,7 +7,7 @@
       <stop offset="1"   stop-color="#120509"/>
     </linearGradient>
 
-    <radialGradient id="logoGlow" cx="270" cy="315" r="290" gradientUnits="userSpaceOnUse">
+    <radialGradient id="logoGlow" cx="270" cy="315" r="280" gradientUnits="userSpaceOnUse">
       <stop offset="0"   stop-color="#ff6b8a" stop-opacity="0.35"/>
       <stop offset="1"   stop-color="#ff6b8a" stop-opacity="0"/>
     </radialGradient>
@@ -23,24 +23,24 @@
 
     <g id="impactRays">
       <g stroke="#ff6b8a" stroke-linecap="round" stroke-width="6" opacity="0.55">
-        <line x1="0" y1="-235" x2="0" y2="-190"/>
-        <line x1="0" y1="235"  x2="0" y2="190"/>
-        <line x1="-235" y1="0" x2="-190" y2="0"/>
-        <line x1="235" y1="0"  x2="190" y2="0"/>
-        <line x1="-166" y1="-166" x2="-134" y2="-134"/>
-        <line x1="166"  y1="-166" x2="134"  y2="-134"/>
-        <line x1="-166" y1="166"  x2="-134" y2="134"/>
-        <line x1="166"  y1="166"  x2="134"  y2="134"/>
+        <line x1="0" y1="-230" x2="0" y2="-185"/>
+        <line x1="0" y1="230"  x2="0" y2="185"/>
+        <line x1="-230" y1="0" x2="-185" y2="0"/>
+        <line x1="230" y1="0"  x2="185" y2="0"/>
+        <line x1="-162" y1="-162" x2="-131" y2="-131"/>
+        <line x1="162"  y1="-162" x2="131"  y2="-131"/>
+        <line x1="-162" y1="162"  x2="-131" y2="131"/>
+        <line x1="162"  y1="162"  x2="131"  y2="131"/>
       </g>
       <g stroke="#ffb3c4" stroke-linecap="round" stroke-width="3" opacity="0.7">
-        <line x1="-90" y1="-217" x2="-72" y2="-177"/>
-        <line x1="90"  y1="-217" x2="72"  y2="-177"/>
-        <line x1="-90" y1="217"  x2="-72" y2="177"/>
-        <line x1="90"  y1="217"  x2="72"  y2="177"/>
-        <line x1="-217" y1="-90" x2="-177" y2="-72"/>
-        <line x1="217"  y1="-90" x2="177"  y2="-72"/>
-        <line x1="-217" y1="90"  x2="-177" y2="72"/>
-        <line x1="217"  y1="90"  x2="177"  y2="72"/>
+        <line x1="-88" y1="-213" x2="-71" y2="-173"/>
+        <line x1="88"  y1="-213" x2="71"  y2="-173"/>
+        <line x1="-88" y1="213"  x2="-71" y2="173"/>
+        <line x1="88"  y1="213"  x2="71"  y2="173"/>
+        <line x1="-213" y1="-88" x2="-173" y2="-71"/>
+        <line x1="213"  y1="-88" x2="173"  y2="-71"/>
+        <line x1="-213" y1="88"  x2="-173" y2="71"/>
+        <line x1="213"  y1="88"  x2="173"  y2="71"/>
       </g>
     </g>
 
@@ -62,19 +62,7 @@
         font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
         font-weight: 500;
         fill: #ff9bb3;
-        opacity: 0.75;
-      }
-      .version {
-        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-        font-weight: 700;
-        fill: #fff5f7;
-      }
-      .versionPill {
-        fill: #ff6b8a;
-        fill-opacity: 0.22;
-        stroke: #ff6b8a;
-        stroke-opacity: 0.6;
-        stroke-width: 1.5;
+        opacity: 0.7;
       }
       .divider {
         stroke: #ff6b8a;
@@ -86,25 +74,26 @@
 
   <rect x="0" y="0" width="1200" height="630" fill="url(#bgGradient)"/>
   <rect x="0" y="0" width="1200" height="630" fill="url(#rightAccent)"/>
-  <ellipse cx="270" cy="315" rx="290" ry="290" fill="url(#logoGlow)"/>
+  <ellipse cx="270" cy="315" rx="280" ry="280" fill="url(#logoGlow)"/>
 
   <g transform="translate(270, 315)">
     <use href="#impactRays"/>
-    <image href="__ICON_DATA_URI__" x="-155" y="-155" width="310" height="310" filter="url(#iconShadow)" preserveAspectRatio="xMidYMid meet"/>
+    <image href="__ICON_DATA_URI__" x="-150" y="-150" width="300" height="300" filter="url(#iconShadow)" preserveAspectRatio="xMidYMid meet"/>
   </g>
 
   <line x1="540" y1="80" x2="540" y2="550" class="divider"/>
 
-  <g transform="translate(580, 170)">
+  <g transform="translate(580, 180)">
     <text class="title" x="0" y="0" font-size="120">Yamete</text>
-    <text class="tagline" x="0" y="64" font-size="30">a macOS menu bar app</text>
-    <text class="tagline" x="0" y="104" font-size="30">that reacts when you smack it</text>
+    <text class="tagline" x="0" y="68" font-size="30">a macOS menu bar app</text>
+    <text class="tagline" x="0" y="108" font-size="30">that reacts when you smack it</text>
 
-    <g transform="translate(0, 152)">
-      <rect class="versionPill" x="0" y="0" width="190" height="54" rx="27" ry="27"/>
-      <text class="version" x="95" y="36" font-size="26" text-anchor="middle">__VERSION__</text>
+    <g transform="translate(0, 158)">
+      <circle cx="14"  cy="14" r="14" fill="#ff6b8a"/>
+      <circle cx="58"  cy="14" r="14" fill="#ffb3c4"/>
+      <circle cx="102" cy="14" r="14" fill="#9ed8ff"/>
     </g>
 
-    <text class="meta" x="0" y="248" font-size="22">accelerometer · microphone · AirPods IMU</text>
+    <text class="meta" x="0" y="240" font-size="22">accelerometer · microphone · AirPods IMU</text>
   </g>
 </svg>
