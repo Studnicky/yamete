@@ -1,18 +1,30 @@
 {
-  "devDependencies": {
-    "vitepress": "^1.6.4"
-  },
   "name": "yamete-docs",
   "private": true,
+  "type": "module",
+  "version": "0.0.0",
   "scripts": {
+    "stamp-version": "node scripts/stamp-version.mjs",
+    "stamp-version:check": "node scripts/stamp-version.mjs --check",
+    "render-og": "node scripts/render-og.mjs",
+    "predocs:build": "node scripts/stamp-version.mjs && node scripts/render-og.mjs",
     "docs:build": "vitepress build docs",
     "docs:dev": "vitepress dev docs",
     "docs:preview": "vitepress preview docs"
   },
-  "type": "module",
-  "version": "0.0.0",
   "dependencies": {
     "mermaid": "^11.14.0",
     "vitepress-plugin-mermaid": "^2.0.17"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.5",
+    "vitepress": "^1.6.4"
+  },
+  "yamete": {
+    "seo": {
+      "googleSiteVerification": "",
+      "bingSiteVerification": "",
+      "twitterHandle": ""
+    }
   }
 }

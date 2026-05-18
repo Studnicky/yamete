@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Yamete __VERSION__">
+
+  <defs>
+    <linearGradient id="bgGradient" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0"   stop-color="#1a1a1a"/>
+      <stop offset="0.5" stop-color="#141414"/>
+      <stop offset="1"   stop-color="#0a0a0a"/>
+    </linearGradient>
+
+    <radialGradient id="logoGlow" cx="270" cy="315" r="290" gradientUnits="userSpaceOnUse">
+      <stop offset="0"   stop-color="#ff6b8a" stop-opacity="0.28"/>
+      <stop offset="1"   stop-color="#ff6b8a" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="iconShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="28" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+
+    <g id="impactRays">
+      <g stroke="#ff6b8a" stroke-linecap="round" stroke-width="6" opacity="0.6">
+        <line x1="0" y1="-245" x2="0" y2="-200"/>
+        <line x1="0" y1="245"  x2="0" y2="200"/>
+        <line x1="-245" y1="0" x2="-200" y2="0"/>
+        <line x1="245" y1="0"  x2="200" y2="0"/>
+        <line x1="-173" y1="-173" x2="-141" y2="-141"/>
+        <line x1="173"  y1="-173" x2="141"  y2="-141"/>
+        <line x1="-173" y1="173"  x2="-141" y2="141"/>
+        <line x1="173"  y1="173"  x2="141"  y2="141"/>
+      </g>
+      <g stroke="#ffb3c4" stroke-linecap="round" stroke-width="3" opacity="0.7">
+        <line x1="-94" y1="-225" x2="-76" y2="-185"/>
+        <line x1="94"  y1="-225" x2="76"  y2="-185"/>
+        <line x1="-94" y1="225"  x2="-76" y2="185"/>
+        <line x1="94"  y1="225"  x2="76"  y2="185"/>
+        <line x1="-225" y1="-94" x2="-185" y2="-76"/>
+        <line x1="225"  y1="-94" x2="185"  y2="-76"/>
+        <line x1="-225" y1="94"  x2="-185" y2="76"/>
+        <line x1="225"  y1="94"  x2="185"  y2="76"/>
+      </g>
+    </g>
+
+    <style>
+      .title {
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        fill: #ffb3c4;
+      }
+      .tagline {
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 400;
+        letter-spacing: 0.005em;
+        fill: #f0f0f0;
+      }
+      .meta {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-weight: 500;
+        fill: #ff6b8a;
+      }
+      .version {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-weight: 700;
+        fill: #ffb3c4;
+      }
+      .versionPill {
+        fill: #ff6b8a;
+        fill-opacity: 0.16;
+        stroke: #ff6b8a;
+        stroke-opacity: 0.6;
+        stroke-width: 1.5;
+      }
+      .divider {
+        stroke: #ff6b8a;
+        stroke-opacity: 0.35;
+        stroke-width: 1.5;
+      }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="630" fill="url(#bgGradient)"/>
+  <ellipse cx="270" cy="315" rx="290" ry="290" fill="url(#logoGlow)"/>
+
+  <g transform="translate(270, 315)">
+    <use href="#impactRays"/>
+    <image href="__ICON_DATA_URI__" x="-165" y="-165" width="330" height="330" filter="url(#iconShadow)" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <line x1="540" y1="80" x2="540" y2="550" class="divider"/>
+
+  <g transform="translate(580, 168)">
+    <text class="title" x="0" y="0" font-size="120">Yamete</text>
+    <text class="tagline" x="0" y="64" font-size="30">Lives in your menu bar.</text>
+    <text class="tagline" x="0" y="104" font-size="30">Reacts when you touch it.</text>
+
+    <g transform="translate(0, 152)">
+      <rect class="versionPill" x="0" y="0" width="190" height="54" rx="27" ry="27"/>
+      <text class="version" x="95" y="36" font-size="26" text-anchor="middle">__VERSION__</text>
+    </g>
+
+    <text class="meta" x="0" y="248" font-size="22">Three sensors. Eleven triggers. Zero shame.</text>
+  </g>
+</svg>
