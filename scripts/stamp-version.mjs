@@ -32,8 +32,17 @@ import { fileURLToPath } from 'node:url';
 const ROOT             = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PROJECT_YML_PATH = join(ROOT, 'project.yml');
 const PUBLIC_DIR       = join(ROOT, 'docs/public');
-const ICON_SRC_PATH    = join(PUBLIC_DIR, 'icon.png');
-const ICON_EMBED_SIZE  = 320;
+/**
+ * `Assets/yamete_icon_source.svg` is the canonical face artwork: a
+ * potrace-traced single-colour stencil with `fill="#ffffff"`. Rendered
+ * on its own it's blank-on-blank; embedded over the banner's dark-pink
+ * gradient it reads as white line art (the look the design calls for).
+ * Keep this pointed at the SVG source rather than the rasterised app
+ * icon (`docs/public/icon.png`) so the embedded art tracks the original
+ * line work without the rounded-squircle macOS app-icon wrapper.
+ */
+const ICON_SRC_PATH    = join(ROOT, 'Assets/yamete_icon_source.svg');
+const ICON_EMBED_SIZE  = 512;
 
 /**
  * Extract MARKETING_VERSION from project.yml without pulling in a YAML
@@ -62,8 +71,14 @@ function readMarketingVersion() {
  */
 async function buildIconDataUri() {
   const { default: sharp } = await import('sharp');
-  const buf = await sharp(ICON_SRC_PATH)
-    .resize(ICON_EMBED_SIZE, ICON_EMBED_SIZE, { 'fit': 'cover' })
+  const svg = readFileSync(ICON_SRC_PATH, 'utf8');
+  /* Density 96 keeps sharp's intermediate raster at the SVG's native
+     800×800 pt → 800×800 px, well under sharp's default pixel-limit;
+     resize then downsamples cleanly to ICON_EMBED_SIZE. Higher density
+     pushes the intermediate buffer over sharp's safety threshold and
+     throws `Input image exceeds pixel limit`. */
+  const buf = await sharp(Buffer.from(svg), { 'density': 96 })
+    .resize(ICON_EMBED_SIZE, ICON_EMBED_SIZE, { 'fit': 'contain', 'background': { 'r': 0, 'g': 0, 'b': 0, 'alpha': 0 } })
     .png({ 'compressionLevel': 9 })
     .toBuffer();
   return `data:image/png;base64,${buf.toString('base64')}`;
