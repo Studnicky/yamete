@@ -33,16 +33,19 @@ const ROOT             = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PROJECT_YML_PATH = join(ROOT, 'project.yml');
 const PUBLIC_DIR       = join(ROOT, 'docs/public');
 /**
- * `Assets/yamete_icon_source.svg` is the canonical face artwork: a
- * potrace-traced single-colour stencil with `fill="#ffffff"`. Rendered
- * on its own it's blank-on-blank; embedded over the banner's dark-pink
- * gradient it reads as white line art (the look the design calls for).
- * Keep this pointed at the SVG source rather than the rasterised app
- * icon (`docs/public/icon.png`) so the embedded art tracks the original
- * line work without the rounded-squircle macOS app-icon wrapper.
+ * `App/Resources/menubar_icon.png` is the canonical face source: the
+ * original 1024×1024 line-art bitmap (black on white, no rounded
+ * squircle, fills the frame). Every other icon surface — App icon set,
+ * docs site favicon, yamete_icon_source.svg — derives from it. We
+ * tone-map the bitmap on the fly: where pixels are dark, we substitute
+ * the brand pink `#ff6b8a`; where pixels are bright, we keep them
+ * white. The result reads as pink line art on white, matching the
+ * design reference and tracking the source bitmap if the artist ever
+ * updates it.
  */
-const ICON_SRC_PATH    = join(ROOT, 'Assets/yamete_icon_source.svg');
-const ICON_EMBED_SIZE  = 512;
+const ICON_SRC_PATH    = join(ROOT, 'App/Resources/menubar_icon.png');
+const ICON_EMBED_SIZE  = 320;
+const BRAND_PINK_RGB   = [0xff, 0x6b, 0x8a];
 
 /**
  * Extract MARKETING_VERSION from project.yml without pulling in a YAML
@@ -71,14 +74,29 @@ function readMarketingVersion() {
  */
 async function buildIconDataUri() {
   const { default: sharp } = await import('sharp');
-  const svg = readFileSync(ICON_SRC_PATH, 'utf8');
-  /* Density 96 keeps sharp's intermediate raster at the SVG's native
-     800×800 pt → 800×800 px, well under sharp's default pixel-limit;
-     resize then downsamples cleanly to ICON_EMBED_SIZE. Higher density
-     pushes the intermediate buffer over sharp's safety threshold and
-     throws `Input image exceeds pixel limit`. */
-  const buf = await sharp(Buffer.from(svg), { 'density': 96 })
-    .resize(ICON_EMBED_SIZE, ICON_EMBED_SIZE, { 'fit': 'contain', 'background': { 'r': 0, 'g': 0, 'b': 0, 'alpha': 0 } })
+  /* Read the source bitmap as flat sRGB so we can luminance-mix each
+     pixel between the brand pink and pure white. Anti-aliased line
+     edges get intermediate pink shades automatically (no banding). */
+  const { data, info } = await sharp(ICON_SRC_PATH)
+    .removeAlpha()
+    .toColourspace('srgb')
+    .raw()
+    .toBuffer({ 'resolveWithObject': true });
+
+  const pixelCount = info.width * info.height;
+  const recolored  = Buffer.alloc(pixelCount * 4);
+  const [pinkR, pinkG, pinkB] = BRAND_PINK_RGB;
+  for (let i = 0; i < pixelCount; i++) {
+    /* Luminance 0..1: 0 = pure black (full ink), 1 = pure white. */
+    const lum = (data[i * 3] + data[i * 3 + 1] + data[i * 3 + 2]) / (3 * 255);
+    const ink = 1 - lum;
+    recolored[i * 4]     = Math.round(255 * lum + pinkR * ink);
+    recolored[i * 4 + 1] = Math.round(255 * lum + pinkG * ink);
+    recolored[i * 4 + 2] = Math.round(255 * lum + pinkB * ink);
+    recolored[i * 4 + 3] = 255;
+  }
+  const buf = await sharp(recolored, { 'raw': { 'width': info.width, 'height': info.height, 'channels': 4 } })
+    .resize(ICON_EMBED_SIZE, ICON_EMBED_SIZE, { 'fit': 'cover' })
     .png({ 'compressionLevel': 9 })
     .toBuffer();
   return `data:image/png;base64,${buf.toString('base64')}`;
