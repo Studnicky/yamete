@@ -45,6 +45,15 @@ jobs:
           fi
           echo "version check passed: $TAG_VERSION"
 
+      - name: Verify stamped banner matches tag version
+        run: |
+          STAMPED=$(grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' docs/public/yamete-banner.svg | head -1 || true)
+          EXPECTED="v${{ steps.version.outputs.version }}"
+          if [[ "$STAMPED" != "$EXPECTED" ]]; then
+            echo "::error::yamete-banner.svg carries '$STAMPED' but the tag is '$EXPECTED'. Run 'npm run stamp-version' before tagging."
+            exit 1
+          fi
+
       - name: Run tests
         run: make test
 
@@ -71,7 +80,12 @@ jobs:
         id: changelog
         run: |
           version="${{ steps.version.outputs.version }}"
+          tag="v${version}"
+          repo="${{ github.repository }}"
+          banner_url="https://raw.githubusercontent.com/${repo}/${tag}/docs/public/yamete-banner.svg"
           {
+            echo "<p align=\"center\"><img src=\"${banner_url}\" alt=\"Yamete ${tag}\" width=\"600\" /></p>"
+            echo ""
             awk "/^## \[${version}\]/{found=1; next} /^## \[/{found=0} found" docs/CHANGELOG.md
             echo ""
             echo "---"

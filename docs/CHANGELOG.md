@@ -11,6 +11,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-05-18
+
+### Added
+- **Docs site SEO infrastructure.** The VitePress site at
+  https://studnicky.github.io/yamete now ships a full SEO surface area:
+  per-page canonical / `og:` / `twitter:` meta via `transformPageData`,
+  JSON-LD blocks for `SoftwareApplication` + `WebSite` + `Organization`
+  + per-page `BreadcrumbList`, search-console verification slots
+  (suppressed at build time until populated in `package.json` →
+  `yamete.seo`), `hreflang` declarations, modern `robots` hints
+  (`max-snippet:-1`, `max-image-preview:large`), and a complete favicon
+  stack with `manifest.webmanifest` for PWA-style install.
+- **Sitemap + RSS feed.** `sitemap.xml` is generated from every rendered
+  page; `feed.xml` is composed from `docs/CHANGELOG.md` at build end
+  and linked from the head via `<link rel="alternate"
+  type="application/rss+xml">` so release watchers, Sparkle-style
+  updaters, and GitHub-action notifiers can subscribe to version drops
+  without polling.
+- **`llms.txt` index.** A semantic table of contents at `/llms.txt`
+  surfaces the docs structure to retrieval-augmented language models in
+  the format proposed at <https://llmstxt.org>.
+- **Release banner image.** New `docs/public/og-image.{svg,png}`
+  (1200×630 social card, pink theme, wincing face with impact rays)
+  drives the unfurl preview on Discord, Slack, iMessage, Twitter/X, and
+  LinkedIn. New `docs/public/yamete-banner.svg.template` is stamped per
+  release by `scripts/stamp-version.mjs` (reads `MARKETING_VERSION` from
+  `project.yml`) into `yamete-banner.svg` with the version pill visible;
+  the release workflow now prepends this banner at the top of every
+  GitHub release body via a `raw.githubusercontent.com` URL.
+- **GitHub repository social preview.** New
+  `docs/public/github-social.{svg,png}` (1280×640, GitHub's recommended
+  Repository → Settings → General → Social preview dimensions). Upload
+  the PNG via the repo settings UI to control the unfurl card that
+  shows when `github.com/Studnicky/yamete` itself is shared on Discord
+  / Twitter / Slack / iMessage. GitHub provides no API for this
+  surface; the asset lives in `docs/public/` for convenient access.
+- **Docs-build CI gate.** `ci.yml` gains a `docs-build` job that runs
+  `npm ci`, `stamp-version:check`, `docs:build`, and asserts the SEO
+  outputs (sitemap, feed, robots, manifest, OG image, stamped banner)
+  exist in `docs/.vitepress/dist`. Docs regressions are now caught at
+  PR time instead of after merge to master.
+
+### Fixed
+- **GitHub Pages deploy was failing since release 2.3.0** due to bare
+  `*<display>*` placeholders in `docs/using.md` and `docs/CHANGELOG.md`
+  which Vue's SFC parser read as unclosed HTML start tags during
+  VitePress's `vite-plugin-vue` pass. Replaced with `&lt;display&gt;`
+  entity escapes so the markdown italicises the placeholder without
+  triggering the HTML tokeniser. The new `docs-build` CI gate (above)
+  prevents this class of regression from reaching master again.
+- **VitePress build no longer chokes on local-only design notes.** The
+  gitignored `docs/art/` design-exploration markdown is now declared in
+  `srcExclude` so VitePress's srcDir glob skips it. Previously the
+  files were silently picked up by local builds and could throw
+  interpolation parser errors on `{{ }}` brace pairs unrelated to the
+  shipped site.
+
+### Build & release pipeline
+- **`stamp-version.mjs` script** reads `MARKETING_VERSION` from
+  `project.yml` (the canonical macOS bundle version source of truth)
+  and stamps every `docs/public/*.svg.template` into a sibling `.svg`
+  with `__VERSION__` replaced by `v<version>`. Hooked into
+  `predocs:build`. `--check` mode exits non-zero if any output is
+  stale so CI flags pre-tag drift.
+- **`render-og.mjs` script** rasterises `og-image.svg` and
+  `yamete-banner.svg` to PNG via `sharp` (devDep). Hooked into
+  `predocs:build` after stamp.
+- **`release.yml` banner verification step** greps the stamped
+  `yamete-banner.svg` for the version string and fails the workflow
+  if it doesn't match the tag — surfaces missed `npm run stamp-version`
+  invocations before the release notes go out.
+
 ## [2.5.0] - 2026-05-07
 
 ### Added
@@ -189,7 +261,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   device's IORegistry ancestors and matches against
   `CGDisplayVendorNumber`/`ModelNumber`/`SerialNumber`. Built-in
   speakers pair structurally to whatever display reports
-  `CGDisplayIsBuiltin == 1`. Audio rows render an "attached to *<display>*"
+  `CGDisplayIsBuiltin == 1`. Audio rows render an "attached to *&lt;display&gt;*"
   footnote when pairing succeeds. See
   [docs/architecture/display-audio-pairing](architecture/display-audio-pairing)
   for failure modes (USB-C docks, KVMs, adapter chains, monitors with

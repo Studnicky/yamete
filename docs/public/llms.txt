@@ -1,0 +1,47 @@
+# Yamete
+
+> A macOS menu bar app that reacts when you smack your laptop. Three sensors. Eleven event triggers. Forty languages. Zero shame.
+
+Yamete is a native macOS menu bar app (Swift 6, strict concurrency, MainActor-confined UI) that detects physical impacts on the MacBook chassis via the built-in accelerometer (BMI286 via SPU HID broker), microphone transient detection, and AirPods IMU. A consensus engine fuses sensor signals before firing reactions. Eleven system event sources (USB, power, audio peripheral, Bluetooth, Thunderbolt, display hotplug, sleep/wake, lid hinge angle, thermal pressure, gyroscope, ambient light) drive their own reaction matrices. Two build variants: Yamete (App Store, rated 12+, tame strings) and Yamete+ (direct download, notarized, full strings).
+
+## Getting started
+
+- [What it does](https://studnicky.github.io/yamete/): the pitch — features, sensors, triggers.
+- [What is this?](https://studnicky.github.io/yamete/what-is-this): the elevator description.
+- [Using Yamete (the menu)](https://studnicky.github.io/yamete/using): every menu item, every toggle, every keyboard shortcut.
+- [Installation](https://studnicky.github.io/yamete/INSTALLATION): App Store + Direct download paths, sensor permissions, sensor kickstart helper.
+- [Support & FAQ](https://studnicky.github.io/yamete/support): troubleshooting, sensor checks, the "why is nothing happening" decision tree.
+
+## Architecture
+
+- [Overview](https://studnicky.github.io/yamete/architecture): the module graph and the high-level data flow.
+- [Module graph](https://studnicky.github.io/yamete/architecture/modules): four SPM modules (YameteCore → IOHIDPublic/SensorKit/ResponseKit → YameteApp) plus the unidirectional dependency rule.
+- [Signal pipeline](https://studnicky.github.io/yamete/architecture/signal-pipeline): how raw sensor samples flow from the kernel through the per-sensor six-gate pipeline to the fusion engine.
+- [Detection gates](https://studnicky.github.io/yamete/architecture/detection-gates): warmup, spike, rise rate, crest factor, confirmations, intensity — the six gates each sensor sample passes through before it can trigger anything.
+- [Fusion engine](https://studnicky.github.io/yamete/architecture/fusion): consensus across accelerometer + microphone + AirPods IMU before a smack registers.
+- [Sensitivity gate](https://studnicky.github.io/yamete/architecture/sensitivity): the global per-user sensitivity multiplier and how it composes with per-sensor gates.
+- [Bus enricher](https://studnicky.github.io/yamete/architecture/enricher): tags impact events with sensor provenance, intensity, and source metadata before dispatch.
+- [Response dispatch](https://studnicky.github.io/yamete/architecture/responses): the matrix of event source × output channel that decides what fires.
+- [LED flash detail](https://studnicky.github.io/yamete/architecture/led-flash): how Caps Lock LED and Keyboard Brightness output channels work and why they are gated independently.
+- [Concurrency model](https://studnicky.github.io/yamete/architecture/concurrency): Swift 6 strict concurrency, MainActor isolation, actor boundaries.
+- [Pipeline lifecycle](https://studnicky.github.io/yamete/architecture/lifecycle): startup, sensor kickstart, sleep/wake handling, shutdown.
+- [Source map](https://studnicky.github.io/yamete/architecture/source-map): which source file owns which architectural concept.
+- [Configuration (every knob)](https://studnicky.github.io/yamete/architecture/configuration): the canonical list of user-facing settings and their defaults.
+
+## Verification
+
+- [Testing](https://studnicky.github.io/yamete/testing): how the test suite is organised, what runs under `make test`.
+- [Sensor Kickstart helper](https://studnicky.github.io/yamete/sensor-kickstart/): the privileged helper that initialises the BMI286 accelerometer on boot and wake from the App Store sandbox.
+
+## Reference
+
+- [Changelog](https://studnicky.github.io/yamete/CHANGELOG): the full version history.
+- [Content licenses](https://studnicky.github.io/yamete/LICENSES-CONTENT): bundled string and audio asset licenses.
+- [Privacy policy](https://studnicky.github.io/yamete/privacy): what Yamete collects (nothing) and what it transmits (nothing).
+- [Acknowledgments](https://studnicky.github.io/yamete/acknowledgments): people, libraries, and content creators credited.
+
+## Source
+
+- [GitHub repository](https://github.com/Studnicky/yamete)
+- [Latest release](https://github.com/Studnicky/yamete/releases/latest)
+- [Sitemap](https://studnicky.github.io/yamete/sitemap.xml)
