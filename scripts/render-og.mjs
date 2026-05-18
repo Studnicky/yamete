@@ -37,12 +37,22 @@ try {
   process.exit(0);
 }
 
+/**
+ * Render targets. `width` × `height` is the output PNG size. `og-image`
+ * and `yamete-banner` are 1200×630 (the universal OG / Twitter
+ * `summary_large_image` aspect ratio). `github-social` is 1280×640,
+ * which is GitHub's recommended Repository → Settings → General →
+ * Social preview dimensions; the file is uploaded manually through that
+ * UI surface (there is no API for it) so it lives in `docs/public/` for
+ * convenient access alongside the docs-site OG image.
+ */
 const targets = [
-  { 'src': 'og-image.svg',      'out': 'og-image.png' },
-  { 'src': 'yamete-banner.svg', 'out': 'yamete-banner.png' },
+  { 'src': 'og-image.svg',       'out': 'og-image.png',       'width': 1200, 'height': 630 },
+  { 'src': 'yamete-banner.svg',  'out': 'yamete-banner.png',  'width': 1200, 'height': 630 },
+  { 'src': 'github-social.svg',  'out': 'github-social.png',  'width': 1280, 'height': 640 },
 ];
 
-for (const { src, out } of targets) {
+for (const { src, out, width, height } of targets) {
   const srcPath = join(PUBLIC_DIR, src);
   const outPath = join(PUBLIC_DIR, out);
   if (!existsSync(srcPath)) {
@@ -51,9 +61,9 @@ for (const { src, out } of targets) {
   }
   const svg = readFileSync(srcPath);
   const png = await sharp(svg, { 'density': 144 })
-    .resize(1200, 630, { 'fit': 'cover' })
+    .resize(width, height, { 'fit': 'cover' })
     .png({ 'compressionLevel': 9, 'palette': false })
     .toBuffer();
   writeFileSync(outPath, png);
-  console.log(`render-og: wrote ${out} (${png.length} bytes)`);
+  console.log(`render-og: wrote ${out} (${width}×${height}, ${png.length} bytes)`);
 }

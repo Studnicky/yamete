@@ -40,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `project.yml`) into `yamete-banner.svg` with the version pill visible;
   the release workflow now prepends this banner at the top of every
   GitHub release body via a `raw.githubusercontent.com` URL.
+- **GitHub repository social preview.** New
+  `docs/public/github-social.{svg,png}` (1280×640, GitHub's recommended
+  Repository → Settings → General → Social preview dimensions). Upload
+  the PNG via the repo settings UI to control the unfurl card that
+  shows when `github.com/Studnicky/yamete` itself is shared on Discord
+  / Twitter / Slack / iMessage. GitHub provides no API for this
+  surface; the asset lives in `docs/public/` for convenient access.
 - **Docs-build CI gate.** `ci.yml` gains a `docs-build` job that runs
   `npm ci`, `stamp-version:check`, `docs:build`, and asserts the SEO
   outputs (sitemap, feed, robots, manifest, OG image, stamped banner)
