@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Yamete">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="60%">
+      <stop offset="0%"  stop-color="#ff8aa6"/>
+      <stop offset="55%" stop-color="#ff6b8a"/>
+      <stop offset="100%" stop-color="#c4365a"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="60%"  stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="64" height="64" rx="14" ry="14" fill="url(#bg)"/>
+  <circle cx="32" cy="30" r="22" fill="url(#glow)"/>
+  <g fill="#fff5f7" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" text-anchor="middle">
+    <text x="32" y="44" font-size="38" letter-spacing="-1.5">Y</text>
+  </g>
+  <g fill="none" stroke="#fff5f7" stroke-linecap="round" stroke-width="2.4" opacity="0.85">
+    <path d="M9 14 L14 19"/>
+    <path d="M55 14 L50 19"/>
+    <path d="M9 50 L14 45"/>
+    <path d="M55 50 L50 45"/>
+  </g>
+</svg>

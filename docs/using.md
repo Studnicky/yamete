@@ -105,7 +105,7 @@ Pick which physical devices the outputs talk to.
 
 | Picker | What it controls |
 |---|---|
-| **Audio output** | Which Core Audio device(s) the sound clips play on. Multi-select. Each row carries an icon derived from its CoreAudio transport class (laptop = built-in, TV = DisplayPort/HDMI, cable = USB, headphones = wireless or analog). When the audio device is paired to a connected display via EDID match (DisplayPort/HDMI) or built-in association (MacBook speakers + built-in display), an "attached to *<display>*" footnote appears under the device name. See [Architecture > Display / audio pairing](/architecture/display-audio-pairing) for the matching algorithm and the topologies it can't resolve. |
+| **Audio output** | Which Core Audio device(s) the sound clips play on. Multi-select. Each row carries an icon derived from its CoreAudio transport class (laptop = built-in, TV = DisplayPort/HDMI, cable = USB, headphones = wireless or analog). When the audio device is paired to a connected display via EDID match (DisplayPort/HDMI) or built-in association (MacBook speakers + built-in display), an "attached to *&lt;display&gt;*" footnote appears under the device name. See [Architecture > Display / audio pairing](/architecture/display-audio-pairing) for the matching algorithm and the topologies it can't resolve. |
 | **Display** | Which monitor(s) get the screen-flash overlay. Multi-select. |
 | **Keyboard** | Which physical keyboard the LED + backlight pulse drives. Useful when an external keyboard is attached. |
 

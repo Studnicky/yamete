@@ -1,0 +1,37 @@
+{
+  "name": "Yamete: a macOS app that reacts when you smack your laptop",
+  "short_name": "Yamete",
+  "description": "A macOS menu bar app that reacts when you smack your laptop. Three sensors. Eleven event triggers. Forty languages. Zero shame.",
+  "id": "/yamete/",
+  "start_url": "/yamete/",
+  "scope": "/yamete/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#ff6b8a",
+  "background_color": "#1a0a12",
+  "lang": "en-US",
+  "categories": ["entertainment", "utilities", "lifestyle"],
+  "icons": [
+    {
+      "src": "/yamete/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/yamete/icon.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/yamete/og-image.png",
+      "type": "image/png",
+      "sizes": "1200x630",
+      "form_factor": "wide",
+      "label": "Yamete: a macOS menu bar app that reacts when you smack your laptop"
+    }
+  ]
+}

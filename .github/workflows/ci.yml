@@ -36,6 +36,28 @@ jobs:
       - name: Verify project.yml ↔ docs version match
         run: scripts/check-versions.sh
 
+  docs-build:
+    name: Docs build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v6
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Verify stamped banner is current
+        run: npm run stamp-version:check
+      - name: Build VitePress site
+        run: npm run docs:build
+      - name: Verify SEO outputs present
+        run: |
+          test -f docs/.vitepress/dist/sitemap.xml
+          test -f docs/.vitepress/dist/feed.xml
+          test -f docs/.vitepress/dist/robots.txt
+          test -f docs/.vitepress/dist/manifest.webmanifest
+          test -f docs/.vitepress/dist/og-image.png
+          test -f docs/.vitepress/dist/yamete-banner.svg
+
   lint:
     name: Lint (strict concurrency)
     runs-on: macos-15
