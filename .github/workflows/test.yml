@@ -35,7 +35,7 @@ jobs:
     name: swift test (default)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Resolve Xcode version
         id: xcode
         run: echo "version=$(xcodebuild -version | head -1 | awk '{print $2}')" >> "$GITHUB_OUTPUT"
@@ -61,7 +61,7 @@ jobs:
     name: swift test (DIRECT_BUILD)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Resolve Xcode version
         id: xcode
         run: echo "version=$(xcodebuild -version | head -1 | awk '{print $2}')" >> "$GITHUB_OUTPUT"
@@ -87,7 +87,7 @@ jobs:
     name: Lint (strict concurrency)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Resolve Xcode version
         id: xcode
         run: echo "version=$(xcodebuild -version | head -1 | awk '{print $2}')" >> "$GITHUB_OUTPUT"
@@ -110,7 +110,7 @@ jobs:
     # `fetch-depth: 0` would be wasteful — we only need the merge-base
     # plus this branch's commits.
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Resolve Xcode version

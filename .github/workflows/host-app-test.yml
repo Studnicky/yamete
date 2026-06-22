@@ -35,7 +35,7 @@ jobs:
     name: make test-host-app
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install xcodegen
         # Yamete.xcodeproj is gitignored; project.yml is the source of
         # truth and `make test-host-app` regenerates the project on the

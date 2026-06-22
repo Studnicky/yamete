@@ -24,7 +24,7 @@ jobs:
     name: Lint workflow YAML
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Run actionlint
         uses: raven-actions/actionlint@v2
 
@@ -32,7 +32,7 @@ jobs:
     name: Version consistency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Verify project.yml ↔ docs version match
         run: scripts/check-versions.sh
 
@@ -40,7 +40,7 @@ jobs:
     name: Docs build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v6
         with: { node-version: 24, cache: npm }
@@ -62,7 +62,7 @@ jobs:
     name: Lint (strict concurrency)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Verify framework lists
         run: make lint-frameworks
       - name: Type-check with strict concurrency
@@ -72,7 +72,7 @@ jobs:
     name: Build
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build Direct bundle
         run: make build
       - name: Build App Store bundle
@@ -95,7 +95,7 @@ jobs:
     name: Test
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # Route through Makefile so local `make test` and CI stay in sync.
       # Hardware-dependent integration tests self-skip via XCTSkip when the
       # specific hardware (keyboard backlight, built-in trackpad, accessible
