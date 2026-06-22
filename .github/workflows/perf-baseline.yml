@@ -33,7 +33,7 @@ jobs:
     name: make perf-baseline
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Run perf-baseline regression check
         # Runs Performance_Tests cells, captures PERFMETRIC lines, and
         # diffs against Tests/Performance/baselines.json with per-cell
