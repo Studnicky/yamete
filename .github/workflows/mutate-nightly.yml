@@ -37,7 +37,7 @@ jobs:
     name: make mutate (full catalog)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Resolve Xcode version
         id: xcode
         run: echo "version=$(xcodebuild -version | head -1 | awk '{print $2}')" >> "$GITHUB_OUTPUT"
