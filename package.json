@@ -13,11 +13,11 @@
     "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
-    "mermaid": "^11.15.0",
+    "mermaid": "^11.17.2",
     "vitepress-plugin-mermaid": "^2.0.17"
   },
   "devDependencies": {
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.4",
     "vitepress": "^1.6.4"
   },
   "yamete": {
